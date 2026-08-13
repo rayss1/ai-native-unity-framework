@@ -173,7 +173,7 @@ The fork follows these maintenance rules:
 - Never update the production baseline by floating package version or an unpinned branch.
 - Preserve required copyright and license notices.
 
-In the locally reviewed Fantasy commit `6df3507b15737d86f93a36af1a6d28a2404e163d`, the core `Fantasy.Net` project conditionally exposes `net10.0`, but the Server Main/Entity/Hotfix projects, server templates, Benchmark, and bundled DotRecast projects target only .NET 8 and/or .NET 9. End-to-end .NET 10 support is therefore unproven and must pass ADR-0012 before adoption. The repository license is based on the MIT text but adds an entity-specific restriction. Legal/license review remains a release gate before commercial distribution, redistribution of the fork, or publication of derived packages.
+In the locally reviewed Fantasy commit `6df3507b15737d86f93a36af1a6d28a2404e163d`, the core `Fantasy.Net` project conditionally exposes `net10.0`, but the Server Main/Entity/Hotfix projects, server templates, Benchmark, and bundled DotRecast projects target only .NET 8 and/or .NET 9. A [Windows compatibility Spike](runtime-successor-spike-2026-08-13.md) showed that adding the missing Host-graph TFMs allows a .NET 10 build and startup, while also exposing a runtime-neutral duplicate-config publish defect. End-to-end .NET 10 support remains unproven and must pass ADR-0012 before adoption. The repository license is based on the MIT text but adds an entity-specific restriction. Legal/license review remains a release gate before commercial distribution, redistribution of the fork, or publication of derived packages.
 
 See [ADR-0001: Use Fantasy as the server foundation](../ADR/0001-fantasy-server-foundation.md) for the authoritative decision and validation conditions.
 

@@ -20,6 +20,8 @@ The locally reviewed Fantasy checkout is `qq362946/Fantasy` commit `6df3507b1573
 
 Therefore the core package declaration is migration evidence for one component, not proof that the Fantasy server stack supports .NET 10.
 
+A Windows compatibility Spike against this exact commit subsequently added `net10.0` to the example Host dependency graph without changing production source. The complete Server solution matrix built, and the tooling solution built its declared targets under SDK 10.0.202. The unmodified Host publish failed on both `net9.0` and `net10.0` because `Entity/Fantasy.config` and `Fantasy.Net/Fantasy.config` collide; after an isolated, runtime-neutral config-publication correction, both targets published and the .NET 10 Host completed startup. The checkout has no .NET tests, and its standalone Benchmark project has a missing project reference. This is positive feasibility evidence, not acceptance evidence. See the [Spike report](../Architecture/runtime-successor-spike-2026-08-13.md).
+
 ## Proposed decision
 
 Adopt `.NET 10` (`net10.0`) and C# 14 for future Server Hosts only if the evidence gate below passes for the exact pinned Fantasy fork and project-owned server composition. Shared gameplay remains `netstandard2.1` with C# 9 and the same Unity-independent source set; no .NET 10 assembly is imported into Unity.
@@ -34,6 +36,8 @@ This ADR is not yet accepted and does not supersede ADR-0004. No Server project 
 4. Pass protocol compatibility, Shared vectors, replay, impairment, allocation, shutdown, container, and observability tests.
 5. Pass the 64-player load and Tick budgets on release-equivalent Linux artifacts, with comparison data against the current runtime baseline where available.
 6. Record required Fantasy fork changes and their upstream-maintenance cost; complete the existing license review gate before distributing the fork.
+
+The Windows build/publish/start portion has partial evidence. Linux/CI, tests, replay, load, operational behavior, and a reviewed fix for the duplicate-config publication defect remain open, so this ADR stays Proposed.
 
 ## Acceptance or rejection
 
