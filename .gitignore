@@ -10,10 +10,16 @@ client/UnityProject/[Bb]uilds/
 client/UnityProject/[Ll]ogs/
 client/UnityProject/[Uu]ser[Ss]ettings/
 client/UnityProject/MemoryCaptures/
+client/UnityProject/TestResults/
+client/UnityProject/Artifacts/
+
+# Test and coverage outputs
+/artifacts/
+TestResults/
+coverage/
 
 # IDE state
 .vs/
 .idea/
 *.user
 *.suo
-

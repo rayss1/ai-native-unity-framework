@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0</TargetFrameworks>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <AssemblyName>AiNative.Tools.ArchitectureCheck.Tests</AssemblyName>
+    <RootNamespace>AiNative.Tools.ArchitectureCheck.Tests</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.8.1" />
+    <PackageReference Include="NUnit" Version="3.14.0" />
+    <PackageReference Include="NUnit3TestAdapter" Version="6.2.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../ArchitectureCheck/ArchitectureCheck.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="../ArchitectureCheck/architecture-rules.json" Link="architecture-rules.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

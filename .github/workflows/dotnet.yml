@@ -1,0 +1,45 @@
+name: .NET validation
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install .NET SDKs
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+
+      - name: Restore
+        run: dotnet restore AiNative.sln
+
+      - name: Build
+        run: dotnet build AiNative.sln --configuration Release --no-restore
+
+      - name: Test .NET 8
+        run: |
+          dotnet test shared/gameplay/Tests/Gameplay.Shared.Tests.csproj --configuration Release --framework net8.0 --no-build --no-restore
+          dotnet test tools/ArchitectureCheck.Tests/ArchitectureCheck.Tests.csproj --configuration Release --framework net8.0 --no-build --no-restore
+
+      - name: Test .NET 9
+        run: |
+          dotnet test shared/gameplay/Tests/Gameplay.Shared.Tests.csproj --configuration Release --framework net9.0 --no-build --no-restore
+          dotnet test tools/ArchitectureCheck.Tests/ArchitectureCheck.Tests.csproj --configuration Release --framework net9.0 --no-build --no-restore
+
+      - name: Validate architecture
+        run: dotnet run --project tools/ArchitectureCheck --configuration Release --no-build -- --root . --format text
