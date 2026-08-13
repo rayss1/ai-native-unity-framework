@@ -1,0 +1,59 @@
+{
+  "ignoredDirectoryNames": [
+    ".git",
+    ".idea",
+    ".vs",
+    "bin",
+    "obj",
+    "artifacts",
+    "Library",
+    "Temp",
+    "Logs",
+    "UserSettings",
+    "TestResults"
+  ],
+  "ignoredPathPrefixes": [
+    "tools/ArchitectureCheck.Tests/Fixtures"
+  ],
+  "unityPackageForbiddenDirectoryNames": [
+    "bin",
+    "obj"
+  ],
+  "layerRoots": {
+    "client": "Client",
+    "packages": "Client",
+    "samples": "Client",
+    "server": "Server",
+    "shared": "Shared",
+    "tools": "Tools",
+    "infrastructure": "Infrastructure",
+    "agents": "Agents"
+  },
+  "allowedDependencies": {
+    "Client": ["Client", "Shared"],
+    "Server": ["Server", "Shared"],
+    "Shared": ["Shared"],
+    "Tools": ["Shared", "Tools"],
+    "Infrastructure": ["Infrastructure"],
+    "Agents": ["Agents"]
+  },
+  "internalReferencePrefixes": [
+    "AiNative.",
+    "com.ainative."
+  ],
+  "sharedForbiddenNamespacePrefixes": [
+    "UnityEngine",
+    "UnityEditor",
+    "Fantasy",
+    "Microsoft.AspNetCore",
+    "Microsoft.Data.SqlClient",
+    "Microsoft.EntityFrameworkCore",
+    "MongoDB",
+    "Npgsql",
+    "StackExchange.Redis",
+    "System.Data",
+    "System.IO",
+    "System.Net",
+    "System.Threading"
+  ]
+}

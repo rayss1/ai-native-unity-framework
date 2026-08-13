@@ -86,8 +86,8 @@ shared/test-vectors/              # Cross-runtime fixtures and golden vectors
 tools/                            # .NET CLI, code generation, architecture checks
 infrastructure/                   # CI, containers, deployment, observability
 agents/                           # Context, rules, skills, and workflows
-docs/architecture/                # Architecture documentation
-docs/adr/                         # Architecture Decision Records
+Docs/Architecture/                # Architecture documentation
+Docs/ADR/                         # Architecture Decision Records
 samples/                          # Minimal vertical slices and plugin examples
 ```
 

@@ -1,0 +1,11 @@
+{
+  "name": "com.ainative.gameplay",
+  "version": "0.1.0",
+  "displayName": "AI-Native Gameplay Shared",
+  "description": "Unity-independent gameplay contracts and rules shared by Unity and server runtimes.",
+  "unity": "6000.3",
+  "dependencies": {},
+  "author": {
+    "name": "AI-Native Unity Framework"
+  }
+}
