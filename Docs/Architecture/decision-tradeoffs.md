@@ -1,0 +1,22 @@
+# Decision Alternatives and Trade-offs
+
+Status: Companion to accepted ADRs
+Last updated: 2026-08-13
+
+This crosswalk records the principal alternatives considered when freezing the first vertical slice. A rejected/deferred option may be reconsidered only when its evidence signal occurs; preference alone is not new evidence.
+
+| ADR | Selected approach | Rejected or deferred alternative | Why not now | Reconsider when |
+| --- | --- | --- | --- | --- |
+| 0001 | Project-owned, deeply customized Fantasy fork behind adapters | Build all server infrastructure; consume Fantasy unchanged | Greenfield delays the risky gameplay/replication slice; unchanged consumption cannot support expected Tick/replication work | Adapter replacement is cheaper than fork maintenance, or legal/performance gates fail |
+| 0002 | Six roots/layers, manifest graph, build-time composition | Layer-by-feature monolith; runtime scanning/unloading | Creates hidden/cyclic dependencies and conflicts with IL2CPP/AOT visibility | No reconsideration without a superseding deployment/AOT model and validator proof |
+| 0003 | One Shared source set compiled by Unity and .NET Standard 2.1 | Copy/translate rules; import server binary into Unity | Copies drift; modern server binaries are not a safe Unity plugin contract | Unity changes its supported profile enough to justify a new common target |
+| 0004 | .NET 8 production, .NET 9 compatibility | .NET 9 production default; .NET 10 Hosts; publish every Host twice | Adds artifact/runtime variance without a consumer and exceeds current baseline | Successor/runtime Spike passes dependencies, replay, load, and operational rollout gates |
+| 0005 | Server authority at fixed 60 Hz with prediction/reconciliation | Deterministic lockstep; variable-step authority; client authority | Cross-platform physics and adversarial validation make lockstep/client authority unsafe; variable step harms replay | A different game model and deterministic stack are proven by a superseding ADR |
+| 0006 | Fantasy KCP adapter plus project-owned replication | Leak Fantasy Session into gameplay; 60 full snapshots/s; unbounded reliable queues | Prevents replacement and fails isolation/bandwidth goals | Another transport/codec beats the adapter with compatible capability/replay evidence |
+| 0007 | Jolt and Recast/Detour candidates behind Shared ports | Unity runtime on server; native types as public API; synchronous navigation | Violates headless independence/testability and Tick budget | A competing adapter passes the same normalized corpus and budgets with lower lifecycle cost |
+| 0008 | Project-owned signed/atomic content pipeline; optional HybridCLR | Addressables baseline; mandatory managed-code hot update | Conflicts with product control requirement and expands boot/policy blast radius | Product requirements change, or an alternative proves atomic recovery/provider neutrality |
+| 0009 | Protobuf-first additive evolution; measured codec exception | Multiple general serializers; hand-written bit layouts; generator-only artifacts | Multiplies compatibility rules and weakens reproducibility/inspection | Protobuf plus AOI/delta/quantization misses a measured budget; exception must improve it >=20% |
+| 0010 | OpenTelemetry boundary, Compose-first, self-hosted/cloud-neutral | Vendor SDKs in modules; Kubernetes/Agones/broker/Redis by default | Adds coupling and operational failure modes before a measured need | Load/availability/coordination evidence identifies a requirement with an operator and exit plan |
+| 0011 | Repository-owned context and common automated checks | Prompt-only rules; agent-specific quality gates; A2A/orchestration framework now | Rules drift and results become irreproducible; interoperability need is not yet concrete | A documented cross-agent scenario cannot be served by issue/workflow/MCP contracts |
+
+Trade-offs inside provisional decisions—snapshot frequency, codec, prediction physics, nav options, hot update, room density, and successor runtime—are governed by the threshold/migration/rollback table in the [ADR index](../ADR/README.md).
