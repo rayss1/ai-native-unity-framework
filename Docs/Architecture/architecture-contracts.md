@@ -13,7 +13,8 @@ Provide one implementation entry condition for the `Start -> Login -> Match -> A
 ## Non-goals
 
 - Creating empty repository/module scaffolding before its first owned artifact.
-- Finalizing codec, snapshot rate, client prediction physics, nav options, HybridCLR adoption, rooms per process, or the successor .NET runtime without vertical-slice evidence.
+- Finalizing codec, snapshot rate, client prediction physics, nav options, HybridCLR adoption, or rooms per process without vertical-slice evidence.
+- Introducing a Server project or Fantasy fork before the overdue runtime-successor gate in the ADR index is satisfied.
 - Adopting deterministic lockstep, global DOTS, Addressables, runtime plugin discovery, Kubernetes/Agones, Redis, a broker, or a hosted cloud dependency as a default.
 - Freezing private implementation types. Only documented public contracts, ownership, dependency direction, lifecycle/threading behavior, compatibility policy, and gates are stable.
 
@@ -23,7 +24,7 @@ Provide one implementation entry condition for the `Start -> Login -> Match -> A
 | --- | --- |
 | Any new module, package, project, or reference | [Dependency matrix](dependency-matrix.md) and [ADR-0002](../ADR/0002-repository-layout-and-module-dependencies.md) |
 | Shared gameplay or public port | [Public API catalog](public-api-contracts.md), [ADR-0003](../ADR/0003-shared-gameplay-dual-compilation.md), and cross-runtime vectors |
-| Server Host/runtime dependency | [ADR-0001](../ADR/0001-fantasy-server-foundation.md) and [ADR-0004](../ADR/0004-server-runtime-policy.md) |
+| Server Host/runtime dependency | [ADR-0001](../ADR/0001-fantasy-server-foundation.md), [ADR-0004](../ADR/0004-server-runtime-policy.md), and proposed [ADR-0012](../ADR/0012-server-runtime-successor.md) |
 | Tick, prediction, replay, or lag compensation | [ADR-0005](../ADR/0005-authoritative-simulation-and-reconciliation.md) and [performance budgets](performance-budgets.md) |
 | Transport, replication, or protocol | [ADR-0006](../ADR/0006-realtime-transport-and-replication.md), [ADR-0009](../ADR/0009-protocol-evolution-and-code-generation.md), and impairment gates |
 | Physics or navigation | [ADR-0007](../ADR/0007-physics-and-navigation-boundaries.md) |

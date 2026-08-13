@@ -4,6 +4,8 @@ Status: Accepted
 Date: 2026-08-13
 Decision source: WS-11
 
+Successor evaluation continues in proposed [ADR-0012](0012-server-runtime-successor.md). This ADR remains accepted until a successor passes the full server-stack evidence gate.
+
 ## Context
 
 Fantasy supports the selected runtimes, but deployable artifacts need one predictable baseline. Both selected versions have a finite support window, so compatibility cannot substitute for an upgrade plan.

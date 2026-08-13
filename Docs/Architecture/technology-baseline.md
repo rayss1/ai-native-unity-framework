@@ -1,7 +1,7 @@
 # Architecture and Technology Baseline
 
 Status: Baseline for the first vertical slice
-Last updated: 2026-08-12
+Last updated: 2026-08-13
 Decision source: WS-9 architecture discussion
 
 This document consolidates the current architecture decisions for the AI-Native Unity Framework. Later Architecture Decision Records (ADRs) may supersede individual decisions. When that happens, the ADR is authoritative and this document must be updated.
@@ -143,14 +143,14 @@ Physics, navigation, HybridCLR, UI, DOTS, localization, platform services, and o
 
 ### 6.1 Runtime versions
 
-- `.NET 8` (`net8.0`) is the default development and production target.
-- `.NET 9` (`net9.0`) is a supported alternative and part of the CI compatibility matrix.
+- `.NET 8` (`net8.0`) remains the accepted development and production policy until a successor ADR is accepted.
+- `.NET 9` (`net9.0`) remains the accepted compatibility lane, not a second production artifact.
 - Deployable Hosts target one runtime at a time; the project does not publish duplicate Host artifacts without a deployment need.
 - Reusable server libraries may multi-target `net8.0;net9.0` when publishing both assets is justified.
-- Code shared by the .NET 8 and .NET 9 builds uses the .NET 8 API surface and C# 12 as its common baseline. .NET 9/C# 13-only behavior belongs in a separate adapter.
+- Code shared by the .NET 8 and .NET 9 builds uses the .NET 8 API surface and C# 12 as its common baseline. Shared gameplay remains `netstandard2.1` and C# 9 for Unity dual compilation.
 - The repository pins the SDK with `global.json`; local development, CI, and container builds use matching SDK versions.
 
-.NET 8 and .NET 9 both reach the end of Microsoft support on 2026-11-10. The project accepts that constraint and must schedule a runtime upgrade before unsupported production operation.
+.NET 8 and .NET 9 both reach the end of Microsoft support on 2026-11-10, and the original successor deadline has been missed. No Server project or Fantasy fork import may merge until a supported successor passes the ADR index gate. ADR-0012 proposes .NET 10 but is not accepted.
 
 ### 6.2 Fantasy foundation and fork policy
 
@@ -173,7 +173,7 @@ The fork follows these maintenance rules:
 - Never update the production baseline by floating package version or an unpinned branch.
 - Preserve required copyright and license notices.
 
-At the time of this decision, `Fantasy.Net` targets `net8.0`, `net9.0`, and `net10.0`, so the project's .NET 8 default and .NET 9 compatibility matrix are supported without adopting .NET 10. The repository license is based on the MIT text but adds an entity-specific restriction. Legal/license review is therefore a release gate before commercial distribution, redistribution of the fork, or publication of derived packages.
+In the locally reviewed Fantasy commit `6df3507b15737d86f93a36af1a6d28a2404e163d`, the core `Fantasy.Net` project conditionally exposes `net10.0`, but the Server Main/Entity/Hotfix projects, server templates, Benchmark, and bundled DotRecast projects target only .NET 8 and/or .NET 9. End-to-end .NET 10 support is therefore unproven and must pass ADR-0012 before adoption. The repository license is based on the MIT text but adds an entity-specific restriction. Legal/license review remains a release gate before commercial distribution, redistribution of the fork, or publication of derived packages.
 
 See [ADR-0001: Use Fantasy as the server foundation](../ADR/0001-fantasy-server-foundation.md) for the authoritative decision and validation conditions.
 
@@ -361,7 +361,7 @@ Acceptance measurements:
 - No single-client backpressure can delay room simulation.
 - Unity and .NET execute the same input vectors for N ticks and compare critical state hashes.
 - Shared gameplay compiles through both Unity Batch Mode and the `netstandard2.1` project.
-- Server builds and tests under the `.NET 8` default and `.NET 9` compatibility matrix.
+- Server builds, tests, publishes, and runs under the supported successor matrix accepted before the first Server merge.
 - Protocol generation and compatibility tests pass; generated artifacts have no drift.
 
 The results decide the final snapshot frequency, transport library, replication codec, Jolt binding, client prediction physics, and rooms-per-process target.
@@ -380,7 +380,7 @@ The following are not baseline commitments:
 - Redis, a message broker, Kubernetes, or Agones without measured need.
 - Unity Gaming Services or another cloud-provider-specific runtime dependency.
 - A2A or a complex Agent orchestration framework without a concrete workflow.
-- .NET 10 for server Hosts under the current project decision.
+- .NET 10 for Server Hosts before the proposed successor gate passes.
 
 ## 17. Required follow-up ADRs
 
@@ -389,7 +389,7 @@ The following decisions should be captured as individual ADRs before or during t
 1. Repository layout and module dependency policy.
 2. Shared gameplay source compilation through Unity and .NET Standard 2.1.
 3. Fantasy fork ownership, customization boundaries, upstream synchronization, and license release gate. Accepted as [ADR-0001](../ADR/0001-fantasy-server-foundation.md).
-4. Server runtime policy for .NET 8 default, .NET 9 compatibility, and the support-expiry upgrade plan.
+4. Server runtime policy and support-expiry upgrade plan. [ADR-0012](../ADR/0012-server-runtime-successor.md) proposes .NET 10, but remains open pending full Fantasy server-stack evidence.
 5. Authoritative 60 Hz simulation, client prediction, reconciliation, and lag compensation.
 6. Fantasy KCP transport and replication validation criteria.
 7. Jolt integration boundary and client prediction strategy.
@@ -412,7 +412,7 @@ The following decisions should be captured as individual ADRs before or during t
 - [Jolt deterministic simulation constraints](https://github.com/jrouwe/JoltPhysics/blob/master/Docs/Architecture.md#deterministic-simulation)
 - [Recast Navigation](https://github.com/recastnavigation/recastnavigation)
 - [Fantasy](https://github.com/qq362946/Fantasy)
-- [Fantasy.Net project targets](https://github.com/qq362946/Fantasy/blob/main/Fantasy.Packages/Fantasy.Net/Fantasy.Net.csproj)
+- [Fantasy.Net core project targets at the reviewed commit](https://github.com/qq362946/Fantasy/blob/6df3507b15737d86f93a36af1a6d28a2404e163d/Fantasy.Packages/Fantasy.Net/Fantasy.Net.csproj)
 - [Fantasy license](https://github.com/qq362946/Fantasy/blob/main/LICENSE)
 - [HybridCLR](https://github.com/focus-creative-games/hybridclr)
 - [Apple App Review Guidelines](https://developer.apple.com/app-store/review/guidelines/#software-requirements)
