@@ -1,0 +1,19 @@
+**/bin/
+**/obj/
+
+# Unity generated state
+client/UnityProject/[Ll]ibrary/
+client/UnityProject/[Tt]emp/
+client/UnityProject/[Oo]bj/
+client/UnityProject/[Bb]uild/
+client/UnityProject/[Bb]uilds/
+client/UnityProject/[Ll]ogs/
+client/UnityProject/[Uu]ser[Ss]ettings/
+client/UnityProject/MemoryCaptures/
+
+# IDE state
+.vs/
+.idea/
+*.user
+*.suo
+
