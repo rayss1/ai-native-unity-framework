@@ -3,6 +3,7 @@
 Status: Partial evidence for proposed ADR-0012
 Date: 2026-08-13
 Reviewed source: local `qq362946/Fantasy` commit `6df3507b15737d86f93a36af1a6d28a2404e163d`
+Candidate follow-up: local migration commit `c6c3f06f4ae54af122b24bac1d7dd1048445123b`, validated 2026-08-14
 
 ## Scope
 
@@ -46,10 +47,38 @@ The reviewed Fantasy checkout does not support .NET 10 as a declared, tested ser
 
 This lowers the estimated migration cost but does not satisfy ADR-0012. The ADR remains Proposed until the exact project-owned fork and Host pass the untested evidence gates. The config publication fix also requires a deliberate fork patch with regression tests; it must not be hidden as a runtime-specific workaround.
 
+## Candidate migration follow-up
+
+The local Fantasy `dev_study` branch subsequently implemented the candidate as four focused commits on top of the reviewed upstream revision, ending at `c6c3f06f4ae54af122b24bac1d7dd1048445123b`:
+
+- supported core packages, tools, Server Main/Entity/Hotfix, templates, and the bundled DotRecast graph target `net10.0`;
+- `Fantasy.SourceGenerator` remains `netstandard2.0` as a compiler/analyzer compatibility component;
+- the package-template `Fantasy.config` no longer enters project-reference publish output, while the application-owned config remains;
+- the tracked `Fantasy-Net.2026.1.1001.nupkg` contains only `lib/net10.0/Fantasy-Net.dll`;
+- `Tmds.DBus.Protocol` is pinned to `0.21.3` and `SQLitePCLRaw.bundle_e_sqlite3` to `2.1.12`, eliminating the two high-severity transitive vulnerability findings present during the first migration build;
+- the already removed Console platform is not reintroduced; its orphan Benchmark and Console examples are marked as unsupported historical code.
+
+### Follow-up results
+
+| Check | Result | Evidence and interpretation |
+| --- | --- | --- |
+| Fantasy tooling solution | Pass, 0 warnings and 0 errors | All supported tooling projects build under SDK 10.0.202; package vulnerability scan reports no known vulnerable packages. |
+| Complete Server solution | Pass, 0 warnings and 0 errors | Main, Entity, Hotfix, Fantasy.Net, Source Generator, and the complete DotRecast graph produce .NET 10 artifacts. |
+| Host publish | Pass | The runtime config selects `net10.0`; publish output contains exactly one application-owned `Fantasy.config`. |
+| Controlled Host startup | Pass | Develop mode opened the configured TCP/KCP/HTTP listeners and logged `Process:1 Startup Complete SceneCount:6`; the probe then stopped the process. |
+| Tracked NuGet artifact | Pass | Package inspection found only the .NET 10 library asset, analyzer, and build/buildTransitive config assets. |
+| Independent package consumer | Pass, 0 warnings and 0 errors | A fresh ignored .NET 10 console project restored the local package and built successfully. |
+| Package/config regression tests | Pass, 3 tests | An uncommitted `Fantasy.Net.Tests` follow-up verifies the tracked package has only the .NET 10 library asset and fresh project-reference and package-reference publishes each contain one application-owned config. It is not yet part of the pinned candidate commit. |
+| Windows/Ubuntu CI definition | Prepared, not run | An uncommitted GitHub Actions matrix restores and builds the tooling solution, runs the regression tests, builds the Server example, and audits dependencies on both operating systems. It cannot provide evidence until committed and pushed to a remotely fetchable fork. |
+| Control Center SQLite smoke test | Pass | Control Center initialized its SQLite database and listened on `127.0.0.1:5277` with the patched SQLitePCLRaw line; the probe then stopped the process. |
+| Linux/container | Not run | Docker is not installed and WSL has no distribution on the validation workstation. |
+
+The candidate commit is local-only and therefore is not yet a reproducible fork pin for CI or another developer. The follow-up test project and CI workflow are also uncommitted. The three packaging regressions do not substitute for protocol compatibility, Shared vectors, replay, graceful shutdown, observability, impairment, or load suites.
+
 ## Remaining gates
 
-1. Reproduce restore/build/publish/start on Linux CI and the intended container base image with warnings-as-errors policy decided explicitly.
-2. Add tests that guarantee one application-owned `Fantasy.config` in publish output for both project-reference and packaged consumption.
-3. Create project-owned tests for the fork and Host because the reviewed checkout has no .NET test projects; add protocol compatibility, Shared vectors, replay, shutdown, and observability suites on .NET 10.
-4. Repair or replace the currently broken `Fantasy.Benchmark` project, then run the 64-player impairment/load workload and compare Tick, allocation, memory, bandwidth, and tail latency against the current baseline.
-5. Pin the fork, record the minimal TFM/config changes, and assess their upstream synchronization cost.
+1. Commit the initial package/config tests and cross-platform workflow, publish the exact candidate fork state, then require the Windows/Ubuntu matrix to pass.
+2. Reproduce publish/start on the intended Linux container base image with warnings-as-errors.
+3. Create project-owned tests for the fork and Host; add protocol compatibility, Shared vectors, replay, graceful shutdown, and observability suites on .NET 10.
+4. Replace the orphan Benchmark with a project-owned load harness, then run the 64-player impairment workload and compare Tick, allocation, memory, bandwidth, and tail latency against the baseline.
+5. Record the minimal fork patch queue and upstream synchronization cost, and complete the license review before distributing the fork or its package.

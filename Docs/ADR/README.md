@@ -26,13 +26,13 @@ Changing an accepted contract requires a superseding ADR that records compatibil
 | [0009](0009-protocol-evolution-and-code-generation.md) | Accepted | Protocol evolution | Protobuf-first, additive compatibility, reproducible generation | High-frequency codec threshold and compatibility harness |
 | [0010](0010-observability-and-deployment.md) | Accepted | Observability and deployment | OTel boundary, self-hosted/cloud-neutral deployment | Cardinality/load test and deployment sizing |
 | [0011](0011-agent-engineering-and-architecture-enforcement.md) | Accepted | Agent engineering | Repository-owned context plus automated boundary checks | First validator and drift-repair workflow |
-| [0012](0012-server-runtime-successor.md) | Proposed | .NET 10 successor candidate | No frozen successor until the pinned Fantasy server stack passes the gate | Windows build/start passed; Linux/CI, publish fix, tests, replay, load, and rollout remain |
+| [0012](0012-server-runtime-successor.md) | Proposed | .NET 10 successor candidate | No frozen successor until the pinned Fantasy server stack passes the gate | Local Windows migration and 3 packaging regressions passed; committed remote pin, Linux/CI, broader tests, replay, load, legal, and rollout remain |
 
 ## Open decision gates
 
 These are deliberately not final product choices. Each owner must record the resulting evidence in a new or superseding ADR before crossing the named gate.
 
-The runtime successor deadline has passed. [ADR-0012](0012-server-runtime-successor.md) records `.NET 10` as the preferred candidate. A [Windows Spike](../Architecture/runtime-successor-spike-2026-08-13.md) proved that the reviewed Fantasy commit can build and start after small isolated project/build fixes, but it does not yet prove the full acceptance matrix. ADR-0012 remains Proposed and does not supersede ADR-0004.
+The runtime successor deadline has passed. [ADR-0012](0012-server-runtime-successor.md) records `.NET 10` as the preferred candidate. A [Windows Spike and local candidate migration](../Architecture/runtime-successor-spike-2026-08-13.md) proved build, publish, startup, package consumption, and dependency-vulnerability checks, but the candidate is not remotely pinned and does not yet prove the Linux, automated-test, replay, load, legal, or rollout matrix. ADR-0012 remains Proposed and does not supersede ADR-0004.
 
 | Decision | Default during Spike | Decision gate | Pass/trigger threshold | Migration and rollback |
 | --- | --- | --- | --- | --- |
