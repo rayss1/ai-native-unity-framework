@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - .github/workflows/runtime-acceptance.yml
+      - .dockerignore
+      - infrastructure/runtime-acceptance/**
       - server/RuntimeAcceptance.sln
       - server/src/**
       - server/tests/**
@@ -93,3 +95,91 @@ jobs:
         run: |
           output="$(dotnet package list --project "$GITHUB_WORKSPACE/server/RuntimeAcceptance.sln" --vulnerable --include-transitive --no-restore --format json --output-version 1)"
           test "$(jq '[.. | objects | .vulnerabilities? // empty | length] | add // 0' <<<"$output")" = '0'
+
+      - name: Resolve immutable base image digests
+        id: images
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdk_tag='mcr.microsoft.com/dotnet/sdk:10.0.202-noble'
+          runtime_tag='mcr.microsoft.com/dotnet/aspnet:10.0.4-noble'
+          sdk_digest="$(docker buildx imagetools inspect "$sdk_tag" --format '{{.Manifest.Digest}}')"
+          runtime_digest="$(docker buildx imagetools inspect "$runtime_tag" --format '{{.Manifest.Digest}}')"
+          test "$sdk_digest" != '<no value>'
+          test "$runtime_digest" != '<no value>'
+          echo "sdk_image=$sdk_tag@$sdk_digest" >> "$GITHUB_OUTPUT"
+          echo "runtime_image=$runtime_tag@$runtime_digest" >> "$GITHUB_OUTPUT"
+
+      - name: Build release-equivalent Linux x64 candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          fantasy_commit="$(git -C server/vendor/Fantasy rev-parse HEAD)"
+          protocol_identity="$(sha256sum shared/schemas/ainative/v1/gameplay.proto | cut -d ' ' -f 1)"
+          docker build \
+            --platform linux/amd64 \
+            --file infrastructure/runtime-acceptance/Dockerfile \
+            --build-arg "SDK_IMAGE=${{ steps.images.outputs.sdk_image }}" \
+            --build-arg "RUNTIME_IMAGE=${{ steps.images.outputs.runtime_image }}" \
+            --build-arg "SOURCE_COMMIT=$GITHUB_SHA" \
+            --build-arg "FANTASY_COMMIT=$fantasy_commit" \
+            --build-arg "PROTOCOL_IDENTITY=$protocol_identity" \
+            --tag ainative/battle-host:acceptance \
+            .
+
+      - name: Probe candidate image identity, readiness, drain, and SIGTERM
+        shell: bash
+        run: |
+          set -euo pipefail
+          container_id="$(docker run --detach \
+            --publish 127.0.0.1:5081:8080 \
+            --env AINATIVE_ENABLE_EVALUATION_ENDPOINTS=true \
+            --env OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4317 \
+            ainative/battle-host:acceptance)"
+          cleanup() { docker rm --force "$container_id" >/dev/null 2>&1 || true; }
+          trap cleanup EXIT
+          deadline=$((SECONDS + 30))
+          until curl --fail --silent http://127.0.0.1:5081/health/ready >/dev/null; do
+            if ! docker inspect --format '{{.State.Running}}' "$container_id" | grep -q true || (( SECONDS >= deadline )); then
+              docker logs "$container_id"
+              exit 1
+            fi
+            sleep 0.25
+          done
+          test "$(docker exec "$container_id" id -u)" != '0'
+          docker exec "$container_id" sh -c "grep -q '\"tfm\": \"net10.0\"' /app/AiNative.BattleHost.runtimeconfig.json"
+          curl --fail --silent --request POST http://127.0.0.1:5081/admin/drain >/dev/null
+          readiness_deadline=$((SECONDS + 2))
+          until test "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:5081/health/ready)" = '503'; do
+            if (( SECONDS >= readiness_deadline )); then
+              docker logs "$container_id"
+              exit 1
+            fi
+            sleep 0.05
+          done
+          docker stop --signal TERM --time 10 "$container_id"
+          test "$(docker inspect --format '{{.State.ExitCode}}' "$container_id")" = '0'
+
+      - name: Record candidate image provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/runtime-acceptance
+          image_id="$(docker image inspect ainative/battle-host:acceptance --format '{{.Id}}')"
+          cat > artifacts/runtime-acceptance/provenance.json <<JSON
+          {
+            "parentCommit": "$GITHUB_SHA",
+            "fantasyCommit": "$(git -C server/vendor/Fantasy rev-parse HEAD)",
+            "sdkImage": "${{ steps.images.outputs.sdk_image }}",
+            "runtimeImage": "${{ steps.images.outputs.runtime_image }}",
+            "candidateImageId": "$image_id",
+            "protocolSha256": "$(sha256sum shared/schemas/ainative/v1/gameplay.proto | cut -d ' ' -f 1)"
+          }
+          JSON
+
+      - name: Upload candidate provenance
+        uses: actions/upload-artifact@v4
+        with:
+          name: runtime-acceptance-provenance
+          path: artifacts/runtime-acceptance/provenance.json
+          if-no-files-found: error

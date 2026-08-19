@@ -1,0 +1,8 @@
+.git
+**/bin
+**/obj
+artifacts
+client/UnityProject/Library
+client/UnityProject/Logs
+client/UnityProject/Temp
+client/UnityProject/UserSettings

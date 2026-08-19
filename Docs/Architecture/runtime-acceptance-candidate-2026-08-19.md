@@ -12,6 +12,7 @@ Base: `codex/ws-14-runtime-operations`
 - The Host exposes `/health/live` and `/health/ready`; an evaluation-only drain endpoint makes readiness return 503 before process shutdown.
 - OTel metrics/traces are enabled with an optional OTLP endpoint. Runtime correctness does not require an exporter.
 - A 64-bot synthetic room runs at 60 Hz. Tests report P99/P99.9, slow-Tick count, and steady-state managed allocation after warm-up.
+- `infrastructure/runtime-acceptance` builds an internal Linux x64 image from immutable .NET base-image digests. CI verifies non-root execution, .NET 10 runtime identity, readiness within the candidate, drain within two seconds, and a normal SIGTERM exit within ten seconds, then uploads provenance without publishing the image.
 
 ## Evidence boundary
 
