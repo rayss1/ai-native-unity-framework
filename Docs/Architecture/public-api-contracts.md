@@ -129,14 +129,21 @@ Contract:
 - Manifest activation/rollback is managed by the bootstrap/update service, not arbitrary gameplay callers.
 - Load failures use stable categories: unknown ID, incompatible manifest, unavailable, integrity failure, quota, cancelled, and internal fault.
 
+## `IRandomSource` and `IStateHasher`
+
+Owner: Shared Gameplay
+Consumers: simulation rules, replay, golden-vector tests
+
+`IRandomSource` exposes `NextUInt32`, `CaptureState`, and `RestoreState`. The first implementation is portable PCG-XSH-RR 32 with an explicit 128-bit `(state, stream)` value. No global or wall-clock seed is permitted.
+
+`IStateHasher.ComputeHash(ReadOnlySpan<byte>)` hashes a caller-owned canonical representation. The first implementation is xxHash64 with seed zero; canonical state bytes are versioned, little-endian, and independent of object layout or locale.
+
 ## Supporting boundary contracts
 
 The first slice also requires, but does not yet freeze method shapes for:
 
 | Contract | Owner | Gate before signature acceptance |
 | --- | --- | --- |
-| `IRandomSource` | Shared Gameplay | Golden-vector RNG/state serialization proof |
-| `IStateHasher` | Shared test/replay contracts | Canonical byte-order and versioning fixture |
 | `IReplicationEncoder` | Realtime replication | Protobuf/delta baseline measurement; ADR-0009 codec gate |
 | `IContentManifestStore` | Client bootstrap/update | Atomic activation and crash-recovery Spike |
 | `IGameplayDiagnostics` | Shared diagnostics abstraction | Zero-allocation disabled path and cardinality review |

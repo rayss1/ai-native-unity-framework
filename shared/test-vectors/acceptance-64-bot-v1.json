@@ -1,0 +1,11 @@
+{
+  "formatVersion": 1,
+  "scenario": "64 bots move and fire for 3600 fixed ticks",
+  "tickRateHz": 60,
+  "botCount": 64,
+  "tickCount": 3600,
+  "seed": "0x5eed",
+  "hashAlgorithm": "xxhash64-seed-0",
+  "canonicalByteOrder": "little-endian",
+  "expectedStateHash": "0xbcf2dd42887f4f4e"
+}

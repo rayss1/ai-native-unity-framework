@@ -18,6 +18,10 @@ public sealed class ArchitectureRules
 
     public required string[] SharedForbiddenNamespacePrefixes { get; init; }
 
+    public required string[] SharedPassiveContractPathPrefixes { get; init; }
+
+    public required string[] SharedPassiveContractAllowedNamespacePrefixes { get; init; }
+
     public static ArchitectureRules Load(string path)
     {
         using FileStream stream = File.OpenRead(path);

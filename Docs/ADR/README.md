@@ -27,6 +27,7 @@ Changing an accepted contract requires a superseding ADR that records compatibil
 | [0010](0010-observability-and-deployment.md) | Accepted | Observability and deployment | OTel boundary, self-hosted/cloud-neutral deployment | Cardinality/load test and deployment sizing |
 | [0011](0011-agent-engineering-and-architecture-enforcement.md) | Accepted | Agent engineering | Repository-owned context plus automated boundary checks | First validator and drift-repair workflow |
 | [0012](0012-server-runtime-successor.md) | Proposed | .NET 10 successor candidate | Evaluation submodule allowed; no product reference or production Host until all acceptance gates pass | Exact merged fork and Windows/Ubuntu CI passed; graceful shutdown, Linux container release, replay, load, legal, and rollout remain |
+| [0013](0013-passive-async-shared-contracts.md) | Accepted | Passive async Shared boundary types | `shared/realtime` may expose cancellation/value-task contracts but may not schedule work or perform I/O | Unity/.NET compilation and architecture checks |
 
 ## Open decision gates
 

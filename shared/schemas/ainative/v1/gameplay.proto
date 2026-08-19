@@ -1,0 +1,93 @@
+syntax = "proto3";
+
+package ainative.v1;
+option csharp_namespace = "AiNative.Protocol.V1";
+
+enum MessageId {
+  MESSAGE_ID_UNSPECIFIED = 0;
+  MESSAGE_ID_LOGIN_REQUEST = 1000;
+  MESSAGE_ID_LOGIN_RESPONSE = 1001;
+  MESSAGE_ID_JOIN_ROOM_REQUEST = 1010;
+  MESSAGE_ID_JOIN_ROOM_RESPONSE = 1011;
+  MESSAGE_ID_INPUT_COMMAND = 1100;
+  MESSAGE_ID_SNAPSHOT = 1101;
+  MESSAGE_ID_RELIABLE_EVENT = 1102;
+  MESSAGE_ID_RECONNECT_REQUEST = 1200;
+  MESSAGE_ID_RECONNECT_RESPONSE = 1201;
+}
+
+message LoginRequest {
+  uint32 protocol_major = 1;
+  string client_build = 2;
+  reserved 100 to 199;
+}
+
+message LoginResponse {
+  fixed64 session_id = 1;
+  uint32 connection_epoch = 2;
+  reserved 100 to 199;
+}
+
+message JoinRoomRequest {
+  fixed64 session_id = 1;
+  uint32 requested_room = 2;
+  reserved 100 to 199;
+}
+
+message JoinRoomResponse {
+  uint32 room_id = 1;
+  uint32 entity_id = 2;
+  uint32 tick_rate = 3;
+  reserved 100 to 199;
+}
+
+message InputCommand {
+  fixed64 room_tick = 1;
+  uint32 sequence = 2;
+  sint32 move_x_milli = 3;
+  sint32 move_y_milli = 4;
+  sint32 yaw_millidegrees = 5;
+  uint32 buttons = 6;
+  reserved 100 to 199;
+}
+
+message PlayerState {
+  uint32 entity_id = 1;
+  sint32 position_x_milli = 2;
+  sint32 position_y_milli = 3;
+  sint32 position_z_milli = 4;
+  sint32 yaw_millidegrees = 5;
+  uint32 health = 6;
+  reserved 100 to 199;
+}
+
+message Snapshot {
+  uint32 protocol_major = 1;
+  fixed64 room_tick = 2;
+  fixed64 baseline_tick = 3;
+  repeated PlayerState players = 4;
+  fixed64 state_hash = 5;
+  reserved 100 to 199;
+}
+
+message ReliableEvent {
+  fixed64 room_tick = 1;
+  uint32 sequence = 2;
+  uint32 event_type = 3;
+  bytes payload = 4;
+  reserved 100 to 199;
+}
+
+message ReconnectRequest {
+  fixed64 session_id = 1;
+  uint32 connection_epoch = 2;
+  fixed64 last_received_tick = 3;
+  reserved 100 to 199;
+}
+
+message ReconnectResponse {
+  uint32 connection_epoch = 1;
+  fixed64 resume_tick = 2;
+  Snapshot snapshot = 3;
+  reserved 100 to 199;
+}
