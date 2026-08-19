@@ -12,7 +12,7 @@ ADR-0004 selected `.NET 8` for production Hosts and `.NET 9` as a compatibility 
 
 .NET 10 is the preferred LTS candidate, but the complete Fantasy composition—not only `Fantasy.Net`—must build, publish, start, and satisfy project operational and gameplay gates. The recovery baseline is [rayss1/Fantasy `493d5d4`](https://github.com/rayss1/Fantasy/commit/493d5d4dd1dd009cdfcd2846b88ebab9746d4504).
 
-WS-13 rebuilt the candidate on branch `codex/ws-13-dotnet10` and merged [Fantasy PR #1](https://github.com/rayss1/Fantasy/pull/1). The parent repository pins the resulting fork `main` commit `40159864408067f97de3ad569e3a559b597f6d38`. It:
+WS-13 rebuilt the candidate on branch `codex/ws-13-dotnet10` and merged [Fantasy PR #1](https://github.com/rayss1/Fantasy/pull/1). WS-14 then merged [Fantasy PR #2](https://github.com/rayss1/Fantasy/pull/2), and the parent repository pins fork `main` commit `b65e6fd60224cf264a3ee62207f0f9041e9f6d92`. It:
 
 - pins SDK `10.0.202` and migrates the supported runtime, tools, example Server, templates, and bundled DotRecast projects to `net10.0`/C# 14;
 - keeps the Source Generator on `netstandard2.0` and leaves orphan Benchmark/Console examples outside the supported matrix;
@@ -22,9 +22,11 @@ WS-13 rebuilt the candidate on branch `codex/ws-13-dotnet10` and merged [Fantasy
 - adds three NUnit package/config regressions and a Windows/Ubuntu GitHub Actions workflow.
 - removes conflicting Source Generator project-instance metadata after the first Windows run exposed a parallel-build file lock.
 
-Local validation on macOS used installed SDK `10.0.200` because the pinned `10.0.202` SDK was unavailable locally. Both solutions built in Release with zero warnings/errors, all three tests passed, publish selected .NET 10 and produced one application configuration, the Host reached `Startup Complete`, Control Center initialized SQLite and listened, and dependency scans found no known vulnerabilities. The Host did not exit promptly on the exercised termination signal and required a forced stop, so graceful shutdown remains open.
+Local validation on macOS used installed SDK `10.0.200` because the pinned `10.0.202` SDK was unavailable locally. Both solutions built in Release with zero warnings/errors, all three tests passed, publish selected .NET 10 and produced one application configuration, the Host reached `Startup Complete`, Control Center initialized SQLite and listened, and dependency scans found no known vulnerabilities. WS-14 added cancellation-aware host lifetime, Unix SIGTERM/SIGINT and Windows Ctrl+C handling, main-scheduler pumping during asynchronous disposal, and bounded NLog shutdown.
 
 The final [Windows/Ubuntu CI run](https://github.com/rayss1/Fantasy/actions/runs/32242324689) passed restore, warnings-as-errors builds of both Solutions, all three regressions, Host publish/start and runtime/config assertions, Control Center SQLite smoke, and direct/transitive vulnerability auditing on SDK `10.0.202`. This establishes reproducible cross-platform migration evidence, but does not satisfy the remaining release, gameplay, load, shutdown, observability, or legal gates.
+
+The WS-14 [Windows/Ubuntu CI run](https://github.com/rayss1/Fantasy/actions/runs/32248783092) additionally passed a real Linux SIGTERM probe: after startup, the example Host completed Scene/Process disposal, emitted `Shutdown Complete`, and exited with code zero within ten seconds without a forced stop. Linux container readiness/drain, integrated replay/load, observability, and legal gates remain open.
 
 ## Proposed decision
 
@@ -40,7 +42,7 @@ Completed recovery evidence: the focused fork commits are merged and pinned by e
 
 Remaining acceptance evidence:
 
-1. Reproduce publish, startup, graceful shutdown, and observability on the intended Linux container/release path.
+1. Reproduce publish, readiness/drain, graceful shutdown, and observability on the intended Linux container/release path; the standalone Linux SIGTERM gate is complete.
 2. Pass Shared vectors, protocol compatibility, replay, impairment, allocation, and backpressure tests.
 3. Pass the 64-player load and Tick budgets on release-equivalent Linux artifacts.
 4. Complete the Fantasy license/legal review before commercial distribution, redistribution, or publication of derived artifacts.
@@ -57,7 +59,9 @@ If the evidence fails, keep the Shared/Tools skeleton, isolate or replace the fa
 - [Fantasy recovery baseline](https://github.com/rayss1/Fantasy/commit/493d5d4dd1dd009cdfcd2846b88ebab9746d4504)
 - [Fantasy recovery PR](https://github.com/rayss1/Fantasy/pull/1)
 - [Green Windows/Ubuntu validation run](https://github.com/rayss1/Fantasy/actions/runs/32242324689)
-- [Pinned Fantasy fork commit](https://github.com/rayss1/Fantasy/commit/40159864408067f97de3ad569e3a559b597f6d38)
+- [Pinned Fantasy fork commit](https://github.com/rayss1/Fantasy/commit/b65e6fd60224cf264a3ee62207f0f9041e9f6d92)
+- [Graceful-shutdown PR](https://github.com/rayss1/Fantasy/pull/2)
+- [Green graceful-shutdown matrix](https://github.com/rayss1/Fantasy/actions/runs/32248783092)
 - [Green parent submodule and .NET 8/.NET 9 validation run](https://github.com/rayss1/ai-native-unity-framework/actions/runs/32242925933)
 - [Microsoft .NET support policy](https://dotnet.microsoft.com/en-us/platform/support/policy)
 - [Microsoft .NET lifecycle](https://learn.microsoft.com/lifecycle/products/microsoft-net-and-net-core)

@@ -56,7 +56,9 @@ Parent [CI run 32242925933](https://github.com/rayss1/ai-native-unity-framework/
 
 ## Remaining gates
 
-1. Validate Linux container/release startup and graceful shutdown.
+WS-14 merged [Fantasy PR #2](https://github.com/rayss1/Fantasy/pull/2) as `b65e6fd60224cf264a3ee62207f0f9041e9f6d92`. Its [Windows/Ubuntu matrix](https://github.com/rayss1/Fantasy/actions/runs/32248783092) passed, including a Linux SIGTERM probe that exited cleanly within ten seconds. The parent pin now follows that exact merge commit.
+
+1. Validate Linux container/release readiness, drain, and observability; standalone graceful SIGTERM is complete.
 2. Add and pass Shared vectors, protocol compatibility, replay, impairment, allocation, backpressure, observability, and 64-player load suites.
 3. Complete license/legal review before distributing the fork or derived package.
 
