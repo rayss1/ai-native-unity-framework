@@ -12,7 +12,7 @@ Building sessions, routing, process topology, service discovery, server ECS infr
 
 ## Decision
 
-The server platform will use a project-maintained, deeply customized fork of [Fantasy](https://github.com/qq362946/Fantasy) as its infrastructure foundation.
+The server platform will use the project-maintained [rayss1/Fantasy fork](https://github.com/rayss1/Fantasy) as its infrastructure foundation. The controlled evaluation source is embedded at `server/vendor/Fantasy` as an exact gitlink without a floating branch.
 
 Fantasy owns the initial implementation of network sessions, TCP/KCP/WebSocket/HTTP transports, Scene/Entity lifecycle, Gate and routing/Roaming, service discovery, server-to-server communication, and related code-generation/bootstrap tooling.
 
@@ -28,7 +28,7 @@ Deep customization may cover the fixed-Tick scheduler, KCP/transport behavior, r
 
 `Gameplay.Shared` remains independent of Fantasy. It targets `.NET Standard 2.1`/C# 9 and is compiled from the same source by Unity and the server. Fantasy Entity, Scene, Session, timer, transport, persistence, and configuration types are confined to server/client adapters and composition roots. Product gameplay rules must not be implemented inside the fork.
 
-The server defaults to `net8.0`; `net9.0` remains in the compatibility build/test matrix. Adoption of Fantasy does not change the existing decision to avoid .NET 10 for current server Hosts.
+The parent repository retains its accepted `net8.0`/`net9.0` skeleton matrix until proposed ADR-0012 is accepted or replaced. The pinned evaluation submodule is allowed before that decision, but no production Server Host or product project may reference Fantasy while ADR-0012 remains Proposed.
 
 Fantasy's repository license uses the MIT license text with an additional entity-specific restriction. A completed legal/license review is required before commercial distribution, redistribution of the fork, or publication of derived packages.
 
@@ -64,7 +64,8 @@ If these gates fail, the project will first replace or redesign the failing Fant
 
 ## References
 
-- [Fantasy repository](https://github.com/qq362946/Fantasy)
-- [Fantasy.Net target frameworks](https://github.com/qq362946/Fantasy/blob/main/Fantasy.Packages/Fantasy.Net/Fantasy.Net.csproj)
-- [Fantasy license](https://github.com/qq362946/Fantasy/blob/main/LICENSE)
+- [Project Fantasy fork](https://github.com/rayss1/Fantasy)
+- [Reviewed public baseline](https://github.com/rayss1/Fantasy/commit/493d5d4dd1dd009cdfcd2846b88ebab9746d4504)
+- [Pinned evaluation fork commit](https://github.com/rayss1/Fantasy/commit/40159864408067f97de3ad569e3a559b597f6d38)
+- [Fantasy license](https://github.com/rayss1/Fantasy/blob/main/LICENSE)
 - [Architecture and Technology Baseline](../Architecture/technology-baseline.md)

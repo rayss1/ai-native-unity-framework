@@ -17,6 +17,18 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Verify submodule state
+        shell: bash
+        run: |
+          status="$(git submodule status --recursive)"
+          printf '%s\n' "$status"
+          if printf '%s\n' "$status" | grep -Eq '^[-+U]'; then
+            echo "Submodule is uninitialized, conflicted, or differs from the recorded gitlink." >&2
+            exit 1
+          fi
 
       - name: Install .NET SDKs
         uses: actions/setup-dotnet@v4
