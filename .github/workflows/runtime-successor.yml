@@ -28,7 +28,7 @@ jobs:
         run: |
           set -euo pipefail
           sdk_tag='mcr.microsoft.com/dotnet/sdk:10.0.202-noble'
-          runtime_tag='mcr.microsoft.com/dotnet/runtime:10.0.4-noble'
+          runtime_tag='mcr.microsoft.com/dotnet/aspnet:10.0.4-noble'
           sdk_digest="$(docker buildx imagetools inspect "$sdk_tag" --format '{{.Manifest.Digest}}')"
           runtime_digest="$(docker buildx imagetools inspect "$runtime_tag" --format '{{.Manifest.Digest}}')"
           test "$sdk_digest" != '<no value>'
