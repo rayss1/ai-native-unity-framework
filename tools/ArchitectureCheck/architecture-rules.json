@@ -13,7 +13,8 @@
     "TestResults"
   ],
   "ignoredPathPrefixes": [
-    "tools/ArchitectureCheck.Tests/Fixtures"
+    "tools/ArchitectureCheck.Tests/Fixtures",
+    "server/vendor/Fantasy"
   ],
   "unityPackageForbiddenDirectoryNames": [
     "bin",

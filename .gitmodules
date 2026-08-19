@@ -1,0 +1,3 @@
+[submodule "server/vendor/Fantasy"]
+	path = server/vendor/Fantasy
+	url = https://github.com/rayss1/Fantasy.git

@@ -140,6 +140,20 @@ public sealed class ArchitectureValidatorTests
         AssertCode("ARC006");
     }
 
+    [Test]
+    public void InitializedFantasySubmoduleIsTreatedAsAnOpaqueVendorBoundary()
+    {
+        Write("server/vendor/Fantasy/Fantasy.sln", string.Empty);
+        Write(
+            "server/vendor/Fantasy/Fantasy.Packages/Fantasy.Net/Fantasy.Net.csproj",
+            Project("Fantasy.Net", "../../../../client/Forbidden.csproj"));
+        Write("server/vendor/Fantasy/Shared/Bad.cs", "using UnityEngine; class Bad { }");
+
+        ArchitectureValidationResult result = Validate();
+
+        Assert.That(result.Diagnostics, Is.Empty);
+    }
+
     private ArchitectureValidationResult Validate()
     {
         string rules = Path.Combine(AppContext.BaseDirectory, "architecture-rules.json");

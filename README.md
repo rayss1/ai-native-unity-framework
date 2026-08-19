@@ -9,6 +9,28 @@ The repository currently contains the first verifiable skeleton: one Shared Game
 - .NET 8 and .NET 9 runtimes for the compatibility test matrix.
 - Unity 6000.3.9f1 for local package import and EditMode tests.
 
+## Clone and initialize dependencies
+
+For a new checkout, initialize the pinned vendor source at clone time:
+
+```bash
+git clone --recurse-submodules https://github.com/rayss1/ai-native-unity-framework.git
+```
+
+For an existing checkout:
+
+```bash
+git submodule update --init --recursive
+```
+
+Maintainers update Fantasy only to an explicitly reviewed commit; the submodule does not follow a floating branch:
+
+```bash
+git -C server/vendor/Fantasy fetch origin
+git -C server/vendor/Fantasy checkout <reviewed-commit-sha>
+git add server/vendor/Fantasy
+```
+
 ## Validate
 
 ```powershell
@@ -40,6 +62,7 @@ The architecture-check command returns `0` for a valid repository, `1` for archi
 - `client/UnityProject`: minimal Unity composition project and local package manifest.
 - `shared/gameplay`: UPM package, .NET Standard 2.1 project, shared Runtime source, and dual-runtime tests.
 - `tools/ArchitectureCheck`: architecture graph and forbidden-API validator.
+- `server/vendor/Fantasy`: pinned, opaque evaluation source; production projects must not reference it while ADR-0012 is Proposed.
 - `Docs`: accepted ADRs and architecture contracts.
 
 ## Documentation
