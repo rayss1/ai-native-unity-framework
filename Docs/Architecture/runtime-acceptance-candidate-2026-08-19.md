@@ -17,4 +17,6 @@ Base: `codex/ws-14-runtime-operations`
 
 Local SDK 10.0.200 evidence: Release build completed with zero warnings/errors; two adapter tests and two Host tests passed; liveness/readiness/drain worked with an unavailable OTLP endpoint; Ctrl+C exited with code zero.
 
+[Linux candidate run 32280508631](https://github.com/rayss1/ai-native-unity-framework/actions/runs/32280508631) passed at commit `e4e636ced83ca967d90995b2bfb9ea6618629e36` on SDK `10.0.202`: warnings-as-errors build, all four candidate tests, `net10.0` publish, readiness-to-drain transition, unavailable-OTLP operation, normal SIGTERM exit within ten seconds, and direct/transitive vulnerability audit. The established parent [.NET validation run 32280508637](https://github.com/rayss1/ai-native-unity-framework/actions/runs/32280508637) also passed for the same commit.
+
 This is not a qualified 64-player or Fantasy-integrated vertical slice. The candidate does not yet route real Fantasy KCP sessions into the Battle room, execute Regional/Degraded impairment profiles, run the 60-minute soak, prove reconnect/replay over the transport, validate Unity vectors in licensed CI, or satisfy legal review. It must remain on an unmerged candidate branch until those gates pass and ADR-0012 is accepted atomically with the production Host.
