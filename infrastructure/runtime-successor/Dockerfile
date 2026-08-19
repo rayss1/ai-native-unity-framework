@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
-ARG SDK_IMAGE=mcr.microsoft.com/dotnet/sdk:10.0.202-bookworm-slim
-ARG RUNTIME_IMAGE=mcr.microsoft.com/dotnet/runtime:10.0.4-bookworm-slim
+ARG SDK_IMAGE=mcr.microsoft.com/dotnet/sdk:10.0.202-noble
+ARG RUNTIME_IMAGE=mcr.microsoft.com/dotnet/runtime:10.0.4-noble
 
 FROM ${SDK_IMAGE} AS build
 WORKDIR /source
