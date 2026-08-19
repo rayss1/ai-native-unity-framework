@@ -58,6 +58,7 @@ If the evidence fails, keep the Shared/Tools skeleton, isolate or replace the fa
 - [Fantasy recovery PR](https://github.com/rayss1/Fantasy/pull/1)
 - [Green Windows/Ubuntu validation run](https://github.com/rayss1/Fantasy/actions/runs/32242324689)
 - [Pinned Fantasy fork commit](https://github.com/rayss1/Fantasy/commit/40159864408067f97de3ad569e3a559b597f6d38)
+- [Green parent submodule and .NET 8/.NET 9 validation run](https://github.com/rayss1/ai-native-unity-framework/actions/runs/32242925933)
 - [Microsoft .NET support policy](https://dotnet.microsoft.com/en-us/platform/support/policy)
 - [Microsoft .NET lifecycle](https://learn.microsoft.com/lifecycle/products/microsoft-net-and-net-core)
 - [.NET 10 breaking changes](https://learn.microsoft.com/dotnet/core/compatibility/10)

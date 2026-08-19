@@ -52,6 +52,8 @@ The parent integration:
 - documents recursive clone, existing-clone initialization, and exact-SHA update commands;
 - keeps the parent SDK pin and .NET 8/.NET 9 validation matrix unchanged.
 
+Parent [CI run 32242925933](https://github.com/rayss1/ai-native-unity-framework/actions/runs/32242925933) passed recursive checkout, exact submodule-state validation, restore/build, the native .NET 8/.NET 9 test matrix, and architecture validation with the submodule initialized.
+
 ## Remaining gates
 
 1. Validate Linux container/release startup and graceful shutdown.
