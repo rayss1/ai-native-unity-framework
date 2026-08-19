@@ -9,6 +9,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../Modules/AiNative.Server.Fantasy/AiNative.Server.Fantasy.csproj" />
+    <ProjectReference Include="../../Modules/AiNative.Server.Protocol/AiNative.Server.Protocol.csproj" />
     <ProjectReference Include="../../../../shared/gameplay/Gameplay.Shared.csproj" />
     <ProjectReference Include="../../../../shared/protocol/Protocol.Shared.csproj" />
     <ProjectReference Include="../../../../shared/realtime/Realtime.Shared.csproj" />

@@ -16,6 +16,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AiNative.Server.Fantasy.Tes
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AiNative.BattleHost.Tests", "tests\AiNative.BattleHost.Tests\AiNative.BattleHost.Tests.csproj", "{D1DA19B6-1F78-4FA6-9B92-48CB245A0004}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AiNative.Server.Protocol", "src\Modules\AiNative.Server.Protocol\AiNative.Server.Protocol.csproj", "{D1DA19B6-1F78-4FA6-9B92-48CB245A0005}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AiNative.Server.Protocol.Tests", "tests\AiNative.Server.Protocol.Tests\AiNative.Server.Protocol.Tests.csproj", "{D1DA19B6-1F78-4FA6-9B92-48CB245A0006}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -50,5 +54,13 @@ Global
 		{D1DA19B6-1F78-4FA6-9B92-48CB245A0004}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{D1DA19B6-1F78-4FA6-9B92-48CB245A0004}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{D1DA19B6-1F78-4FA6-9B92-48CB245A0004}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D1DA19B6-1F78-4FA6-9B92-48CB245A0005}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D1DA19B6-1F78-4FA6-9B92-48CB245A0005}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D1DA19B6-1F78-4FA6-9B92-48CB245A0005}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D1DA19B6-1F78-4FA6-9B92-48CB245A0005}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D1DA19B6-1F78-4FA6-9B92-48CB245A0006}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D1DA19B6-1F78-4FA6-9B92-48CB245A0006}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D1DA19B6-1F78-4FA6-9B92-48CB245A0006}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D1DA19B6-1F78-4FA6-9B92-48CB245A0006}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

@@ -11,6 +11,7 @@ COPY shared/protocol/ /source/shared/protocol/
 COPY shared/realtime/ /source/shared/realtime/
 COPY server/vendor/Fantasy/nupkg/ /source/server/vendor/Fantasy/nupkg/
 COPY server/src/Modules/AiNative.Server.Fantasy/ /source/server/src/Modules/AiNative.Server.Fantasy/
+COPY server/src/Modules/AiNative.Server.Protocol/ /source/server/src/Modules/AiNative.Server.Protocol/
 COPY server/src/Hosts/AiNative.BattleHost/ /source/server/src/Hosts/AiNative.BattleHost/
 RUN dotnet restore /source/server/src/Hosts/AiNative.BattleHost/AiNative.BattleHost.csproj \
     && dotnet publish /source/server/src/Hosts/AiNative.BattleHost/AiNative.BattleHost.csproj \
