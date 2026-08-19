@@ -31,21 +31,25 @@ jobs:
           dotnet-version: 10.0.202
 
       - name: Restore candidate
-        run: dotnet restore server/RuntimeAcceptance.sln
+        working-directory: /tmp
+        run: dotnet restore "$GITHUB_WORKSPACE/server/RuntimeAcceptance.sln"
 
       - name: Build candidate
-        run: dotnet build server/RuntimeAcceptance.sln --configuration Release --no-restore --warnaserror
+        working-directory: /tmp
+        run: dotnet build "$GITHUB_WORKSPACE/server/RuntimeAcceptance.sln" --configuration Release --no-restore --warnaserror
 
       - name: Run adapter, health, and allocation tests
-        run: dotnet test server/RuntimeAcceptance.sln --configuration Release --no-build --no-restore
+        working-directory: /tmp
+        run: dotnet test "$GITHUB_WORKSPACE/server/RuntimeAcceptance.sln" --configuration Release --no-build --no-restore
 
       - name: Publish candidate Host
+        working-directory: /tmp
         run: >-
-          dotnet publish server/src/Hosts/AiNative.BattleHost/AiNative.BattleHost.csproj
+          dotnet publish "$GITHUB_WORKSPACE/server/src/Hosts/AiNative.BattleHost/AiNative.BattleHost.csproj"
           --configuration Release
           --framework net10.0
           --no-restore
-          --output artifacts/battle-host
+          --output "$GITHUB_WORKSPACE/artifacts/battle-host"
           --nologo
 
       - name: Probe readiness, telemetry outage, drain, and SIGTERM
@@ -56,9 +60,9 @@ jobs:
           OTEL_EXPORTER_OTLP_ENDPOINT: http://127.0.0.1:4317
         run: |
           set -euo pipefail
-          stdout=artifacts/battle-host.stdout.log
-          stderr=artifacts/battle-host.stderr.log
-          dotnet artifacts/battle-host/AiNative.BattleHost.dll >"$stdout" 2>"$stderr" &
+          stdout="$GITHUB_WORKSPACE/artifacts/battle-host.stdout.log"
+          stderr="$GITHUB_WORKSPACE/artifacts/battle-host.stderr.log"
+          dotnet "$GITHUB_WORKSPACE/artifacts/battle-host/AiNative.BattleHost.dll" >"$stdout" 2>"$stderr" &
           host_pid=$!
           cleanup() { kill -KILL "$host_pid" >/dev/null 2>&1 || true; }
           trap cleanup EXIT
@@ -85,6 +89,7 @@ jobs:
           host_pid=''
 
       - name: Audit candidate dependencies
+        working-directory: /tmp
         run: |
-          output="$(dotnet package list --project server/RuntimeAcceptance.sln --vulnerable --include-transitive --no-restore --format json --output-version 1)"
+          output="$(dotnet package list --project "$GITHUB_WORKSPACE/server/RuntimeAcceptance.sln" --vulnerable --include-transitive --no-restore --format json --output-version 1)"
           test "$(jq '[.. | objects | .vulnerabilities? // empty | length] | add // 0' <<<"$output")" = '0'
