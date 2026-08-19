@@ -7,6 +7,9 @@
     <AssemblyName>AiNative.Server.Fantasy</AssemblyName>
     <RootNamespace>AiNative.Server.Fantasy</RootNamespace>
     <RestoreAdditionalProjectSources>$(RestoreAdditionalProjectSources);$(MSBuildThisFileDirectory)../../../vendor/Fantasy/nupkg</RestoreAdditionalProjectSources>
+    <!-- This adapter consumes Fantasy runtime APIs only; host-owned configuration is injected at composition time. -->
+    <IsDirectFantasyNetReference>false</IsDirectFantasyNetReference>
+    <FantasyConfigAutoDiscoveryEnabled>false</FantasyConfigAutoDiscoveryEnabled>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../../../shared/realtime/Realtime.Shared.csproj" />
