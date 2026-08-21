@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>14.0</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>AiNative.Server.Protocol</AssemblyName>
+    <RootNamespace>AiNative.Server.Protocol</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../../../shared/protocol/Protocol.Shared.csproj" />
+    <ProjectReference Include="../../../../shared/realtime/Realtime.Shared.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Google.Protobuf" Version="3.35.1" />
+  </ItemGroup>
+</Project>
