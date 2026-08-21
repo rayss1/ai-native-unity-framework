@@ -1,19 +1,7 @@
-name: Unity shared-vector validation
+name: Unity shared-vector validation (manual, credentialed)
 
 on:
-  pull_request:
-    paths:
-      - .github/workflows/unity.yml
-      - client/UnityProject/**
-      - shared/gameplay/**
-      - shared/realtime/**
-  push:
-    branches:
-      - main
-    paths:
-      - client/UnityProject/**
-      - shared/gameplay/**
-      - shared/realtime/**
+  workflow_dispatch:
 
 permissions:
   contents: read
