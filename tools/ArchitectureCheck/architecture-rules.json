@@ -56,5 +56,11 @@
     "System.IO",
     "System.Net",
     "System.Threading"
+  ],
+  "sharedPassiveContractPathPrefixes": [
+    "shared/realtime/Runtime"
+  ],
+  "sharedPassiveContractAllowedNamespacePrefixes": [
+    "System.Threading"
   ]
 }

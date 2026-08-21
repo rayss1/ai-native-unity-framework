@@ -40,17 +40,26 @@ jobs:
       - name: Restore
         run: dotnet restore AiNative.sln
 
+      - name: Verify generated protocol artifacts
+        run: |
+          dotnet build tools/ProtocolCodegen/ProtocolCodegen.csproj --configuration Release --no-restore -p:GenerateProtocol=true
+          git diff --exit-code -- shared/generated/csharp
+
       - name: Build
         run: dotnet build AiNative.sln --configuration Release --no-restore
 
       - name: Test .NET 8
         run: |
           dotnet test shared/gameplay/Tests/Gameplay.Shared.Tests.csproj --configuration Release --framework net8.0 --no-build --no-restore
+          dotnet test shared/realtime/Tests/Realtime.Shared.Tests.csproj --configuration Release --framework net8.0 --no-build --no-restore
+          dotnet test shared/protocol/Tests/Protocol.Shared.Tests.csproj --configuration Release --framework net8.0 --no-build --no-restore
           dotnet test tools/ArchitectureCheck.Tests/ArchitectureCheck.Tests.csproj --configuration Release --framework net8.0 --no-build --no-restore
 
       - name: Test .NET 9
         run: |
           dotnet test shared/gameplay/Tests/Gameplay.Shared.Tests.csproj --configuration Release --framework net9.0 --no-build --no-restore
+          dotnet test shared/realtime/Tests/Realtime.Shared.Tests.csproj --configuration Release --framework net9.0 --no-build --no-restore
+          dotnet test shared/protocol/Tests/Protocol.Shared.Tests.csproj --configuration Release --framework net9.0 --no-build --no-restore
           dotnet test tools/ArchitectureCheck.Tests/ArchitectureCheck.Tests.csproj --configuration Release --framework net9.0 --no-build --no-restore
 
       - name: Validate architecture

@@ -40,7 +40,15 @@ dotnet test AiNative.sln -c Release --no-build --no-restore
 dotnet run --project tools/ArchitectureCheck -c Release --no-build -- --root . --format text
 ```
 
-Run the Unity package tests from the repository root on Windows:
+Until credentialed Unity CI is restored, run the Unity package tests manually on the exact commit under review. On macOS:
+
+```bash
+tools/run-unity-manual-validation.sh
+```
+
+The required seven-test result and evidence bundle are defined in [Manual Unity Shared-Vector Validation](Docs/Architecture/unity-manual-validation.md).
+
+The equivalent direct invocation on Windows is:
 
 ```powershell
 if (-not $env:ALLUSERSPROFILE) {
