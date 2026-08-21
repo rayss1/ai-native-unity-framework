@@ -43,7 +43,7 @@ Completed recovery evidence: the focused fork commits are merged and pinned by e
 Remaining acceptance evidence:
 
 1. Add project-owned readiness/drain and observability to the release-equivalent Linux candidate; container publish/start/non-root/SIGTERM and provenance gates are complete.
-2. Pass Shared vectors, protocol compatibility, replay, impairment, allocation, and backpressure tests.
+2. Pass Shared vectors in both .NET and Unity, protocol compatibility, replay, impairment, allocation, and backpressure tests. While ADR-0014 is active, Unity proof is an exact-commit manual evidence bundle rather than an automatic CI result.
 3. Pass the 64-player load and Tick budgets on release-equivalent Linux artifacts.
 4. Complete the Fantasy license/legal review before commercial distribution, redistribution, or publication of derived artifacts.
 
