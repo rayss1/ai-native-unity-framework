@@ -1,0 +1,11 @@
+{
+  "name": "com.ainative.realtime",
+  "version": "0.1.0",
+  "displayName": "AI-Native Realtime Contracts",
+  "description": "Engine- and transport-independent realtime networking contracts shared by Unity and server runtimes.",
+  "unity": "6000.3",
+  "dependencies": {},
+  "author": {
+    "name": "AI-Native Unity Framework"
+  }
+}

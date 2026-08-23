@@ -1,0 +1,36 @@
+name: Unity shared-vector validation (manual, credentialed)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  edit-mode:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run Unity 6000.3.9f1 EditMode vectors
+        uses: game-ci/unity-test-runner@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          projectPath: client/UnityProject
+          unityVersion: 6000.3.9f1
+          testMode: EditMode
+          artifactsPath: artifacts/unity-test-results
+          githubToken: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Unity test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unity-editmode-results
+          path: artifacts/unity-test-results
+          if-no-files-found: warn

@@ -1,6 +1,6 @@
 # .NET 10 Fantasy Runtime Successor Recovery
 
-Status: Cross-platform recovery evidence for proposed ADR-0012
+Status: Cross-platform and Linux container recovery evidence for proposed ADR-0012
 Original Spike: 2026-08-13
 Recovery update: 2026-08-19
 Reviewed public source: `rayss1/Fantasy` `493d5d4dd1dd009cdfcd2846b88ebab9746d4504`
@@ -8,7 +8,7 @@ Merged candidate: [rayss1/Fantasy#1](https://github.com/rayss1/Fantasy/pull/1), 
 
 ## Scope
 
-WS-13 reconstructs the lost .NET 10 candidate from the current public Fantasy baseline and prepares a reproducible Windows/Ubuntu validation matrix. It does not accept ADR-0012 or claim legal, container, protocol/replay, observability, graceful-shutdown, impairment, allocation, or 64-player load evidence.
+WS-13 reconstructed the lost .NET 10 candidate from the current public Fantasy baseline. WS-14 added graceful shutdown and an evaluation-only Linux container path. Neither accepts ADR-0012 or claims legal, integrated protocol/replay, observability, impairment, allocation, or 64-player load evidence.
 
 ## Candidate patch queue
 
@@ -39,6 +39,8 @@ The workstation had macOS and .NET SDK `10.0.200`; it did not have the pinned `1
 | Control Center SQLite smoke | Pass | Initialized `data/fantasy-control.db`, listened on `127.0.0.1:5277`, and answered the HTTP probe. |
 | Dependency vulnerability audit | Pass locally | Both solutions reported no known direct or transitive vulnerable packages. |
 | Windows/Ubuntu GitHub Actions | Pass | [Run 32242324689](https://github.com/rayss1/Fantasy/actions/runs/32242324689) passed both complete jobs on SDK `10.0.202`. The first run exposed a Windows-only Source Generator file lock; `773b67c` fixed the project graph and the full rerun passed. |
+| Linux container publish/start/shutdown | Pass in CI | [Run 32278435820](https://github.com/rayss1/ai-native-unity-framework/actions/runs/32278435820) built exact Fantasy commit `b65e6fd60224cf264a3ee62207f0f9041e9f6d92`, ran as non-root, reached `Startup Complete`, and exited normally on SIGTERM within ten seconds. This is evaluation evidence, not a production image release. |
+| Container provenance | Pass | SDK `10.0.202-noble` digest `sha256:adc02be8b87957d07208a4a3e51775935b33bad3317de8c45b1e67357b4c073b`; ASP.NET runtime `10.0.4-noble` digest `sha256:8b75cdf59a5068d9adfd8a6d202cc7671b2dc8f5f46c51e3b88a0a632e8fad1f`; evaluation image ID `sha256:2adc969bc08b728bea393b234f39a92f0a43ce330530f8e5eb425ab4268eda0d`; protocol SHA-256 `a94af66598d7933236364ae227008c030870b25a9e7bf492a036972df82d28e0`. |
 
 ## Parent repository integration state
 
@@ -56,7 +58,9 @@ Parent [CI run 32242925933](https://github.com/rayss1/ai-native-unity-framework/
 
 ## Remaining gates
 
-1. Validate Linux container/release startup and graceful shutdown.
+WS-14 merged [Fantasy PR #2](https://github.com/rayss1/Fantasy/pull/2) as `b65e6fd60224cf264a3ee62207f0f9041e9f6d92`. Its [Windows/Ubuntu matrix](https://github.com/rayss1/Fantasy/actions/runs/32248783092) passed, including a Linux SIGTERM probe that exited cleanly within ten seconds. The parent pin now follows that exact merge commit.
+
+1. Add and validate project-owned readiness/drain and observability in the release-equivalent Linux candidate; container publish/start/non-root/SIGTERM and provenance are complete.
 2. Add and pass Shared vectors, protocol compatibility, replay, impairment, allocation, backpressure, observability, and 64-player load suites.
 3. Complete license/legal review before distributing the fork or derived package.
 

@@ -1,9 +1,11 @@
 {
   "dependencies": {
     "com.ainative.gameplay": "file:../../../shared/gameplay",
+    "com.ainative.realtime": "file:../../../shared/realtime",
     "com.unity.test-framework": "1.6.0"
   },
   "testables": [
-    "com.ainative.gameplay"
+    "com.ainative.gameplay",
+    "com.ainative.realtime"
   ]
 }

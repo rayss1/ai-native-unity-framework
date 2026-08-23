@@ -322,6 +322,10 @@ public sealed class ArchitectureValidator
     {
         foreach (string path in sourceFiles.Where(path => IsSharedRuntime(root, path)))
         {
+            string relativePath = Relative(root, path);
+            bool isPassiveContract = rules.SharedPassiveContractPathPrefixes.Any(prefix =>
+                relativePath.Equals(prefix, StringComparison.OrdinalIgnoreCase)
+                || relativePath.StartsWith(prefix + "/", StringComparison.OrdinalIgnoreCase));
             string source = File.ReadAllText(path);
             CompilationUnitSyntax compilation = CSharpSyntaxTree.ParseText(source).GetCompilationUnitRoot();
             HashSet<string> violations = new(StringComparer.Ordinal);
@@ -329,7 +333,7 @@ public sealed class ArchitectureValidator
             foreach (UsingDirectiveSyntax directive in compilation.Usings)
             {
                 string namespaceName = directive.Name?.ToString() ?? string.Empty;
-                if (IsForbiddenName(namespaceName, rules))
+                if (IsForbiddenName(namespaceName, rules, isPassiveContract))
                 {
                     violations.Add(namespaceName);
                 }
@@ -338,7 +342,7 @@ public sealed class ArchitectureValidator
             foreach (NameSyntax name in compilation.DescendantNodes().OfType<NameSyntax>())
             {
                 string qualifiedName = name.ToString();
-                if (IsForbiddenName(qualifiedName, rules))
+                if (IsForbiddenName(qualifiedName, rules, isPassiveContract))
                 {
                     violations.Add(qualifiedName);
                 }
@@ -349,6 +353,11 @@ public sealed class ArchitectureValidator
                 string typeName = creation.Type.ToString();
                 if (typeName.Equals("Random", StringComparison.Ordinal)
                     || typeName.EndsWith(".Random", StringComparison.Ordinal))
+                {
+                    violations.Add(typeName);
+                }
+
+                if (isPassiveContract && IsActiveSchedulingType(typeName))
                 {
                     violations.Add(typeName);
                 }
@@ -371,7 +380,7 @@ public sealed class ArchitectureValidator
                 string expression = member.Expression.ToString();
                 string name = member.Name.Identifier.ValueText;
                 string fullMember = member.ToString();
-                if (IsForbiddenName(fullMember, rules))
+                if (IsForbiddenName(fullMember, rules, isPassiveContract))
                 {
                     violations.Add(fullMember);
                 }
@@ -383,6 +392,11 @@ public sealed class ArchitectureValidator
                     || (expression.EndsWith("Stopwatch", StringComparison.Ordinal) && name is "GetTimestamp" or "StartNew"))
                 {
                     violations.Add($"{expression}.{name}");
+                }
+
+                if (isPassiveContract && IsActiveSchedulingMember(expression, name))
+                {
+                    violations.Add(fullMember);
                 }
             }
 
@@ -401,10 +415,27 @@ public sealed class ArchitectureValidator
         }
     }
 
-    private static bool IsForbiddenName(string name, ArchitectureRules rules) =>
+    private static bool IsForbiddenName(string name, ArchitectureRules rules, bool isPassiveContract) =>
         rules.SharedForbiddenNamespacePrefixes.Any(prefix =>
-            name.Equals(prefix, StringComparison.Ordinal)
-            || name.StartsWith(prefix + ".", StringComparison.Ordinal));
+            (name.Equals(prefix, StringComparison.Ordinal)
+             || name.StartsWith(prefix + ".", StringComparison.Ordinal))
+            && (!isPassiveContract
+                || !rules.SharedPassiveContractAllowedNamespacePrefixes.Any(allowed =>
+                    name.Equals(allowed, StringComparison.Ordinal)
+                    || name.StartsWith(allowed + ".", StringComparison.Ordinal))));
+
+    private static bool IsActiveSchedulingType(string typeName) =>
+        typeName is "Thread" or "System.Threading.Thread"
+            or "Timer" or "System.Threading.Timer"
+            or "CancellationTokenSource" or "System.Threading.CancellationTokenSource"
+            or "Task" or "System.Threading.Tasks.Task"
+            or "TaskFactory" or "System.Threading.Tasks.TaskFactory";
+
+    private static bool IsActiveSchedulingMember(string expression, string name) =>
+        (expression.EndsWith("Task", StringComparison.Ordinal) && name == "Run")
+        || (expression.EndsWith("Task.Factory", StringComparison.Ordinal) && name == "StartNew")
+        || expression.EndsWith("ThreadPool", StringComparison.Ordinal)
+        || (expression.EndsWith("Thread", StringComparison.Ordinal) && name is "Sleep" or "Yield");
 
     private static void ValidateSolutions(
         string root,

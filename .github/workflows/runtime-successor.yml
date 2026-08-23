@@ -1,0 +1,97 @@
+name: Runtime successor container evaluation
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/runtime-successor.yml
+      - infrastructure/runtime-successor/**
+      - server/vendor/Fantasy
+      - .gitmodules
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  linux-container:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact submodule state
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Resolve immutable base image digests
+        id: images
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdk_tag='mcr.microsoft.com/dotnet/sdk:10.0.202-noble'
+          runtime_tag='mcr.microsoft.com/dotnet/aspnet:10.0.4-noble'
+          sdk_digest="$(docker buildx imagetools inspect "$sdk_tag" --format '{{.Manifest.Digest}}')"
+          runtime_digest="$(docker buildx imagetools inspect "$runtime_tag" --format '{{.Manifest.Digest}}')"
+          test "$sdk_digest" != '<no value>'
+          test "$runtime_digest" != '<no value>'
+          echo "sdk_image=$sdk_tag@$sdk_digest" >> "$GITHUB_OUTPUT"
+          echo "runtime_image=$runtime_tag@$runtime_digest" >> "$GITHUB_OUTPUT"
+
+      - name: Build release-equivalent evaluation image
+        shell: bash
+        run: |
+          set -euo pipefail
+          fantasy_commit="$(git -C server/vendor/Fantasy rev-parse HEAD)"
+          protocol_identity="$(sha256sum shared/schemas/ainative/v1/gameplay.proto | cut -d ' ' -f 1)"
+          docker build \
+            --file infrastructure/runtime-successor/Dockerfile \
+            --build-arg "SDK_IMAGE=${{ steps.images.outputs.sdk_image }}" \
+            --build-arg "RUNTIME_IMAGE=${{ steps.images.outputs.runtime_image }}" \
+            --build-arg "SOURCE_COMMIT=$GITHUB_SHA" \
+            --build-arg "FANTASY_COMMIT=$fantasy_commit" \
+            --build-arg "PROTOCOL_IDENTITY=$protocol_identity" \
+            --tag ainative/runtime-successor:evaluation \
+            .
+
+      - name: Probe startup, identity, user, and graceful stop
+        shell: bash
+        run: |
+          set -euo pipefail
+          container_id="$(docker run --detach ainative/runtime-successor:evaluation)"
+          cleanup() { docker rm --force "$container_id" >/dev/null 2>&1 || true; }
+          trap cleanup EXIT
+          deadline=$((SECONDS + 45))
+          until docker logs "$container_id" 2>&1 | grep -q 'Startup Complete'; do
+            if (( SECONDS >= deadline )); then
+              docker logs "$container_id"
+              exit 1
+            fi
+            sleep 1
+          done
+          test "$(docker exec "$container_id" id -u)" != '0'
+          docker stop --time 10 "$container_id"
+          test "$(docker inspect --format '{{.State.ExitCode}}' "$container_id")" = '0'
+          docker logs "$container_id" 2>&1 | grep -q 'Shutdown Complete'
+
+      - name: Record immutable provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/runtime-successor
+          image_id="$(docker image inspect ainative/runtime-successor:evaluation --format '{{.Id}}')"
+          cat > artifacts/runtime-successor/provenance.json <<JSON
+          {
+            "parentCommit": "$GITHUB_SHA",
+            "fantasyCommit": "$(git -C server/vendor/Fantasy rev-parse HEAD)",
+            "sdkImage": "${{ steps.images.outputs.sdk_image }}",
+            "runtimeImage": "${{ steps.images.outputs.runtime_image }}",
+            "evaluationImageId": "$image_id",
+            "protocolSha256": "$(sha256sum shared/schemas/ainative/v1/gameplay.proto | cut -d ' ' -f 1)"
+          }
+          JSON
+
+      - name: Upload provenance
+        uses: actions/upload-artifact@v4
+        with:
+          name: runtime-successor-provenance
+          path: artifacts/runtime-successor/provenance.json
+          if-no-files-found: error

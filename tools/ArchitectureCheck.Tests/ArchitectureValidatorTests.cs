@@ -124,6 +124,28 @@ public sealed class ArchitectureValidatorTests
     }
 
     [Test]
+    public void RealtimePassiveContractMayUseCancellationAndValueTask()
+    {
+        Write(
+            "shared/realtime/Runtime/ITransport.cs",
+            "using System.Threading; using System.Threading.Tasks; interface ITransport { ValueTask Send(CancellationToken token); }");
+
+        ArchitectureValidationResult result = Validate();
+
+        Assert.That(result.Diagnostics, Is.Empty);
+    }
+
+    [TestCase("using System.Threading; class Bad { object Value = new Thread(() => { }); }")]
+    [TestCase("using System.Threading; class Bad { object Value = new CancellationTokenSource(); }")]
+    [TestCase("using System.Threading.Tasks; class Bad { object Value = Task.Run(() => { }); }")]
+    public void RealtimePassiveContractRejectsActiveScheduling(string source)
+    {
+        Write("shared/realtime/Runtime/Bad.cs", source);
+
+        AssertCode("ARC004");
+    }
+
+    [Test]
     public void MissingInternalReferenceIsReported()
     {
         Write("client/Runtime/AiNative.Client.asmdef", Asmdef("AiNative.Client", "AiNative.Missing"));

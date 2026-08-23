@@ -60,6 +60,7 @@ Rows are consumers and columns are dependencies.
 
 - Recommended direction: `Contracts/Primitives -> Gameplay Model -> Gameplay Rules`; test support depends inward only.
 - Shared must not reference `UnityEngine`, Fantasy, ASP.NET Core, EF Core, databases, sockets, filesystem APIs, native P/Invoke, UI/rendering, platform SDKs, wall-clock time, or uncontrolled scheduling.
+- Per ADR-0013, `shared/realtime` may use `CancellationToken`, `ValueTask`, and `IAsyncDisposable` as passive boundary types; active scheduling and I/O remain forbidden, and `shared/gameplay` receives no exception.
 - Public ports are owned by the consumer policy layer (Shared); adapters are owned by Client/Server.
 - Generated wire types do not become the gameplay domain model by default. Translation occurs at a boundary.
 
