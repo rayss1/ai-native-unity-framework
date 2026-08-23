@@ -5,6 +5,9 @@ on:
     paths:
       - .github/workflows/runtime-acceptance.yml
       - .dockerignore
+      - Docs/ADR/0012-server-runtime-successor.md
+      - Docs/Architecture/runtime-acceptance-candidate-2026-08-19.md
+      - Docs/Architecture/technology-baseline.md
       - infrastructure/runtime-acceptance/**
       - server/RuntimeAcceptance.sln
       - server/src/**
