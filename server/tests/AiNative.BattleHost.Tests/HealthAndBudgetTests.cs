@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Net;
 using AiNative.BattleHost;
+using AiNative.Gameplay;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using NUnit.Framework;
@@ -81,9 +82,46 @@ public sealed class HealthAndBudgetTests
         Assert.That(slowTicks, Is.LessThanOrEqualTo((int)Math.Floor(measuredTicks * 0.001)));
     }
 
+    [Test]
+    public void RecordedInputStreamReplaysToTheExactCanonicalStateHash()
+    {
+        const int ticks = 3600;
+        RecordedInput[] recording = new RecordedInput[ticks];
+        Pcg32Random inputRandom = new(seed: 0xA11CE5EEDUL, sequence: 0x13UL);
+        SyntheticRoom recorded = new(64);
+
+        for (int tick = 0; tick < ticks; tick++)
+        {
+            RecordedInput input = new(
+                (int)(inputRandom.NextUInt32() % 64),
+                (int)(inputRandom.NextUInt32() % 2001) - 1000,
+                (int)(inputRandom.NextUInt32() % 2001) - 1000);
+            recording[tick] = input;
+            recorded.ApplyInput(input.EntityIndex, input.MoveXMilli, input.MoveYMilli);
+            recorded.Tick();
+        }
+
+        ulong recordedHash = recorded.ComputeStateHash();
+        SyntheticRoom replayed = new(64);
+        foreach (RecordedInput input in recording)
+        {
+            replayed.ApplyInput(input.EntityIndex, input.MoveXMilli, input.MoveYMilli);
+            replayed.Tick();
+        }
+
+        ulong replayedHash = replayed.ComputeStateHash();
+        Assert.That(replayedHash, Is.EqualTo(recordedHash));
+        Assert.That(replayed.CreateSnapshot(ticks).StateHash, Is.EqualTo(recordedHash));
+
+        replayed.ApplyInput(0, 1000, 0);
+        Assert.That(replayed.ComputeStateHash(), Is.Not.EqualTo(recordedHash));
+    }
+
     private static int PercentileIndex(int count, double percentile) =>
         Math.Clamp((int)Math.Ceiling(count * percentile) - 1, 0, count - 1);
 
     private static double ToMilliseconds(long timestampDelta) =>
         timestampDelta * 1000d / Stopwatch.Frequency;
+
+    private readonly record struct RecordedInput(int EntityIndex, int MoveXMilli, int MoveYMilli);
 }

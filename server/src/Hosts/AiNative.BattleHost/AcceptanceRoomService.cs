@@ -1,4 +1,6 @@
+using System.Buffers.Binary;
 using System.Diagnostics;
+using AiNative.Gameplay;
 
 namespace AiNative.BattleHost;
 
@@ -42,6 +44,10 @@ internal sealed class AcceptanceRoomService(
 
 internal sealed class SyntheticRoom
 {
+    private const int MaxBots = 64;
+    private const int CanonicalHeaderBytes = 16;
+    private const int CanonicalBotBytes = 12;
+    private static readonly XxHash64StateHasher StateHasher = new();
     private readonly int[] _positionX;
     private readonly int[] _positionZ;
     private readonly int[] _health;
@@ -49,7 +55,8 @@ internal sealed class SyntheticRoom
 
     public SyntheticRoom(int botCount)
     {
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(botCount);
+        ArgumentOutOfRangeException.ThrowIfLessThan(botCount, 2);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(botCount, MaxBots);
         BotCount = botCount;
         _positionX = new int[botCount];
         _positionZ = new int[botCount];
@@ -92,6 +99,7 @@ internal sealed class SyntheticRoom
             ProtocolMajor = 1,
             RoomTick = roomTick,
             BaselineTick = roomTick > 3 ? roomTick - 3 : 0,
+            StateHash = ComputeStateHash(),
         };
 
         for (int index = 0; index < BotCount; index++)
@@ -108,5 +116,24 @@ internal sealed class SyntheticRoom
         }
 
         return snapshot;
+    }
+
+    public ulong ComputeStateHash()
+    {
+        Span<byte> canonical = stackalloc byte[CanonicalHeaderBytes + (MaxBots * CanonicalBotBytes)];
+        BinaryPrimitives.WriteUInt32LittleEndian(canonical, 1);
+        BinaryPrimitives.WriteUInt32LittleEndian(canonical[4..], checked((uint)BotCount));
+        BinaryPrimitives.WriteUInt64LittleEndian(canonical[8..], _state);
+
+        int offset = CanonicalHeaderBytes;
+        for (int index = 0; index < BotCount; index++)
+        {
+            BinaryPrimitives.WriteInt32LittleEndian(canonical[offset..], _positionX[index]);
+            BinaryPrimitives.WriteInt32LittleEndian(canonical[(offset + 4)..], _positionZ[index]);
+            BinaryPrimitives.WriteInt32LittleEndian(canonical[(offset + 8)..], _health[index]);
+            offset += CanonicalBotBytes;
+        }
+
+        return StateHasher.ComputeHash(canonical[..offset]);
     }
 }
