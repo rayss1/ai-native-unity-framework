@@ -21,10 +21,13 @@ jobs:
   candidate:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      CANDIDATE_SOURCE_COMMIT: ${{ github.event.pull_request.head.sha }}
     steps:
       - name: Checkout exact submodule state
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.pull_request.head.sha }}
           submodules: recursive
 
       - name: Install .NET 10 SDK
@@ -127,7 +130,7 @@ jobs:
             --file infrastructure/runtime-acceptance/Dockerfile \
             --build-arg "SDK_IMAGE=${{ steps.images.outputs.sdk_image }}" \
             --build-arg "RUNTIME_IMAGE=${{ steps.images.outputs.runtime_image }}" \
-            --build-arg "SOURCE_COMMIT=$GITHUB_SHA" \
+            --build-arg "SOURCE_COMMIT=$CANDIDATE_SOURCE_COMMIT" \
             --build-arg "FANTASY_COMMIT=$fantasy_commit" \
             --build-arg "PROTOCOL_IDENTITY=$protocol_identity" \
             --tag ainative/battle-host:acceptance \
@@ -180,7 +183,7 @@ jobs:
           image_id="$(docker image inspect ainative/battle-host:acceptance --format '{{.Id}}')"
           cat > artifacts/runtime-acceptance/provenance.json <<JSON
           {
-            "parentCommit": "$GITHUB_SHA",
+            "parentCommit": "$CANDIDATE_SOURCE_COMMIT",
             "fantasyCommit": "$(git -C server/vendor/Fantasy rev-parse HEAD)",
             "sdkImage": "${{ steps.images.outputs.sdk_image }}",
             "runtimeImage": "${{ steps.images.outputs.runtime_image }}",
