@@ -6,6 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>AiNative.BattleHost</AssemblyName>
     <RootNamespace>AiNative.BattleHost</RootNamespace>
+    <RestoreAdditionalProjectSources>$(RestoreAdditionalProjectSources);$(MSBuildThisFileDirectory)../../../vendor/Fantasy/nupkg</RestoreAdditionalProjectSources>
     <!-- The composition root owns Fantasy.config and enables its compile-time scene registry. -->
     <IsDirectFantasyNetReference>false</IsDirectFantasyNetReference>
     <FantasyConfigAutoDiscoveryEnabled>true</FantasyConfigAutoDiscoveryEnabled>

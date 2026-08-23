@@ -7,6 +7,7 @@
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
     <AssemblyName>AiNative.Server.Fantasy.Tests</AssemblyName>
+    <RestoreAdditionalProjectSources>$(RestoreAdditionalProjectSources);$(MSBuildThisFileDirectory)../../vendor/Fantasy/nupkg</RestoreAdditionalProjectSources>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/Modules/AiNative.Server.Fantasy/AiNative.Server.Fantasy.csproj" />
