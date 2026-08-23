@@ -43,13 +43,47 @@ public sealed class FantasyRealtimeTransportTests
         Assert.That(packet.IsComplete, Is.False);
     }
 
+    [Test]
+    public async Task SenderBackpressureIsReportedWithoutAcceptingBytes()
+    {
+        FakeSender sender = new() { NextStatus = SendStatus.WouldBlock };
+        await using FantasyRealtimeTransport transport = new(sender);
+
+        SendResult result = await transport.SendAsync(SnapshotChannel, new byte[32]);
+
+        Assert.That(result.Status, Is.EqualTo(SendStatus.WouldBlock));
+        Assert.That(result.AcceptedBytes, Is.Zero);
+    }
+
+    [Test]
+    public async Task InboundQueueIsBoundedByPacketCountForEmptyPayloads()
+    {
+        await using FantasyRealtimeTransport transport = new(
+            new FakeSender(),
+            maxInboundBytes: 256,
+            maxInboundPackets: 2);
+
+        Assert.That(transport.TryEnqueueReceived(SnapshotChannel, [], 1, 1), Is.True);
+        Assert.That(transport.TryEnqueueReceived(SnapshotChannel, [], 2, 1), Is.True);
+        Assert.That(transport.TryEnqueueReceived(SnapshotChannel, [], 3, 1), Is.False);
+
+        Assert.That(transport.TryReceive([], out _), Is.True);
+        Assert.That(transport.TryEnqueueReceived(SnapshotChannel, [], 4, 1), Is.True);
+    }
+
     private sealed class FakeSender : IFantasySessionSender
     {
         public bool IsClosed { get; private set; }
 
         public int SendCount { get; private set; }
 
-        public void Send(TransportChannel channel, ReadOnlySpan<byte> payload) => SendCount++;
+        public SendStatus NextStatus { get; init; } = SendStatus.Accepted;
+
+        public SendStatus Send(TransportChannel channel, ReadOnlySpan<byte> payload)
+        {
+            SendCount++;
+            return NextStatus;
+        }
 
         public void Dispose() => IsClosed = true;
     }

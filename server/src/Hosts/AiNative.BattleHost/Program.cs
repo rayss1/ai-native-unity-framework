@@ -1,11 +1,19 @@
 using AiNative.BattleHost;
+using AiNative.Server.Fantasy;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
-builder.Services.AddSingleton<RuntimeReadiness>();
+bool fantasyEnabled = builder.Configuration.GetValue("AINATIVE_FANTASY_ENABLED", true);
+builder.Services.AddSingleton(new RuntimeReadiness(networkRequired: fantasyEnabled));
 builder.Services.AddSingleton<BattleMetrics>();
+builder.Services.AddSingleton<FantasyKcpGateway>();
+builder.Services.AddSingleton<RoomProtocolService>();
+if (fantasyEnabled)
+{
+    builder.Services.AddHostedService<FantasyRuntimeService>();
+}
 builder.Services.AddHostedService<AcceptanceRoomService>();
 
 builder.Services.AddOpenTelemetry()
@@ -46,6 +54,28 @@ if (builder.Configuration.GetValue("AINATIVE_ENABLE_EVALUATION_ENDPOINTS", false
         readiness.BeginDrain();
         return Results.Accepted();
     });
+
+    if (fantasyEnabled)
+    {
+        app.MapPost("/admin/kcp-loopback", async (
+            FantasyKcpGateway gateway,
+            CancellationToken cancellationToken) =>
+        {
+            FantasyKcpProbeResult result =
+                await FantasyKcpLoopbackProbe.RunAsync(gateway, cancellationToken);
+            return Results.Ok(new
+            {
+                status = "ok",
+                result.SessionId,
+                result.InitialConnectionEpoch,
+                result.ReconnectedEpoch,
+                result.RoomId,
+                result.EntityId,
+                result.SnapshotTick,
+                result.ResumeTick,
+            });
+        });
+    }
 }
 
 await app.RunAsync();

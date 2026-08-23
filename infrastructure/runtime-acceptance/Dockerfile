@@ -33,5 +33,6 @@ WORKDIR /app
 COPY --from=build --chown=$APP_UID:$APP_UID /artifacts/host/ ./
 ENV ASPNETCORE_URLS=http://+:8080
 EXPOSE 8080
+EXPOSE 22000/udp
 USER $APP_UID
-ENTRYPOINT ["dotnet", "AiNative.BattleHost.dll"]
+ENTRYPOINT ["dotnet", "AiNative.BattleHost.dll", "-m", "Develop"]

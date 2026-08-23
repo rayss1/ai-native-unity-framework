@@ -2,7 +2,7 @@
 
 Status: Proposed
 Date: 2026-08-13
-Last evidence update: 2026-08-19
+Last evidence update: 2026-08-23
 Decision source: WS-13
 Proposes to supersede: [ADR-0004](0004-server-runtime-policy.md)
 
@@ -12,7 +12,7 @@ ADR-0004 selected `.NET 8` for production Hosts and `.NET 9` as a compatibility 
 
 .NET 10 is the preferred LTS candidate, but the complete Fantasy composition—not only `Fantasy.Net`—must build, publish, start, and satisfy project operational and gameplay gates. The recovery baseline is [rayss1/Fantasy `493d5d4`](https://github.com/rayss1/Fantasy/commit/493d5d4dd1dd009cdfcd2846b88ebab9746d4504).
 
-WS-13 rebuilt the candidate on branch `codex/ws-13-dotnet10` and merged [Fantasy PR #1](https://github.com/rayss1/Fantasy/pull/1). WS-14 then merged [Fantasy PR #2](https://github.com/rayss1/Fantasy/pull/2), and the parent repository pins fork `main` commit `b65e6fd60224cf264a3ee62207f0f9041e9f6d92`. It:
+WS-13 rebuilt the candidate on branch `codex/ws-13-dotnet10` and merged [Fantasy PR #1](https://github.com/rayss1/Fantasy/pull/1). WS-14 then merged [Fantasy PR #2](https://github.com/rayss1/Fantasy/pull/2). WS-16 advanced the parent evaluation pin from the WS-14 commit to fork `main` commit `0979bc1add9e7567dae21fe56649b0b2f31f05a6`. It:
 
 - pins SDK `10.0.202` and migrates the supported runtime, tools, example Server, templates, and bundled DotRecast projects to `net10.0`/C# 14;
 - keeps the Source Generator on `netstandard2.0` and leaves orphan Benchmark/Console examples outside the supported matrix;
@@ -26,7 +26,9 @@ Local validation on macOS used installed SDK `10.0.200` because the pinned `10.0
 
 The final [Windows/Ubuntu CI run](https://github.com/rayss1/Fantasy/actions/runs/32242324689) passed restore, warnings-as-errors builds of both Solutions, all three regressions, Host publish/start and runtime/config assertions, Control Center SQLite smoke, and direct/transitive vulnerability auditing on SDK `10.0.202`. This establishes reproducible cross-platform migration evidence, but does not satisfy the remaining release, gameplay, load, shutdown, observability, or legal gates.
 
-The WS-14 [Windows/Ubuntu CI run](https://github.com/rayss1/Fantasy/actions/runs/32248783092) additionally passed a real Linux SIGTERM probe: after startup, the example Host completed Scene/Process disposal, emitted `Shutdown Complete`, and exited with code zero within ten seconds without a forced stop. Parent [container run 32278435820](https://github.com/rayss1/ai-native-unity-framework/actions/runs/32278435820) then built that exact fork commit with SDK image digest `sha256:adc02be8b87957d07208a4a3e51775935b33bad3317de8c45b1e67357b4c073b`, ran it on ASP.NET runtime image digest `sha256:8b75cdf59a5068d9adfd8a6d202cc7671b2dc8f5f46c51e3b88a0a632e8fad1f` as the image-defined non-root user, reached `Startup Complete`, and exited normally on SIGTERM within ten seconds. The run published source, SDK, runtime-image, evaluation-image, and protocol identities as provenance. Integrated readiness/drain, replay/load, observability, and legal gates remain open.
+The WS-14 [Windows/Ubuntu CI run](https://github.com/rayss1/Fantasy/actions/runs/32248783092) additionally passed a real Linux SIGTERM probe: after startup, the example Host completed Scene/Process disposal, emitted `Shutdown Complete`, and exited with code zero within ten seconds without a forced stop. Parent [container run 32278435820](https://github.com/rayss1/ai-native-unity-framework/actions/runs/32278435820) then built that exact fork commit with SDK image digest `sha256:adc02be8b87957d07208a4a3e51775935b33bad3317de8c45b1e67357b4c073b`, ran it on ASP.NET runtime image digest `sha256:8b75cdf59a5068d9adfd8a6d202cc7671b2dc8f5f46c51e3b88a0a632e8fad1f` as the image-defined non-root user, reached `Startup Complete`, and exited normally on SIGTERM within ten seconds. The run published source, SDK, runtime-image, evaluation-image, and protocol identities as provenance.
+
+WS-16 exposed that the tracked `Fantasy-Net` package lagged the graceful-shutdown source. [Fantasy PR #3](https://github.com/rayss1/Fantasy/pull/3) regenerated package `2026.1.1002`, compiled its cancellation-aware Entry API from independent project/package consumers, and enabled a real .NET KCP acceptance client. Its [Windows/Ubuntu matrix](https://github.com/rayss1/Fantasy/actions/runs/32630652446) passed. [Fantasy PR #4](https://github.com/rayss1/Fantasy/pull/4) aligned the runtime banner with package `2026.1.1002` and made both published-consumer regressions execute and assert that identity; its [Windows/Ubuntu matrix](https://github.com/rayss1/Fantasy/actions/runs/32630957890) passed. The gated parent candidate now starts a real KCP listener and locally completes Login, JoinRoom, Input, 20 Hz Snapshot, disconnect, and Reconnect through project-owned protocol and bounded adapters. This is a minimum integration result, not impairment, deterministic replay, qualified load, or legal evidence.
 
 ## Proposed decision
 
@@ -42,8 +44,8 @@ Completed recovery evidence: the focused fork commits are merged and pinned by e
 
 Remaining acceptance evidence:
 
-1. Add project-owned readiness/drain and observability to the release-equivalent Linux candidate; container publish/start/non-root/SIGTERM and provenance gates are complete.
-2. Pass Shared vectors in both .NET and Unity, protocol compatibility, replay, impairment, allocation, and backpressure tests. While ADR-0014 is active, Unity proof is an exact-commit manual evidence bundle rather than an automatic CI result.
+1. Project-owned readiness/drain, bounded OTel configuration, container publish/start/non-root/SIGTERM, and provenance gates are implemented; rerun them on the final exact candidate with the real KCP loopback enabled.
+2. Pass final-commit Shared vectors in both .NET and Unity, plus deterministic replay, Regional/Degraded impairment, allocation, blocked-client isolation, and backpressure tests. While ADR-0014 is active, Unity proof is an exact-commit manual evidence bundle rather than an automatic CI result.
 3. Pass the 64-player load and Tick budgets on release-equivalent Linux artifacts.
 4. Complete the Fantasy license/legal review before commercial distribution, redistribution, or publication of derived artifacts.
 
@@ -59,9 +61,13 @@ If the evidence fails, keep the Shared/Tools skeleton, isolate or replace the fa
 - [Fantasy recovery baseline](https://github.com/rayss1/Fantasy/commit/493d5d4dd1dd009cdfcd2846b88ebab9746d4504)
 - [Fantasy recovery PR](https://github.com/rayss1/Fantasy/pull/1)
 - [Green Windows/Ubuntu validation run](https://github.com/rayss1/Fantasy/actions/runs/32242324689)
-- [Pinned Fantasy fork commit](https://github.com/rayss1/Fantasy/commit/b65e6fd60224cf264a3ee62207f0f9041e9f6d92)
+- [Pinned Fantasy fork commit](https://github.com/rayss1/Fantasy/commit/0979bc1add9e7567dae21fe56649b0b2f31f05a6)
 - [Graceful-shutdown PR](https://github.com/rayss1/Fantasy/pull/2)
 - [Green graceful-shutdown matrix](https://github.com/rayss1/Fantasy/actions/runs/32248783092)
+- [Runtime-package consistency and .NET KCP client PR](https://github.com/rayss1/Fantasy/pull/3)
+- [Green runtime-package Windows/Ubuntu matrix](https://github.com/rayss1/Fantasy/actions/runs/32630652446)
+- [Runtime/package identity PR](https://github.com/rayss1/Fantasy/pull/4)
+- [Green runtime/package identity Windows/Ubuntu matrix](https://github.com/rayss1/Fantasy/actions/runs/32630957890)
 - [Green parent Linux container and provenance run](https://github.com/rayss1/ai-native-unity-framework/actions/runs/32278435820)
 - [Green parent submodule and .NET 8/.NET 9 validation run](https://github.com/rayss1/ai-native-unity-framework/actions/runs/32242925933)
 - [Microsoft .NET support policy](https://dotnet.microsoft.com/en-us/platform/support/policy)

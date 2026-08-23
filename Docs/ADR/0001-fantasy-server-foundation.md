@@ -66,6 +66,6 @@ If these gates fail, the project will first replace or redesign the failing Fant
 
 - [Project Fantasy fork](https://github.com/rayss1/Fantasy)
 - [Reviewed public baseline](https://github.com/rayss1/Fantasy/commit/493d5d4dd1dd009cdfcd2846b88ebab9746d4504)
-- [Pinned evaluation fork commit](https://github.com/rayss1/Fantasy/commit/b65e6fd60224cf264a3ee62207f0f9041e9f6d92)
+- [Pinned evaluation fork commit](https://github.com/rayss1/Fantasy/commit/0979bc1add9e7567dae21fe56649b0b2f31f05a6)
 - [Fantasy license](https://github.com/rayss1/Fantasy/blob/main/LICENSE)
 - [Architecture and Technology Baseline](../Architecture/technology-baseline.md)

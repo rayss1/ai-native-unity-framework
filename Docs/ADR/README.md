@@ -26,7 +26,7 @@ Changing an accepted contract requires a superseding ADR that records compatibil
 | [0009](0009-protocol-evolution-and-code-generation.md) | Accepted | Protocol evolution | Protobuf-first, additive compatibility, reproducible generation | High-frequency codec threshold and compatibility harness |
 | [0010](0010-observability-and-deployment.md) | Accepted | Observability and deployment | OTel boundary, self-hosted/cloud-neutral deployment | Cardinality/load test and deployment sizing |
 | [0011](0011-agent-engineering-and-architecture-enforcement.md) | Accepted | Agent engineering | Repository-owned context plus automated boundary checks | First validator and drift-repair workflow |
-| [0012](0012-server-runtime-successor.md) | Proposed | .NET 10 successor candidate | Evaluation submodule allowed; no product reference or production Host until all acceptance gates pass | Build/start and standalone SIGTERM passed; container readiness/drain, integrated replay/load, observability, legal, and rollout remain |
+| [0012](0012-server-runtime-successor.md) | Proposed | .NET 10 successor candidate | Evaluation submodule allowed; no product reference or production Host until all acceptance gates pass | Build/start/SIGTERM and minimum KCP flow passed; impairment, deterministic replay, qualified load, final Unity, legal, and rollout remain |
 | [0013](0013-passive-async-shared-contracts.md) | Accepted | Passive async Shared boundary types | `shared/realtime` may expose cancellation/value-task contracts but may not schedule work or perform I/O | Unity/.NET compilation and architecture checks |
 | [0014](0014-temporary-manual-unity-validation.md) | Accepted | Temporary manual Unity validation | Exact-commit Unity 6000.3.9f1 evidence is mandatory while credentialed CI is unavailable | Project-owner evidence bundle; restore automatic CI when authentication is available |
 
@@ -34,7 +34,7 @@ Changing an accepted contract requires a superseding ADR that records compatibil
 
 These are deliberately not final product choices. Each owner must record the resulting evidence in a new or superseding ADR before crossing the named gate.
 
-The runtime successor deadline has passed. [ADR-0012](0012-server-runtime-successor.md) records `.NET 10` as the preferred candidate. The [recovered fork commit](../Architecture/runtime-successor-spike-2026-08-13.md) is remotely pinned and passes the SDK 10.0.202 Windows/Ubuntu build, test, publish, startup, SQLite, and vulnerability matrix. Graceful shutdown, Linux container release, protocol/replay, load, legal, and rollout gates remain open; product references remain forbidden. ADR-0012 stays Proposed and does not supersede ADR-0004.
+The runtime successor deadline has passed. [ADR-0012](0012-server-runtime-successor.md) records `.NET 10` as the preferred candidate. The recovered fork passes the SDK 10.0.202 Windows/Ubuntu build, test, publish, startup, SQLite, SIGTERM, package-consumer, and vulnerability matrices. The gated candidate has a minimum real KCP Login/Join/Input/Snapshot/Reconnect path, but impairment, deterministic replay, qualified load, final Unity, legal, and rollout gates remain open; product references remain forbidden. ADR-0012 stays Proposed and does not supersede ADR-0004.
 
 | Decision | Default during Spike | Decision gate | Pass/trigger threshold | Migration and rollback |
 | --- | --- | --- | --- | --- |

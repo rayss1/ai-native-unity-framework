@@ -10,10 +10,29 @@ namespace AiNative.BattleHost.Tests;
 public sealed class HealthAndBudgetTests
 {
     [Test]
+    public void ReadinessRequiresBothRoomAndNetworkWhenFantasyIsEnabled()
+    {
+        RuntimeReadiness readiness = new(networkRequired: true);
+
+        readiness.MarkRoomReady();
+        Assert.That(readiness.IsReady, Is.False);
+
+        readiness.MarkNetworkReady();
+        Assert.That(readiness.IsReady, Is.True);
+
+        readiness.BeginDrain();
+        Assert.That(readiness.IsReady, Is.False);
+    }
+
+    [Test]
     public async Task DrainMakesReadinessUnavailableWithoutFailingLiveness()
     {
         await using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>()
-            .WithWebHostBuilder(builder => builder.UseSetting("AINATIVE_ENABLE_EVALUATION_ENDPOINTS", "true"));
+            .WithWebHostBuilder(builder =>
+            {
+                builder.UseSetting("AINATIVE_ENABLE_EVALUATION_ENDPOINTS", "true");
+                builder.UseSetting("AINATIVE_FANTASY_ENABLED", "false");
+            });
         using HttpClient client = factory.CreateClient();
 
         HttpResponseMessage live = await client.GetAsync("/health/live");

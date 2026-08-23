@@ -173,7 +173,7 @@ The fork follows these maintenance rules:
 - Never update the production baseline by floating package version or an unpinned branch.
 - Preserve required copyright and license notices.
 
-The reviewed public baseline is `493d5d4dd1dd009cdfcd2846b88ebab9746d4504`. The [WS-13 recovery](runtime-successor-spike-2026-08-13.md) established the .NET 10 composition, and WS-14 advanced the pin to `b65e6fd60224cf264a3ee62207f0f9041e9f6d92` with cancellation-aware host lifetime and bounded log shutdown. The exact commit passed the [SDK 10.0.202 Windows/Ubuntu graceful-shutdown matrix](https://github.com/rayss1/Fantasy/actions/runs/32248783092), including a real Linux SIGTERM exit within ten seconds. Parent [container run 32278435820](https://github.com/rayss1/ai-native-unity-framework/actions/runs/32278435820) also passed exact-source publish, non-root startup, bounded SIGTERM, and immutable provenance checks. Project-owned readiness/drain, integrated replay/load, observability, and legal evidence remain open, so ADR-0012 must pass before a product project references this source. The repository license is based on the MIT text but adds an entity-specific restriction; legal/license review remains a release gate before commercial distribution, redistribution, or publication of derived packages.
+The reviewed public baseline is `493d5d4dd1dd009cdfcd2846b88ebab9746d4504`. The [WS-13 recovery](runtime-successor-spike-2026-08-13.md) established the .NET 10 composition, and WS-14 advanced the pin to `b65e6fd60224cf264a3ee62207f0f9041e9f6d92` with cancellation-aware host lifetime and bounded log shutdown. That commit passed the [SDK 10.0.202 Windows/Ubuntu graceful-shutdown matrix](https://github.com/rayss1/Fantasy/actions/runs/32248783092), including a real Linux SIGTERM exit within ten seconds. Parent [container run 32278435820](https://github.com/rayss1/ai-native-unity-framework/actions/runs/32278435820) also passed exact-source publish, non-root startup, bounded SIGTERM, and immutable provenance checks. WS-16 now pins `0979bc1add9e7567dae21fe56649b0b2f31f05a6`, whose tracked package exposes the same cancellation-aware lifecycle and .NET KCP client used by the gated minimum vertical path. Qualified impairment, replay/load, final Unity, and legal evidence remain open, so ADR-0012 must pass before a product project references this source. The repository license is based on the MIT text but adds an entity-specific restriction; legal/license review remains a release gate before commercial distribution, redistribution, or publication of derived packages.
 
 See [ADR-0001: Use Fantasy as the server foundation](../ADR/0001-fantasy-server-foundation.md) for the authoritative decision and validation conditions.
 
@@ -413,7 +413,7 @@ The following decisions should be captured as individual ADRs before or during t
 - [Recast Navigation](https://github.com/recastnavigation/recastnavigation)
 - [Project Fantasy fork](https://github.com/rayss1/Fantasy)
 - [Reviewed Fantasy baseline](https://github.com/rayss1/Fantasy/commit/493d5d4dd1dd009cdfcd2846b88ebab9746d4504)
-- [Pinned Fantasy fork commit](https://github.com/rayss1/Fantasy/commit/b65e6fd60224cf264a3ee62207f0f9041e9f6d92)
+- [Pinned Fantasy fork commit](https://github.com/rayss1/Fantasy/commit/0979bc1add9e7567dae21fe56649b0b2f31f05a6)
 - [Fantasy license](https://github.com/rayss1/Fantasy/blob/main/LICENSE)
 - [HybridCLR](https://github.com/focus-creative-games/hybridclr)
 - [Apple App Review Guidelines](https://developer.apple.com/app-store/review/guidelines/#software-requirements)

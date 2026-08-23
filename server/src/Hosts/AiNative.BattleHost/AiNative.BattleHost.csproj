@@ -6,6 +6,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>AiNative.BattleHost</AssemblyName>
     <RootNamespace>AiNative.BattleHost</RootNamespace>
+    <!-- The composition root owns Fantasy.config and enables its compile-time scene registry. -->
+    <IsDirectFantasyNetReference>false</IsDirectFantasyNetReference>
+    <FantasyConfigAutoDiscoveryEnabled>true</FantasyConfigAutoDiscoveryEnabled>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../Modules/AiNative.Server.Fantasy/AiNative.Server.Fantasy.csproj" />
@@ -15,6 +18,13 @@
     <ProjectReference Include="../../../../shared/realtime/Realtime.Shared.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="Fantasy.config">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Fantasy-Net" Version="2026.1.1002" PrivateAssets="all" />
     <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.17.0" />
     <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.17.0" />
     <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.17.0" />

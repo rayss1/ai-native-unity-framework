@@ -1,7 +1,7 @@
 # Architecture Risk Register
 
 Status: Active for the first vertical slice
-Last updated: 2026-08-19
+Last updated: 2026-08-23
 
 Scale: likelihood and impact are Low/Medium/High. “Tripwire” is the earliest objective signal that forces action. Owners are roles until modules have maintainers.
 
@@ -10,7 +10,7 @@ Scale: likelihood and impact are Low/Medium/High. “Tripwire” is the earliest
 | R-01 | Fantasy fork license blocks commercial distribution | Medium | High | Project owner + legal | Legal review not complete before first distributable fork artifact | Complete counsel review; preserve notices; isolate fork boundary | Do not distribute; continue Spike internally or replace foundation/adapters via superseding ADR |
 | R-02 | Deep Fantasy changes make upstream/security updates impractical | High | High | Server platform | Patch queue cannot rebase cleanly or upstream merge fails replay/load suite | Pin upstream; focused commits; fork changelog; scheduled sync rehearsal | Retain previous fork pin/image; replace only failing subsystem behind adapter |
 | R-03 | Fantasy types leak into Shared or product modules | Medium | High | Architecture | Manifest/API validator finds forbidden reference or public signature | ADR-0002 validator; adapter contracts; review public APIs | Revert leaking API; compatibility shim with removal issue |
-| R-04 | .NET 8/9 expire before a successor is proven for the Fantasy server stack | High | High | Server platform + release | Successor deadline missed; the exact .NET 10 fork pin has green Windows/Ubuntu CI and standalone SIGTERM evidence but no qualified Linux container readiness/drain, integrated load, or replay matrix | Permit only the opaque evaluation submodule; complete ADR-0012 container, observability, replay, and load gates before any production Host reference | Retain the Shared/Tools skeleton or remove the evaluation gitlink; do not deploy a new Host on an unsupported runtime |
+| R-04 | .NET 8/9 expire before a successor is proven for the Fantasy server stack | High | High | Server platform + release | Successor deadline missed; the .NET 10 fork has green Windows/Ubuntu package/SIGTERM evidence and the candidate has a minimum real KCP flow, but no qualified impairment, replay, or 60-minute load matrix | Keep the Host on the gated candidate branch; complete ADR-0012 replay, impairment, final Unity, legal, and load gates before production merge | Retain the Shared/Tools skeleton or remove the evaluation gitlink; do not deploy the candidate while ADR-0012 is Proposed |
 | R-05 | Shared code compiles but diverges across Unity/server | Medium | High | Shared gameplay | Golden vector event/hash mismatch or conditional code added | Same source set; canonical hash; cross-runtime CI; explicit adapters | Revert incompatible change; never fork Shared source |
 | R-06 | Unity/server physics mismatch causes visible correction or invalid hit results | High | High | Gameplay + physics | Correction/error gates fail under Regional profile | Constrain predicted model, normalize queries, tune reconciliation; evaluate client Jolt | Return to simpler prediction/Unity adapter; server remains authoritative |
 | R-07 | Jolt native binding is unstable, slow, or costly on mobile | Medium | High | Physics adapter | ABI crash/leak, >3 ms P99, nonzero Tick allocations, unacceptable binary cost | Stable C ABI, sanitizer/native tests, representative benchmark, isolated lifecycle | Swap adapter or restrict Jolt to server; retain test fake and Unity client path |

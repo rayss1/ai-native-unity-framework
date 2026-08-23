@@ -5,6 +5,7 @@ namespace AiNative.BattleHost;
 internal sealed class AcceptanceRoomService(
     RuntimeReadiness readiness,
     BattleMetrics metrics,
+    RoomProtocolService protocol,
     ILogger<AcceptanceRoomService> logger) : BackgroundService
 {
     private static readonly TimeSpan TickInterval = TimeSpan.FromTicks(TimeSpan.TicksPerSecond / 60);
@@ -13,7 +14,7 @@ internal sealed class AcceptanceRoomService(
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         using PeriodicTimer timer = new(TickInterval);
-        readiness.MarkReady();
+        readiness.MarkRoomReady();
         logger.LogInformation("Acceptance room ready with {BotCount} bots at 60 Hz", _room.BotCount);
 
         try
@@ -21,8 +22,10 @@ internal sealed class AcceptanceRoomService(
             while (await timer.WaitForNextTickAsync(stoppingToken))
             {
                 long started = Stopwatch.GetTimestamp();
+                protocol.PumpInbound(_room, checked((ulong)readiness.Tick));
                 _room.Tick();
                 readiness.AdvanceTick();
+                protocol.PublishSnapshot(_room, checked((ulong)readiness.Tick));
                 metrics.RecordTick(Stopwatch.GetElapsedTime(started).TotalMilliseconds);
             }
         }
@@ -69,5 +72,41 @@ internal sealed class SyntheticRoom
                 _health[target] = _health[target] > 0 ? _health[target] - 1 : 100;
             }
         }
+    }
+
+    public void ApplyInput(int entityIndex, int moveXMilli, int moveYMilli)
+    {
+        if ((uint)entityIndex >= (uint)BotCount)
+        {
+            throw new ArgumentOutOfRangeException(nameof(entityIndex));
+        }
+
+        _positionX[entityIndex] += Math.Clamp(moveXMilli, -1000, 1000) / 20;
+        _positionZ[entityIndex] += Math.Clamp(moveYMilli, -1000, 1000) / 20;
+    }
+
+    public AiNative.Protocol.V1.Snapshot CreateSnapshot(ulong roomTick)
+    {
+        AiNative.Protocol.V1.Snapshot snapshot = new()
+        {
+            ProtocolMajor = 1,
+            RoomTick = roomTick,
+            BaselineTick = roomTick > 3 ? roomTick - 3 : 0,
+        };
+
+        for (int index = 0; index < BotCount; index++)
+        {
+            snapshot.Players.Add(new AiNative.Protocol.V1.PlayerState
+            {
+                EntityId = checked((uint)index + 1),
+                PositionXMilli = _positionX[index],
+                PositionYMilli = 0,
+                PositionZMilli = _positionZ[index],
+                YawMillidegrees = 0,
+                Health = checked((uint)_health[index]),
+            });
+        }
+
+        return snapshot;
     }
 }

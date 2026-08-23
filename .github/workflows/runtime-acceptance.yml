@@ -62,9 +62,11 @@ jobs:
           OTEL_EXPORTER_OTLP_ENDPOINT: http://127.0.0.1:4317
         run: |
           set -euo pipefail
+          test "$(find "$GITHUB_WORKSPACE/artifacts/battle-host" -name Fantasy.config -type f | wc -l)" = '1'
+          grep -q 'Fantasy-Net/2026.1.1002' "$GITHUB_WORKSPACE/artifacts/battle-host/AiNative.BattleHost.deps.json"
           stdout="$GITHUB_WORKSPACE/artifacts/battle-host.stdout.log"
           stderr="$GITHUB_WORKSPACE/artifacts/battle-host.stderr.log"
-          dotnet "$GITHUB_WORKSPACE/artifacts/battle-host/AiNative.BattleHost.dll" >"$stdout" 2>"$stderr" &
+          dotnet "$GITHUB_WORKSPACE/artifacts/battle-host/AiNative.BattleHost.dll" -m Develop >"$stdout" 2>"$stderr" &
           host_pid=$!
           cleanup() { kill -KILL "$host_pid" >/dev/null 2>&1 || true; }
           trap cleanup EXIT
@@ -76,6 +78,9 @@ jobs:
             fi
             sleep 0.25
           done
+          probe="$(curl --fail --silent --request POST http://127.0.0.1:5080/admin/kcp-loopback)"
+          test "$(jq -r '.status' <<<"$probe")" = 'ok'
+          test "$(jq -r '.reconnectedEpoch > .initialConnectionEpoch' <<<"$probe")" = 'true'
           curl --fail --silent --request POST http://127.0.0.1:5080/admin/drain >/dev/null
           test "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:5080/health/ready)" = '503'
           kill -TERM "$host_pid"
@@ -148,6 +153,11 @@ jobs:
           done
           test "$(docker exec "$container_id" id -u)" != '0'
           docker exec "$container_id" sh -c "grep -q '\"tfm\": \"net10.0\"' /app/AiNative.BattleHost.runtimeconfig.json"
+          test "$(docker exec "$container_id" sh -c 'find /app -name Fantasy.config -type f | wc -l')" = '1'
+          docker exec "$container_id" grep -q 'Fantasy-Net/2026.1.1002' /app/AiNative.BattleHost.deps.json
+          probe="$(curl --fail --silent --request POST http://127.0.0.1:5081/admin/kcp-loopback)"
+          test "$(jq -r '.status' <<<"$probe")" = 'ok'
+          test "$(jq -r '.reconnectedEpoch > .initialConnectionEpoch' <<<"$probe")" = 'true'
           curl --fail --silent --request POST http://127.0.0.1:5081/admin/drain >/dev/null
           readiness_deadline=$((SECONDS + 2))
           until test "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:5081/health/ready)" = '503'; do
