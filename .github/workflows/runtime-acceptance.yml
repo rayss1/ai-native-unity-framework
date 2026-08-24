@@ -348,11 +348,16 @@ jobs:
               > "$GITHUB_WORKSPACE/artifacts/runtime-acceptance/$profile-netem.txt"
             pcap="$GITHUB_WORKSPACE/artifacts/runtime-acceptance/$profile.pcap"
             sudo nsenter --target "$container_pid" --net \
-              tcpdump --immediate-mode --snapshot-length 0 --interface lo \
-              --write-file "$pcap" 'udp port 22000' \
+              tcpdump -U -s 0 -i lo -w "$pcap" 'udp port 22000' \
               > "$GITHUB_WORKSPACE/artifacts/runtime-acceptance/$profile-tcpdump.log" 2>&1 &
             capture_pid=$!
             sleep 0.5
+            if ! kill -0 "$capture_pid" 2>/dev/null; then
+              wait "$capture_pid" || true
+              capture_pid=''
+              cat "$GITHUB_WORKSPACE/artifacts/runtime-acceptance/$profile-tcpdump.log"
+              exit 1
+            fi
             response="$GITHUB_WORKSPACE/artifacts/runtime-acceptance/$profile-load.json"
             http_status="$(curl --silent --max-time 240 --output "$response" --write-out '%{http_code}' \
               --request POST 'http://127.0.0.1:5083/admin/kcp-load?botCount=64&warmupSeconds=10&durationSeconds=60')"
@@ -361,9 +366,16 @@ jobs:
               docker logs "$active_container"
               exit 1
             fi
-            sudo kill -INT "$capture_pid"
-            wait "$capture_pid" || true
+            if ! sudo kill -INT "$capture_pid"; then
+              wait "$capture_pid" || true
+              capture_pid=''
+              cat "$GITHUB_WORKSPACE/artifacts/runtime-acceptance/$profile-tcpdump.log"
+              exit 1
+            fi
+            wait "$capture_pid"
             capture_pid=''
+            cat "$GITHUB_WORKSPACE/artifacts/runtime-acceptance/$profile-tcpdump.log"
+            test "$(stat --format '%s' "$pcap")" -gt 24
             sudo nsenter --target "$container_pid" --net tc -s qdisc show dev lo \
               > "$GITHUB_WORKSPACE/artifacts/runtime-acceptance/$profile-netem-stats.txt"
             dropped="$(sed -n 's/.*dropped \([0-9][0-9]*\).*/\1/p' "$GITHUB_WORKSPACE/artifacts/runtime-acceptance/$profile-netem-stats.txt" | head -1)"
@@ -393,6 +405,18 @@ jobs:
 
           run_profile regional-socket 50ms 10ms 1% 0.5% 1%
           run_profile degraded-socket 100ms 20ms 5% 1% 2%
+
+      - name: Upload socket impairment failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: runtime-acceptance-socket-failure
+          path: |
+            artifacts/runtime-acceptance/*-socket-load.json
+            artifacts/runtime-acceptance/*-socket-netem*.txt
+            artifacts/runtime-acceptance/*-socket-tcpdump.log
+            artifacts/runtime-acceptance/*-socket.pcap
+          if-no-files-found: warn
 
       - name: Record candidate image provenance
         shell: bash
