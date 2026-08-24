@@ -32,9 +32,11 @@ WS-16 exposed that the tracked `Fantasy-Net` package lagged the graceful-shutdow
 
 [Fantasy PR #5](https://github.com/rayss1/Fantasy/pull/5) retained the existing 470-byte outer KCP MTU by default while allowing a process to select and freeze an internet-safe value up to 1150 bytes before the first outer network is created. It regenerated tracked package `2026.1.1003`, kept the .NET and Unity KCP sources aligned, and passed the [SDK 10.0.202 Windows/Ubuntu matrix](https://github.com/rayss1/Fantasy/actions/runs/32696781372). The parent candidate fixes 1150 at its adapter boundary so a 799-byte Snapshot fits one KCP segment while the Fantasy reserved header plus IPv4/UDP overhead remains below 1200 bytes.
 
-The first exact 60 Hz Linux socket rerun passed Regional wire budgets but Degraded loss caused stale reliable KCP Input retransmissions to raise upstream P95 to `75.648 kbit/s`. The candidate therefore adds protocol ID 1103 as an additive, Protobuf-first `InputBatch`: clients still sample 60 ordered movement/fire commands per second, but send two commands per 30 Hz batch while the original ID 1100 decoder remains supported. This follows ADR-0006's input-coalescing allowance and ADR-0009's compatibility rules; exact Linux impairment, replay, generated-drift, and Unity vector evidence is required before it counts toward acceptance.
+The first exact 60 Hz Linux socket rerun passed Regional wire budgets but Degraded loss caused stale reliable KCP Input retransmissions to raise upstream P95 to `75.648 kbit/s`. The candidate therefore adds protocol ID 1103 as an additive, Protobuf-first `InputBatch`: clients still sample 60 ordered movement/fire commands per second, but send two commands per 30 Hz batch while the original ID 1100 decoder remains supported. This follows ADR-0006's input-coalescing allowance and ADR-0009's compatibility rules.
 
-The next WS-16 slice adds newest-only Snapshot coalescing, bounded asynchronous production Input capture with strict deterministic replay, fixed-seed Regional/Degraded/Backpressure codec profiles, exact Host performance reports, and a real 64-session Fantasy KCP load probe. Linux CI additionally applies explicit Regional/Degraded `tc netem` profiles inside the candidate network namespace and derives per-client bandwidth/datagram evidence from a hashed packet capture. The label-gated soak measures 60 full minutes only after clients join and the declared warm-up ends. Local parser/short-load evidence passes, while exact-commit Linux socket and qualified-duration reports remain to be recorded.
+WS-16 adds newest-only Snapshot coalescing, bounded asynchronous production Input capture with strict deterministic replay, fixed-seed Regional/Degraded/Backpressure codec profiles, exact Host performance reports, and a real 64-session Fantasy KCP load probe. Linux CI additionally applies explicit Regional/Degraded `tc netem` profiles inside the candidate network namespace and derives per-client bandwidth/datagram evidence from a hashed packet capture. The label-gated soak measures 60 full minutes only after clients join and the declared warm-up ends.
+
+[Exact Linux candidate run 32710003483](https://github.com/rayss1/ai-native-unity-framework/actions/runs/32710003483) passed at parent commit `fd366411991d78e5ac517f79e020976608ca4113`, Fantasy `f8bed0d464924f159d46498f1311206ea0694be8`, and protocol SHA-256 `726a80d6a762913b87fe840f0be9086224598bcaadb0e4a7d4e3e44856c0b92c`. It passed 17 candidate tests, deterministic Regional/Degraded/Backpressure gates, direct and non-root image KCP/replay/load probes, zero-vulnerability audit, bounded drain/SIGTERM, and the two qualified 64-client socket profiles. Regional measured exactly 230,400 Input frames at `60.0006 Hz` and 115,200 batches at `30.0003 Hz`; PCAP P95 was `173.480 kbit/s` downstream and `43.744 kbit/s` upstream with a 917-byte maximum UDP payload. Degraded measured the same frame/batch counts at `60.0001/30.0001 Hz`; PCAP P95 was `197.488/49.064 kbit/s` with a 987-byte maximum. Host Tick P99/P99.9 remained at or below `0.7743/1.0147 ms`, Gameplay allocation was zero, and both captures passed their immutable identity and wire gates. The full 60-minute qualified soak, exact-final-commit Unity evidence, and legal review remain open.
 
 ## Proposed decision
 
@@ -50,8 +52,8 @@ Completed recovery evidence: the focused fork commits are merged and pinned by e
 
 Remaining acceptance evidence:
 
-1. Pass final-commit Shared vectors in both .NET and Unity, plus deterministic replay, Regional/Degraded impairment, allocation, blocked-client isolation, and backpressure tests. While ADR-0014 is active, Unity proof is an exact-commit manual evidence bundle rather than an automatic CI result.
-2. Pass the 64-player load and Tick budgets on release-equivalent Linux artifacts.
+1. Pass final-commit Shared vectors in Unity. The matching .NET vectors, deterministic replay, Regional/Degraded impairment, allocation, blocked-client isolation, and backpressure gates are green; while ADR-0014 is active, Unity proof is an exact-commit manual evidence bundle rather than an automatic CI result.
+2. Pass the label-gated 60-minute 64-player soak and Tick budgets on the exact release-equivalent Linux artifact; the qualified 60-second Regional/Degraded socket profiles are green.
 3. Complete the Fantasy license/legal review before commercial distribution, redistribution, or publication of derived artifacts.
 
 ## Acceptance, migration, and rollback
@@ -75,6 +77,7 @@ If the evidence fails, keep the Shared/Tools skeleton, isolate or replace the fa
 - [Green runtime/package identity Windows/Ubuntu matrix](https://github.com/rayss1/Fantasy/actions/runs/32630957890)
 - [Outer KCP MTU and package 2026.1.1003 PR](https://github.com/rayss1/Fantasy/pull/5)
 - [Green outer KCP MTU Windows/Ubuntu matrix](https://github.com/rayss1/Fantasy/actions/runs/32696781372)
+- [Green exact-commit 64-client Linux socket, replay, and image run](https://github.com/rayss1/ai-native-unity-framework/actions/runs/32710003483)
 - [Green exact-source real-KCP candidate and image run](https://github.com/rayss1/ai-native-unity-framework/actions/runs/32631900769)
 - [Green parent Linux container and provenance run](https://github.com/rayss1/ai-native-unity-framework/actions/runs/32278435820)
 - [Green parent submodule and .NET 8/.NET 9 validation run](https://github.com/rayss1/ai-native-unity-framework/actions/runs/32242925933)
