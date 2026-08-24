@@ -15,11 +15,12 @@ public sealed class BattleMetrics : IDisposable
     private readonly double[]? _tickSamples;
     private readonly double[]? _gameplaySamples;
     private readonly long[]? _gameplayAllocations;
-    private readonly int _warmupTicks;
-    private readonly long _startedTimestamp = Stopwatch.GetTimestamp();
+    private int _warmupTicks;
+    private long _startedTimestamp = Stopwatch.GetTimestamp();
     private int _acceptanceReportWritten;
     private int _sampleCount;
     private int _observedTickCount;
+    private int _requestedWarmupTicks = -1;
 
     public BattleMetrics(IConfiguration? configuration = null)
     {
@@ -42,6 +43,15 @@ public sealed class BattleMetrics : IDisposable
     public void RecordTick(double milliseconds)
     {
         _tickDurationMilliseconds.Record(milliseconds);
+        int requestedWarmup = Interlocked.Exchange(ref _requestedWarmupTicks, -1);
+        if (requestedWarmup >= 0)
+        {
+            _warmupTicks = requestedWarmup;
+            _sampleCount = 0;
+            _observedTickCount = 0;
+            Volatile.Write(ref _startedTimestamp, Stopwatch.GetTimestamp());
+        }
+
         int observedTick = _observedTickCount++;
         if (observedTick < _warmupTicks)
         {
@@ -74,6 +84,15 @@ public sealed class BattleMetrics : IDisposable
 
     public void RecordReplayDropped() => _droppedReplayRecords.Add(1);
 
+    public void RequestAcceptanceMeasurement(int warmupTicks)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(warmupTicks);
+        if (_tickSamples is not null)
+        {
+            Interlocked.Exchange(ref _requestedWarmupTicks, warmupTicks);
+        }
+    }
+
     public void WriteAcceptanceReport(ulong finalTick, ulong finalStateHash)
     {
         if (_acceptanceReportPath is null ||
@@ -102,7 +121,7 @@ public sealed class BattleMetrics : IDisposable
             SampleCount: count,
             FinalTick: finalTick,
             FinalStateHash: finalStateHash.ToString("x16", System.Globalization.CultureInfo.InvariantCulture),
-            ElapsedSeconds: Stopwatch.GetElapsedTime(_startedTimestamp).TotalSeconds,
+            ElapsedSeconds: Stopwatch.GetElapsedTime(Volatile.Read(ref _startedTimestamp)).TotalSeconds,
             TickP99Milliseconds: tickP99,
             TickP999Milliseconds: tickP999,
             SlowTickPercentage: count == 0 ? 100 : slowTicks * 100d / count,

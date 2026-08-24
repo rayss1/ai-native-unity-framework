@@ -11,6 +11,11 @@ internal static class Program
 {
     public static int Main(string[] args)
     {
+        if (args.Contains("--pcap", StringComparer.Ordinal))
+        {
+            return PcapCommand.Run(args);
+        }
+
         AcceptanceOptions options = AcceptanceOptions.Parse(args);
         NetworkProfile profile = NetworkProfile.Resolve(options.Profile);
         ScenarioReport report = ScenarioRunner.Run(profile, options);

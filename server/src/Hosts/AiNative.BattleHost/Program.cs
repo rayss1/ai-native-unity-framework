@@ -86,14 +86,19 @@ if (builder.Configuration.GetValue("AINATIVE_ENABLE_EVALUATION_ENDPOINTS", false
 
         app.MapPost("/admin/kcp-load", async (
             FantasyKcpGateway gateway,
+            BattleMetrics metrics,
             int? botCount,
             int? durationSeconds,
+            int? warmupSeconds,
             CancellationToken cancellationToken) =>
         {
+            int requestedWarmupSeconds = warmupSeconds ?? 1;
             FantasyKcpLoadResult result = await FantasyKcpLoadProbe.RunAsync(
                 gateway,
                 botCount ?? 64,
                 TimeSpan.FromSeconds(durationSeconds ?? 10),
+                TimeSpan.FromSeconds(requestedWarmupSeconds),
+                () => metrics.RequestAcceptanceMeasurement(checked(requestedWarmupSeconds * 60)),
                 cancellationToken);
             return Results.Ok(result);
         });

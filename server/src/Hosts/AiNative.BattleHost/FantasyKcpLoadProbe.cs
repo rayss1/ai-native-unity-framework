@@ -11,14 +11,18 @@ internal static class FantasyKcpLoadProbe
     public static async Task<FantasyKcpLoadResult> RunAsync(
         FantasyKcpGateway gateway,
         int botCount,
-        TimeSpan duration,
+        TimeSpan measuredDuration,
+        TimeSpan warmupDuration,
+        Action loadReady,
         CancellationToken cancellationToken)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(botCount, 2);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(botCount, 64);
-        if (duration <= TimeSpan.Zero || duration > TimeSpan.FromMinutes(65))
+        ArgumentNullException.ThrowIfNull(loadReady);
+        if (measuredDuration <= TimeSpan.Zero || measuredDuration > TimeSpan.FromMinutes(60) ||
+            warmupDuration < TimeSpan.Zero || warmupDuration > TimeSpan.FromMinutes(5))
         {
-            throw new ArgumentOutOfRangeException(nameof(duration));
+            throw new ArgumentOutOfRangeException(nameof(measuredDuration));
         }
 
         using CancellationTokenSource startupTimeout =
@@ -72,15 +76,25 @@ internal static class FantasyKcpLoadProbe
                 }
             }
 
+            loadReady();
+            long loadStartedUnixMilliseconds = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            long loadStartedTimestamp = Stopwatch.GetTimestamp();
+            long measuredStartedUnixMilliseconds = 0;
             using PeriodicTimer timer = new(TimeSpan.FromTicks(TimeSpan.TicksPerSecond / 60));
             using CancellationTokenSource durationLimit =
                 CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            durationLimit.CancelAfter(duration);
+            durationLimit.CancelAfter(warmupDuration + measuredDuration);
             uint sequence = 0;
             try
             {
                 while (await timer.WaitForNextTickAsync(durationLimit.Token))
                 {
+                    if (measuredStartedUnixMilliseconds == 0 &&
+                        Stopwatch.GetElapsedTime(loadStartedTimestamp) >= warmupDuration)
+                    {
+                        measuredStartedUnixMilliseconds = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+                    }
+
                     sequence++;
                     for (int index = 0; index < botCount; index++)
                     {
@@ -125,7 +139,6 @@ internal static class FantasyKcpLoadProbe
             {
             }
 
-            double elapsedSeconds = Stopwatch.GetElapsedTime(started).TotalSeconds;
             if (snapshotFrames == 0 || newestSnapshotTick == 0)
             {
                 throw new InvalidOperationException("The 64-bot KCP load probe received no production snapshots.");
@@ -133,7 +146,13 @@ internal static class FantasyKcpLoadProbe
 
             return new FantasyKcpLoadResult(
                 botCount,
-                elapsedSeconds,
+                SetupSeconds: Stopwatch.GetElapsedTime(started, loadStartedTimestamp).TotalSeconds,
+                LoadElapsedSeconds: Stopwatch.GetElapsedTime(loadStartedTimestamp).TotalSeconds,
+                WarmupSeconds: warmupDuration.TotalSeconds,
+                MeasuredSeconds: measuredDuration.TotalSeconds,
+                LoadStartedUnixMilliseconds: loadStartedUnixMilliseconds,
+                MeasuredStartedUnixMilliseconds: measuredStartedUnixMilliseconds,
+                CompletedUnixMilliseconds: DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
                 inputFrames,
                 snapshotFrames,
                 snapshotBytes,
@@ -155,7 +174,13 @@ internal static class FantasyKcpLoadProbe
 
 internal readonly record struct FantasyKcpLoadResult(
     int BotCount,
-    double ElapsedSeconds,
+    double SetupSeconds,
+    double LoadElapsedSeconds,
+    double WarmupSeconds,
+    double MeasuredSeconds,
+    long LoadStartedUnixMilliseconds,
+    long MeasuredStartedUnixMilliseconds,
+    long CompletedUnixMilliseconds,
     long InputFrames,
     long SnapshotFrames,
     long SnapshotBytes,
