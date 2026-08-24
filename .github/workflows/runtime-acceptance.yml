@@ -145,7 +145,7 @@ jobs:
             sleep 0.25
           done
           load_file="$GITHUB_WORKSPACE/artifacts/runtime-acceptance/direct-load-response.json"
-          load_status="$(curl --silent --output "$load_file" --write-out '%{http_code}' --request POST 'http://127.0.0.1:5080/admin/kcp-load?botCount=64&durationSeconds=5')"
+          load_status="$(curl --silent --output "$load_file" --write-out '%{http_code}' --request POST 'http://127.0.0.1:5080/admin/kcp-load?botCount=64&warmupSeconds=1&durationSeconds=5')"
           if test "$load_status" != '200'; then
             cat "$load_file" "$stdout" "$stderr"
             exit 1
@@ -270,7 +270,7 @@ jobs:
             sleep 0.25
           done
           load_file="$GITHUB_WORKSPACE/artifacts/runtime-acceptance/image-load-response.json"
-          load_status="$(curl --silent --output "$load_file" --write-out '%{http_code}' --request POST 'http://127.0.0.1:5081/admin/kcp-load?botCount=64&durationSeconds=5')"
+          load_status="$(curl --silent --output "$load_file" --write-out '%{http_code}' --request POST 'http://127.0.0.1:5081/admin/kcp-load?botCount=64&warmupSeconds=1&durationSeconds=5')"
           if test "$load_status" != '200'; then
             cat "$load_file"
             docker logs "$container_id"
@@ -290,6 +290,103 @@ jobs:
           test "$(jq -r '.gameplayAllocatedBytes' "$GITHUB_WORKSPACE/artifacts/runtime-acceptance/image-load-report.json")" = '0'
           test "$(jq -r '.tickP99Milliseconds <= 16.67' "$GITHUB_WORKSPACE/artifacts/runtime-acceptance/image-load-report.json")" = 'true'
           docker rm "$first_container_id" >/dev/null
+
+      - name: Run qualified Linux socket impairment profiles
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v nsenter >/dev/null
+          command -v tc >/dev/null
+          command -v tcpdump >/dev/null
+          export AINATIVE_SOURCE_COMMIT="$CANDIDATE_SOURCE_COMMIT"
+          export AINATIVE_FANTASY_COMMIT="$(git -C server/vendor/Fantasy rev-parse HEAD)"
+          export AINATIVE_PROTOCOL_IDENTITY="$(sha256sum shared/schemas/ainative/v1/gameplay.proto | cut -d ' ' -f 1)"
+          runner="$GITHUB_WORKSPACE/artifacts/bin/AiNative.RuntimeAcceptance/Release/net10.0/AiNative.RuntimeAcceptance.dll"
+          active_container=''
+          capture_pid=''
+          cleanup_impairment() {
+            if test -n "$capture_pid"; then sudo kill -INT "$capture_pid" >/dev/null 2>&1 || true; fi
+            if test -n "$active_container"; then docker rm --force "$active_container" >/dev/null 2>&1 || true; fi
+          }
+          trap cleanup_impairment EXIT
+
+          run_profile() {
+            profile="$1"
+            delay="$2"
+            jitter="$3"
+            loss="$4"
+            duplicate="$5"
+            reorder="$6"
+            active_container="$(docker run --detach \
+              --publish 127.0.0.1:5083:8080 \
+              --env AINATIVE_ENABLE_EVALUATION_ENDPOINTS=true \
+              --env AINATIVE_ACCEPTANCE_REPORT_PATH="/tmp/$profile-host.json" \
+              --env AINATIVE_ACCEPTANCE_MAX_TICKS=6000 \
+              ainative/battle-host:acceptance)"
+            deadline=$((SECONDS + 30))
+            until curl --fail --silent http://127.0.0.1:5083/health/ready >/dev/null; do
+              if ! docker inspect --format '{{.State.Running}}' "$active_container" | grep -q true || (( SECONDS >= deadline )); then
+                docker logs "$active_container"
+                exit 1
+              fi
+              sleep 0.25
+            done
+            container_pid="$(docker inspect --format '{{.State.Pid}}' "$active_container")"
+            sudo nsenter --target "$container_pid" --net \
+              tc qdisc replace dev lo root netem \
+              delay "$delay" "$jitter" 25% \
+              loss random "$loss" \
+              duplicate "$duplicate" \
+              reorder "$reorder" 50%
+            sudo nsenter --target "$container_pid" --net tc qdisc show dev lo \
+              > "$GITHUB_WORKSPACE/artifacts/runtime-acceptance/$profile-netem.txt"
+            pcap="$GITHUB_WORKSPACE/artifacts/runtime-acceptance/$profile.pcap"
+            sudo nsenter --target "$container_pid" --net \
+              tcpdump --immediate-mode --snapshot-length 0 --interface lo \
+              --write-file "$pcap" 'udp port 22000' \
+              > "$GITHUB_WORKSPACE/artifacts/runtime-acceptance/$profile-tcpdump.log" 2>&1 &
+            capture_pid=$!
+            sleep 0.5
+            response="$GITHUB_WORKSPACE/artifacts/runtime-acceptance/$profile-load.json"
+            http_status="$(curl --silent --max-time 240 --output "$response" --write-out '%{http_code}' \
+              --request POST 'http://127.0.0.1:5083/admin/kcp-load?botCount=64&warmupSeconds=10&durationSeconds=60')"
+            if test "$http_status" != '200'; then
+              cat "$response"
+              docker logs "$active_container"
+              exit 1
+            fi
+            sudo kill -INT "$capture_pid"
+            wait "$capture_pid" || true
+            capture_pid=''
+            sudo nsenter --target "$container_pid" --net tc -s qdisc show dev lo \
+              > "$GITHUB_WORKSPACE/artifacts/runtime-acceptance/$profile-netem-stats.txt"
+            dropped="$(sed -n 's/.*dropped \([0-9][0-9]*\).*/\1/p' "$GITHUB_WORKSPACE/artifacts/runtime-acceptance/$profile-netem-stats.txt" | head -1)"
+            test "${dropped:-0}" -gt 0
+            docker stop --signal TERM --time 30 "$active_container"
+            test "$(docker inspect --format '{{.State.ExitCode}}' "$active_container")" = '0'
+            host_report="$GITHUB_WORKSPACE/artifacts/runtime-acceptance/$profile-host.json"
+            docker cp "$active_container:/tmp/$profile-host.json" "$host_report"
+            test "$(jq -r '.botCount' "$response")" = '64'
+            test "$(jq -r '.peakConnections' "$response")" = '64'
+            test "$(jq -r '.loadElapsedSeconds >= 70' "$response")" = 'true'
+            test "$(jq -r '.sampleCount >= 3500' "$host_report")" = 'true'
+            test "$(jq -r '.tickP99Milliseconds <= 16.67' "$host_report")" = 'true'
+            test "$(jq -r '.tickP999Milliseconds <= 20' "$host_report")" = 'true'
+            test "$(jq -r '.slowTickPercentage <= 0.1' "$host_report")" = 'true'
+            test "$(jq -r '.gameplayP99Milliseconds <= 8' "$host_report")" = 'true'
+            test "$(jq -r '.gameplayAllocatedBytes' "$host_report")" = '0'
+            dotnet "$runner" \
+              --pcap "$pcap" \
+              --server-port 22000 \
+              --start-unix-ms "$(jq -r '.measuredStartedUnixMilliseconds' "$response")" \
+              --duration-seconds 60 \
+              --output "$GITHUB_WORKSPACE/artifacts/runtime-acceptance/$profile-wire.json"
+            docker rm "$active_container" >/dev/null
+            active_container=''
+          }
+
+          run_profile regional-socket 50ms 10ms 1% 0.5% 1%
+          run_profile degraded-socket 100ms 20ms 5% 1% 2%
 
       - name: Record candidate image provenance
         shell: bash
@@ -331,6 +428,14 @@ jobs:
             artifacts/runtime-acceptance/image-load.anrp
             artifacts/runtime-acceptance/image-load-report.json
             artifacts/runtime-acceptance/image-load-response.json
+            artifacts/runtime-acceptance/regional-socket-*.json
+            artifacts/runtime-acceptance/regional-socket-netem*.txt
+            artifacts/runtime-acceptance/regional-socket-tcpdump.log
+            artifacts/runtime-acceptance/regional-socket.pcap
+            artifacts/runtime-acceptance/degraded-socket-*.json
+            artifacts/runtime-acceptance/degraded-socket-netem*.txt
+            artifacts/runtime-acceptance/degraded-socket-tcpdump.log
+            artifacts/runtime-acceptance/degraded-socket.pcap
           if-no-files-found: error
 
       - name: Run labeled 60-minute release-equivalent 64-bot soak
@@ -355,8 +460,8 @@ jobs:
             fi
             sleep 0.25
           done
-          curl --fail --silent --max-time 3700 --request POST \
-            'http://127.0.0.1:5082/admin/kcp-load?botCount=64&durationSeconds=3600' \
+          curl --fail --silent --max-time 3800 --request POST \
+            'http://127.0.0.1:5082/admin/kcp-load?botCount=64&warmupSeconds=10&durationSeconds=3600' \
             > "$GITHUB_WORKSPACE/artifacts/runtime-acceptance/soak-load.json"
           docker stop --signal TERM --time 30 "$soak_container"
           test "$(docker inspect --format '{{.State.ExitCode}}' "$soak_container")" = '0'
@@ -366,11 +471,11 @@ jobs:
           report="$GITHUB_WORKSPACE/artifacts/runtime-acceptance/soak-host.json"
           test "$(jq -r '.botCount' "$load")" = '64'
           test "$(jq -r '.peakConnections' "$load")" = '64'
-          test "$(jq -r '.elapsedSeconds >= 3600' "$load")" = 'true'
+          test "$(jq -r '.loadElapsedSeconds >= 3610' "$load")" = 'true'
           test "$(jq -r '.inputFrames > 10000000' "$load")" = 'true'
           test "$(jq -r '.snapshotFrames > 1000000' "$load")" = 'true'
-          test "$(jq -r '.sampleCount >= 215000' "$report")" = 'true'
-          test "$(jq -r '.elapsedSeconds >= 3600' "$report")" = 'true'
+          test "$(jq -r '.sampleCount >= 215900' "$report")" = 'true'
+          test "$(jq -r '.elapsedSeconds >= 3610' "$report")" = 'true'
           test "$(jq -r '.tickP99Milliseconds <= 16.67' "$report")" = 'true'
           test "$(jq -r '.tickP999Milliseconds <= 20' "$report")" = 'true'
           test "$(jq -r '.slowTickPercentage <= 0.1' "$report")" = 'true'
