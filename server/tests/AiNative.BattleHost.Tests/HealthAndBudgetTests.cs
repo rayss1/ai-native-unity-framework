@@ -16,6 +16,22 @@ namespace AiNative.BattleHost.Tests;
 public sealed class HealthAndBudgetTests
 {
     [Test]
+    public void FixedRatePacerPreservesFractionalSixtyHertzDeadlines()
+    {
+        long[] deadlines = Enumerable.Range(1, 60)
+            .Select(tick => MonotonicFixedRatePacer.GetDeadlineOffset(tick, 60, 1000))
+            .ToArray();
+        long[] intervals = deadlines
+            .Zip(new long[] { 0 }.Concat(deadlines[..^1]), (deadline, previous) => deadline - previous)
+            .ToArray();
+
+        Assert.That(deadlines[^1], Is.EqualTo(1000));
+        Assert.That(intervals.Count(interval => interval == 16), Is.EqualTo(20));
+        Assert.That(intervals.Count(interval => interval == 17), Is.EqualTo(40));
+        Assert.That(intervals.Sum(), Is.EqualTo(1000));
+    }
+
+    [Test]
     public void ReadinessRequiresBothRoomAndNetworkWhenFantasyIsEnabled()
     {
         RuntimeReadiness readiness = new(networkRequired: true);

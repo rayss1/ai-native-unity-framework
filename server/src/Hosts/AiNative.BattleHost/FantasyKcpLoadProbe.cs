@@ -33,6 +33,7 @@ internal static class FantasyKcpLoadProbe
         InputCommand[] commands = new InputCommand[botCount];
         byte[] sendBuffer = new byte[RealtimeProtocolCodec.MaxDatagramBytes];
         long inputFrames = 0;
+        long measuredInputFrames = 0;
         long snapshotFrames = 0;
         long snapshotBytes = 0;
         ulong newestSnapshotTick = 0;
@@ -119,63 +120,62 @@ internal static class FantasyKcpLoadProbe
             long loadStartedUnixMilliseconds = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
             long loadStartedTimestamp = Stopwatch.GetTimestamp();
             long measuredStartedUnixMilliseconds = 0;
-            using PeriodicTimer timer = new(TimeSpan.FromTicks(TimeSpan.TicksPerSecond / 60));
-            using CancellationTokenSource durationLimit =
-                CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            durationLimit.CancelAfter(warmupDuration + measuredDuration);
+            long measuredStartedTimestamp = 0;
+            long warmupTicks = checked((long)Math.Ceiling(warmupDuration.TotalSeconds * 60));
+            long measuredTicks = checked((long)Math.Ceiling(measuredDuration.TotalSeconds * 60));
+            long totalTicks = checked(warmupTicks + measuredTicks);
+            MonotonicFixedRatePacer pacer = new(60);
             uint sequence = 0;
-            try
+            for (long loadTick = 0; loadTick < totalTicks; loadTick++)
             {
-                while (await timer.WaitForNextTickAsync(durationLimit.Token))
+                if (loadTick == warmupTicks)
                 {
-                    if (measuredStartedUnixMilliseconds == 0 &&
-                        Stopwatch.GetElapsedTime(loadStartedTimestamp) >= warmupDuration)
-                    {
-                        measuredStartedUnixMilliseconds = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-                    }
+                    measuredStartedTimestamp = Stopwatch.GetTimestamp();
+                    measuredStartedUnixMilliseconds = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+                }
 
-                    sequence++;
-                    for (int index = 0; index < botCount; index++)
+                await pacer.WaitForNextTickAsync(cancellationToken);
+                sequence++;
+                for (int index = 0; index < botCount; index++)
+                {
+                    InputCommand command = commands[index];
+                    command.RoomTick = newestSnapshotTick;
+                    command.Sequence = sequence;
+                    command.MoveXMilli = ((index + (int)sequence) & 1) == 0 ? 1000 : -1000;
+                    command.MoveYMilli = ((index + (int)(sequence / 30)) & 1) == 0 ? 500 : -500;
+                    await FantasyKcpLoopbackProbe.SendAsync(
+                        probes[index],
+                        MessageId.InputCommand,
+                        command,
+                        sendBuffer,
+                        cancellationToken);
+                    inputFrames++;
+                    if (loadTick >= warmupTicks)
                     {
-                        InputCommand command = commands[index];
-                        command.RoomTick = newestSnapshotTick;
-                        command.Sequence = sequence;
-                        command.MoveXMilli = ((index + (int)sequence) & 1) == 0 ? 1000 : -1000;
-                        command.MoveYMilli = ((index + (int)(sequence / 30)) & 1) == 0 ? 500 : -500;
-                        await FantasyKcpLoopbackProbe.SendAsync(
-                            probes[index],
-                            MessageId.InputCommand,
-                            command,
-                            sendBuffer,
-                            durationLimit.Token);
-                        inputFrames++;
-                    }
-
-                    for (int index = 0; index < botCount; index++)
-                    {
-                        Span<byte> receiveBuffer = receiveBuffers[index];
-                        while (probes[index].Transport.TryReceive(receiveBuffer, out ReceivedPacket packet))
-                        {
-                            if (!packet.IsComplete ||
-                                RealtimeProtocolCodec.TryDecode(
-                                    receiveBuffer[..packet.WrittenBytes],
-                                    out DecodedProtocolMessage decoded) != ProtocolDecodeStatus.Accepted ||
-                                decoded.MessageId != MessageId.Snapshot ||
-                                decoded.Message is not Snapshot snapshot)
-                            {
-                                continue;
-                            }
-
-                            snapshotFrames++;
-                            snapshotBytes += packet.WrittenBytes;
-                            newestSnapshotTick = Math.Max(newestSnapshotTick, snapshot.RoomTick);
-                        }
+                        measuredInputFrames++;
                     }
                 }
-            }
-            catch (OperationCanceledException) when (
-                durationLimit.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
-            {
+
+                for (int index = 0; index < botCount; index++)
+                {
+                    Span<byte> receiveBuffer = receiveBuffers[index];
+                    while (probes[index].Transport.TryReceive(receiveBuffer, out ReceivedPacket packet))
+                    {
+                        if (!packet.IsComplete ||
+                            RealtimeProtocolCodec.TryDecode(
+                                receiveBuffer[..packet.WrittenBytes],
+                                out DecodedProtocolMessage decoded) != ProtocolDecodeStatus.Accepted ||
+                            decoded.MessageId != MessageId.Snapshot ||
+                            decoded.Message is not Snapshot snapshot)
+                        {
+                            continue;
+                        }
+
+                        snapshotFrames++;
+                        snapshotBytes += packet.WrittenBytes;
+                        newestSnapshotTick = Math.Max(newestSnapshotTick, snapshot.RoomTick);
+                    }
+                }
             }
 
             if (snapshotFrames == 0 || newestSnapshotTick == 0)
@@ -183,16 +183,22 @@ internal static class FantasyKcpLoadProbe
                 throw new InvalidOperationException("The 64-bot KCP load probe received no production snapshots.");
             }
 
+            long completedTimestamp = Stopwatch.GetTimestamp();
+            double measuredInputElapsedSeconds =
+                Stopwatch.GetElapsedTime(measuredStartedTimestamp, completedTimestamp).TotalSeconds;
             return new FantasyKcpLoadResult(
                 botCount,
                 SetupSeconds: Stopwatch.GetElapsedTime(started, loadStartedTimestamp).TotalSeconds,
-                LoadElapsedSeconds: Stopwatch.GetElapsedTime(loadStartedTimestamp).TotalSeconds,
+                LoadElapsedSeconds: Stopwatch.GetElapsedTime(loadStartedTimestamp, completedTimestamp).TotalSeconds,
                 WarmupSeconds: warmupDuration.TotalSeconds,
                 MeasuredSeconds: measuredDuration.TotalSeconds,
                 LoadStartedUnixMilliseconds: loadStartedUnixMilliseconds,
                 MeasuredStartedUnixMilliseconds: measuredStartedUnixMilliseconds,
                 CompletedUnixMilliseconds: DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
                 inputFrames,
+                measuredInputFrames,
+                measuredInputElapsedSeconds,
+                measuredInputFrames / (double)botCount / measuredInputElapsedSeconds,
                 snapshotFrames,
                 snapshotBytes,
                 newestSnapshotTick,
@@ -222,6 +228,9 @@ internal readonly record struct FantasyKcpLoadResult(
     long MeasuredStartedUnixMilliseconds,
     long CompletedUnixMilliseconds,
     long InputFrames,
+    long MeasuredInputFrames,
+    double MeasuredInputElapsedSeconds,
+    double MeasuredInputRateHz,
     long SnapshotFrames,
     long SnapshotBytes,
     ulong NewestSnapshotTick,

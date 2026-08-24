@@ -11,19 +11,19 @@ internal sealed class AcceptanceRoomService(
     BattleReplayCapture replayCapture,
     ILogger<AcceptanceRoomService> logger) : BackgroundService
 {
-    private static readonly TimeSpan TickInterval = TimeSpan.FromTicks(TimeSpan.TicksPerSecond / 60);
     private readonly SyntheticRoom _room = new(64);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        using PeriodicTimer timer = new(TickInterval);
+        MonotonicFixedRatePacer pacer = new(60);
         readiness.MarkRoomReady();
         logger.LogInformation("Acceptance room ready with {BotCount} bots at 60 Hz", _room.BotCount);
 
         try
         {
-            while (await timer.WaitForNextTickAsync(stoppingToken))
+            while (true)
             {
+                await pacer.WaitForNextTickAsync(stoppingToken);
                 long started = Stopwatch.GetTimestamp();
                 protocol.PumpInbound(_room, checked((ulong)readiness.Tick));
                 long gameplayStarted = Stopwatch.GetTimestamp();
