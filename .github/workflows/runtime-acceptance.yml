@@ -2,6 +2,7 @@ name: Runtime acceptance candidate
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, labeled]
     paths:
       - .github/workflows/runtime-acceptance.yml
       - .dockerignore
@@ -10,6 +11,7 @@ on:
       - Docs/Architecture/technology-baseline.md
       - infrastructure/runtime-acceptance/**
       - server/RuntimeAcceptance.sln
+      - server/acceptance/**
       - server/src/**
       - server/tests/**
       - shared/gameplay/**
@@ -23,7 +25,7 @@ permissions:
 jobs:
   candidate:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 90
     env:
       CANDIDATE_SOURCE_COMMIT: ${{ github.event.pull_request.head.sha }}
     steps:
@@ -50,6 +52,24 @@ jobs:
         working-directory: /tmp
         run: dotnet test "$GITHUB_WORKSPACE/server/RuntimeAcceptance.sln" --configuration Release --no-build --no-restore
 
+      - name: Run deterministic Regional, Degraded, and Backpressure profiles
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$GITHUB_WORKSPACE/artifacts/runtime-acceptance"
+          export AINATIVE_SOURCE_COMMIT="$CANDIDATE_SOURCE_COMMIT"
+          export AINATIVE_FANTASY_COMMIT="$(git -C "$GITHUB_WORKSPACE/server/vendor/Fantasy" rev-parse HEAD)"
+          export AINATIVE_PROTOCOL_IDENTITY="$(sha256sum "$GITHUB_WORKSPACE/shared/schemas/ainative/v1/gameplay.proto" | cut -d ' ' -f 1)"
+          runner="$GITHUB_WORKSPACE/artifacts/bin/AiNative.RuntimeAcceptance/Release/net10.0/AiNative.RuntimeAcceptance.dll"
+          for profile in regional degraded backpressure; do
+            dotnet "$runner" \
+              --profile "$profile" \
+              --warmup-ticks 600 \
+              --measured-ticks 3600 \
+              --seed 1592594996 \
+              --output "$GITHUB_WORKSPACE/artifacts/runtime-acceptance/$profile.json"
+          done
+
       - name: Publish candidate Host
         working-directory: /tmp
         run: >-
@@ -68,6 +88,10 @@ jobs:
           OTEL_EXPORTER_OTLP_ENDPOINT: http://127.0.0.1:4317
         run: |
           set -euo pipefail
+          export AINATIVE_SOURCE_COMMIT="$CANDIDATE_SOURCE_COMMIT"
+          export AINATIVE_FANTASY_COMMIT="$(git -C "$GITHUB_WORKSPACE/server/vendor/Fantasy" rev-parse HEAD)"
+          export AINATIVE_PROTOCOL_IDENTITY="$(sha256sum "$GITHUB_WORKSPACE/shared/schemas/ainative/v1/gameplay.proto" | cut -d ' ' -f 1)"
+          export AINATIVE_REPLAY_CAPTURE_PATH="$GITHUB_WORKSPACE/artifacts/runtime-acceptance/direct-battle.anrp"
           test "$(find "$GITHUB_WORKSPACE/artifacts/battle-host" -name Fantasy.config -type f | wc -l)" = '1'
           test -f "$GITHUB_WORKSPACE/artifacts/battle-host/Fantasy-Net.dll"
           grep -q 'Fantasy-Net/2026.1.1002' "$GITHUB_WORKSPACE/artifacts/battle-host/AiNative.BattleHost.deps.json"
@@ -101,6 +125,45 @@ jobs:
           done
           wait "$host_pid"
           host_pid=''
+          replay="$(dotnet "$GITHUB_WORKSPACE/artifacts/battle-host/AiNative.BattleHost.dll" --verify-replay "$AINATIVE_REPLAY_CAPTURE_PATH")"
+          test "$(jq -r '.InputCount' <<<"$replay")" = '1'
+          test "$(jq -r '.SourceCommit' <<<"$replay")" = "$CANDIDATE_SOURCE_COMMIT"
+          test "$(jq -r '.FantasyCommit' <<<"$replay")" = "$AINATIVE_FANTASY_COMMIT"
+          test "$(jq -r '.ProtocolIdentity' <<<"$replay")" = "$AINATIVE_PROTOCOL_IDENTITY"
+
+          export AINATIVE_REPLAY_CAPTURE_PATH="$GITHUB_WORKSPACE/artifacts/runtime-acceptance/direct-load.anrp"
+          export AINATIVE_ACCEPTANCE_REPORT_PATH="$GITHUB_WORKSPACE/artifacts/runtime-acceptance/direct-load-report.json"
+          export AINATIVE_ACCEPTANCE_WARMUP_TICKS=60
+          dotnet "$GITHUB_WORKSPACE/artifacts/battle-host/AiNative.BattleHost.dll" -m Develop >"$stdout" 2>"$stderr" &
+          host_pid=$!
+          deadline=$((SECONDS + 30))
+          until curl --fail --silent http://127.0.0.1:5080/health/ready >/dev/null; do
+            if ! kill -0 "$host_pid" 2>/dev/null || (( SECONDS >= deadline )); then
+              cat "$stdout" "$stderr"
+              exit 1
+            fi
+            sleep 0.25
+          done
+          load="$(curl --fail --silent --request POST 'http://127.0.0.1:5080/admin/kcp-load?botCount=64&durationSeconds=5')"
+          test "$(jq -r '.botCount' <<<"$load")" = '64'
+          test "$(jq -r '.peakConnections' <<<"$load")" = '64'
+          test "$(jq -r '.inputFrames > 1000' <<<"$load")" = 'true'
+          test "$(jq -r '.snapshotFrames > 0' <<<"$load")" = 'true'
+          kill -TERM "$host_pid"
+          shutdown_deadline=$((SECONDS + 10))
+          while kill -0 "$host_pid" 2>/dev/null; do
+            if (( SECONDS >= shutdown_deadline )); then
+              cat "$stdout" "$stderr"
+              exit 1
+            fi
+            sleep 0.1
+          done
+          wait "$host_pid"
+          host_pid=''
+          replay="$(dotnet "$GITHUB_WORKSPACE/artifacts/battle-host/AiNative.BattleHost.dll" --verify-replay "$AINATIVE_REPLAY_CAPTURE_PATH")"
+          test "$(jq -r '.InputCount > 1000' <<<"$replay")" = 'true'
+          test "$(jq -r '.gameplayAllocatedBytes' "$AINATIVE_ACCEPTANCE_REPORT_PATH")" = '0'
+          test "$(jq -r '.tickP99Milliseconds <= 16.67' "$AINATIVE_ACCEPTANCE_REPORT_PATH")" = 'true'
 
       - name: Audit candidate dependencies
         working-directory: /tmp
@@ -146,6 +209,7 @@ jobs:
           container_id="$(docker run --detach \
             --publish 127.0.0.1:5081:8080 \
             --env AINATIVE_ENABLE_EVALUATION_ENDPOINTS=true \
+            --env AINATIVE_REPLAY_CAPTURE_PATH=/tmp/battle.anrp \
             --env OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4317 \
             ainative/battle-host:acceptance)"
           cleanup() { docker rm --force "$container_id" >/dev/null 2>&1 || true; }
@@ -177,6 +241,42 @@ jobs:
           done
           docker stop --signal TERM --time 10 "$container_id"
           test "$(docker inspect --format '{{.State.ExitCode}}' "$container_id")" = '0'
+          docker cp "$container_id:/tmp/battle.anrp" "$GITHUB_WORKSPACE/artifacts/runtime-acceptance/image-battle.anrp"
+          replay="$(dotnet "$GITHUB_WORKSPACE/artifacts/battle-host/AiNative.BattleHost.dll" --verify-replay "$GITHUB_WORKSPACE/artifacts/runtime-acceptance/image-battle.anrp")"
+          test "$(jq -r '.InputCount' <<<"$replay")" = '1'
+          test "$(jq -r '.SourceCommit' <<<"$replay")" = "$CANDIDATE_SOURCE_COMMIT"
+          test "$(jq -r '.FantasyCommit' <<<"$replay")" = "$(git -C server/vendor/Fantasy rev-parse HEAD)"
+
+          first_container_id="$container_id"
+          container_id="$(docker run --detach \
+            --publish 127.0.0.1:5081:8080 \
+            --env AINATIVE_ENABLE_EVALUATION_ENDPOINTS=true \
+            --env AINATIVE_REPLAY_CAPTURE_PATH=/tmp/load.anrp \
+            --env AINATIVE_ACCEPTANCE_REPORT_PATH=/tmp/load-report.json \
+            --env AINATIVE_ACCEPTANCE_WARMUP_TICKS=60 \
+            ainative/battle-host:acceptance)"
+          deadline=$((SECONDS + 30))
+          until curl --fail --silent http://127.0.0.1:5081/health/ready >/dev/null; do
+            if ! docker inspect --format '{{.State.Running}}' "$container_id" | grep -q true || (( SECONDS >= deadline )); then
+              docker logs "$container_id"
+              exit 1
+            fi
+            sleep 0.25
+          done
+          load="$(curl --fail --silent --request POST 'http://127.0.0.1:5081/admin/kcp-load?botCount=64&durationSeconds=5')"
+          test "$(jq -r '.botCount' <<<"$load")" = '64'
+          test "$(jq -r '.peakConnections' <<<"$load")" = '64'
+          test "$(jq -r '.inputFrames > 1000' <<<"$load")" = 'true'
+          test "$(jq -r '.snapshotFrames > 0' <<<"$load")" = 'true'
+          docker stop --signal TERM --time 10 "$container_id"
+          test "$(docker inspect --format '{{.State.ExitCode}}' "$container_id")" = '0'
+          docker cp "$container_id:/tmp/load.anrp" "$GITHUB_WORKSPACE/artifacts/runtime-acceptance/image-load.anrp"
+          docker cp "$container_id:/tmp/load-report.json" "$GITHUB_WORKSPACE/artifacts/runtime-acceptance/image-load-report.json"
+          replay="$(dotnet "$GITHUB_WORKSPACE/artifacts/battle-host/AiNative.BattleHost.dll" --verify-replay "$GITHUB_WORKSPACE/artifacts/runtime-acceptance/image-load.anrp")"
+          test "$(jq -r '.InputCount > 1000' <<<"$replay")" = 'true'
+          test "$(jq -r '.gameplayAllocatedBytes' "$GITHUB_WORKSPACE/artifacts/runtime-acceptance/image-load-report.json")" = '0'
+          test "$(jq -r '.tickP99Milliseconds <= 16.67' "$GITHUB_WORKSPACE/artifacts/runtime-acceptance/image-load-report.json")" = 'true'
+          docker rm "$first_container_id" >/dev/null
 
       - name: Record candidate image provenance
         shell: bash
@@ -200,4 +300,75 @@ jobs:
         with:
           name: runtime-acceptance-provenance
           path: artifacts/runtime-acceptance/provenance.json
+          if-no-files-found: error
+
+      - name: Upload impairment and production replay evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: runtime-acceptance-evidence
+          path: |
+            artifacts/runtime-acceptance/regional.json
+            artifacts/runtime-acceptance/degraded.json
+            artifacts/runtime-acceptance/backpressure.json
+            artifacts/runtime-acceptance/direct-battle.anrp
+            artifacts/runtime-acceptance/direct-load.anrp
+            artifacts/runtime-acceptance/direct-load-report.json
+            artifacts/runtime-acceptance/image-battle.anrp
+            artifacts/runtime-acceptance/image-load.anrp
+            artifacts/runtime-acceptance/image-load-report.json
+          if-no-files-found: error
+
+      - name: Run labeled 60-minute release-equivalent 64-bot soak
+        if: contains(github.event.pull_request.labels.*.name, 'qualified-soak')
+        shell: bash
+        run: |
+          set -euo pipefail
+          soak_container="$(docker run --detach \
+            --publish 127.0.0.1:5082:8080 \
+            --env AINATIVE_ENABLE_EVALUATION_ENDPOINTS=true \
+            --env AINATIVE_ACCEPTANCE_REPORT_PATH=/tmp/soak-report.json \
+            --env AINATIVE_ACCEPTANCE_WARMUP_TICKS=600 \
+            --env AINATIVE_ACCEPTANCE_MAX_TICKS=230000 \
+            ainative/battle-host:acceptance)"
+          cleanup_soak() { docker rm --force "$soak_container" >/dev/null 2>&1 || true; }
+          trap cleanup_soak EXIT
+          deadline=$((SECONDS + 30))
+          until curl --fail --silent http://127.0.0.1:5082/health/ready >/dev/null; do
+            if ! docker inspect --format '{{.State.Running}}' "$soak_container" | grep -q true || (( SECONDS >= deadline )); then
+              docker logs "$soak_container"
+              exit 1
+            fi
+            sleep 0.25
+          done
+          curl --fail --silent --max-time 3700 --request POST \
+            'http://127.0.0.1:5082/admin/kcp-load?botCount=64&durationSeconds=3600' \
+            > "$GITHUB_WORKSPACE/artifacts/runtime-acceptance/soak-load.json"
+          docker stop --signal TERM --time 30 "$soak_container"
+          test "$(docker inspect --format '{{.State.ExitCode}}' "$soak_container")" = '0'
+          docker cp "$soak_container:/tmp/soak-report.json" \
+            "$GITHUB_WORKSPACE/artifacts/runtime-acceptance/soak-host.json"
+          load="$GITHUB_WORKSPACE/artifacts/runtime-acceptance/soak-load.json"
+          report="$GITHUB_WORKSPACE/artifacts/runtime-acceptance/soak-host.json"
+          test "$(jq -r '.botCount' "$load")" = '64'
+          test "$(jq -r '.peakConnections' "$load")" = '64'
+          test "$(jq -r '.elapsedSeconds >= 3600' "$load")" = 'true'
+          test "$(jq -r '.inputFrames > 10000000' "$load")" = 'true'
+          test "$(jq -r '.snapshotFrames > 1000000' "$load")" = 'true'
+          test "$(jq -r '.sampleCount >= 215000' "$report")" = 'true'
+          test "$(jq -r '.elapsedSeconds >= 3600' "$report")" = 'true'
+          test "$(jq -r '.tickP99Milliseconds <= 16.67' "$report")" = 'true'
+          test "$(jq -r '.tickP999Milliseconds <= 20' "$report")" = 'true'
+          test "$(jq -r '.slowTickPercentage <= 0.1' "$report")" = 'true'
+          test "$(jq -r '.gameplayP99Milliseconds <= 8' "$report")" = 'true'
+          test "$(jq -r '.gameplayAllocatedBytes' "$report")" = '0'
+          test "$(jq -r '.sourceCommit' "$report")" = "$CANDIDATE_SOURCE_COMMIT"
+
+      - name: Upload qualified-duration soak evidence
+        if: contains(github.event.pull_request.labels.*.name, 'qualified-soak')
+        uses: actions/upload-artifact@v4
+        with:
+          name: runtime-acceptance-soak
+          path: |
+            artifacts/runtime-acceptance/soak-load.json
+            artifacts/runtime-acceptance/soak-host.json
           if-no-files-found: error

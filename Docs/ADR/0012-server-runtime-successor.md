@@ -2,7 +2,7 @@
 
 Status: Proposed
 Date: 2026-08-13
-Last evidence update: 2026-08-23
+Last evidence update: 2026-08-24
 Decision source: WS-13
 Proposes to supersede: [ADR-0004](0004-server-runtime-policy.md)
 
@@ -29,6 +29,8 @@ The final [Windows/Ubuntu CI run](https://github.com/rayss1/Fantasy/actions/runs
 The WS-14 [Windows/Ubuntu CI run](https://github.com/rayss1/Fantasy/actions/runs/32248783092) additionally passed a real Linux SIGTERM probe: after startup, the example Host completed Scene/Process disposal, emitted `Shutdown Complete`, and exited with code zero within ten seconds without a forced stop. Parent [container run 32278435820](https://github.com/rayss1/ai-native-unity-framework/actions/runs/32278435820) then built that exact fork commit with SDK image digest `sha256:adc02be8b87957d07208a4a3e51775935b33bad3317de8c45b1e67357b4c073b`, ran it on ASP.NET runtime image digest `sha256:8b75cdf59a5068d9adfd8a6d202cc7671b2dc8f5f46c51e3b88a0a632e8fad1f` as the image-defined non-root user, reached `Startup Complete`, and exited normally on SIGTERM within ten seconds. The run published source, SDK, runtime-image, evaluation-image, and protocol identities as provenance.
 
 WS-16 exposed that the tracked `Fantasy-Net` package lagged the graceful-shutdown source. [Fantasy PR #3](https://github.com/rayss1/Fantasy/pull/3) regenerated package `2026.1.1002`, compiled its cancellation-aware Entry API from independent project/package consumers, and enabled a real .NET KCP acceptance client. Its [Windows/Ubuntu matrix](https://github.com/rayss1/Fantasy/actions/runs/32630652446) passed. [Fantasy PR #4](https://github.com/rayss1/Fantasy/pull/4) aligned the runtime banner with package `2026.1.1002` and made both published-consumer regressions execute and assert that identity; its [Windows/Ubuntu matrix](https://github.com/rayss1/Fantasy/actions/runs/32630957890) passed. The gated parent [real-KCP candidate run](https://github.com/rayss1/ai-native-unity-framework/actions/runs/32631900769) then passed the exact source/package/config checks, all ten tests, direct Host and non-root image Login/Join/Input/Snapshot/Reconnect probes, readiness/drain, dependency audit, and normal SIGTERM. This is minimum integration and operational evidence, not impairment, deterministic replay, qualified load, final Unity, or legal evidence.
+
+The next WS-16 slice adds newest-only Snapshot coalescing, bounded asynchronous production Input capture with strict deterministic replay, fixed-seed Regional/Degraded/Backpressure codec profiles, exact Host performance reports, and a real 64-session Fantasy KCP load probe. Local short-load evidence passes, while exact-commit Linux reports and the label-gated 60-minute run remain to be recorded. The impairment harness deliberately identifies itself as non-socket evidence; Linux socket/network-namespace impairment remains a separate acceptance gate.
 
 ## Proposed decision
 
