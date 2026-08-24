@@ -12,6 +12,14 @@ public sealed class FantasyRealtimeTransportTests
         TransportOrdering.Sequenced);
 
     [Test]
+    public async Task GatewayUsesTheInternetSafeOuterKcpMtu()
+    {
+        await using FantasyKcpGateway gateway = new(outerKcpMtu: 1150);
+
+        Assert.That(gateway.OuterKcpMtu, Is.EqualTo(1150));
+    }
+
+    [Test]
     public async Task SendCopiesOnlyDatagramsWithinTheTransportMtu()
     {
         FakeSender sender = new();

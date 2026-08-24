@@ -13,10 +13,11 @@ if (args is ["--verify-replay", string replayPath])
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 bool fantasyEnabled = builder.Configuration.GetValue("AINATIVE_FANTASY_ENABLED", true);
+int outerKcpMtu = builder.Configuration.GetValue("AINATIVE_FANTASY_OUTER_KCP_MTU", 1150);
 builder.Services.AddSingleton(new RuntimeReadiness(networkRequired: fantasyEnabled));
 builder.Services.AddSingleton<BattleMetrics>();
 builder.Services.AddSingleton<BattleReplayCapture>();
-builder.Services.AddSingleton<FantasyKcpGateway>();
+builder.Services.AddSingleton(new FantasyKcpGateway(outerKcpMtu: outerKcpMtu));
 builder.Services.AddSingleton<RoomProtocolService>();
 if (fantasyEnabled)
 {

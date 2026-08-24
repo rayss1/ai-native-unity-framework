@@ -94,7 +94,7 @@ jobs:
           export AINATIVE_REPLAY_CAPTURE_PATH="$GITHUB_WORKSPACE/artifacts/runtime-acceptance/direct-battle.anrp"
           test "$(find "$GITHUB_WORKSPACE/artifacts/battle-host" -name Fantasy.config -type f | wc -l)" = '1'
           test -f "$GITHUB_WORKSPACE/artifacts/battle-host/Fantasy-Net.dll"
-          grep -q 'Fantasy-Net/2026.1.1002' "$GITHUB_WORKSPACE/artifacts/battle-host/AiNative.BattleHost.deps.json"
+          grep -q 'Fantasy-Net/2026.1.1003' "$GITHUB_WORKSPACE/artifacts/battle-host/AiNative.BattleHost.deps.json"
           stdout="$GITHUB_WORKSPACE/artifacts/battle-host.stdout.log"
           stderr="$GITHUB_WORKSPACE/artifacts/battle-host.stderr.log"
           dotnet "$GITHUB_WORKSPACE/artifacts/battle-host/AiNative.BattleHost.dll" -m Develop >"$stdout" 2>"$stderr" &
@@ -153,6 +153,7 @@ jobs:
           load="$(cat "$load_file")"
           test "$(jq -r '.botCount' <<<"$load")" = '64'
           test "$(jq -r '.peakConnections' <<<"$load")" = '64'
+          test "$(jq -r '.outerKcpMtu' <<<"$load")" = '1150'
           test "$(jq -r '.inputFrames > 1000' <<<"$load")" = 'true'
           test "$(jq -r '.snapshotFrames > 0' <<<"$load")" = 'true'
           kill -TERM "$host_pid"
@@ -172,6 +173,7 @@ jobs:
           jq . <<<"$replay"
           test "$(jq -r '.InputCount > 1000' <<<"$replay")" = 'true'
           test "$(jq -r '.gameplayAllocatedBytes' "$AINATIVE_ACCEPTANCE_REPORT_PATH")" = '0'
+          test "$(jq -r '.outerKcpMtu' "$AINATIVE_ACCEPTANCE_REPORT_PATH")" = '1150'
           test "$(jq -r '.tickP99Milliseconds <= 16.67' "$AINATIVE_ACCEPTANCE_REPORT_PATH")" = 'true'
 
       - name: Audit candidate dependencies
@@ -235,7 +237,7 @@ jobs:
           docker exec "$container_id" sh -c "grep -q '\"tfm\": \"net10.0\"' /app/AiNative.BattleHost.runtimeconfig.json"
           test "$(docker exec "$container_id" sh -c 'find /app -name Fantasy.config -type f | wc -l')" = '1'
           docker exec "$container_id" test -f /app/Fantasy-Net.dll
-          docker exec "$container_id" grep -q 'Fantasy-Net/2026.1.1002' /app/AiNative.BattleHost.deps.json
+          docker exec "$container_id" grep -q 'Fantasy-Net/2026.1.1003' /app/AiNative.BattleHost.deps.json
           probe="$(curl --fail --silent --request POST http://127.0.0.1:5081/admin/kcp-loopback)"
           test "$(jq -r '.status' <<<"$probe")" = 'ok'
           test "$(jq -r '.reconnectedEpoch > .initialConnectionEpoch' <<<"$probe")" = 'true'
@@ -282,6 +284,7 @@ jobs:
           load="$(cat "$load_file")"
           test "$(jq -r '.botCount' <<<"$load")" = '64'
           test "$(jq -r '.peakConnections' <<<"$load")" = '64'
+          test "$(jq -r '.outerKcpMtu' <<<"$load")" = '1150'
           test "$(jq -r '.inputFrames > 1000' <<<"$load")" = 'true'
           test "$(jq -r '.snapshotFrames > 0' <<<"$load")" = 'true'
           docker stop --signal TERM --time 10 "$container_id"
@@ -294,6 +297,7 @@ jobs:
           jq . <<<"$replay"
           test "$(jq -r '.InputCount > 1000' <<<"$replay")" = 'true'
           test "$(jq -r '.gameplayAllocatedBytes' "$GITHUB_WORKSPACE/artifacts/runtime-acceptance/image-load-report.json")" = '0'
+          test "$(jq -r '.outerKcpMtu' "$GITHUB_WORKSPACE/artifacts/runtime-acceptance/image-load-report.json")" = '1150'
           test "$(jq -r '.tickP99Milliseconds <= 16.67' "$GITHUB_WORKSPACE/artifacts/runtime-acceptance/image-load-report.json")" = 'true'
           docker rm "$first_container_id" >/dev/null
 
@@ -386,6 +390,7 @@ jobs:
             docker cp "$active_container:/tmp/$profile-host.json" "$host_report"
             test "$(jq -r '.botCount' "$response")" = '64'
             test "$(jq -r '.peakConnections' "$response")" = '64'
+            test "$(jq -r '.outerKcpMtu' "$response")" = '1150'
             test "$(jq -r '.loadElapsedSeconds >= 70' "$response")" = 'true'
             test "$(jq -r '.sampleCount >= 3500' "$host_report")" = 'true'
             test "$(jq -r '.tickP99Milliseconds <= 16.67' "$host_report")" = 'true'
@@ -393,6 +398,7 @@ jobs:
             test "$(jq -r '.slowTickPercentage <= 0.1' "$host_report")" = 'true'
             test "$(jq -r '.gameplayP99Milliseconds <= 8' "$host_report")" = 'true'
             test "$(jq -r '.gameplayAllocatedBytes' "$host_report")" = '0'
+            test "$(jq -r '.outerKcpMtu' "$host_report")" = '1150'
             dotnet "$runner" \
               --pcap "$pcap" \
               --server-port 22000 \
@@ -431,6 +437,7 @@ jobs:
             "sdkImage": "${{ steps.images.outputs.sdk_image }}",
             "runtimeImage": "${{ steps.images.outputs.runtime_image }}",
             "candidateImageId": "$image_id",
+            "outerKcpMtu": 1150,
             "protocolSha256": "$(sha256sum shared/schemas/ainative/v1/gameplay.proto | cut -d ' ' -f 1)"
           }
           JSON
@@ -501,6 +508,7 @@ jobs:
           report="$GITHUB_WORKSPACE/artifacts/runtime-acceptance/soak-host.json"
           test "$(jq -r '.botCount' "$load")" = '64'
           test "$(jq -r '.peakConnections' "$load")" = '64'
+          test "$(jq -r '.outerKcpMtu' "$load")" = '1150'
           test "$(jq -r '.loadElapsedSeconds >= 3610' "$load")" = 'true'
           test "$(jq -r '.inputFrames > 10000000' "$load")" = 'true'
           test "$(jq -r '.snapshotFrames > 1000000' "$load")" = 'true'
@@ -511,6 +519,7 @@ jobs:
           test "$(jq -r '.slowTickPercentage <= 0.1' "$report")" = 'true'
           test "$(jq -r '.gameplayP99Milliseconds <= 8' "$report")" = 'true'
           test "$(jq -r '.gameplayAllocatedBytes' "$report")" = '0'
+          test "$(jq -r '.outerKcpMtu' "$report")" = '1150'
           test "$(jq -r '.sourceCommit' "$report")" = "$CANDIDATE_SOURCE_COMMIT"
 
       - name: Upload qualified-duration soak evidence

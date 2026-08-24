@@ -15,6 +15,7 @@ public sealed class BattleMetrics : IDisposable
     private readonly double[]? _tickSamples;
     private readonly double[]? _gameplaySamples;
     private readonly long[]? _gameplayAllocations;
+    private readonly int _outerKcpMtu;
     private int _warmupTicks;
     private long _startedTimestamp = Stopwatch.GetTimestamp();
     private int _acceptanceReportWritten;
@@ -27,6 +28,7 @@ public sealed class BattleMetrics : IDisposable
         _tickDurationMilliseconds = _meter.CreateHistogram<double>("battle.tick.duration", "ms");
         _droppedDiagnostics = _meter.CreateCounter<long>("battle.diagnostics.dropped");
         _droppedReplayRecords = _meter.CreateCounter<long>("battle.replay.records.dropped");
+        _outerKcpMtu = configuration?.GetValue("AINATIVE_FANTASY_OUTER_KCP_MTU", 1150) ?? 1150;
         _acceptanceReportPath = configuration?["AINATIVE_ACCEPTANCE_REPORT_PATH"];
         if (!string.IsNullOrWhiteSpace(_acceptanceReportPath))
         {
@@ -130,6 +132,7 @@ public sealed class BattleMetrics : IDisposable
             Runtime: Environment.Version.ToString(),
             OperatingSystem: Environment.OSVersion.ToString(),
             ProcessorCount: Environment.ProcessorCount,
+            OuterKcpMtu: _outerKcpMtu,
             SourceCommit: Environment.GetEnvironmentVariable("AINATIVE_SOURCE_COMMIT") ?? "unrecorded",
             FantasyCommit: Environment.GetEnvironmentVariable("AINATIVE_FANTASY_COMMIT") ?? "unrecorded",
             ProtocolIdentity: Environment.GetEnvironmentVariable("AINATIVE_PROTOCOL_IDENTITY") ?? "unrecorded");
@@ -166,6 +169,7 @@ internal sealed record RuntimeSoakReport(
     string Runtime,
     string OperatingSystem,
     int ProcessorCount,
+    int OuterKcpMtu,
     string SourceCommit,
     string FantasyCommit,
     string ProtocolIdentity);

@@ -196,7 +196,8 @@ internal static class FantasyKcpLoadProbe
                 snapshotFrames,
                 snapshotBytes,
                 newestSnapshotTick,
-                gateway.ConnectionCount);
+                gateway.ConnectionCount,
+                gateway.OuterKcpMtu);
         }
         finally
         {
@@ -224,4 +225,5 @@ internal readonly record struct FantasyKcpLoadResult(
     long SnapshotFrames,
     long SnapshotBytes,
     ulong NewestSnapshotTick,
-    int PeakConnections);
+    int PeakConnections,
+    int OuterKcpMtu);

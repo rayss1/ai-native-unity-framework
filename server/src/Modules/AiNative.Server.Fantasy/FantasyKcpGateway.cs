@@ -63,17 +63,22 @@ internal sealed class FantasyKcpGateway : IAsyncDisposable
 
     public FantasyKcpGateway(
         int maxInboundBytesPerConnection = 256 * 1024,
-        int maxConnections = 64)
+        int maxConnections = 64,
+        int outerKcpMtu = 1150)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxInboundBytesPerConnection);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxConnections);
+        KCPSettings.ConfigureOuterMtu(outerKcpMtu);
         _maxInboundBytesPerConnection = maxInboundBytesPerConnection;
         _maxConnections = maxConnections;
+        OuterKcpMtu = outerKcpMtu;
     }
 
     public int ListeningPort => _listening.Task.IsCompletedSuccessfully ? _listening.Task.Result : 0;
 
     public int ConnectionCount => _connections.Count;
+
+    public int OuterKcpMtu { get; }
 
     public async Task RunAsync(CancellationToken cancellationToken)
     {
