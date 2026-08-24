@@ -144,7 +144,13 @@ jobs:
             fi
             sleep 0.25
           done
-          load="$(curl --fail --silent --request POST 'http://127.0.0.1:5080/admin/kcp-load?botCount=64&durationSeconds=5')"
+          load_file="$GITHUB_WORKSPACE/artifacts/runtime-acceptance/direct-load-response.json"
+          load_status="$(curl --silent --output "$load_file" --write-out '%{http_code}' --request POST 'http://127.0.0.1:5080/admin/kcp-load?botCount=64&durationSeconds=5')"
+          if test "$load_status" != '200'; then
+            cat "$load_file" "$stdout" "$stderr"
+            exit 1
+          fi
+          load="$(cat "$load_file")"
           test "$(jq -r '.botCount' <<<"$load")" = '64'
           test "$(jq -r '.peakConnections' <<<"$load")" = '64'
           test "$(jq -r '.inputFrames > 1000' <<<"$load")" = 'true'
@@ -263,7 +269,14 @@ jobs:
             fi
             sleep 0.25
           done
-          load="$(curl --fail --silent --request POST 'http://127.0.0.1:5081/admin/kcp-load?botCount=64&durationSeconds=5')"
+          load_file="$GITHUB_WORKSPACE/artifacts/runtime-acceptance/image-load-response.json"
+          load_status="$(curl --silent --output "$load_file" --write-out '%{http_code}' --request POST 'http://127.0.0.1:5081/admin/kcp-load?botCount=64&durationSeconds=5')"
+          if test "$load_status" != '200'; then
+            cat "$load_file"
+            docker logs "$container_id"
+            exit 1
+          fi
+          load="$(cat "$load_file")"
           test "$(jq -r '.botCount' <<<"$load")" = '64'
           test "$(jq -r '.peakConnections' <<<"$load")" = '64'
           test "$(jq -r '.inputFrames > 1000' <<<"$load")" = 'true'
@@ -313,9 +326,11 @@ jobs:
             artifacts/runtime-acceptance/direct-battle.anrp
             artifacts/runtime-acceptance/direct-load.anrp
             artifacts/runtime-acceptance/direct-load-report.json
+            artifacts/runtime-acceptance/direct-load-response.json
             artifacts/runtime-acceptance/image-battle.anrp
             artifacts/runtime-acceptance/image-load.anrp
             artifacts/runtime-acceptance/image-load-report.json
+            artifacts/runtime-acceptance/image-load-response.json
           if-no-files-found: error
 
       - name: Run labeled 60-minute release-equivalent 64-bot soak
