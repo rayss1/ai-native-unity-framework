@@ -42,6 +42,7 @@ internal static class FantasyKcpLoadProbe
         {
             HashSet<uint> assignedEntities = new(botCount);
             const int connectionBatchSize = 8;
+            uint setupSequence = 0;
             for (int batchStart = 0; batchStart < botCount; batchStart += connectionBatchSize)
             {
                 int batchCount = Math.Min(connectionBatchSize, botCount - batchStart);
@@ -95,6 +96,22 @@ internal static class FantasyKcpLoadProbe
                     {
                         throw new InvalidOperationException("The 64-bot KCP load probe received an invalid room assignment.");
                     }
+                }
+
+                setupSequence++;
+                int connectedCount = batchStart + batchCount;
+                for (int index = 0; index < connectedCount; index++)
+                {
+                    InputCommand command = commands[index];
+                    command.Sequence = setupSequence;
+                    command.MoveXMilli = (index & 1) == 0 ? 1000 : -1000;
+                    command.MoveYMilli = 0;
+                    await FantasyKcpLoopbackProbe.SendAsync(
+                        probes[index],
+                        MessageId.InputCommand,
+                        command,
+                        sendBuffer,
+                        startupTimeout.Token);
                 }
             }
 
