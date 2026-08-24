@@ -10,7 +10,7 @@ Client prediction and server replay need the same gameplay rules without copying
 
 ## Decision
 
-`shared/gameplay/Runtime/**/*.cs` is the single handwritten gameplay source set. Unity compiles it through an asmdef; `Gameplay.Shared.csproj` compiles the same files for `netstandard2.1` with C# 9. Server projects reference that assembly. A `net8.0` or `net9.0` binary is never imported into Unity.
+`shared/gameplay/Runtime/**/*.cs` is the single handwritten gameplay source set. Unity compiles it through an asmdef; `Gameplay.Shared.csproj` compiles the same files for `netstandard2.1` with C# 9. Server projects reference that assembly. A `net10.0` binary is never imported into Unity.
 
 Shared owns pure values and ports. It may use the .NET Standard 2.1 surface but must not reference Unity, Fantasy, sockets, filesystems, databases, native bindings, wall-clock APIs, uncontrolled tasks/threads, or locale-dependent behavior on the Tick path.
 
@@ -24,7 +24,7 @@ Rules remain reusable and replayable. Adapters must translate engine-specific ty
 
 ## Validation, migration, and rollback
 
-- CI compiles Shared in Unity Batch Mode and with `dotnet build`, then executes identical vectors under Unity and .NET 8/.NET 9.
+- CI compiles Shared with `dotnet build` under .NET 10, and Unity executes the identical source and vectors through the active ADR-0014 manual path until credentialed automation is restored.
 - A change passes only when event sequences and critical hashes match for every non-physics golden vector. Physics vectors use documented tolerance plus authoritative reconciliation.
 - Migrate existing engine-dependent rules by extracting pure state first, then ports, then adapters; retain characterization vectors throughout.
 - If dual compilation fails, revert the incompatible API use or isolate it in an adapter. Do not fork the source tree as a rollback.

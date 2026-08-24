@@ -1,0 +1,17 @@
+services:
+  battle-host:
+    image: ${AINATIVE_BATTLE_HOST_IMAGE:?Set AINATIVE_BATTLE_HOST_IMAGE to an immutable image digest}
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    volumes:
+      - ${AINATIVE_FANTASY_CONFIG:?Set AINATIVE_FANTASY_CONFIG to a reviewed file}:/app/Fantasy.config:ro
+    ports:
+      - "${AINATIVE_HTTP_PORT:-8080}:8080"
+      - "${AINATIVE_KCP_PORT:-22000}:22000/udp"
+    stop_grace_period: 30s
+    restart: unless-stopped
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true

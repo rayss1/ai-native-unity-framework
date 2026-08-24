@@ -62,5 +62,12 @@
   ],
   "sharedPassiveContractAllowedNamespacePrefixes": [
     "System.Threading"
+  ],
+  "fantasyPackageReferenceAllowedPathPrefixes": [
+    "server/src/Modules/AiNative.Server.Fantasy",
+    "server/src/Hosts/AiNative.BattleHost"
+  ],
+  "fantasyNamespaceAllowedPathPrefixes": [
+    "server/src/Modules/AiNative.Server.Fantasy"
   ]
 }

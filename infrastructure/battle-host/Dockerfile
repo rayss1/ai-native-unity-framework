@@ -28,7 +28,7 @@ ARG PROTOCOL_IDENTITY=none
 LABEL org.opencontainers.image.revision="${SOURCE_COMMIT}" \
       org.ainative.fantasy.revision="${FANTASY_COMMIT}" \
       org.ainative.protocol.identity="${PROTOCOL_IDENTITY}" \
-      org.ainative.release-status="acceptance-candidate"
+      org.ainative.release-status="production"
 WORKDIR /app
 COPY --from=build --chown=$APP_UID:$APP_UID /artifacts/host/ ./
 ENV ASPNETCORE_URLS=http://+:8080

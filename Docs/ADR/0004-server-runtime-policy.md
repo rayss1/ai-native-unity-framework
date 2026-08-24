@@ -1,10 +1,11 @@
 # ADR-0004: Use .NET 8 by Default with .NET 9 Compatibility
 
-Status: Accepted
+Status: Superseded
 Date: 2026-08-13
 Decision source: WS-11
+Superseded: 2026-08-24 by [ADR-0012](0012-server-runtime-successor.md)
 
-Successor evaluation continues in proposed [ADR-0012](0012-server-runtime-successor.md). This ADR remains accepted until a successor passes the full server-stack evidence gate.
+ADR-0012 passed the full server-stack evidence gate and replaces this policy with the .NET 10 production baseline. This record is retained to preserve the previous decision, migration context, and rollback history.
 
 ## Context
 

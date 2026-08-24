@@ -2,7 +2,7 @@
 
 Status: Frozen for the first vertical slice
 Authority: ADR-0002
-Last updated: 2026-08-13
+Last updated: 2026-08-24
 
 This document defines compile-time and runtime dependency direction. “May depend” still requires an explicit manifest reference and a concrete need; it is not a default reference.
 
@@ -50,7 +50,7 @@ Rows are consumers and columns are dependencies.
 
 ### Server
 
-- Hosts reference module public contracts/registration packages, never module internals.
+- Hosts reference module public contracts/registration packages, never module internals. The Battle Host may reference the pinned `Fantasy-Net` package only for compile-time generated startup metadata; handwritten Fantasy runtime namespace usage remains inside `AiNative.Server.Fantasy`.
 - A module owns configuration, persistence schema/migrations, and public contracts. Modules do not share tables or implementation types.
 - Cross-module calls use public contracts/events. Cycles are forbidden; orchestration belongs in a Host/application module.
 - Fantasy, ASP.NET Core, EF Core, native physics/navigation, and telemetry SDK types terminate at adapters/composition roots.
@@ -77,6 +77,6 @@ Every plugin declares:
 
 ## Automated enforcement
 
-CI derives the graph from `package.json`, `.asmdef`, `.csproj`, solution/build manifests, and schema generator configuration. It fails on forbidden edges, cross-module cycles, Editor-to-Runtime edges, direct Shared forbidden APIs, runtime references to Tools/Infrastructure/Agents, or undocumented new public contracts.
+CI derives the graph from `package.json`, `.asmdef`, `.csproj`, solution/build manifests, and schema generator configuration. It fails on forbidden edges, cross-module cycles, Editor-to-Runtime edges, direct Shared forbidden APIs, Fantasy package/namespace use outside the approved adapter/composition boundary, runtime references to Tools/Infrastructure/Agents, or undocumented new public contracts.
 
 See [ADR-0002](../ADR/0002-repository-layout-and-module-dependencies.md) for migration and rollback rules.

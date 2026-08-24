@@ -1,10 +1,11 @@
-# ADR-0012: Evaluate .NET 10 LTS as the Server Runtime Successor
+# ADR-0012: Adopt .NET 10 LTS as the Server Runtime
 
-Status: Proposed
+Status: Accepted
 Date: 2026-08-13
+Accepted: 2026-08-24
 Last evidence update: 2026-08-24
 Decision source: WS-13
-Proposes to supersede: [ADR-0004](0004-server-runtime-policy.md)
+Supersedes: [ADR-0004](0004-server-runtime-policy.md)
 
 ## Context
 
@@ -36,31 +37,35 @@ The first exact 60 Hz Linux socket rerun passed Regional wire budgets but Degrad
 
 WS-16 adds newest-only Snapshot coalescing, bounded asynchronous production Input capture with strict deterministic replay, fixed-seed Regional/Degraded/Backpressure codec profiles, exact Host performance reports, and a real 64-session Fantasy KCP load probe. Linux CI additionally applies explicit Regional/Degraded `tc netem` profiles inside the candidate network namespace and derives per-client bandwidth/datagram evidence from a hashed packet capture. The label-gated soak measures 60 full minutes only after clients join and the declared warm-up ends.
 
-[Exact Linux candidate run 32710003483](https://github.com/rayss1/ai-native-unity-framework/actions/runs/32710003483) passed at parent commit `fd366411991d78e5ac517f79e020976608ca4113`, Fantasy `f8bed0d464924f159d46498f1311206ea0694be8`, and protocol SHA-256 `726a80d6a762913b87fe840f0be9086224598bcaadb0e4a7d4e3e44856c0b92c`. It passed 17 candidate tests, deterministic Regional/Degraded/Backpressure gates, direct and non-root image KCP/replay/load probes, zero-vulnerability audit, bounded drain/SIGTERM, and the two qualified 64-client socket profiles. Regional measured exactly 230,400 Input frames at `60.0006 Hz` and 115,200 batches at `30.0003 Hz`; PCAP P95 was `173.480 kbit/s` downstream and `43.744 kbit/s` upstream with a 917-byte maximum UDP payload. Degraded measured the same frame/batch counts at `60.0001/30.0001 Hz`; PCAP P95 was `197.488/49.064 kbit/s` with a 987-byte maximum. Host Tick P99/P99.9 remained at or below `0.7743/1.0147 ms`, Gameplay allocation was zero, and both captures passed their immutable identity and wire gates. The full 60-minute qualified soak, exact-final-commit Unity evidence, and legal review remain open.
+[Exact Linux candidate run 32710003483](https://github.com/rayss1/ai-native-unity-framework/actions/runs/32710003483) passed at parent commit `fd366411991d78e5ac517f79e020976608ca4113`, Fantasy `f8bed0d464924f159d46498f1311206ea0694be8`, and protocol SHA-256 `726a80d6a762913b87fe840f0be9086224598bcaadb0e4a7d4e3e44856c0b92c`. It passed 17 candidate tests, deterministic Regional/Degraded/Backpressure gates, direct and non-root image KCP/replay/load probes, zero-vulnerability audit, bounded drain/SIGTERM, and the two qualified 64-client socket profiles. Regional measured exactly 230,400 Input frames at `60.0006 Hz` and 115,200 batches at `30.0003 Hz`; PCAP P95 was `173.480 kbit/s` downstream and `43.744 kbit/s` upstream with a 917-byte maximum UDP payload. Degraded measured the same frame/batch counts at `60.0001/30.0001 Hz`; PCAP P95 was `197.488/49.064 kbit/s` with a 987-byte maximum. Host Tick P99/P99.9 remained at or below `0.7743/1.0147 ms`, Gameplay allocation was zero, and both captures passed their immutable identity and wire gates.
 
-## Proposed decision
+[Qualified-duration run 32710967424](https://github.com/rayss1/ai-native-unity-framework/actions/runs/32710967424) then passed at exact source `ab3c60c52a1aa8a9a2ad42fb3b46277b3a73e91d`. After a distinct ten-second warm-up, 64 real KCP clients ran for 3,600 measured seconds and produced 13,824,000 Input frames at `60.0000045 Hz`, 6,912,000 two-frame batches at `30.0000022 Hz`, 4,622,834 Snapshot frames, and 216,004 measured Host Ticks. Tick P99/P99.9 were `0.6573/0.9548 ms`, slow Tick rate was zero, Gameplay P99 was `0.0007 ms`, and stable Gameplay managed allocation was zero.
 
-Adopt `.NET 10` (`net10.0`) and C# 14 for future Server Hosts only when the required evidence below passes for the exact merged Fantasy fork commit and project-owned Server composition. Shared gameplay remains `netstandard2.1` with C# 9; no .NET 10 assembly is imported into Unity.
+The ADR-0014 manual Unity run for the same exact source used Unity `6000.3.9f1` revision `7a9955a4f2fa` and passed all seven required EditMode tests with zero failed/skipped. The retained NUnit XML SHA-256 is `4a1a4a2fc17866f9b31ae5d2ba3ab2b1b7c4b75e55595625f9c8cfba309d464d`. The project owner also supplied the [written Fantasy license approval](../Architecture/fantasy-license-approval-2026-08-24.md), accepting the current restrictions and the project legal risk for commercial use, modification, and distribution.
 
-This ADR remains Proposed and does not supersede ADR-0004. The exact, unreferenced Fantasy evaluation source may be present at `server/vendor/Fantasy` behind the architecture-check ignore boundary. Until this ADR is accepted, neither `AiNative.sln` nor any production Server Host or product project may reference the submodule.
+## Decision
 
-The parent `global.json` and existing .NET 8/.NET 9 skeleton matrix remain unchanged.
+Adopt `.NET 10` (`net10.0`) and C# 14 for Server Hosts, Server tools, and .NET test executables. Shared gameplay remains `netstandard2.1` with C# 9; no .NET 10 assembly is imported into Unity.
 
-## Required evidence
+Fantasy remains pinned at `server/vendor/Fantasy` and opaque to the architecture graph. Only the dedicated `AiNative.Server.Fantasy` adapter and Battle Host composition root may reference `Fantasy-Net`; Fantasy runtime namespaces terminate inside the adapter. Product gameplay, Shared contracts, protocol models, and Unity assemblies expose only project-owned types.
 
-Completed recovery evidence: the focused fork commits are merged and pinned by exact SHA, and the committed SDK `10.0.202` Windows/Ubuntu matrix is green.
+The parent `global.json` pins SDK `10.0.202`, `AiNative.sln` owns the product Host and Server modules, and CI builds/tests/publishes the single `net10.0` product lane. The former .NET 8/.NET 9 skeleton matrix and evaluation-only container are retired.
 
-Remaining acceptance evidence:
+## Acceptance evidence
 
-1. Pass final-commit Shared vectors in Unity. The matching .NET vectors, deterministic replay, Regional/Degraded impairment, allocation, blocked-client isolation, and backpressure gates are green; while ADR-0014 is active, Unity proof is an exact-commit manual evidence bundle rather than an automatic CI result.
-2. Pass the label-gated 60-minute 64-player soak and Tick budgets on the exact release-equivalent Linux artifact; the qualified 60-second Regional/Degraded socket profiles are green.
-3. Complete the Fantasy license/legal review before commercial distribution, redistribution, or publication of derived artifacts.
+All required gates passed for the pinned Fantasy baseline and project-owned composition:
+
+- SDK `10.0.202` Windows/Ubuntu fork build, package, publish, startup, SQLite, shutdown, and vulnerability matrices;
+- .NET and Unity Shared vectors plus generated protocol drift checks;
+- real Login/Join/Input/Snapshot/Reconnect, strict production replay, readiness/drain, SIGTERM, telemetry-outage, bounded queue, and zero-allocation checks;
+- Regional/Degraded netem/PCAP bandwidth and payload gates, deterministic Backpressure, and the qualified 60-minute 64-client Linux soak;
+- project-owner written license approval for the pinned fork baseline.
 
 ## Acceptance, migration, and rollback
 
-If all evidence passes, change this ADR to Accepted, mark ADR-0004 Superseded, and migrate the parent SDK/CI/container baseline before the first production Server project merges.
+The acceptance and parent SDK/Solution/CI/container migration merge atomically. Production promotion uses the recorded immutable source, Fantasy, protocol, configuration, SDK, runtime image, and built image identities. Release operators preserve the prior image digest during rollout and keep protocol evolution additive so a canary can be rolled back without data or wire incompatibility.
 
-If the evidence fails, keep the Shared/Tools skeleton, isolate or replace the failing subsystem behind existing adapters, or select another supported runtime in a replacement ADR. The evaluation submodule can be rolled back by removing its gitlink, `.gitmodules` entry, CI initialization, documentation, and architecture-ignore rule.
+Rollback restores the last qualified Host image and configuration first. If the runtime/fork itself must be removed, retain Shared/Tools and protocol assets, replace `AiNative.Server.Fantasy` behind project-owned contracts, remove the Host/Fantasy package references from `AiNative.sln`, and select another supported runtime in a superseding ADR. Database and protocol changes made during rollout must stay backward compatible until the rollback window closes.
 
 ## References
 
@@ -78,6 +83,8 @@ If the evidence fails, keep the Shared/Tools skeleton, isolate or replace the fa
 - [Outer KCP MTU and package 2026.1.1003 PR](https://github.com/rayss1/Fantasy/pull/5)
 - [Green outer KCP MTU Windows/Ubuntu matrix](https://github.com/rayss1/Fantasy/actions/runs/32696781372)
 - [Green exact-commit 64-client Linux socket, replay, and image run](https://github.com/rayss1/ai-native-unity-framework/actions/runs/32710003483)
+- [Green exact-commit 60-minute 64-client soak](https://github.com/rayss1/ai-native-unity-framework/actions/runs/32710967424)
+- [Fantasy license project-owner approval](../Architecture/fantasy-license-approval-2026-08-24.md)
 - [Green exact-source real-KCP candidate and image run](https://github.com/rayss1/ai-native-unity-framework/actions/runs/32631900769)
 - [Green parent Linux container and provenance run](https://github.com/rayss1/ai-native-unity-framework/actions/runs/32278435820)
 - [Green parent submodule and .NET 8/.NET 9 validation run](https://github.com/rayss1/ai-native-unity-framework/actions/runs/32242925933)

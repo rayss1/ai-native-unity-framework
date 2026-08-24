@@ -1,12 +1,11 @@
 # ai-native-unity-framework
 An AI-native full-stack Unity game development framework for autonomous AI agents, covering client, server, shared modules, development tools, testing, build pipelines, and automation.
 
-The repository currently contains the first verifiable skeleton: one Shared Gameplay source set compiled by both Unity and .NET, cross-runtime contract tests, and a manifest-derived architecture validator. Server and vertical-slice runtime modules are intentionally deferred until they own a real artifact.
+The repository contains the first production vertical-slice foundation: one Shared Gameplay source set compiled by Unity and .NET, project-owned realtime/protocol contracts, a .NET 10 Fantasy-backed Battle Host, cross-runtime vectors, deterministic replay/load evidence, a production container contract, and a manifest-derived architecture validator.
 
 ## Requirements
 
-- .NET SDK 9.0.300 or a later 9.0 feature band. The repository `global.json` selects the installed 9.0 SDK.
-- .NET 8 and .NET 9 runtimes for the compatibility test matrix.
+- .NET SDK 10.0.202. The repository `global.json` pins the exact SDK servicing version.
 - Unity 6000.3.9f1 for local package import and EditMode tests.
 
 ## Clone and initialize dependencies
@@ -37,6 +36,7 @@ git add server/vendor/Fantasy
 dotnet restore AiNative.sln
 dotnet build AiNative.sln -c Release --no-restore
 dotnet test AiNative.sln -c Release --no-build --no-restore
+dotnet publish server/src/Hosts/AiNative.BattleHost/AiNative.BattleHost.csproj -c Release -f net10.0 --no-restore
 dotnet run --project tools/ArchitectureCheck -c Release --no-build -- --root . --format text
 ```
 
@@ -68,10 +68,23 @@ The architecture-check command returns `0` for a valid repository, `1` for archi
 ## Current layout
 
 - `client/UnityProject`: minimal Unity composition project and local package manifest.
-- `shared/gameplay`: UPM package, .NET Standard 2.1 project, shared Runtime source, and dual-runtime tests.
+- `shared`: UPM/.NET Standard 2.1 Gameplay and realtime contracts, Protobuf schemas/generated code, and dual-runtime tests.
+- `server/src/Hosts/AiNative.BattleHost`: production `net10.0` composition root with health, drain, replay, and Fantasy KCP startup.
+- `server/src/Modules`: project-owned Fantasy and protocol adapters; Fantasy runtime types terminate at this boundary.
 - `tools/ArchitectureCheck`: architecture graph and forbidden-API validator.
-- `server/vendor/Fantasy`: pinned, opaque evaluation source; production projects must not reference it while ADR-0012 is Proposed.
+- `server/vendor/Fantasy`: pinned, opaque production vendor source; only the approved Server adapter/composition projects consume its tracked package.
+- `infrastructure/battle-host`: non-root Linux production image and Compose deployment contract.
 - `Docs`: accepted ADRs and architecture contracts.
+
+## Battle Host container
+
+CI builds and validates the production Dockerfile without publishing it. A release pipeline supplies immutable SDK/runtime image references and records source, Fantasy, protocol, configuration, and image identities. Operators deploy an immutable built-image digest and mount a reviewed configuration:
+
+```bash
+AINATIVE_BATTLE_HOST_IMAGE='registry.example/ainative/battle-host@sha256:<digest>' \
+AINATIVE_FANTASY_CONFIG='/absolute/path/Fantasy.config' \
+docker compose -f infrastructure/battle-host/compose.yaml up -d
+```
 
 ## Documentation
 

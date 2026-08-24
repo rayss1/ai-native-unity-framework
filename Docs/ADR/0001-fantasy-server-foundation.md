@@ -6,13 +6,13 @@ Decision source: WS-9
 
 ## Context
 
-The framework targets a self-hosted, cloud-neutral, authoritative multiplayer FPS/action stack with an initial 64-player, 60 Tick vertical slice. The server must run independently of Unity on .NET 8 by default, retain .NET 9 compatibility, support deep optimization, and allow client and server to compile the same Unity-independent gameplay source.
+The framework targets a self-hosted, cloud-neutral, authoritative multiplayer FPS/action stack with an initial 64-player, 60 Tick vertical slice. The server must run independently of Unity, support deep optimization, and allow client and server to compile the same Unity-independent gameplay source. The original .NET 8/.NET 9 runtime assumption was superseded by ADR-0012.
 
-Building sessions, routing, process topology, service discovery, server ECS infrastructure, and protocol tooling from scratch would delay validation of replication and gameplay risks. Fantasy already provides relevant C# game-server infrastructure and directly targets .NET 8 and .NET 9, while its source is available for deep customization.
+Building sessions, routing, process topology, service discovery, server ECS infrastructure, and protocol tooling from scratch would delay validation of replication and gameplay risks. Fantasy provides relevant C# game-server infrastructure and source access for deep customization; the accepted fork now targets .NET 10.
 
 ## Decision
 
-The server platform will use the project-maintained [rayss1/Fantasy fork](https://github.com/rayss1/Fantasy) as its infrastructure foundation. The controlled evaluation source is embedded at `server/vendor/Fantasy` as an exact gitlink without a floating branch.
+The server platform uses the project-maintained [rayss1/Fantasy fork](https://github.com/rayss1/Fantasy) as its infrastructure foundation. The controlled production source is embedded at `server/vendor/Fantasy` as an exact gitlink without a floating branch.
 
 Fantasy owns the initial implementation of network sessions, TCP/KCP/WebSocket/HTTP transports, Scene/Entity lifecycle, Gate and routing/Roaming, service discovery, server-to-server communication, and related code-generation/bootstrap tooling.
 
@@ -28,9 +28,9 @@ Deep customization may cover the fixed-Tick scheduler, KCP/transport behavior, r
 
 `Gameplay.Shared` remains independent of Fantasy. It targets `.NET Standard 2.1`/C# 9 and is compiled from the same source by Unity and the server. Fantasy Entity, Scene, Session, timer, transport, persistence, and configuration types are confined to server/client adapters and composition roots. Product gameplay rules must not be implemented inside the fork.
 
-The parent repository retains its accepted `net8.0`/`net9.0` skeleton matrix until proposed ADR-0012 is accepted or replaced. The pinned evaluation submodule is allowed before that decision, but no production Server Host or product project may reference Fantasy while ADR-0012 remains Proposed.
+[ADR-0012](0012-server-runtime-successor.md) accepts the single `net10.0` product lane. `AiNative.Server.Fantasy` owns Fantasy runtime types; the Battle Host composition root may reference the tracked package for generated startup metadata, while Shared and other product modules remain Fantasy-free.
 
-Fantasy's repository license uses the MIT license text with an additional entity-specific restriction. A completed legal/license review is required before commercial distribution, redistribution of the fork, or publication of derived packages.
+Fantasy's repository license uses the MIT license text with an additional entity-specific restriction. The project owner accepted that license and project risk for the pinned baseline; any license, ownership, entity relationship, distribution model, or adopted baseline change reopens review.
 
 ## Consequences
 
@@ -39,7 +39,7 @@ Benefits:
 - The first vertical slice can start from an existing game-server network and process model.
 - Source availability permits optimization of the 60 Tick hot path and protocol stack.
 - Built-in routing and service discovery provide an evolution path without forcing an early microservice topology.
-- Direct .NET 8/.NET 9 targets match the selected server runtime matrix.
+- The direct .NET 10 target matches the selected Server runtime.
 
 Costs and risks:
 
@@ -57,7 +57,7 @@ Fantasy remains the accepted foundation only if the 64-player vertical slice dem
 - Correct behavior at 100/200 ms RTT, 1%/5% loss, jitter, duplication, and reordering.
 - Backpressure isolation so one client cannot delay a Battle room.
 - Measured AOI, snapshot bandwidth, correction rate, reconnect, packet capture, and replay behavior.
-- Successful .NET 8 default and .NET 9 compatibility builds/tests.
+- Successful .NET 10 build, test, publish, and release-equivalent image validation.
 - Successful Unity and .NET execution of shared gameplay test vectors without Fantasy dependencies in `Gameplay.Shared`.
 
 If these gates fail, the project will first replace or redesign the failing Fantasy subsystem behind its adapter boundary. Reconsidering the whole foundation requires a superseding ADR with benchmark evidence.
@@ -66,6 +66,8 @@ If these gates fail, the project will first replace or redesign the failing Fant
 
 - [Project Fantasy fork](https://github.com/rayss1/Fantasy)
 - [Reviewed public baseline](https://github.com/rayss1/Fantasy/commit/493d5d4dd1dd009cdfcd2846b88ebab9746d4504)
-- [Pinned evaluation fork commit](https://github.com/rayss1/Fantasy/commit/f8bed0d464924f159d46498f1311206ea0694be8)
+- [Pinned production fork commit](https://github.com/rayss1/Fantasy/commit/f8bed0d464924f159d46498f1311206ea0694be8)
+- [Accepted .NET 10 runtime](0012-server-runtime-successor.md)
+- [Project-owner license approval](../Architecture/fantasy-license-approval-2026-08-24.md)
 - [Fantasy license](https://github.com/rayss1/Fantasy/blob/main/LICENSE)
 - [Architecture and Technology Baseline](../Architecture/technology-baseline.md)

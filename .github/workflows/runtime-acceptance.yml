@@ -1,4 +1,4 @@
-name: Runtime acceptance candidate
+name: Battle Host production validation
 
 on:
   pull_request:
@@ -6,10 +6,13 @@ on:
     paths:
       - .github/workflows/runtime-acceptance.yml
       - .dockerignore
+      - AiNative.sln
+      - Directory.Build.props
+      - global.json
       - Docs/ADR/0012-server-runtime-successor.md
       - Docs/Architecture/runtime-acceptance-candidate-2026-08-19.md
       - Docs/Architecture/technology-baseline.md
-      - infrastructure/runtime-acceptance/**
+      - infrastructure/battle-host/**
       - server/RuntimeAcceptance.sln
       - server/acceptance/**
       - server/src/**
@@ -18,21 +21,40 @@ on:
       - shared/protocol/**
       - shared/realtime/**
       - server/vendor/Fantasy
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/runtime-acceptance.yml
+      - .dockerignore
+      - AiNative.sln
+      - Directory.Build.props
+      - global.json
+      - infrastructure/battle-host/**
+      - server/RuntimeAcceptance.sln
+      - server/acceptance/**
+      - server/src/**
+      - server/tests/**
+      - shared/gameplay/**
+      - shared/protocol/**
+      - shared/realtime/**
+      - server/vendor/Fantasy
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  candidate:
+  production:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     env:
-      CANDIDATE_SOURCE_COMMIT: ${{ github.event.pull_request.head.sha }}
+      SOURCE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:
       - name: Checkout exact submodule state
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           submodules: recursive
 
       - name: Install .NET 10 SDK
@@ -40,24 +62,24 @@ jobs:
         with:
           dotnet-version: 10.0.202
 
-      - name: Restore candidate
+      - name: Restore product Host
         working-directory: /tmp
-        run: dotnet restore "$GITHUB_WORKSPACE/server/RuntimeAcceptance.sln"
+        run: dotnet restore "$GITHUB_WORKSPACE/AiNative.sln"
 
-      - name: Build candidate
+      - name: Build product Host
         working-directory: /tmp
-        run: dotnet build "$GITHUB_WORKSPACE/server/RuntimeAcceptance.sln" --configuration Release --no-restore --warnaserror
+        run: dotnet build "$GITHUB_WORKSPACE/AiNative.sln" --configuration Release --no-restore --warnaserror
 
       - name: Run adapter, health, and allocation tests
         working-directory: /tmp
-        run: dotnet test "$GITHUB_WORKSPACE/server/RuntimeAcceptance.sln" --configuration Release --no-build --no-restore
+        run: dotnet test "$GITHUB_WORKSPACE/AiNative.sln" --configuration Release --no-build --no-restore
 
       - name: Run deterministic Regional, Degraded, and Backpressure profiles
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p "$GITHUB_WORKSPACE/artifacts/runtime-acceptance"
-          export AINATIVE_SOURCE_COMMIT="$CANDIDATE_SOURCE_COMMIT"
+          export AINATIVE_SOURCE_COMMIT="$SOURCE_COMMIT"
           export AINATIVE_FANTASY_COMMIT="$(git -C "$GITHUB_WORKSPACE/server/vendor/Fantasy" rev-parse HEAD)"
           export AINATIVE_PROTOCOL_IDENTITY="$(sha256sum "$GITHUB_WORKSPACE/shared/schemas/ainative/v1/gameplay.proto" | cut -d ' ' -f 1)"
           runner="$GITHUB_WORKSPACE/artifacts/bin/AiNative.RuntimeAcceptance/Release/net10.0/AiNative.RuntimeAcceptance.dll"
@@ -70,7 +92,7 @@ jobs:
               --output "$GITHUB_WORKSPACE/artifacts/runtime-acceptance/$profile.json"
           done
 
-      - name: Publish candidate Host
+      - name: Publish product Host
         working-directory: /tmp
         run: >-
           dotnet publish "$GITHUB_WORKSPACE/server/src/Hosts/AiNative.BattleHost/AiNative.BattleHost.csproj"
@@ -88,7 +110,7 @@ jobs:
           OTEL_EXPORTER_OTLP_ENDPOINT: http://127.0.0.1:4317
         run: |
           set -euo pipefail
-          export AINATIVE_SOURCE_COMMIT="$CANDIDATE_SOURCE_COMMIT"
+          export AINATIVE_SOURCE_COMMIT="$SOURCE_COMMIT"
           export AINATIVE_FANTASY_COMMIT="$(git -C "$GITHUB_WORKSPACE/server/vendor/Fantasy" rev-parse HEAD)"
           export AINATIVE_PROTOCOL_IDENTITY="$(sha256sum "$GITHUB_WORKSPACE/shared/schemas/ainative/v1/gameplay.proto" | cut -d ' ' -f 1)"
           export AINATIVE_REPLAY_CAPTURE_PATH="$GITHUB_WORKSPACE/artifacts/runtime-acceptance/direct-battle.anrp"
@@ -128,7 +150,7 @@ jobs:
           replay="$(dotnet "$GITHUB_WORKSPACE/artifacts/battle-host/AiNative.BattleHost.dll" --verify-replay "$AINATIVE_REPLAY_CAPTURE_PATH")"
           jq . <<<"$replay"
           test "$(jq -r '.InputCount' <<<"$replay")" = '1'
-          test "$(jq -r '.SourceCommit' <<<"$replay")" = "$CANDIDATE_SOURCE_COMMIT"
+          test "$(jq -r '.SourceCommit' <<<"$replay")" = "$SOURCE_COMMIT"
           test "$(jq -r '.FantasyCommit' <<<"$replay")" = "$AINATIVE_FANTASY_COMMIT"
           test "$(jq -r '.ProtocolIdentity' <<<"$replay")" = "$AINATIVE_PROTOCOL_IDENTITY"
 
@@ -182,10 +204,10 @@ jobs:
           test "$(jq -r '.outerKcpMtu' "$AINATIVE_ACCEPTANCE_REPORT_PATH")" = '1150'
           test "$(jq -r '.tickP99Milliseconds <= 16.67' "$AINATIVE_ACCEPTANCE_REPORT_PATH")" = 'true'
 
-      - name: Audit candidate dependencies
+      - name: Audit product dependencies
         working-directory: /tmp
         run: |
-          output="$(dotnet package list --project "$GITHUB_WORKSPACE/server/RuntimeAcceptance.sln" --vulnerable --include-transitive --no-restore --format json --output-version 1)"
+          output="$(dotnet package list --project "$GITHUB_WORKSPACE/AiNative.sln" --vulnerable --include-transitive --no-restore --format json --output-version 1)"
           test "$(jq '[.. | objects | .vulnerabilities? // empty | length] | add // 0' <<<"$output")" = '0'
 
       - name: Resolve immutable base image digests
@@ -202,7 +224,7 @@ jobs:
           echo "sdk_image=$sdk_tag@$sdk_digest" >> "$GITHUB_OUTPUT"
           echo "runtime_image=$runtime_tag@$runtime_digest" >> "$GITHUB_OUTPUT"
 
-      - name: Build release-equivalent Linux x64 candidate
+      - name: Build release-equivalent Linux x64 product image
         shell: bash
         run: |
           set -euo pipefail
@@ -210,25 +232,36 @@ jobs:
           protocol_identity="$(sha256sum shared/schemas/ainative/v1/gameplay.proto | cut -d ' ' -f 1)"
           docker build \
             --platform linux/amd64 \
-            --file infrastructure/runtime-acceptance/Dockerfile \
+            --file infrastructure/battle-host/Dockerfile \
             --build-arg "SDK_IMAGE=${{ steps.images.outputs.sdk_image }}" \
             --build-arg "RUNTIME_IMAGE=${{ steps.images.outputs.runtime_image }}" \
-            --build-arg "SOURCE_COMMIT=$CANDIDATE_SOURCE_COMMIT" \
+            --build-arg "SOURCE_COMMIT=$SOURCE_COMMIT" \
             --build-arg "FANTASY_COMMIT=$fantasy_commit" \
             --build-arg "PROTOCOL_IDENTITY=$protocol_identity" \
-            --tag ainative/battle-host:acceptance \
+            --tag ainative/battle-host:production-validation \
             .
 
-      - name: Probe candidate image identity, readiness, drain, and SIGTERM
+      - name: Validate production Compose contract
+        shell: bash
+        run: |
+          AINATIVE_BATTLE_HOST_IMAGE='ainative/battle-host@sha256:0000000000000000000000000000000000000000000000000000000000000000' \
+          AINATIVE_FANTASY_CONFIG="$GITHUB_WORKSPACE/server/src/Hosts/AiNative.BattleHost/Fantasy.config" \
+          docker compose --file infrastructure/battle-host/compose.yaml config --quiet
+
+      - name: Probe product image identity, readiness, drain, and SIGTERM
         shell: bash
         run: |
           set -euo pipefail
           container_id="$(docker run --detach \
+            --read-only \
+            --tmpfs /tmp:size=64m,mode=1777 \
+            --cap-drop ALL \
+            --security-opt no-new-privileges \
             --publish 127.0.0.1:5081:8080 \
             --env AINATIVE_ENABLE_EVALUATION_ENDPOINTS=true \
             --env AINATIVE_REPLAY_CAPTURE_PATH=/tmp/battle.anrp \
             --env OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4317 \
-            ainative/battle-host:acceptance)"
+            ainative/battle-host:production-validation)"
           cleanup() { docker rm --force "$container_id" >/dev/null 2>&1 || true; }
           trap cleanup EXIT
           deadline=$((SECONDS + 30))
@@ -261,17 +294,21 @@ jobs:
           docker cp "$container_id:/tmp/battle.anrp" "$GITHUB_WORKSPACE/artifacts/runtime-acceptance/image-battle.anrp"
           replay="$(dotnet "$GITHUB_WORKSPACE/artifacts/battle-host/AiNative.BattleHost.dll" --verify-replay "$GITHUB_WORKSPACE/artifacts/runtime-acceptance/image-battle.anrp")"
           test "$(jq -r '.InputCount' <<<"$replay")" = '1'
-          test "$(jq -r '.SourceCommit' <<<"$replay")" = "$CANDIDATE_SOURCE_COMMIT"
+          test "$(jq -r '.SourceCommit' <<<"$replay")" = "$SOURCE_COMMIT"
           test "$(jq -r '.FantasyCommit' <<<"$replay")" = "$(git -C server/vendor/Fantasy rev-parse HEAD)"
 
           first_container_id="$container_id"
           container_id="$(docker run --detach \
+            --read-only \
+            --tmpfs /tmp:size=64m,mode=1777 \
+            --cap-drop ALL \
+            --security-opt no-new-privileges \
             --publish 127.0.0.1:5081:8080 \
             --env AINATIVE_ENABLE_EVALUATION_ENDPOINTS=true \
             --env AINATIVE_REPLAY_CAPTURE_PATH=/tmp/load.anrp \
             --env AINATIVE_ACCEPTANCE_REPORT_PATH=/tmp/load-report.json \
             --env AINATIVE_ACCEPTANCE_WARMUP_TICKS=60 \
-            ainative/battle-host:acceptance)"
+            ainative/battle-host:production-validation)"
           deadline=$((SECONDS + 30))
           until curl --fail --silent http://127.0.0.1:5081/health/ready >/dev/null; do
             if ! docker inspect --format '{{.State.Running}}' "$container_id" | grep -q true || (( SECONDS >= deadline )); then
@@ -319,7 +356,7 @@ jobs:
           command -v nsenter >/dev/null
           command -v tc >/dev/null
           command -v tcpdump >/dev/null
-          export AINATIVE_SOURCE_COMMIT="$CANDIDATE_SOURCE_COMMIT"
+          export AINATIVE_SOURCE_COMMIT="$SOURCE_COMMIT"
           export AINATIVE_FANTASY_COMMIT="$(git -C server/vendor/Fantasy rev-parse HEAD)"
           export AINATIVE_PROTOCOL_IDENTITY="$(sha256sum shared/schemas/ainative/v1/gameplay.proto | cut -d ' ' -f 1)"
           runner="$GITHUB_WORKSPACE/artifacts/bin/AiNative.RuntimeAcceptance/Release/net10.0/AiNative.RuntimeAcceptance.dll"
@@ -339,11 +376,15 @@ jobs:
             duplicate="$5"
             reorder="$6"
             active_container="$(docker run --detach \
+              --read-only \
+              --tmpfs /tmp:size=64m,mode=1777 \
+              --cap-drop ALL \
+              --security-opt no-new-privileges \
               --publish 127.0.0.1:5083:8080 \
               --env AINATIVE_ENABLE_EVALUATION_ENDPOINTS=true \
               --env AINATIVE_ACCEPTANCE_REPORT_PATH="/tmp/$profile-host.json" \
               --env AINATIVE_ACCEPTANCE_MAX_TICKS=6000 \
-              ainative/battle-host:acceptance)"
+              ainative/battle-host:production-validation)"
             deadline=$((SECONDS + 30))
             until curl --fail --silent http://127.0.0.1:5083/health/ready >/dev/null; do
               if ! docker inspect --format '{{.State.Running}}' "$active_container" | grep -q true || (( SECONDS >= deadline )); then
@@ -441,25 +482,25 @@ jobs:
             artifacts/runtime-acceptance/*-socket.pcap
           if-no-files-found: warn
 
-      - name: Record candidate image provenance
+      - name: Record product image provenance
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p artifacts/runtime-acceptance
-          image_id="$(docker image inspect ainative/battle-host:acceptance --format '{{.Id}}')"
+          image_id="$(docker image inspect ainative/battle-host:production-validation --format '{{.Id}}')"
           cat > artifacts/runtime-acceptance/provenance.json <<JSON
           {
-            "parentCommit": "$CANDIDATE_SOURCE_COMMIT",
+            "parentCommit": "$SOURCE_COMMIT",
             "fantasyCommit": "$(git -C server/vendor/Fantasy rev-parse HEAD)",
             "sdkImage": "${{ steps.images.outputs.sdk_image }}",
             "runtimeImage": "${{ steps.images.outputs.runtime_image }}",
-            "candidateImageId": "$image_id",
+            "productImageId": "$image_id",
             "outerKcpMtu": 1150,
             "protocolSha256": "$(sha256sum shared/schemas/ainative/v1/gameplay.proto | cut -d ' ' -f 1)"
           }
           JSON
 
-      - name: Upload candidate provenance
+      - name: Upload product provenance
         uses: actions/upload-artifact@v4
         with:
           name: runtime-acceptance-provenance
@@ -492,18 +533,22 @@ jobs:
             artifacts/runtime-acceptance/degraded-socket.pcap
           if-no-files-found: error
 
-      - name: Run labeled 60-minute release-equivalent 64-bot soak
-        if: contains(github.event.pull_request.labels.*.name, 'qualified-soak')
+      - name: Run qualified 60-minute release-equivalent 64-bot soak
+        if: github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'qualified-soak')
         shell: bash
         run: |
           set -euo pipefail
           soak_container="$(docker run --detach \
+            --read-only \
+            --tmpfs /tmp:size=64m,mode=1777 \
+            --cap-drop ALL \
+            --security-opt no-new-privileges \
             --publish 127.0.0.1:5082:8080 \
             --env AINATIVE_ENABLE_EVALUATION_ENDPOINTS=true \
             --env AINATIVE_ACCEPTANCE_REPORT_PATH=/tmp/soak-report.json \
             --env AINATIVE_ACCEPTANCE_WARMUP_TICKS=600 \
             --env AINATIVE_ACCEPTANCE_MAX_TICKS=230000 \
-            ainative/battle-host:acceptance)"
+            ainative/battle-host:production-validation)"
           cleanup_soak() { docker rm --force "$soak_container" >/dev/null 2>&1 || true; }
           trap cleanup_soak EXIT
           deadline=$((SECONDS + 30))
@@ -541,10 +586,10 @@ jobs:
           test "$(jq -r '.gameplayP99Milliseconds <= 8' "$report")" = 'true'
           test "$(jq -r '.gameplayAllocatedBytes' "$report")" = '0'
           test "$(jq -r '.outerKcpMtu' "$report")" = '1150'
-          test "$(jq -r '.sourceCommit' "$report")" = "$CANDIDATE_SOURCE_COMMIT"
+          test "$(jq -r '.sourceCommit' "$report")" = "$SOURCE_COMMIT"
 
       - name: Upload qualified-duration soak evidence
-        if: contains(github.event.pull_request.labels.*.name, 'qualified-soak')
+        if: github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'qualified-soak')
         uses: actions/upload-artifact@v4
         with:
           name: runtime-acceptance-soak
