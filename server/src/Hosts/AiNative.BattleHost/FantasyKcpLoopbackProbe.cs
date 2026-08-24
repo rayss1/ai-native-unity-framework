@@ -123,6 +123,7 @@ internal static class FantasyKcpLoopbackProbe
             cancellationToken);
         if (send.Status != SendStatus.Accepted)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             throw new InvalidOperationException($"KCP loopback {messageId} send failed with {send.Status}.");
         }
     }
