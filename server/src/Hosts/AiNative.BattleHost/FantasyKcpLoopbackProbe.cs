@@ -40,6 +40,12 @@ internal static class FantasyKcpLoopbackProbe
                 MessageId.JoinRoomResponse,
                 timeout.Token);
 
+            Snapshot baseline = await ReceiveAsync<Snapshot>(
+                probe,
+                MessageId.Snapshot,
+                timeout.Token);
+            PlayerState baselinePlayer = baseline.Players.First(player => player.EntityId == join.EntityId);
+
             await SendAsync(
                 probe,
                 MessageId.InputCommand,
@@ -51,10 +57,15 @@ internal static class FantasyKcpLoopbackProbe
                     MoveYMilli = -500,
                 },
                 timeout.Token);
-            snapshot = await ReceiveAsync<Snapshot>(
-                probe,
-                MessageId.Snapshot,
-                timeout.Token);
+            do
+            {
+                snapshot = await ReceiveAsync<Snapshot>(
+                    probe,
+                    MessageId.Snapshot,
+                    timeout.Token);
+            }
+            while (snapshot.Players.First(player => player.EntityId == join.EntityId).PositionXMilli <
+                   baselinePlayer.PositionXMilli + 25);
         }
 
         await using FantasyKcpProbe reconnectProbe = await gateway.ConnectLoopbackProbeAsync(timeout.Token);

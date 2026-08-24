@@ -126,6 +126,7 @@ jobs:
           wait "$host_pid"
           host_pid=''
           replay="$(dotnet "$GITHUB_WORKSPACE/artifacts/battle-host/AiNative.BattleHost.dll" --verify-replay "$AINATIVE_REPLAY_CAPTURE_PATH")"
+          jq . <<<"$replay"
           test "$(jq -r '.InputCount' <<<"$replay")" = '1'
           test "$(jq -r '.SourceCommit' <<<"$replay")" = "$CANDIDATE_SOURCE_COMMIT"
           test "$(jq -r '.FantasyCommit' <<<"$replay")" = "$AINATIVE_FANTASY_COMMIT"
@@ -151,6 +152,7 @@ jobs:
             exit 1
           fi
           load="$(cat "$load_file")"
+          jq . <<<"$load"
           test "$(jq -r '.botCount' <<<"$load")" = '64'
           test "$(jq -r '.peakConnections' <<<"$load")" = '64'
           test "$(jq -r '.outerKcpMtu' <<<"$load")" = '1150'
@@ -286,6 +288,7 @@ jobs:
             exit 1
           fi
           load="$(cat "$load_file")"
+          jq . <<<"$load"
           test "$(jq -r '.botCount' <<<"$load")" = '64'
           test "$(jq -r '.peakConnections' <<<"$load")" = '64'
           test "$(jq -r '.outerKcpMtu' <<<"$load")" = '1150'
@@ -396,6 +399,8 @@ jobs:
             test "$(docker inspect --format '{{.State.ExitCode}}' "$active_container")" = '0'
             host_report="$GITHUB_WORKSPACE/artifacts/runtime-acceptance/$profile-host.json"
             docker cp "$active_container:/tmp/$profile-host.json" "$host_report"
+            jq . "$response"
+            jq . "$host_report"
             test "$(jq -r '.botCount' "$response")" = '64'
             test "$(jq -r '.peakConnections' "$response")" = '64'
             test "$(jq -r '.outerKcpMtu' "$response")" = '1150'
