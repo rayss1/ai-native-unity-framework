@@ -252,14 +252,17 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          evidence_dir="$GITHUB_WORKSPACE/artifacts/runtime-acceptance"
+          chmod 0777 "$evidence_dir"
           container_id="$(docker run --detach \
             --read-only \
             --tmpfs /tmp:size=64m,mode=1777 \
+            --volume "$evidence_dir:/evidence" \
             --cap-drop ALL \
             --security-opt no-new-privileges \
             --publish 127.0.0.1:5081:8080 \
             --env AINATIVE_ENABLE_EVALUATION_ENDPOINTS=true \
-            --env AINATIVE_REPLAY_CAPTURE_PATH=/tmp/battle.anrp \
+            --env AINATIVE_REPLAY_CAPTURE_PATH=/evidence/image-battle.anrp \
             --env OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4317 \
             ainative/battle-host:production-validation)"
           cleanup() { docker rm --force "$container_id" >/dev/null 2>&1 || true; }
@@ -289,9 +292,8 @@ jobs:
             fi
             sleep 0.05
           done
-          docker stop --signal TERM --time 10 "$container_id"
+          docker stop --signal TERM --timeout 10 "$container_id"
           test "$(docker inspect --format '{{.State.ExitCode}}' "$container_id")" = '0'
-          docker cp "$container_id:/tmp/battle.anrp" "$GITHUB_WORKSPACE/artifacts/runtime-acceptance/image-battle.anrp"
           replay="$(dotnet "$GITHUB_WORKSPACE/artifacts/battle-host/AiNative.BattleHost.dll" --verify-replay "$GITHUB_WORKSPACE/artifacts/runtime-acceptance/image-battle.anrp")"
           test "$(jq -r '.InputCount' <<<"$replay")" = '1'
           test "$(jq -r '.SourceCommit' <<<"$replay")" = "$SOURCE_COMMIT"
@@ -301,12 +303,13 @@ jobs:
           container_id="$(docker run --detach \
             --read-only \
             --tmpfs /tmp:size=64m,mode=1777 \
+            --volume "$evidence_dir:/evidence" \
             --cap-drop ALL \
             --security-opt no-new-privileges \
             --publish 127.0.0.1:5081:8080 \
             --env AINATIVE_ENABLE_EVALUATION_ENDPOINTS=true \
-            --env AINATIVE_REPLAY_CAPTURE_PATH=/tmp/load.anrp \
-            --env AINATIVE_ACCEPTANCE_REPORT_PATH=/tmp/load-report.json \
+            --env AINATIVE_REPLAY_CAPTURE_PATH=/evidence/image-load.anrp \
+            --env AINATIVE_ACCEPTANCE_REPORT_PATH=/evidence/image-load-report.json \
             --env AINATIVE_ACCEPTANCE_WARMUP_TICKS=60 \
             ainative/battle-host:production-validation)"
           deadline=$((SECONDS + 30))
@@ -335,10 +338,8 @@ jobs:
           test "$(jq -r '.measuredInputBatchesSent * 2 == .measuredInputFrames' <<<"$load")" = 'true'
           test "$(jq -r '.measuredInputBatchRateHz >= 29.5 and .measuredInputBatchRateHz <= 30.1' <<<"$load")" = 'true'
           test "$(jq -r '.snapshotFrames > 0' <<<"$load")" = 'true'
-          docker stop --signal TERM --time 10 "$container_id"
+          docker stop --signal TERM --timeout 10 "$container_id"
           test "$(docker inspect --format '{{.State.ExitCode}}' "$container_id")" = '0'
-          docker cp "$container_id:/tmp/load.anrp" "$GITHUB_WORKSPACE/artifacts/runtime-acceptance/image-load.anrp"
-          docker cp "$container_id:/tmp/load-report.json" "$GITHUB_WORKSPACE/artifacts/runtime-acceptance/image-load-report.json"
           replay="$(dotnet "$GITHUB_WORKSPACE/artifacts/battle-host/AiNative.BattleHost.dll" --verify-replay "$GITHUB_WORKSPACE/artifacts/runtime-acceptance/image-load.anrp")"
           jq . "$load_file"
           jq . "$GITHUB_WORKSPACE/artifacts/runtime-acceptance/image-load-report.json"
@@ -353,6 +354,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          evidence_dir="$GITHUB_WORKSPACE/artifacts/runtime-acceptance"
+          chmod 0777 "$evidence_dir"
           command -v nsenter >/dev/null
           command -v tc >/dev/null
           command -v tcpdump >/dev/null
@@ -378,11 +381,12 @@ jobs:
             active_container="$(docker run --detach \
               --read-only \
               --tmpfs /tmp:size=64m,mode=1777 \
+              --volume "$evidence_dir:/evidence" \
               --cap-drop ALL \
               --security-opt no-new-privileges \
               --publish 127.0.0.1:5083:8080 \
               --env AINATIVE_ENABLE_EVALUATION_ENDPOINTS=true \
-              --env AINATIVE_ACCEPTANCE_REPORT_PATH="/tmp/$profile-host.json" \
+              --env AINATIVE_ACCEPTANCE_REPORT_PATH="/evidence/$profile-host.json" \
               --env AINATIVE_ACCEPTANCE_MAX_TICKS=6000 \
               ainative/battle-host:production-validation)"
             deadline=$((SECONDS + 30))
@@ -436,10 +440,9 @@ jobs:
               > "$GITHUB_WORKSPACE/artifacts/runtime-acceptance/$profile-netem-stats.txt"
             dropped="$(sed -n 's/.*dropped \([0-9][0-9]*\).*/\1/p' "$GITHUB_WORKSPACE/artifacts/runtime-acceptance/$profile-netem-stats.txt" | head -1)"
             test "${dropped:-0}" -gt 0
-            docker stop --signal TERM --time 30 "$active_container"
+            docker stop --signal TERM --timeout 30 "$active_container"
             test "$(docker inspect --format '{{.State.ExitCode}}' "$active_container")" = '0'
             host_report="$GITHUB_WORKSPACE/artifacts/runtime-acceptance/$profile-host.json"
-            docker cp "$active_container:/tmp/$profile-host.json" "$host_report"
             jq . "$response"
             jq . "$host_report"
             test "$(jq -r '.botCount' "$response")" = '64'
@@ -538,14 +541,17 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          evidence_dir="$GITHUB_WORKSPACE/artifacts/runtime-acceptance"
+          chmod 0777 "$evidence_dir"
           soak_container="$(docker run --detach \
             --read-only \
             --tmpfs /tmp:size=64m,mode=1777 \
+            --volume "$evidence_dir:/evidence" \
             --cap-drop ALL \
             --security-opt no-new-privileges \
             --publish 127.0.0.1:5082:8080 \
             --env AINATIVE_ENABLE_EVALUATION_ENDPOINTS=true \
-            --env AINATIVE_ACCEPTANCE_REPORT_PATH=/tmp/soak-report.json \
+            --env AINATIVE_ACCEPTANCE_REPORT_PATH=/evidence/soak-host.json \
             --env AINATIVE_ACCEPTANCE_WARMUP_TICKS=600 \
             --env AINATIVE_ACCEPTANCE_MAX_TICKS=230000 \
             ainative/battle-host:production-validation)"
@@ -562,10 +568,8 @@ jobs:
           curl --fail --silent --max-time 3800 --request POST \
             'http://127.0.0.1:5082/admin/kcp-load?botCount=64&warmupSeconds=10&durationSeconds=3600' \
             > "$GITHUB_WORKSPACE/artifacts/runtime-acceptance/soak-load.json"
-          docker stop --signal TERM --time 30 "$soak_container"
+          docker stop --signal TERM --timeout 30 "$soak_container"
           test "$(docker inspect --format '{{.State.ExitCode}}' "$soak_container")" = '0'
-          docker cp "$soak_container:/tmp/soak-report.json" \
-            "$GITHUB_WORKSPACE/artifacts/runtime-acceptance/soak-host.json"
           load="$GITHUB_WORKSPACE/artifacts/runtime-acceptance/soak-load.json"
           report="$GITHUB_WORKSPACE/artifacts/runtime-acceptance/soak-host.json"
           test "$(jq -r '.botCount' "$load")" = '64'
