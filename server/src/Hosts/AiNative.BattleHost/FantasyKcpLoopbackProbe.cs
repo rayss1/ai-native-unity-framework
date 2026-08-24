@@ -90,13 +90,23 @@ internal static class FantasyKcpLoopbackProbe
             reconnect.ResumeTick);
     }
 
-    private static async Task SendAsync(
+    internal static Task SendAsync(
         FantasyKcpProbe probe,
         MessageId messageId,
         Google.Protobuf.IMessage message,
         CancellationToken cancellationToken)
     {
         byte[] sendBuffer = new byte[RealtimeProtocolCodec.MaxDatagramBytes];
+        return SendAsync(probe, messageId, message, sendBuffer, cancellationToken);
+    }
+
+    internal static async Task SendAsync(
+        FantasyKcpProbe probe,
+        MessageId messageId,
+        Google.Protobuf.IMessage message,
+        byte[] sendBuffer,
+        CancellationToken cancellationToken)
+    {
         if (!RealtimeProtocolCodec.TryEncode(
                 messageId,
                 message,
@@ -117,7 +127,7 @@ internal static class FantasyKcpLoopbackProbe
         }
     }
 
-    private static async Task<TMessage> ReceiveAsync<TMessage>(
+    internal static async Task<TMessage> ReceiveAsync<TMessage>(
         FantasyKcpProbe probe,
         MessageId expectedMessageId,
         CancellationToken cancellationToken)

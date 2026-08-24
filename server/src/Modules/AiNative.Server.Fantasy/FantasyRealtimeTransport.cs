@@ -12,11 +12,33 @@ internal interface IFantasySessionSender : IDisposable
     SendStatus Send(TransportChannel channel, ReadOnlySpan<byte> payload);
 }
 
+internal interface IFantasyOutboundDispatcher
+{
+    bool IsClosed { get; }
+
+    void Post(Action action);
+
+    void Send(FantasyRealtimeEnvelope envelope);
+
+    void DisposeSession();
+}
+
+internal sealed class FantasyOutboundDispatcher(Session session) : IFantasyOutboundDispatcher
+{
+    public bool IsClosed => session.IsDisposed;
+
+    public void Post(Action action) => session.Scene.ThreadSynchronizationContext.Post(action);
+
+    public void Send(FantasyRealtimeEnvelope envelope) => session.Send(envelope);
+
+    public void DisposeSession() => session.Dispose();
+}
+
 internal sealed class FantasySessionSender : IFantasySessionSender
 {
-    private readonly Session _session;
-    private readonly global::Fantasy.ThreadSynchronizationContext _sceneContext;
+    private readonly IFantasyOutboundDispatcher _dispatcher;
     private readonly ConcurrentQueue<FantasyRealtimeEnvelope> _outbound = new();
+    private readonly object _snapshotGate = new();
     private readonly int _maxOutboundBytes;
     private readonly int _maxOutboundPackets;
     private int _disposed;
@@ -24,28 +46,48 @@ internal sealed class FantasySessionSender : IFantasySessionSender
     private int _outboundBytes;
     private int _outboundPackets;
     private long _sequence;
+    private long _snapshotReplacements;
+    private FantasyRealtimeEnvelope? _latestSnapshot;
 
     public FantasySessionSender(
         Session session,
         int maxOutboundBytes = 256 * 1024,
         int maxOutboundPackets = 1024)
+        : this(new FantasyOutboundDispatcher(session), maxOutboundBytes, maxOutboundPackets)
     {
-        ArgumentNullException.ThrowIfNull(session);
+    }
+
+    internal FantasySessionSender(
+        IFantasyOutboundDispatcher dispatcher,
+        int maxOutboundBytes = 256 * 1024,
+        int maxOutboundPackets = 1024)
+    {
+        ArgumentNullException.ThrowIfNull(dispatcher);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxOutboundBytes);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxOutboundPackets);
-        _session = session;
-        _sceneContext = session.Scene.ThreadSynchronizationContext;
+        _dispatcher = dispatcher;
         _maxOutboundBytes = maxOutboundBytes;
         _maxOutboundPackets = maxOutboundPackets;
     }
 
-    public bool IsClosed => Volatile.Read(ref _disposed) != 0 || _session.IsDisposed;
+    public bool IsClosed => Volatile.Read(ref _disposed) != 0 || _dispatcher.IsClosed;
+
+    internal int PendingOutboundBytes => Volatile.Read(ref _outboundBytes);
+
+    internal int PendingOutboundPackets => Volatile.Read(ref _outboundPackets);
+
+    internal long SnapshotReplacementCount => Interlocked.Read(ref _snapshotReplacements);
 
     public SendStatus Send(TransportChannel channel, ReadOnlySpan<byte> payload)
     {
         if (IsClosed)
         {
             return SendStatus.Closed;
+        }
+
+        if (channel.Id == 1)
+        {
+            return SendReplaceableSnapshot(channel, payload);
         }
 
         int packetCount = Interlocked.Increment(ref _outboundPackets);
@@ -90,6 +132,49 @@ internal sealed class FantasySessionSender : IFantasySessionSender
         return SendStatus.Accepted;
     }
 
+    private SendStatus SendReplaceableSnapshot(TransportChannel channel, ReadOnlySpan<byte> payload)
+    {
+        FantasyRealtimeEnvelope replacement = new()
+        {
+            ChannelId = channel.Id,
+            Payload = payload.ToArray(),
+            Sequence = unchecked((ulong)Interlocked.Increment(ref _sequence)),
+        };
+
+        lock (_snapshotGate)
+        {
+            if (IsClosed)
+            {
+                replacement.Dispose();
+                return SendStatus.Closed;
+            }
+
+            FantasyRealtimeEnvelope? previous = _latestSnapshot;
+            int previousBytes = previous?.Payload.Length ?? 0;
+            int byteDelta = payload.Length - previousBytes;
+            int packetDelta = previous is null ? 1 : 0;
+            int packets = Interlocked.Add(ref _outboundPackets, packetDelta);
+            int bytes = Interlocked.Add(ref _outboundBytes, byteDelta);
+            if (packets > _maxOutboundPackets || bytes > _maxOutboundBytes)
+            {
+                Interlocked.Add(ref _outboundPackets, -packetDelta);
+                Interlocked.Add(ref _outboundBytes, -byteDelta);
+                replacement.Dispose();
+                return SendStatus.WouldBlock;
+            }
+
+            _latestSnapshot = replacement;
+            if (previous is not null)
+            {
+                Interlocked.Increment(ref _snapshotReplacements);
+                previous.Dispose();
+            }
+        }
+
+        ScheduleDrain();
+        return SendStatus.Accepted;
+    }
+
     public void Dispose()
     {
         if (Interlocked.Exchange(ref _disposed, 1) != 0)
@@ -99,9 +184,9 @@ internal sealed class FantasySessionSender : IFantasySessionSender
 
         DrainDisposedOutbound();
 
-        if (!_session.IsDisposed)
+        if (!_dispatcher.IsClosed)
         {
-            _sceneContext.Post(_session.Dispose);
+            _dispatcher.Post(_dispatcher.DisposeSession);
         }
     }
 
@@ -109,7 +194,7 @@ internal sealed class FantasySessionSender : IFantasySessionSender
     {
         if (Interlocked.CompareExchange(ref _drainScheduled, 1, 0) == 0)
         {
-            _sceneContext.Post(DrainOnSceneThread);
+            _dispatcher.Post(DrainOnSceneThread);
         }
     }
 
@@ -125,11 +210,35 @@ internal sealed class FantasySessionSender : IFantasySessionSender
                 continue;
             }
 
-            _session.Send(envelope);
+            _dispatcher.Send(envelope);
+        }
+
+        FantasyRealtimeEnvelope? snapshot;
+        lock (_snapshotGate)
+        {
+            snapshot = _latestSnapshot;
+            _latestSnapshot = null;
+            if (snapshot is not null)
+            {
+                Interlocked.Add(ref _outboundBytes, -snapshot.Payload.Length);
+                Interlocked.Decrement(ref _outboundPackets);
+            }
+        }
+
+        if (snapshot is not null)
+        {
+            if (IsClosed)
+            {
+                snapshot.Dispose();
+            }
+            else
+            {
+                _dispatcher.Send(snapshot);
+            }
         }
 
         Volatile.Write(ref _drainScheduled, 0);
-        if (!_outbound.IsEmpty)
+        if (!_outbound.IsEmpty || HasPendingSnapshot())
         {
             ScheduleDrain();
         }
@@ -142,6 +251,25 @@ internal sealed class FantasySessionSender : IFantasySessionSender
             Interlocked.Add(ref _outboundBytes, -envelope.Payload.Length);
             Interlocked.Decrement(ref _outboundPackets);
             envelope.Dispose();
+        }
+
+        lock (_snapshotGate)
+        {
+            if (_latestSnapshot is { } snapshot)
+            {
+                _latestSnapshot = null;
+                Interlocked.Add(ref _outboundBytes, -snapshot.Payload.Length);
+                Interlocked.Decrement(ref _outboundPackets);
+                snapshot.Dispose();
+            }
+        }
+    }
+
+    private bool HasPendingSnapshot()
+    {
+        lock (_snapshotGate)
+        {
+            return _latestSnapshot is not null;
         }
     }
 }

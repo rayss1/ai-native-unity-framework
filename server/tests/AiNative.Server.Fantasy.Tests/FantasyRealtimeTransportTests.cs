@@ -71,6 +71,32 @@ public sealed class FantasyRealtimeTransportTests
         Assert.That(transport.TryEnqueueReceived(SnapshotChannel, [], 4, 1), Is.True);
     }
 
+    [Test]
+    public void ReplaceableSnapshotBacklogRetainsOnlyTheNewestFrame()
+    {
+        FakeDispatcher dispatcher = new();
+        using FantasySessionSender sender = new(
+            dispatcher,
+            maxOutboundBytes: 4096,
+            maxOutboundPackets: 8);
+
+        for (int index = 0; index < 1000; index++)
+        {
+            Assert.That(sender.Send(SnapshotChannel, BitConverter.GetBytes(index)), Is.EqualTo(SendStatus.Accepted));
+        }
+
+        Assert.That(sender.PendingOutboundPackets, Is.EqualTo(1));
+        Assert.That(sender.PendingOutboundBytes, Is.EqualTo(sizeof(int)));
+        Assert.That(sender.SnapshotReplacementCount, Is.EqualTo(999));
+
+        dispatcher.RunPostedActions();
+
+        Assert.That(dispatcher.SentPayloads, Has.Count.EqualTo(1));
+        Assert.That(BitConverter.ToInt32(dispatcher.SentPayloads[0]), Is.EqualTo(999));
+        Assert.That(sender.PendingOutboundPackets, Is.Zero);
+        Assert.That(sender.PendingOutboundBytes, Is.Zero);
+    }
+
     private sealed class FakeSender : IFantasySessionSender
     {
         public bool IsClosed { get; private set; }
@@ -86,5 +112,32 @@ public sealed class FantasyRealtimeTransportTests
         }
 
         public void Dispose() => IsClosed = true;
+    }
+
+    private sealed class FakeDispatcher : IFantasyOutboundDispatcher
+    {
+        private readonly Queue<Action> _posted = new();
+
+        public bool IsClosed { get; private set; }
+
+        public List<byte[]> SentPayloads { get; } = new();
+
+        public void Post(Action action) => _posted.Enqueue(action);
+
+        public void Send(FantasyRealtimeEnvelope envelope)
+        {
+            SentPayloads.Add(envelope.Payload.ToArray());
+            envelope.Dispose();
+        }
+
+        public void DisposeSession() => IsClosed = true;
+
+        public void RunPostedActions()
+        {
+            while (_posted.TryDequeue(out Action? action))
+            {
+                action();
+            }
+        }
     }
 }

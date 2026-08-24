@@ -2,6 +2,10 @@ using System.Diagnostics;
 using System.Net;
 using AiNative.BattleHost;
 using AiNative.Gameplay;
+using AiNative.Protocol.V1;
+using AiNative.Realtime;
+using AiNative.Server.Protocol;
+using Microsoft.Extensions.Configuration;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using NUnit.Framework;
@@ -115,6 +119,75 @@ public sealed class HealthAndBudgetTests
 
         replayed.ApplyInput(0, 1000, 0);
         Assert.That(replayed.ComputeStateHash(), Is.Not.EqualTo(recordedHash));
+    }
+
+    [Test]
+    public async Task ProductionInputFramesCaptureAndReplayWithExactIdentityAndHash()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), $"ainative-replay-{Guid.NewGuid():N}");
+        string path = Path.Combine(directory, "battle.anrp");
+        Directory.CreateDirectory(directory);
+
+        try
+        {
+            IConfiguration configuration = new ConfigurationBuilder()
+                .AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["AINATIVE_REPLAY_CAPTURE_PATH"] = path,
+                    ["AINATIVE_REPLAY_CAPTURE_CAPACITY"] = "4096",
+                    ["AINATIVE_SOURCE_COMMIT"] = "test-source",
+                    ["AINATIVE_FANTASY_COMMIT"] = "test-fantasy",
+                    ["AINATIVE_PROTOCOL_IDENTITY"] = "test-protocol",
+                    ["AINATIVE_CONFIGURATION_IDENTITY"] = "test-config",
+                })
+                .Build();
+            using BattleMetrics metrics = new();
+            await using BattleReplayCapture capture = new(configuration, metrics);
+            SyntheticRoom recorded = new(64);
+            Pcg32Random random = new(seed: 0xC0FFEEUL, sequence: 0x51UL);
+            byte[] frame = new byte[RealtimeProtocolCodec.MaxDatagramBytes];
+            const int ticks = 3600;
+
+            for (int tick = 0; tick < ticks; tick++)
+            {
+                int entityIndex = (int)(random.NextUInt32() % 64);
+                InputCommand command = new()
+                {
+                    RoomTick = checked((ulong)tick),
+                    Sequence = checked((uint)tick + 1),
+                    MoveXMilli = (int)(random.NextUInt32() % 2001) - 1000,
+                    MoveYMilli = (int)(random.NextUInt32() % 2001) - 1000,
+                };
+                Assert.That(RealtimeProtocolCodec.TryEncode(
+                    MessageId.InputCommand,
+                    command,
+                    frame,
+                    out TransportChannel channel,
+                    out int writtenBytes), Is.True);
+                Assert.That(channel.Id, Is.EqualTo(2));
+                Assert.That(capture.TryRecordInput(
+                    checked((ulong)tick),
+                    entityIndex,
+                    frame.AsSpan(0, writtenBytes)), Is.True);
+                recorded.ApplyInput(entityIndex, command.MoveXMilli, command.MoveYMilli);
+                recorded.Tick();
+            }
+
+            await capture.CompleteAsync(ticks, recorded.ComputeStateHash());
+            ReplayVerificationResult verified = BattleReplayVerifier.Verify(path);
+
+            Assert.That(verified.SourceCommit, Is.EqualTo("test-source"));
+            Assert.That(verified.FantasyCommit, Is.EqualTo("test-fantasy"));
+            Assert.That(verified.ProtocolIdentity, Is.EqualTo("test-protocol"));
+            Assert.That(verified.ConfigurationIdentity, Is.EqualTo("test-config"));
+            Assert.That(verified.InputCount, Is.EqualTo(ticks));
+            Assert.That(verified.FinalTick, Is.EqualTo((ulong)ticks));
+            Assert.That(verified.StateHash, Is.EqualTo(recorded.ComputeStateHash()));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
     }
 
     private static int PercentileIndex(int count, double percentile) =>

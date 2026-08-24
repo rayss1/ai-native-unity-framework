@@ -9,6 +9,7 @@ namespace AiNative.BattleHost;
 internal sealed class RoomProtocolService(
     FantasyKcpGateway gateway,
     BattleMetrics metrics,
+    BattleReplayCapture replayCapture,
     ILogger<RoomProtocolService> logger) : IAsyncDisposable
 {
     private const int MaxConnections = 64;
@@ -54,7 +55,12 @@ internal sealed class RoomProtocolService(
                     continue;
                 }
 
-                Handle(connection, decoded, room, roomTick);
+                Handle(
+                    connection,
+                    decoded,
+                    room,
+                    roomTick,
+                    _receiveBuffer.AsSpan(0, packet.WrittenBytes));
             }
         }
     }
@@ -99,7 +105,8 @@ internal sealed class RoomProtocolService(
         ConnectionState connection,
         DecodedProtocolMessage decoded,
         SyntheticRoom room,
-        ulong roomTick)
+        ulong roomTick,
+        ReadOnlySpan<byte> frame)
     {
         switch (decoded.MessageId)
         {
@@ -110,7 +117,7 @@ internal sealed class RoomProtocolService(
                 HandleJoin(connection, request);
                 return;
             case MessageId.InputCommand when decoded.Message is InputCommand command:
-                HandleInput(connection, command, room);
+                HandleInput(connection, command, room, roomTick, frame);
                 return;
             case MessageId.ReconnectRequest when decoded.Message is ReconnectRequest request:
                 HandleReconnect(connection, request, room, roomTick);
@@ -168,7 +175,12 @@ internal sealed class RoomProtocolService(
         });
     }
 
-    private void HandleInput(ConnectionState connection, InputCommand command, SyntheticRoom room)
+    private void HandleInput(
+        ConnectionState connection,
+        InputCommand command,
+        SyntheticRoom room,
+        ulong roomTick,
+        ReadOnlySpan<byte> frame)
     {
         LogicalSession? session = connection.Session;
         if (session is not { Joined: true } || command.Sequence <= session.LastInputSequence)
@@ -178,6 +190,7 @@ internal sealed class RoomProtocolService(
         }
 
         session.LastInputSequence = command.Sequence;
+        replayCapture.TryRecordInput(roomTick, session.EntityIndex, frame);
         room.ApplyInput(session.EntityIndex, command.MoveXMilli, command.MoveYMilli);
     }
 

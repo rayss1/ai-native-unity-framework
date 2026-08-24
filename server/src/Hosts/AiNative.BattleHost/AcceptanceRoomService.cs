@@ -8,6 +8,7 @@ internal sealed class AcceptanceRoomService(
     RuntimeReadiness readiness,
     BattleMetrics metrics,
     RoomProtocolService protocol,
+    BattleReplayCapture replayCapture,
     ILogger<AcceptanceRoomService> logger) : BackgroundService
 {
     private static readonly TimeSpan TickInterval = TimeSpan.FromTicks(TimeSpan.TicksPerSecond / 60);
@@ -25,7 +26,13 @@ internal sealed class AcceptanceRoomService(
             {
                 long started = Stopwatch.GetTimestamp();
                 protocol.PumpInbound(_room, checked((ulong)readiness.Tick));
+                long gameplayStarted = Stopwatch.GetTimestamp();
+                long allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
                 _room.Tick();
+                long gameplayAllocated = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+                metrics.RecordGameplayTick(
+                    Stopwatch.GetElapsedTime(gameplayStarted).TotalMilliseconds,
+                    gameplayAllocated);
                 readiness.AdvanceTick();
                 protocol.PublishSnapshot(_room, checked((ulong)readiness.Tick));
                 metrics.RecordTick(Stopwatch.GetElapsedTime(started).TotalMilliseconds);
@@ -37,6 +44,12 @@ internal sealed class AcceptanceRoomService(
         finally
         {
             readiness.BeginDrain();
+            await replayCapture.CompleteAsync(
+                checked((ulong)readiness.Tick),
+                _room.ComputeStateHash());
+            metrics.WriteAcceptanceReport(
+                checked((ulong)readiness.Tick),
+                _room.ComputeStateHash());
             logger.LogInformation("Acceptance room drained at tick {Tick}", readiness.Tick);
         }
     }
@@ -44,6 +57,7 @@ internal sealed class AcceptanceRoomService(
 
 internal sealed class SyntheticRoom
 {
+    internal const ulong InitialRandomState = 0x5eed;
     private const int MaxBots = 64;
     private const int CanonicalHeaderBytes = 16;
     private const int CanonicalBotBytes = 12;
@@ -51,7 +65,7 @@ internal sealed class SyntheticRoom
     private readonly int[] _positionX;
     private readonly int[] _positionZ;
     private readonly int[] _health;
-    private ulong _state = 0x5eed;
+    private ulong _state = InitialRandomState;
 
     public SyntheticRoom(int botCount)
     {
