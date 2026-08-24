@@ -40,39 +40,61 @@ internal static class FantasyKcpLoadProbe
 
         try
         {
-            for (int index = 0; index < botCount; index++)
-            {
-                probes[index] = await gateway.ConnectLoopbackProbeAsync(startupTimeout.Token);
-            }
-
             HashSet<uint> assignedEntities = new(botCount);
-            for (int index = 0; index < botCount; index++)
+            const int connectionBatchSize = 8;
+            for (int batchStart = 0; batchStart < botCount; batchStart += connectionBatchSize)
             {
-                receiveBuffers[index] = new byte[RealtimeProtocolCodec.MaxDatagramBytes];
-                commands[index] = new InputCommand();
-                await FantasyKcpLoopbackProbe.SendAsync(
-                    probes[index],
-                    MessageId.LoginRequest,
-                    new LoginRequest { ProtocolMajor = 1, ClientBuild = "kcp-64-bot-load" },
-                    sendBuffer,
-                    startupTimeout.Token);
-                LoginResponse login = await FantasyKcpLoopbackProbe.ReceiveAsync<LoginResponse>(
-                    probes[index],
-                    MessageId.LoginResponse,
-                    startupTimeout.Token);
-                await FantasyKcpLoopbackProbe.SendAsync(
-                    probes[index],
-                    MessageId.JoinRoomRequest,
-                    new JoinRoomRequest { SessionId = login.SessionId, RequestedRoom = 1 },
-                    sendBuffer,
-                    startupTimeout.Token);
-                JoinRoomResponse join = await FantasyKcpLoopbackProbe.ReceiveAsync<JoinRoomResponse>(
-                    probes[index],
-                    MessageId.JoinRoomResponse,
-                    startupTimeout.Token);
-                if (join.EntityId is 0 or > 64 || !assignedEntities.Add(join.EntityId) || join.TickRate != 60)
+                int batchCount = Math.Min(connectionBatchSize, botCount - batchStart);
+                Task<FantasyKcpProbe>[] connections = new Task<FantasyKcpProbe>[batchCount];
+                for (int offset = 0; offset < batchCount; offset++)
                 {
-                    throw new InvalidOperationException("The 64-bot KCP load probe received an invalid room assignment.");
+                    connections[offset] = gateway.ConnectLoopbackProbeAsync(startupTimeout.Token);
+                }
+
+                try
+                {
+                    await Task.WhenAll(connections);
+                }
+                finally
+                {
+                    for (int offset = 0; offset < batchCount; offset++)
+                    {
+                        if (connections[offset].IsCompletedSuccessfully)
+                        {
+                            probes[batchStart + offset] = connections[offset].Result;
+                        }
+                    }
+                }
+
+                for (int offset = 0; offset < batchCount; offset++)
+                {
+                    int index = batchStart + offset;
+                    receiveBuffers[index] = new byte[RealtimeProtocolCodec.MaxDatagramBytes];
+                    commands[index] = new InputCommand();
+                    await FantasyKcpLoopbackProbe.SendAsync(
+                        probes[index],
+                        MessageId.LoginRequest,
+                        new LoginRequest { ProtocolMajor = 1, ClientBuild = "kcp-64-bot-load" },
+                        sendBuffer,
+                        startupTimeout.Token);
+                    LoginResponse login = await FantasyKcpLoopbackProbe.ReceiveAsync<LoginResponse>(
+                        probes[index],
+                        MessageId.LoginResponse,
+                        startupTimeout.Token);
+                    await FantasyKcpLoopbackProbe.SendAsync(
+                        probes[index],
+                        MessageId.JoinRoomRequest,
+                        new JoinRoomRequest { SessionId = login.SessionId, RequestedRoom = 1 },
+                        sendBuffer,
+                        startupTimeout.Token);
+                    JoinRoomResponse join = await FantasyKcpLoopbackProbe.ReceiveAsync<JoinRoomResponse>(
+                        probes[index],
+                        MessageId.JoinRoomResponse,
+                        startupTimeout.Token);
+                    if (join.EntityId is 0 or > 64 || !assignedEntities.Add(join.EntityId) || join.TickRate != 60)
+                    {
+                        throw new InvalidOperationException("The 64-bot KCP load probe received an invalid room assignment.");
+                    }
                 }
             }
 
