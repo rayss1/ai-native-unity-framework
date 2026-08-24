@@ -36,14 +36,11 @@ internal static class FantasyKcpLoadProbe
 
         try
         {
-            Task<FantasyKcpProbe>[] connections = new Task<FantasyKcpProbe>[botCount];
             for (int index = 0; index < botCount; index++)
             {
-                connections[index] = gateway.ConnectLoopbackProbeAsync(startupTimeout.Token);
+                probes[index] = await gateway.ConnectLoopbackProbeAsync(startupTimeout.Token);
             }
 
-            FantasyKcpProbe[] connected = await Task.WhenAll(connections);
-            connected.CopyTo(probes, 0);
             HashSet<uint> assignedEntities = new(botCount);
             for (int index = 0; index < botCount; index++)
             {
