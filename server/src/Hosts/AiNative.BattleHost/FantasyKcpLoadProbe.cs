@@ -30,10 +30,12 @@ internal static class FantasyKcpLoadProbe
         startupTimeout.CancelAfter(TimeSpan.FromMinutes(2));
         FantasyKcpProbe[] probes = new FantasyKcpProbe[botCount];
         byte[][] receiveBuffers = new byte[botCount][];
-        InputCommand[] commands = new InputCommand[botCount];
+        InputBatch[] inputBatches = new InputBatch[botCount];
         byte[] sendBuffer = new byte[RealtimeProtocolCodec.MaxDatagramBytes];
         long inputFrames = 0;
         long measuredInputFrames = 0;
+        long inputBatchesSent = 0;
+        long measuredInputBatchesSent = 0;
         long snapshotFrames = 0;
         long snapshotBytes = 0;
         ulong newestSnapshotTick = 0;
@@ -72,7 +74,10 @@ internal static class FantasyKcpLoadProbe
                 {
                     int index = batchStart + offset;
                     receiveBuffers[index] = new byte[RealtimeProtocolCodec.MaxDatagramBytes];
-                    commands[index] = new InputCommand();
+                    InputBatch inputBatch = new();
+                    inputBatch.Commands.Add(new InputCommand());
+                    inputBatch.Commands.Add(new InputCommand());
+                    inputBatches[index] = inputBatch;
                     await FantasyKcpLoopbackProbe.SendAsync(
                         probes[index],
                         MessageId.LoginRequest,
@@ -103,7 +108,7 @@ internal static class FantasyKcpLoadProbe
                 int connectedCount = batchStart + batchCount;
                 for (int index = 0; index < connectedCount; index++)
                 {
-                    InputCommand command = commands[index];
+                    InputCommand command = inputBatches[index].Commands[0];
                     command.Sequence = setupSequence;
                     command.MoveXMilli = (index & 1) == 0 ? 1000 : -1000;
                     command.MoveYMilli = 0;
@@ -125,7 +130,7 @@ internal static class FantasyKcpLoadProbe
             long measuredTicks = checked((long)Math.Ceiling(measuredDuration.TotalSeconds * 60));
             long totalTicks = checked(warmupTicks + measuredTicks);
             MonotonicFixedRatePacer pacer = new(60);
-            uint sequence = 0;
+            uint sequence = setupSequence;
             for (long loadTick = 0; loadTick < totalTicks; loadTick++)
             {
                 if (loadTick == warmupTicks)
@@ -136,23 +141,37 @@ internal static class FantasyKcpLoadProbe
 
                 await pacer.WaitForNextTickAsync(cancellationToken);
                 sequence++;
+                int commandSlot = (int)(loadTick & 1);
                 for (int index = 0; index < botCount; index++)
                 {
-                    InputCommand command = commands[index];
+                    InputCommand command = inputBatches[index].Commands[commandSlot];
                     command.RoomTick = newestSnapshotTick;
                     command.Sequence = sequence;
                     command.MoveXMilli = ((index + (int)sequence) & 1) == 0 ? 1000 : -1000;
                     command.MoveYMilli = ((index + (int)(sequence / 30)) & 1) == 0 ? 500 : -500;
-                    await FantasyKcpLoopbackProbe.SendAsync(
-                        probes[index],
-                        MessageId.InputCommand,
-                        command,
-                        sendBuffer,
-                        cancellationToken);
+                    command.Buttons = sequence % 6 == 0 ? 1U : 0U;
                     inputFrames++;
                     if (loadTick >= warmupTicks)
                     {
                         measuredInputFrames++;
+                    }
+                }
+
+                if (commandSlot == 1)
+                {
+                    for (int index = 0; index < botCount; index++)
+                    {
+                        await FantasyKcpLoopbackProbe.SendAsync(
+                            probes[index],
+                            MessageId.InputBatch,
+                            inputBatches[index],
+                            sendBuffer,
+                            cancellationToken);
+                        inputBatchesSent++;
+                        if (loadTick >= warmupTicks)
+                        {
+                            measuredInputBatchesSent++;
+                        }
                     }
                 }
 
@@ -199,6 +218,9 @@ internal static class FantasyKcpLoadProbe
                 measuredInputFrames,
                 measuredInputElapsedSeconds,
                 measuredInputFrames / (double)botCount / measuredInputElapsedSeconds,
+                inputBatchesSent,
+                measuredInputBatchesSent,
+                measuredInputBatchesSent / (double)botCount / measuredInputElapsedSeconds,
                 snapshotFrames,
                 snapshotBytes,
                 newestSnapshotTick,
@@ -231,6 +253,9 @@ internal readonly record struct FantasyKcpLoadResult(
     long MeasuredInputFrames,
     double MeasuredInputElapsedSeconds,
     double MeasuredInputRateHz,
+    long InputBatchesSent,
+    long MeasuredInputBatchesSent,
+    double MeasuredInputBatchRateHz,
     long SnapshotFrames,
     long SnapshotBytes,
     ulong NewestSnapshotTick,

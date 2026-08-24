@@ -157,6 +157,8 @@ jobs:
           test "$(jq -r '.inputFrames > 1000' <<<"$load")" = 'true'
           test "$(jq -r '.measuredInputFrames == (.botCount * .measuredSeconds * 60)' <<<"$load")" = 'true'
           test "$(jq -r '.measuredInputRateHz >= 59.5 and .measuredInputRateHz <= 60.1' <<<"$load")" = 'true'
+          test "$(jq -r '.measuredInputBatchesSent * 2 == .measuredInputFrames' <<<"$load")" = 'true'
+          test "$(jq -r '.measuredInputBatchRateHz >= 29.5 and .measuredInputBatchRateHz <= 30.1' <<<"$load")" = 'true'
           test "$(jq -r '.snapshotFrames > 0' <<<"$load")" = 'true'
           kill -TERM "$host_pid"
           shutdown_deadline=$((SECONDS + 10))
@@ -290,6 +292,8 @@ jobs:
           test "$(jq -r '.inputFrames > 1000' <<<"$load")" = 'true'
           test "$(jq -r '.measuredInputFrames == (.botCount * .measuredSeconds * 60)' <<<"$load")" = 'true'
           test "$(jq -r '.measuredInputRateHz >= 59.5 and .measuredInputRateHz <= 60.1' <<<"$load")" = 'true'
+          test "$(jq -r '.measuredInputBatchesSent * 2 == .measuredInputFrames' <<<"$load")" = 'true'
+          test "$(jq -r '.measuredInputBatchRateHz >= 29.5 and .measuredInputBatchRateHz <= 30.1' <<<"$load")" = 'true'
           test "$(jq -r '.snapshotFrames > 0' <<<"$load")" = 'true'
           docker stop --signal TERM --time 10 "$container_id"
           test "$(docker inspect --format '{{.State.ExitCode}}' "$container_id")" = '0'
@@ -398,6 +402,8 @@ jobs:
             test "$(jq -r '.loadElapsedSeconds >= 70' "$response")" = 'true'
             test "$(jq -r '.measuredInputFrames == (.botCount * .measuredSeconds * 60)' "$response")" = 'true'
             test "$(jq -r '.measuredInputRateHz >= 59.9 and .measuredInputRateHz <= 60.1' "$response")" = 'true'
+            test "$(jq -r '.measuredInputBatchesSent * 2 == .measuredInputFrames' "$response")" = 'true'
+            test "$(jq -r '.measuredInputBatchRateHz >= 29.9 and .measuredInputBatchRateHz <= 30.1' "$response")" = 'true'
             test "$(jq -r '.sampleCount >= 3500' "$host_report")" = 'true'
             test "$(jq -r '.tickP99Milliseconds <= 16.67' "$host_report")" = 'true'
             test "$(jq -r '.tickP999Milliseconds <= 20' "$host_report")" = 'true'
@@ -519,6 +525,8 @@ jobs:
           test "$(jq -r '.inputFrames > 10000000' "$load")" = 'true'
           test "$(jq -r '.measuredInputFrames == (.botCount * .measuredSeconds * 60)' "$load")" = 'true'
           test "$(jq -r '.measuredInputRateHz >= 59.9 and .measuredInputRateHz <= 60.1' "$load")" = 'true'
+          test "$(jq -r '.measuredInputBatchesSent * 2 == .measuredInputFrames' "$load")" = 'true'
+          test "$(jq -r '.measuredInputBatchRateHz >= 29.9 and .measuredInputBatchRateHz <= 30.1' "$load")" = 'true'
           test "$(jq -r '.snapshotFrames > 1000000' "$load")" = 'true'
           test "$(jq -r '.sampleCount >= 215900' "$report")" = 'true'
           test "$(jq -r '.elapsedSeconds >= 3610' "$report")" = 'true'

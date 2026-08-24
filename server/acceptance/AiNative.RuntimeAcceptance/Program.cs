@@ -165,6 +165,7 @@ internal static class ScenarioRunner
         long[] tickDurations = new long[options.MeasuredTicks];
         long[] gameplayDurations = new long[options.MeasuredTicks];
         uint[] lastInputSequence = new uint[BotCount];
+        InputCommand?[] pendingInputs = new InputCommand[BotCount];
         SimulatedLink[] upstream = new SimulatedLink[BotCount];
         SimulatedLink[] downstream = new SimulatedLink[BotCount];
         SyntheticRoom room = new(BotCount);
@@ -198,15 +199,27 @@ internal static class ScenarioRunner
                     Sequence = checked((uint)tick + 1),
                     MoveXMilli = (int)(inputRandom.NextUInt32() % 2001) - 1000,
                     MoveYMilli = (int)(inputRandom.NextUInt32() % 2001) - 1000,
+                    Buttons = (tick + 1) % 6 == 0 ? 1U : 0U,
                 };
+                if ((tick & 1) == 0)
+                {
+                    pendingInputs[entity] = command;
+                    continue;
+                }
+
+                InputBatch batch = new();
+                batch.Commands.Add(pendingInputs[entity] ??
+                    throw new InvalidOperationException("The acceptance Input batch lost its first frame."));
+                batch.Commands.Add(command);
+                pendingInputs[entity] = null;
                 if (!RealtimeProtocolCodec.TryEncode(
-                    MessageId.InputCommand,
-                    command,
+                    MessageId.InputBatch,
+                    batch,
                     encodeBuffer,
                     out _,
                     out int inputBytes))
                 {
-                    throw new InvalidOperationException("The production codec rejected an acceptance InputCommand.");
+                    throw new InvalidOperationException("The production codec rejected an acceptance InputBatch.");
                 }
 
                 byte[] frame = encodeBuffer.AsSpan(0, inputBytes).ToArray();
@@ -231,13 +244,20 @@ internal static class ScenarioRunner
                 int capturedEntity = entity;
                 upstream[entity].DrainDue(tick, packet =>
                 {
-                    if (RealtimeProtocolCodec.TryDecode(packet, out DecodedProtocolMessage decoded) == ProtocolDecodeStatus.Accepted &&
-                        decoded.MessageId == MessageId.InputCommand &&
-                        decoded.Message is InputCommand input &&
-                        input.Sequence > lastInputSequence[capturedEntity])
+                    if (RealtimeProtocolCodec.TryDecode(packet, out DecodedProtocolMessage decoded) != ProtocolDecodeStatus.Accepted ||
+                        decoded.MessageId != MessageId.InputBatch ||
+                        decoded.Message is not InputBatch batch)
                     {
-                        lastInputSequence[capturedEntity] = input.Sequence;
-                        room.ApplyInput(capturedEntity, input.MoveXMilli, input.MoveYMilli);
+                        return;
+                    }
+
+                    foreach (InputCommand input in batch.Commands)
+                    {
+                        if (input.Sequence > lastInputSequence[capturedEntity])
+                        {
+                            lastInputSequence[capturedEntity] = input.Sequence;
+                            room.ApplyInput(capturedEntity, input.MoveXMilli, input.MoveYMilli);
+                        }
                     }
                 });
             }

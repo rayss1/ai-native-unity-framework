@@ -47,6 +47,49 @@ public sealed class RealtimeProtocolCodecTests
     }
 
     [Test]
+    public void TwoFrameInputBatchUsesTheSequencedUnreliableChannelAndFitsOneDatagram()
+    {
+        InputBatch batch = new();
+        batch.Commands.Add(new InputCommand
+        {
+            RoomTick = 42,
+            Sequence = 7,
+            MoveXMilli = -1000,
+            MoveYMilli = 500,
+        });
+        batch.Commands.Add(new InputCommand
+        {
+            RoomTick = 43,
+            Sequence = 8,
+            MoveXMilli = 1000,
+            MoveYMilli = -500,
+            Buttons = 1,
+        });
+        Span<byte> frame = stackalloc byte[RealtimeProtocolCodec.MaxDatagramBytes];
+
+        bool encoded = RealtimeProtocolCodec.TryEncode(
+            MessageId.InputBatch,
+            batch,
+            frame,
+            out TransportChannel channel,
+            out int writtenBytes);
+        ProtocolDecodeStatus status = RealtimeProtocolCodec.TryDecode(
+            frame[..writtenBytes],
+            out DecodedProtocolMessage decoded);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(encoded, Is.True);
+            Assert.That(channel.Delivery, Is.EqualTo(TransportDelivery.Unreliable));
+            Assert.That(channel.Ordering, Is.EqualTo(TransportOrdering.Sequenced));
+            Assert.That(writtenBytes, Is.LessThan(96));
+            Assert.That(status, Is.EqualTo(ProtocolDecodeStatus.Accepted));
+            Assert.That(decoded.MessageId, Is.EqualTo(MessageId.InputBatch));
+            Assert.That((InputBatch)decoded.Message, Is.EqualTo(batch));
+        });
+    }
+
+    [Test]
     public void SnapshotFrameForSixtyFourPlayersFitsTheDatagramBudget()
     {
         Snapshot snapshot = new() { ProtocolMajor = 1, RoomTick = 60, BaselineTick = 57 };

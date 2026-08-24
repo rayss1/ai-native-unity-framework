@@ -119,6 +119,9 @@ internal sealed class RoomProtocolService(
             case MessageId.InputCommand when decoded.Message is InputCommand command:
                 HandleInput(connection, command, room, roomTick, frame);
                 return;
+            case MessageId.InputBatch when decoded.Message is InputBatch batch:
+                HandleInputBatch(connection, batch, room, roomTick, frame);
+                return;
             case MessageId.ReconnectRequest when decoded.Message is ReconnectRequest request:
                 HandleReconnect(connection, request, room, roomTick);
                 return;
@@ -192,6 +195,41 @@ internal sealed class RoomProtocolService(
         session.LastInputSequence = command.Sequence;
         replayCapture.TryRecordInput(roomTick, session.EntityIndex, frame);
         room.ApplyInput(session.EntityIndex, command.MoveXMilli, command.MoveYMilli);
+    }
+
+    private void HandleInputBatch(
+        ConnectionState connection,
+        InputBatch batch,
+        SyntheticRoom room,
+        ulong roomTick,
+        ReadOnlySpan<byte> frame)
+    {
+        LogicalSession? session = connection.Session;
+        if (session is not { Joined: true } || batch.Commands.Count is < 1 or > 2)
+        {
+            metrics.RecordDroppedDiagnostic();
+            return;
+        }
+
+        uint previousSequence = session.LastInputSequence;
+        foreach (InputCommand command in batch.Commands)
+        {
+            if (command.Sequence <= previousSequence)
+            {
+                metrics.RecordDroppedDiagnostic();
+                return;
+            }
+
+            previousSequence = command.Sequence;
+        }
+
+        replayCapture.TryRecordInput(roomTick, session.EntityIndex, frame);
+        foreach (InputCommand command in batch.Commands)
+        {
+            room.ApplyInput(session.EntityIndex, command.MoveXMilli, command.MoveYMilli);
+        }
+
+        session.LastInputSequence = previousSequence;
     }
 
     private void HandleReconnect(

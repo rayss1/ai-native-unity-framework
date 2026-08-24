@@ -190,6 +190,42 @@ public sealed class HealthAndBudgetTests
                 recorded.Tick();
             }
 
+            const int batchedEntityIndex = 3;
+            InputBatch batch = new();
+            batch.Commands.Add(new InputCommand
+            {
+                RoomTick = checked((ulong)ticks),
+                Sequence = checked((uint)ticks + 1),
+                MoveXMilli = 1000,
+                MoveYMilli = -500,
+            });
+            batch.Commands.Add(new InputCommand
+            {
+                RoomTick = checked((ulong)ticks),
+                Sequence = checked((uint)ticks + 2),
+                MoveXMilli = -250,
+                MoveYMilli = 750,
+                Buttons = 1,
+            });
+            Assert.That(RealtimeProtocolCodec.TryEncode(
+                MessageId.InputBatch,
+                batch,
+                frame,
+                out TransportChannel batchChannel,
+                out int batchBytes), Is.True);
+            Assert.That(batchChannel.Id, Is.EqualTo(2));
+            Assert.That(capture.TryRecordInput(
+                checked((ulong)ticks),
+                batchedEntityIndex,
+                frame.AsSpan(0, batchBytes)), Is.True);
+            foreach (InputCommand batchedCommand in batch.Commands)
+            {
+                recorded.ApplyInput(
+                    batchedEntityIndex,
+                    batchedCommand.MoveXMilli,
+                    batchedCommand.MoveYMilli);
+            }
+
             await capture.CompleteAsync(ticks, recorded.ComputeStateHash());
             ReplayVerificationResult verified = BattleReplayVerifier.Verify(path);
 
@@ -197,7 +233,7 @@ public sealed class HealthAndBudgetTests
             Assert.That(verified.FantasyCommit, Is.EqualTo("test-fantasy"));
             Assert.That(verified.ProtocolIdentity, Is.EqualTo("test-protocol"));
             Assert.That(verified.ConfigurationIdentity, Is.EqualTo("test-config"));
-            Assert.That(verified.InputCount, Is.EqualTo(ticks));
+            Assert.That(verified.InputCount, Is.EqualTo(ticks + batch.Commands.Count));
             Assert.That(verified.FinalTick, Is.EqualTo((ulong)ticks));
             Assert.That(verified.StateHash, Is.EqualTo(recorded.ComputeStateHash()));
         }

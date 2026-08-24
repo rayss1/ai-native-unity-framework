@@ -111,6 +111,7 @@ internal static class RealtimeProtocolCodec
         switch (messageId)
         {
             case MessageId.InputCommand:
+            case MessageId.InputBatch:
                 channel = InputChannel;
                 return true;
             case MessageId.Snapshot:
@@ -140,6 +141,7 @@ internal static class RealtimeProtocolCodec
         MessageId.JoinRoomRequest => message is JoinRoomRequest,
         MessageId.JoinRoomResponse => message is JoinRoomResponse,
         MessageId.InputCommand => message is InputCommand,
+        MessageId.InputBatch => message is InputBatch,
         MessageId.Snapshot => message is Snapshot,
         MessageId.ReliableEvent => message is ReliableEvent,
         MessageId.ReconnectRequest => message is ReconnectRequest,
@@ -154,6 +156,7 @@ internal static class RealtimeProtocolCodec
         MessageId.JoinRoomRequest => JoinRoomRequest.Parser.ParseFrom(payload),
         MessageId.JoinRoomResponse => JoinRoomResponse.Parser.ParseFrom(payload),
         MessageId.InputCommand => InputCommand.Parser.ParseFrom(payload),
+        MessageId.InputBatch => InputBatch.Parser.ParseFrom(payload),
         MessageId.Snapshot => Snapshot.Parser.ParseFrom(payload),
         MessageId.ReliableEvent => ReliableEvent.Parser.ParseFrom(payload),
         MessageId.ReconnectRequest => ReconnectRequest.Parser.ParseFrom(payload),

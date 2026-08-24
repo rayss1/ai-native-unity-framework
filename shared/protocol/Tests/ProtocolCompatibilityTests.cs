@@ -15,6 +15,24 @@ public sealed class ProtocolCompatibilityTests
     }
 
     [Test]
+    public void InputBatchMatchesGoldenBytes()
+    {
+        InputBatch batch = new();
+        batch.Commands.Add(CreateInputCommand());
+        batch.Commands.Add(new InputCommand
+        {
+            RoomTick = 43,
+            Sequence = 8,
+            MoveXMilli = 1000,
+            MoveYMilli = -1000,
+        });
+
+        Assert.That(
+            Convert.ToHexString(batch.ToByteArray()),
+            Is.EqualTo("0A17092A00000000000000100718CF0F20D00F28D0BB1B30030A11092B00000000000000100818D00F20CF0F"));
+    }
+
+    [Test]
     public void UnknownFieldsSurviveParseAndReserialize()
     {
         byte[] current = CreateInputCommand().ToByteArray();

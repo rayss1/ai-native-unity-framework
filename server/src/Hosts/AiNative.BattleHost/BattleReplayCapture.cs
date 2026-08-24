@@ -227,6 +227,7 @@ internal static class BattleReplayVerifier
         SyntheticRoom room = new(botCount);
         ulong simulatedTick = 0;
         long inputCount = 0;
+        uint[] lastInputSequences = new uint[botCount];
         bool sawFooter = false;
         ulong finalTick = 0;
         ulong expectedHash = 0;
@@ -264,15 +265,40 @@ internal static class BattleReplayVerifier
             int frameLength = reader.ReadUInt16();
             byte[] frame = reader.ReadBytes(frameLength);
             if (frame.Length != frameLength ||
-                RealtimeProtocolCodec.TryDecode(frame, out DecodedProtocolMessage decoded) != ProtocolDecodeStatus.Accepted ||
-                decoded.MessageId != MessageId.InputCommand ||
-                decoded.Message is not InputCommand command)
+                RealtimeProtocolCodec.TryDecode(frame, out DecodedProtocolMessage decoded) != ProtocolDecodeStatus.Accepted)
             {
-                throw new InvalidDataException("The replay contains an invalid production InputCommand frame.");
+                throw new InvalidDataException("The replay contains an invalid production Input frame.");
             }
 
-            room.ApplyInput(entityIndex, command.MoveXMilli, command.MoveYMilli);
-            inputCount++;
+            switch (decoded.MessageId, decoded.Message)
+            {
+                case (MessageId.InputCommand, InputCommand command)
+                    when (uint)entityIndex < (uint)botCount &&
+                         command.Sequence > lastInputSequences[entityIndex]:
+                    lastInputSequences[entityIndex] = command.Sequence;
+                    room.ApplyInput(entityIndex, command.MoveXMilli, command.MoveYMilli);
+                    inputCount++;
+                    break;
+                case (MessageId.InputBatch, InputBatch batch)
+                    when (uint)entityIndex < (uint)botCount && batch.Commands.Count is >= 1 and <= 2:
+                    uint previousSequence = lastInputSequences[entityIndex];
+                    foreach (InputCommand batchedCommand in batch.Commands)
+                    {
+                        if (batchedCommand.Sequence <= previousSequence)
+                        {
+                            throw new InvalidDataException(
+                                "The replay contains an out-of-order production Input batch.");
+                        }
+
+                        previousSequence = batchedCommand.Sequence;
+                        room.ApplyInput(entityIndex, batchedCommand.MoveXMilli, batchedCommand.MoveYMilli);
+                        inputCount++;
+                    }
+                    lastInputSequences[entityIndex] = previousSequence;
+                    break;
+                default:
+                    throw new InvalidDataException("The replay contains an invalid production Input frame.");
+            }
         }
 
         if (!sawFooter || stream.Position != stream.Length || finalTick < simulatedTick)
