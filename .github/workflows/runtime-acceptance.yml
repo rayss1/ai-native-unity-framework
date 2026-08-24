@@ -167,6 +167,9 @@ jobs:
           wait "$host_pid"
           host_pid=''
           replay="$(dotnet "$GITHUB_WORKSPACE/artifacts/battle-host/AiNative.BattleHost.dll" --verify-replay "$AINATIVE_REPLAY_CAPTURE_PATH")"
+          jq . "$load_file"
+          jq . "$AINATIVE_ACCEPTANCE_REPORT_PATH"
+          jq . <<<"$replay"
           test "$(jq -r '.InputCount > 1000' <<<"$replay")" = 'true'
           test "$(jq -r '.gameplayAllocatedBytes' "$AINATIVE_ACCEPTANCE_REPORT_PATH")" = '0'
           test "$(jq -r '.tickP99Milliseconds <= 16.67' "$AINATIVE_ACCEPTANCE_REPORT_PATH")" = 'true'
@@ -286,6 +289,9 @@ jobs:
           docker cp "$container_id:/tmp/load.anrp" "$GITHUB_WORKSPACE/artifacts/runtime-acceptance/image-load.anrp"
           docker cp "$container_id:/tmp/load-report.json" "$GITHUB_WORKSPACE/artifacts/runtime-acceptance/image-load-report.json"
           replay="$(dotnet "$GITHUB_WORKSPACE/artifacts/battle-host/AiNative.BattleHost.dll" --verify-replay "$GITHUB_WORKSPACE/artifacts/runtime-acceptance/image-load.anrp")"
+          jq . "$load_file"
+          jq . "$GITHUB_WORKSPACE/artifacts/runtime-acceptance/image-load-report.json"
+          jq . <<<"$replay"
           test "$(jq -r '.InputCount > 1000' <<<"$replay")" = 'true'
           test "$(jq -r '.gameplayAllocatedBytes' "$GITHUB_WORKSPACE/artifacts/runtime-acceptance/image-load-report.json")" = '0'
           test "$(jq -r '.tickP99Milliseconds <= 16.67' "$GITHUB_WORKSPACE/artifacts/runtime-acceptance/image-load-report.json")" = 'true'
