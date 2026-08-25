@@ -149,13 +149,12 @@ public sealed class HealthAndBudgetTests
     public void FailedMetricExporterPreservesBoundedTaglessProjectSeries()
     {
         TelemetryExportHealth health = new(exporterConfigured: true);
-        using PeriodicExportingMetricReader reader = new(
-            new TrackingMetricExporter(new FailureMetricExporter(), health),
-            exportIntervalMilliseconds: 10,
-            exportTimeoutMilliseconds: 100);
         using MeterProvider provider = Sdk.CreateMeterProviderBuilder()
             .AddMeter(BattleMetrics.MeterName)
-            .AddReader(reader)
+            .AddReader(new PeriodicExportingMetricReader(
+                new TrackingMetricExporter(new FailureMetricExporter(), health),
+                exportIntervalMilliseconds: 60_000,
+                exportTimeoutMilliseconds: 100))
             .Build();
         using BattleMetrics metrics = new(telemetryHealth: health);
 
@@ -168,11 +167,7 @@ public sealed class HealthAndBudgetTests
         }
 
         metrics.RecordConnectionRemoved(64);
-        Assert.That(
-            SpinWait.SpinUntil(
-                () => health.Snapshot().MetricExportAttempts > 0,
-                TimeSpan.FromSeconds(2)),
-            Is.True);
+        Assert.That(provider.ForceFlush(1_000), Is.False);
 
         TelemetryExportSnapshot snapshot = health.Snapshot();
         Assert.That(snapshot.MetricExportFailures, Is.GreaterThan(0));
