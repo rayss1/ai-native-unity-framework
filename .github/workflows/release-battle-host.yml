@@ -73,7 +73,7 @@ jobs:
         run: |
           set -euo pipefail
           qualification_dir="$GITHUB_WORKSPACE/artifacts/release/qualification"
-          mkdir -p "$qualification_dir/provenance" "$qualification_dir/soak"
+          mkdir -p "$qualification_dir/provenance" "$qualification_dir/soak" "$qualification_dir/telemetry"
           gh api "repos/$GITHUB_REPOSITORY/actions/runs/$QUALIFIED_RUN_ID" > "$qualification_dir/run.json"
           gh api "repos/$GITHUB_REPOSITORY/actions/runs/$QUALIFIED_RUN_ID/artifacts" > "$qualification_dir/artifacts.json"
           gh run download "$QUALIFIED_RUN_ID" \
@@ -82,13 +82,17 @@ jobs:
           gh run download "$QUALIFIED_RUN_ID" \
             --name runtime-acceptance-soak \
             --dir "$qualification_dir/soak"
+          gh run download "$QUALIFIED_RUN_ID" \
+            --name runtime-telemetry-capacity \
+            --dir "$qualification_dir/telemetry"
           tools/release/verify-battle-host-qualification.sh \
             "$GITHUB_WORKSPACE" \
             "$GITHUB_SHA" \
             "$qualification_dir/run.json" \
             "$qualification_dir/artifacts.json" \
             "$qualification_dir/provenance/provenance.json" \
-            "$qualification_dir/soak/soak-host.json"
+            "$qualification_dir/soak/soak-host.json" \
+            "$qualification_dir/telemetry/telemetry-capacity.json"
           {
             echo "sdk_image=$(jq -r '.sdkImage' "$qualification_dir/provenance/provenance.json")"
             echo "runtime_image=$(jq -r '.runtimeImage' "$qualification_dir/provenance/provenance.json")"
@@ -206,6 +210,7 @@ jobs:
           config_sha="$(sha256sum server/src/Hosts/AiNative.BattleHost/Fantasy.config | cut -d ' ' -f 1)"
           provenance_sha="$(sha256sum "$qualification_dir/provenance/provenance.json" | cut -d ' ' -f 1)"
           soak_sha="$(sha256sum "$qualification_dir/soak/soak-host.json" | cut -d ' ' -f 1)"
+          telemetry_capacity_sha="$(sha256sum "$qualification_dir/telemetry/telemetry-capacity.json" | cut -d ' ' -f 1)"
           jq -n \
             --arg version "$RELEASE_VERSION" \
             --arg image "$IMAGE_NAME@${{ steps.push.outputs.digest }}" \
@@ -221,6 +226,7 @@ jobs:
             --arg qualifiedRun '${{ steps.qualification.outputs.qualified_run_url }}' \
             --arg qualificationProvenanceSha256 "$provenance_sha" \
             --arg qualificationSoakSha256 "$soak_sha" \
+            --arg qualificationTelemetryCapacitySha256 "$telemetry_capacity_sha" \
             --arg attestationUrl '${{ steps.attest.outputs.attestation-url }}' \
             --arg publishedAtUtc "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             '{
@@ -237,6 +243,7 @@ jobs:
               qualifiedRun: $qualifiedRun,
               qualificationProvenanceSha256: $qualificationProvenanceSha256,
               qualificationSoakSha256: $qualificationSoakSha256,
+              qualificationTelemetryCapacitySha256: $qualificationTelemetryCapacitySha256,
               attestationUrl: $attestationUrl,
               publishedAtUtc: $publishedAtUtc
             }' > "$manifest"

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ $# -ne 6 ]]; then
-  echo "Usage: $0 <repository-root> <expected-source-sha> <run.json> <artifacts.json> <provenance.json> <soak-host.json>" >&2
+if [[ $# -ne 7 ]]; then
+  echo "Usage: $0 <repository-root> <expected-source-sha> <run.json> <artifacts.json> <provenance.json> <soak-host.json> <telemetry-capacity.json>" >&2
   exit 2
 fi
 
@@ -12,6 +12,7 @@ run_json="$3"
 artifacts_json="$4"
 provenance_json="$5"
 soak_host_json="$6"
+telemetry_capacity_json="$7"
 
 for command_name in git jq; do
   if ! command -v "$command_name" >/dev/null 2>&1; then
@@ -20,7 +21,7 @@ for command_name in git jq; do
   fi
 done
 
-for input_file in "$run_json" "$artifacts_json" "$provenance_json" "$soak_host_json"; do
+for input_file in "$run_json" "$artifacts_json" "$provenance_json" "$soak_host_json" "$telemetry_capacity_json"; do
   if [[ ! -s "$input_file" ]]; then
     echo "Required qualification input is missing or empty: $input_file" >&2
     exit 2
@@ -62,7 +63,7 @@ jq -e --arg source "$expected_source_sha" '
 ' "$run_json" >/dev/null
 
 jq -e '
-  ["runtime-acceptance-provenance", "runtime-acceptance-soak"] as $required
+  ["runtime-acceptance-provenance", "runtime-acceptance-soak", "runtime-telemetry-capacity"] as $required
   | ([.artifacts[] | select(.expired == false) | .name] | unique) as $available
   | all($required[]; . as $name | $available | index($name) != null)
 ' "$artifacts_json" >/dev/null
@@ -91,6 +92,33 @@ jq -e --arg source "$expected_source_sha" --arg fantasy "$fantasy_commit" --arg 
   and .gameplayAllocatedBytes == 0
   and .outerKcpMtu == 1150
 ' "$soak_host_json" >/dev/null
+
+jq -e --arg source "$expected_source_sha" --arg fantasy "$fantasy_commit" --arg protocol "$protocol_identity" '
+  .evidenceClass == "telemetry-capacity-comparison"
+  and .sourceCommit == $source
+  and .fantasyCommit == $fantasy
+  and .protocolIdentity == $protocol
+  and .botCount == 64
+  and .warmupSeconds >= 10
+  and .measuredSeconds >= 300
+  and .exporterOutage.tickP99IncrementMilliseconds < .gates.tickP99IncrementLimitMilliseconds
+  and .gates.tickP99IncrementLimitMilliseconds == 0.25
+  and .exporterOutage.metricExportAttempts >= 1
+  and .exporterOutage.metricExportFailures >= 1
+  and .exporterOutage.traceExportAttempts >= 1
+  and .exporterOutage.traceExportFailures >= 1
+  and .exporterOutage.traceRecordsDropped == 0
+  and .exporterOutage.projectMetricSeries >= 1
+  and .exporterOutage.projectMetricSeries <= .exporterOutage.projectMetricSeriesLimit
+  and .exporterOutage.projectMetricSeriesLimit == 16
+  and .exporterOutage.projectMetricTagViolations == 0
+  and .exporterOutage.projectMetricSeriesOverflow == 0
+  and .baseline.processPeakWorkingSetBytes > 0
+  and .exporterOutage.processPeakWorkingSetBytes > 0
+  and .gates.boundedTraceQueue == true
+  and .gates.taglessProjectMetrics == true
+  and .gates.passed == true
+' "$telemetry_capacity_json" >/dev/null
 
 echo "Battle Host qualification passed for $expected_source_sha."
 echo "Fantasy: $fantasy_commit"

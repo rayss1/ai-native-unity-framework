@@ -17,6 +17,7 @@ on:
       - server/acceptance/**
       - server/src/**
       - server/tests/**
+      - tools/release/verify-telemetry-capacity.sh
       - shared/gameplay/**
       - shared/protocol/**
       - shared/realtime/**
@@ -35,6 +36,7 @@ on:
       - server/acceptance/**
       - server/src/**
       - server/tests/**
+      - tools/release/verify-telemetry-capacity.sh
       - shared/gameplay/**
       - shared/protocol/**
       - shared/realtime/**
@@ -349,6 +351,103 @@ jobs:
           test "$(jq -r '.outerKcpMtu' "$GITHUB_WORKSPACE/artifacts/runtime-acceptance/image-load-report.json")" = '1150'
           test "$(jq -r '.tickP99Milliseconds <= 16.67' "$GITHUB_WORKSPACE/artifacts/runtime-acceptance/image-load-report.json")" = 'true'
           docker rm "$first_container_id" >/dev/null
+
+      - name: Compare telemetry outage and one-room capacity
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence_dir="$GITHUB_WORKSPACE/artifacts/runtime-acceptance"
+          chmod 0777 "$evidence_dir"
+          fantasy_commit="$(git -C server/vendor/Fantasy rev-parse HEAD)"
+          protocol_identity="$(sha256sum shared/schemas/ainative/v1/gameplay.proto | cut -d ' ' -f 1)"
+          active_container=''
+          cleanup_capacity() {
+            if test -n "$active_container"; then
+              docker rm --force "$active_container" >/dev/null 2>&1 || true
+            fi
+          }
+          trap cleanup_capacity EXIT
+
+          run_capacity_profile() {
+            profile="$1"
+            exporter_mode="$2"
+            docker_args=(
+              docker run --detach
+              --read-only
+              --tmpfs '/tmp:size=64m,mode=1777'
+              --volume "$evidence_dir:/evidence"
+              --cap-drop ALL
+              --security-opt no-new-privileges
+              --publish 127.0.0.1:5084:8080
+              --env AINATIVE_ENABLE_EVALUATION_ENDPOINTS=true
+              --env AINATIVE_ACCEPTANCE_REPORT_PATH="/evidence/$profile-host.json"
+              --env AINATIVE_ACCEPTANCE_WARMUP_TICKS=600
+              --env AINATIVE_ACCEPTANCE_MAX_TICKS=24000
+              --env AINATIVE_DEPLOYMENT_ENVIRONMENT=continuous-integration
+              --env AINATIVE_SERVICE_INSTANCE_ID="$profile"
+              --env AINATIVE_SOURCE_COMMIT="$SOURCE_COMMIT"
+              --env AINATIVE_FANTASY_COMMIT="$fantasy_commit"
+              --env AINATIVE_PROTOCOL_IDENTITY="$protocol_identity"
+            )
+            if test "$exporter_mode" = 'outage'; then
+              docker_args+=(
+                --env OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4317
+                --env AINATIVE_OTEL_EXPORT_TIMEOUT_MILLISECONDS=250
+                --env AINATIVE_OTEL_METRIC_EXPORT_INTERVAL_MILLISECONDS=1000
+                --env AINATIVE_OTEL_TRACE_QUEUE_SIZE=256
+                --env AINATIVE_OTEL_TRACE_EXPORT_DELAY_MILLISECONDS=1000
+                --env AINATIVE_OTEL_TRACE_EXPORT_BATCH_SIZE=64
+              )
+            fi
+            docker_args+=(ainative/battle-host:production-validation)
+            active_container="$("${docker_args[@]}")"
+            deadline=$((SECONDS + 30))
+            until curl --fail --silent http://127.0.0.1:5084/health/ready >/dev/null; do
+              if ! docker inspect --format '{{.State.Running}}' "$active_container" | grep -q true || (( SECONDS >= deadline )); then
+                docker logs "$active_container"
+                exit 1
+              fi
+              sleep 0.25
+            done
+            load_file="$evidence_dir/$profile-load.json"
+            load_status="$(curl --silent --max-time 420 --output "$load_file" --write-out '%{http_code}' \
+              --request POST 'http://127.0.0.1:5084/admin/kcp-load?botCount=64&warmupSeconds=10&durationSeconds=300')"
+            if test "$load_status" != '200'; then
+              cat "$load_file"
+              docker logs "$active_container"
+              exit 1
+            fi
+            curl --fail --silent http://127.0.0.1:5084/health/telemetry \
+              > "$evidence_dir/$profile-telemetry-health.json"
+            docker stop --signal TERM --timeout 30 "$active_container"
+            test "$(docker inspect --format '{{.State.ExitCode}}' "$active_container")" = '0'
+            docker logs "$active_container" > "$evidence_dir/$profile-host.log" 2>&1
+            jq . "$load_file"
+            jq . "$evidence_dir/$profile-host.json"
+            jq . "$evidence_dir/$profile-telemetry-health.json"
+            docker rm "$active_container" >/dev/null
+            active_container=''
+          }
+
+          run_capacity_profile telemetry-baseline disabled
+          run_capacity_profile telemetry-exporter-outage outage
+          tools/release/verify-telemetry-capacity.sh \
+            "$evidence_dir/telemetry-baseline-host.json" \
+            "$evidence_dir/telemetry-exporter-outage-host.json" \
+            "$evidence_dir/telemetry-baseline-load.json" \
+            "$evidence_dir/telemetry-exporter-outage-load.json" \
+            "$evidence_dir/telemetry-capacity.json"
+          jq . "$evidence_dir/telemetry-capacity.json"
+
+      - name: Upload telemetry outage and capacity evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: runtime-telemetry-capacity
+          path: |
+            artifacts/runtime-acceptance/telemetry-*.json
+            artifacts/runtime-acceptance/telemetry-*.log
+          if-no-files-found: warn
 
       - name: Run qualified Linux socket impairment profiles
         shell: bash

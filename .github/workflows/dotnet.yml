@@ -41,6 +41,9 @@ jobs:
           bash -n tools/release/resolve-battle-host-release.sh
           bash -n tools/release/test-battle-host-release.sh
           tools/release/test-battle-host-release.sh
+          bash -n tools/release/verify-telemetry-capacity.sh
+          bash -n tools/release/test-telemetry-capacity.sh
+          tools/release/test-telemetry-capacity.sh
 
       - name: Install .NET 10 SDK
         uses: actions/setup-dotnet@v4

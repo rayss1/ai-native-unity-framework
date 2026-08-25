@@ -77,6 +77,7 @@ jq -e --arg version_tag "$version_tag" --arg source_tag "$source_tag" '
   and (.qualifiedRun | test("^https://github\\.com/rayss1/ai-native-unity-framework/actions/runs/[1-9][0-9]*$"))
   and (.qualificationProvenanceSha256 | test("^[0-9a-f]{64}$"))
   and (.qualificationSoakSha256 | test("^[0-9a-f]{64}$"))
+  and (.version == "0.1.0" or (.qualificationTelemetryCapacitySha256 | test("^[0-9a-f]{64}$")))
   and (.attestationUrl | test("^https://github\\.com/rayss1/ai-native-unity-framework/attestations/[1-9][0-9]*$"))
   and (.publishedAtUtc | fromdateiso8601 | type == "number")
 ' "$manifest_path" >/dev/null

@@ -1,5 +1,7 @@
 using AiNative.BattleHost;
 using AiNative.Server.Fantasy;
+using OpenTelemetry;
+using OpenTelemetry.Exporter;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
@@ -14,7 +16,13 @@ if (args is ["--verify-replay", string replayPath])
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 bool fantasyEnabled = builder.Configuration.GetValue("AINATIVE_FANTASY_ENABLED", true);
 int outerKcpMtu = builder.Configuration.GetValue("AINATIVE_FANTASY_OUTER_KCP_MTU", 1150);
+BattleTelemetrySettings telemetrySettings = BattleTelemetrySettings.Create(
+    builder.Configuration,
+    builder.Environment.ContentRootPath);
+TelemetryExportHealth telemetryHealth = new(telemetrySettings.Endpoint is not null);
 builder.Services.AddSingleton(new RuntimeReadiness(networkRequired: fantasyEnabled));
+builder.Services.AddSingleton(telemetrySettings);
+builder.Services.AddSingleton(telemetryHealth);
 builder.Services.AddSingleton<BattleMetrics>();
 builder.Services.AddSingleton<BattleReplayCapture>();
 builder.Services.AddSingleton(new FantasyKcpGateway(outerKcpMtu: outerKcpMtu));
@@ -28,22 +36,40 @@ builder.Services.AddHostedService<AcceptanceRoomService>();
 builder.Services.AddOpenTelemetry()
     .ConfigureResource(resource => resource.AddService(
         serviceName: "ainative-battle-host",
-        serviceVersion: typeof(Program).Assembly.GetName().Version?.ToString() ?? "0.0.0"))
+        serviceVersion: typeof(Program).Assembly.GetName().Version?.ToString() ?? "0.0.0",
+        serviceInstanceId: telemetrySettings.Identity.ServiceInstanceId)
+        .AddAttributes(telemetrySettings.Identity.ResourceAttributes))
     .WithMetrics(metrics =>
     {
         metrics.AddMeter(BattleMetrics.MeterName)
             .AddRuntimeInstrumentation();
-        if (Uri.TryCreate(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"], UriKind.Absolute, out Uri? endpoint))
+        if (telemetrySettings.Endpoint is not null)
         {
-            metrics.AddOtlpExporter(options => options.Endpoint = endpoint);
+            metrics.AddReader(_ => new PeriodicExportingMetricReader(
+                new TrackingMetricExporter(
+                    new OtlpMetricExporter(telemetrySettings.CreateExporterOptions()),
+                    telemetryHealth),
+                telemetrySettings.MetricExportIntervalMilliseconds,
+                telemetrySettings.ExportTimeoutMilliseconds));
         }
     })
     .WithTracing(tracing =>
     {
         tracing.AddAspNetCoreInstrumentation();
-        if (Uri.TryCreate(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"], UriKind.Absolute, out Uri? endpoint))
+        if (telemetrySettings.Endpoint is not null)
         {
-            tracing.AddOtlpExporter(options => options.Endpoint = endpoint);
+            tracing.AddProcessor(_ =>
+            {
+                return new BoundedActivityExportProcessor(
+                    new TrackingActivityExporter(
+                        new OtlpTraceExporter(telemetrySettings.CreateExporterOptions()),
+                        telemetryHealth),
+                    telemetryHealth,
+                    telemetrySettings.TraceQueueSize,
+                    telemetrySettings.TraceExportDelayMilliseconds,
+                    telemetrySettings.ExportTimeoutMilliseconds,
+                    telemetrySettings.TraceExportBatchSize);
+            });
         }
     });
 
@@ -55,6 +81,25 @@ app.MapGet("/health/live", () => Results.Ok(new { status = "live" }));
 app.MapGet("/health/ready", () => readiness.IsReady
     ? Results.Ok(new { status = "ready", tick = readiness.Tick })
     : Results.Json(new { status = "draining", tick = readiness.Tick }, statusCode: StatusCodes.Status503ServiceUnavailable));
+app.MapGet("/health/telemetry", () =>
+{
+    TelemetryExportSnapshot snapshot = telemetryHealth.Snapshot();
+    return Results.Ok(new
+    {
+        status = snapshot.MetricExportFailures + snapshot.TraceExportFailures == 0
+            ? "healthy"
+            : "degraded",
+        snapshot.ExporterConfigured,
+        snapshot.MetricExportAttempts,
+        snapshot.MetricExportFailures,
+        snapshot.TraceExportAttempts,
+        snapshot.TraceExportFailures,
+        snapshot.TraceRecordsDropped,
+        snapshot.ProjectMetricSeries,
+        snapshot.ProjectMetricTagViolations,
+        snapshot.ProjectMetricSeriesOverflow,
+    });
+});
 
 if (builder.Configuration.GetValue("AINATIVE_ENABLE_EVALUATION_ENDPOINTS", false))
 {

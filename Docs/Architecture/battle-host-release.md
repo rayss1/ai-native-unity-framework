@@ -14,7 +14,7 @@ A release is the tuple of:
 - exact Fantasy gitlink/package;
 - protocol and application-configuration SHA-256 identities;
 - immutable SDK and runtime base-image digests;
-- qualified GitHub Actions run;
+- qualified GitHub Actions run and its telemetry-outage/capacity comparison;
 - GHCR image digest, embedded BuildKit provenance/SBOM, and GitHub artifact attestation.
 
 Tags are discovery aliases, not deployment identities. Deployments use `ghcr.io/rayss1/ai-native-battle-host@sha256:<digest>`. The workflow creates `sha-<40-character-commit>` first and promotes `v<semantic-version>` only after the published digest passes hardened smoke and attestation verification. It never creates or updates `latest`.
@@ -25,11 +25,11 @@ The manual release workflow accepts only the current `main` HEAD. The supplied p
 
 1. be the `Battle Host production validation` workflow triggered by `push` or manual dispatch on `main`;
 2. be completed successfully for the exact release commit;
-3. retain unexpired provenance and 60-minute soak artifacts;
+3. retain unexpired provenance, 60-minute soak, and telemetry-capacity artifacts;
 4. match the checked-out Fantasy gitlink and protocol hash;
-5. pass the qualified Tick, duration, allocation, and MTU assertions.
+5. pass the qualified Tick, duration, allocation, MTU, bounded-cardinality, and unavailable-exporter assertions.
 
-The repository-owned `tools/release/verify-battle-host-qualification.sh` applies the same checks locally and in the publication workflow. Product CI executes positive and negative contract fixtures for source identity, artifact expiry, and performance-budget rejection.
+The repository-owned `tools/release/verify-battle-host-qualification.sh` applies the same checks locally and in the publication workflow. Product CI executes positive and negative contract fixtures for source identity, artifact expiry, performance-budget rejection, and the strict telemetry Tick P99 increment gate. Releases after `v0.1.0` also record the telemetry-capacity artifact SHA-256 in their manifest; the first retained release predates this gate.
 
 If the current `main` commit has no production-validation run because its changes were outside that workflow's path filter, manually dispatch `Battle Host production validation` on `main`. Non-pull-request runs execute the full qualified soak; pull requests still require the explicit `qualified-soak` label.
 

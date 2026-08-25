@@ -77,6 +77,8 @@ The correction numbers are tuning gates, not truth about game feel. If represent
 | Content rollback | Next launch selects last-known-good manifest without redownloading already verified retained artifacts |
 | Telemetry outage | Buffers bounded; no Tick I/O wait; dropped telemetry counted; Tick delta < 0.25 ms P99 versus exporter disabled |
 
+The telemetry gate uses two sequential 64-Bot profiles of the same release-equivalent image and runner: exporter disabled, then an unavailable OTLP endpoint. Both profiles record process working set/peak, CPU time, managed heap, committed GC memory, thread-pool count, runtime, OS, processor count, and immutable source identities. Passing this comparison establishes only the one-room baseline; it does not authorize additional rooms per process. See [telemetry and one-room capacity validation](telemetry-capacity-validation.md).
+
 ## Decision use
 
 - A red hard gate blocks promotion and requires profiling, scope reduction, adapter replacement, or a superseding ADR.
