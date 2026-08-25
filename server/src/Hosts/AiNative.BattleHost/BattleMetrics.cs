@@ -4,13 +4,17 @@ using System.Text.Json;
 
 namespace AiNative.BattleHost;
 
-public sealed class BattleMetrics : IDisposable
+internal sealed class BattleMetrics : IDisposable
 {
     public const string MeterName = "AiNative.BattleHost";
     private readonly Meter _meter = new(MeterName, "0.1.0");
     private readonly Histogram<double> _tickDurationMilliseconds;
     private readonly Counter<long> _droppedDiagnostics;
     private readonly Counter<long> _droppedReplayRecords;
+    private readonly UpDownCounter<long> _activeConnections;
+    private readonly ObservableCounter<long> _telemetryExportFailures;
+    private readonly ObservableCounter<long> _telemetryTraceRecordsDropped;
+    private readonly TelemetryExportHealth _telemetryHealth;
     private readonly string? _acceptanceReportPath;
     private readonly double[]? _tickSamples;
     private readonly double[]? _gameplaySamples;
@@ -23,11 +27,25 @@ public sealed class BattleMetrics : IDisposable
     private int _observedTickCount;
     private int _requestedWarmupTicks = -1;
 
-    public BattleMetrics(IConfiguration? configuration = null)
+    public BattleMetrics(
+        IConfiguration? configuration = null,
+        TelemetryExportHealth? telemetryHealth = null)
     {
+        _telemetryHealth = telemetryHealth ?? new TelemetryExportHealth(exporterConfigured: false);
         _tickDurationMilliseconds = _meter.CreateHistogram<double>("battle.tick.duration", "ms");
         _droppedDiagnostics = _meter.CreateCounter<long>("battle.diagnostics.dropped");
         _droppedReplayRecords = _meter.CreateCounter<long>("battle.replay.records.dropped");
+        _activeConnections = _meter.CreateUpDownCounter<long>("battle.connections.active", "{connection}");
+        _telemetryExportFailures = _meter.CreateObservableCounter<long>(
+            "battle.telemetry.export.failures",
+            () =>
+            {
+                TelemetryExportSnapshot snapshot = _telemetryHealth.Snapshot();
+                return snapshot.MetricExportFailures + snapshot.TraceExportFailures;
+            });
+        _telemetryTraceRecordsDropped = _meter.CreateObservableCounter<long>(
+            "battle.telemetry.trace.records.dropped",
+            () => _telemetryHealth.Snapshot().TraceRecordsDropped);
         _outerKcpMtu = configuration?.GetValue("AINATIVE_FANTASY_OUTER_KCP_MTU", 1150) ?? 1150;
         _acceptanceReportPath = configuration?["AINATIVE_ACCEPTANCE_REPORT_PATH"];
         if (!string.IsNullOrWhiteSpace(_acceptanceReportPath))
@@ -86,6 +104,10 @@ public sealed class BattleMetrics : IDisposable
 
     public void RecordReplayDropped() => _droppedReplayRecords.Add(1);
 
+    public void RecordConnectionAccepted() => _activeConnections.Add(1);
+
+    public void RecordConnectionRemoved(int count = 1) => _activeConnections.Add(-count);
+
     public void RequestAcceptanceMeasurement(int warmupTicks)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(warmupTicks);
@@ -116,6 +138,9 @@ public sealed class BattleMetrics : IDisposable
         double tickP99 = Percentile(ticks, 0.99);
         double tickP999 = Percentile(ticks, 0.999);
         double gameplayP99 = Percentile(gameplay, 0.99);
+        using Process process = Process.GetCurrentProcess();
+        GCMemoryInfo gc = GC.GetGCMemoryInfo();
+        TelemetryExportSnapshot telemetry = _telemetryHealth.Snapshot();
         RuntimeSoakReport report = new(
             EvidenceClass: "release-equivalent-host-core",
             WarmupTicks: _warmupTicks,
@@ -132,10 +157,26 @@ public sealed class BattleMetrics : IDisposable
             Runtime: Environment.Version.ToString(),
             OperatingSystem: Environment.OSVersion.ToString(),
             ProcessorCount: Environment.ProcessorCount,
+            ProcessWorkingSetBytes: process.WorkingSet64,
+            ProcessPeakWorkingSetBytes: process.PeakWorkingSet64,
+            ProcessTotalProcessorMilliseconds: process.TotalProcessorTime.TotalMilliseconds,
+            ManagedHeapBytes: GC.GetTotalMemory(forceFullCollection: false),
+            GcTotalCommittedBytes: gc.TotalCommittedBytes,
+            ThreadPoolThreadCount: ThreadPool.ThreadCount,
             OuterKcpMtu: _outerKcpMtu,
             SourceCommit: Environment.GetEnvironmentVariable("AINATIVE_SOURCE_COMMIT") ?? "unrecorded",
             FantasyCommit: Environment.GetEnvironmentVariable("AINATIVE_FANTASY_COMMIT") ?? "unrecorded",
-            ProtocolIdentity: Environment.GetEnvironmentVariable("AINATIVE_PROTOCOL_IDENTITY") ?? "unrecorded");
+            ProtocolIdentity: Environment.GetEnvironmentVariable("AINATIVE_PROTOCOL_IDENTITY") ?? "unrecorded",
+            TelemetryExporterConfigured: telemetry.ExporterConfigured,
+            TelemetryMetricExportAttempts: telemetry.MetricExportAttempts,
+            TelemetryMetricExportFailures: telemetry.MetricExportFailures,
+            TelemetryTraceExportAttempts: telemetry.TraceExportAttempts,
+            TelemetryTraceExportFailures: telemetry.TraceExportFailures,
+            TelemetryTraceRecordsDropped: telemetry.TraceRecordsDropped,
+            ProjectMetricSeries: telemetry.ProjectMetricSeries,
+            ProjectMetricSeriesLimit: TelemetryExportHealth.MaximumProjectMetricSeries,
+            ProjectMetricTagViolations: telemetry.ProjectMetricTagViolations,
+            ProjectMetricSeriesOverflow: telemetry.ProjectMetricSeriesOverflow);
         string fullPath = Path.GetFullPath(_acceptanceReportPath);
         Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
         File.WriteAllText(fullPath, JsonSerializer.Serialize(report, new JsonSerializerOptions
@@ -169,7 +210,23 @@ internal sealed record RuntimeSoakReport(
     string Runtime,
     string OperatingSystem,
     int ProcessorCount,
+    long ProcessWorkingSetBytes,
+    long ProcessPeakWorkingSetBytes,
+    double ProcessTotalProcessorMilliseconds,
+    long ManagedHeapBytes,
+    long GcTotalCommittedBytes,
+    int ThreadPoolThreadCount,
     int OuterKcpMtu,
     string SourceCommit,
     string FantasyCommit,
-    string ProtocolIdentity);
+    string ProtocolIdentity,
+    bool TelemetryExporterConfigured,
+    long TelemetryMetricExportAttempts,
+    long TelemetryMetricExportFailures,
+    long TelemetryTraceExportAttempts,
+    long TelemetryTraceExportFailures,
+    long TelemetryTraceRecordsDropped,
+    int ProjectMetricSeries,
+    int ProjectMetricSeriesLimit,
+    long ProjectMetricTagViolations,
+    long ProjectMetricSeriesOverflow);

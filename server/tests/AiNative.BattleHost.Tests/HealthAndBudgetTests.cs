@@ -1,5 +1,7 @@
 using System.Diagnostics;
 using System.Net;
+using System.Security.Cryptography;
+using System.Text.Json;
 using AiNative.BattleHost;
 using AiNative.Gameplay;
 using AiNative.Protocol.V1;
@@ -10,6 +12,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using NUnit.Framework;
+using OpenTelemetry;
+using OpenTelemetry.Metrics;
 
 namespace AiNative.BattleHost.Tests;
 
@@ -66,6 +70,153 @@ public sealed class HealthAndBudgetTests
         Assert.That(ready.StatusCode, Is.EqualTo(HttpStatusCode.OK));
         Assert.That(drain.StatusCode, Is.EqualTo(HttpStatusCode.Accepted));
         Assert.That(draining.StatusCode, Is.EqualTo(HttpStatusCode.ServiceUnavailable));
+    }
+
+    [Test]
+    public async Task TelemetryHealthDoesNotAffectRuntimeReadiness()
+    {
+        await using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(builder => builder.UseSetting("AINATIVE_FANTASY_ENABLED", "false"));
+        using HttpClient client = factory.CreateClient();
+
+        using JsonDocument telemetry = JsonDocument.Parse(
+            await client.GetStringAsync("/health/telemetry"));
+        JsonElement root = telemetry.RootElement;
+
+        Assert.That(root.GetProperty("status").GetString(), Is.EqualTo("healthy"));
+        Assert.That(root.GetProperty("exporterConfigured").GetBoolean(), Is.False);
+        Assert.That(root.GetProperty("metricExportFailures").GetInt64(), Is.Zero);
+        Assert.That(root.GetProperty("traceExportFailures").GetInt64(), Is.Zero);
+        Assert.That((await client.GetAsync("/health/ready")).StatusCode, Is.EqualTo(HttpStatusCode.OK));
+    }
+
+    [Test]
+    public void TelemetryIdentityIsBoundedAndHashesTheApplicationConfiguration()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), $"ainative-telemetry-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        byte[] fantasyConfig = "telemetry-config"u8.ToArray();
+        File.WriteAllBytes(Path.Combine(directory, "Fantasy.config"), fantasyConfig);
+
+        try
+        {
+            IConfiguration configuration = new ConfigurationBuilder()
+                .AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["AINATIVE_DEPLOYMENT_ENVIRONMENT"] = "acceptance",
+                    ["AINATIVE_SERVICE_INSTANCE_ID"] = "runner-1",
+                    ["AINATIVE_SOURCE_COMMIT"] = new string('1', 40),
+                    ["AINATIVE_FANTASY_COMMIT"] = new string('2', 40),
+                    ["AINATIVE_PROTOCOL_IDENTITY"] = new string('3', 64),
+                })
+                .Build();
+
+            BattleTelemetrySettings settings = BattleTelemetrySettings.Create(configuration, directory);
+            Dictionary<string, object> attributes = settings.Identity.ResourceAttributes.ToDictionary();
+
+            Assert.That(settings.Endpoint, Is.Null);
+            Assert.That(attributes["deployment.environment.name"], Is.EqualTo("acceptance"));
+            Assert.That(settings.Identity.ServiceInstanceId, Is.EqualTo("runner-1"));
+            Assert.That(attributes["ainative.source.commit"], Is.EqualTo(new string('1', 40)));
+            Assert.That(
+                attributes["ainative.configuration.identity"],
+                Is.EqualTo(Convert.ToHexString(SHA256.HashData(fantasyConfig)).ToLowerInvariant()));
+            Assert.That(attributes.Keys, Has.Count.EqualTo(7));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [TestCase("OTEL_EXPORTER_OTLP_ENDPOINT", "not-a-uri")]
+    [TestCase("AINATIVE_DEPLOYMENT_ENVIRONMENT", "contains spaces")]
+    [TestCase("AINATIVE_OTEL_TRACE_QUEUE_SIZE", "64")]
+    [TestCase("AINATIVE_OTEL_TRACE_EXPORT_BATCH_SIZE", "4096")]
+    [TestCase("AINATIVE_SOURCE_COMMIT", "not-a-commit")]
+    public void InvalidTelemetryConfigurationFailsAtStartup(string key, string value)
+    {
+        IConfiguration configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { [key] = value })
+            .Build();
+
+        Assert.That(
+            () => BattleTelemetrySettings.Create(configuration, Path.GetTempPath()),
+            Throws.TypeOf<InvalidOperationException>());
+    }
+
+    [Test]
+    public void FailedMetricExporterPreservesBoundedTaglessProjectSeries()
+    {
+        TelemetryExportHealth health = new(exporterConfigured: true);
+        using PeriodicExportingMetricReader reader = new(
+            new TrackingMetricExporter(new FailureMetricExporter(), health),
+            exportIntervalMilliseconds: 10,
+            exportTimeoutMilliseconds: 100);
+        using MeterProvider provider = Sdk.CreateMeterProviderBuilder()
+            .AddMeter(BattleMetrics.MeterName)
+            .AddReader(reader)
+            .Build();
+        using BattleMetrics metrics = new(telemetryHealth: health);
+
+        for (int index = 0; index < 64; index++)
+        {
+            metrics.RecordConnectionAccepted();
+            metrics.RecordTick(index / 100d);
+            metrics.RecordDroppedDiagnostic();
+            metrics.RecordReplayDropped();
+        }
+
+        metrics.RecordConnectionRemoved(64);
+        Assert.That(
+            SpinWait.SpinUntil(
+                () => health.Snapshot().MetricExportAttempts > 0,
+                TimeSpan.FromSeconds(2)),
+            Is.True);
+
+        TelemetryExportSnapshot snapshot = health.Snapshot();
+        Assert.That(snapshot.MetricExportFailures, Is.GreaterThan(0));
+        Assert.That(snapshot.ProjectMetricSeries, Is.InRange(1, TelemetryExportHealth.MaximumProjectMetricSeries));
+        Assert.That(snapshot.ProjectMetricTagViolations, Is.Zero);
+        Assert.That(snapshot.ProjectMetricSeriesOverflow, Is.Zero);
+    }
+
+    [Test]
+    public void BoundedTraceProcessorDropsAndCountsWithoutBlockingProducer()
+    {
+        TelemetryExportHealth health = new(exporterConfigured: true);
+        BlockingActivityExporter blocking = new();
+        using BoundedActivityExportProcessor processor = new(
+            new TrackingActivityExporter(blocking, health),
+            health,
+            queueSize: 2,
+            exportDelayMilliseconds: 1,
+            exporterTimeoutMilliseconds: 1_000,
+            exportBatchSize: 1);
+        Activity[] activities = Enumerable.Range(0, 128)
+            .Select(index => new Activity($"trace-{index}").Start())
+            .ToArray();
+        foreach (Activity activity in activities)
+        {
+            activity.Stop();
+        }
+
+        Stopwatch elapsed = Stopwatch.StartNew();
+        foreach (Activity activity in activities)
+        {
+            processor.OnEnd(activity);
+        }
+
+        elapsed.Stop();
+        Assert.That(elapsed.Elapsed, Is.LessThan(TimeSpan.FromMilliseconds(250)));
+        Assert.That(health.Snapshot().TraceRecordsDropped, Is.GreaterThan(0));
+
+        blocking.Release();
+        Assert.That(processor.ForceFlush(1_000), Is.True);
+        foreach (Activity activity in activities)
+        {
+            activity.Dispose();
+        }
     }
 
     [Test]
@@ -297,6 +448,34 @@ public sealed class HealthAndBudgetTests
         timestampDelta * 1000d / Stopwatch.Frequency;
 
     private readonly record struct RecordedInput(int EntityIndex, int MoveXMilli, int MoveYMilli);
+
+    private sealed class FailureMetricExporter : BaseExporter<Metric>
+    {
+        public override ExportResult Export(in Batch<Metric> batch) => ExportResult.Failure;
+    }
+
+    private sealed class BlockingActivityExporter : BaseExporter<Activity>
+    {
+        private readonly ManualResetEventSlim _released = new(initialState: false);
+
+        public override ExportResult Export(in Batch<Activity> batch)
+        {
+            _released.Wait(TimeSpan.FromSeconds(2));
+            return ExportResult.Success;
+        }
+
+        public void Release() => _released.Set();
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                _released.Dispose();
+            }
+
+            base.Dispose(disposing);
+        }
+    }
 
     private static void WriteUdpPacket(BinaryWriter writer, uint seconds, ushort sourcePort, ushort destinationPort)
     {

@@ -94,6 +94,7 @@ internal sealed class RoomProtocolService(
             }
 
             _connections.Add(new ConnectionState(accepted));
+            metrics.RecordConnectionAccepted();
             logger.LogInformation(
                 "Accepted Fantasy KCP connection {ConnectionId} epoch {ConnectionEpoch}",
                 accepted.ConnectionId,
@@ -299,6 +300,7 @@ internal sealed class RoomProtocolService(
     {
         ConnectionState connection = _connections[index];
         _connections.RemoveAt(index);
+        metrics.RecordConnectionRemoved();
         if (connection.Session is { Joined: true } session && ReferenceEquals(session.Connection, connection))
         {
             session.DisconnectedAtTick = roomTick;
@@ -334,12 +336,18 @@ internal sealed class RoomProtocolService(
 
     public async ValueTask DisposeAsync()
     {
+        int connectionCount = _connections.Count;
         foreach (ConnectionState connection in _connections)
         {
             await connection.Connection.DisposeAsync();
         }
 
         _connections.Clear();
+        if (connectionCount > 0)
+        {
+            metrics.RecordConnectionRemoved(connectionCount);
+        }
+
         _sessions.Clear();
     }
 

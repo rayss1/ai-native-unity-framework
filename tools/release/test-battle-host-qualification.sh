@@ -26,7 +26,8 @@ jq -n --arg source "$source_sha" '{
 
 jq -n '{artifacts: [
   {name: "runtime-acceptance-provenance", expired: false},
-  {name: "runtime-acceptance-soak", expired: false}
+  {name: "runtime-acceptance-soak", expired: false},
+  {name: "runtime-telemetry-capacity", expired: false}
 ]}' > "$fixture_dir/artifacts.json"
 
 jq -n \
@@ -62,6 +63,42 @@ jq -n \
     outerKcpMtu: 1150
   }' > "$fixture_dir/soak-host.json"
 
+jq -n \
+  --arg source "$source_sha" \
+  --arg fantasy "$fantasy_commit" \
+  --arg protocol "$protocol_identity" \
+  '{
+    evidenceClass: "telemetry-capacity-comparison",
+    sourceCommit: $source,
+    fantasyCommit: $fantasy,
+    protocolIdentity: $protocol,
+    botCount: 64,
+    warmupSeconds: 10,
+    measuredSeconds: 30,
+    baseline: {
+      processPeakWorkingSetBytes: 100000000
+    },
+    exporterOutage: {
+      tickP99IncrementMilliseconds: 0.1,
+      metricExportAttempts: 30,
+      metricExportFailures: 30,
+      traceExportAttempts: 30,
+      traceExportFailures: 30,
+      traceRecordsDropped: 0,
+      projectMetricSeries: 7,
+      projectMetricSeriesLimit: 16,
+      projectMetricTagViolations: 0,
+      projectMetricSeriesOverflow: 0,
+      processPeakWorkingSetBytes: 110000000
+    },
+    gates: {
+      tickP99IncrementLimitMilliseconds: 0.25,
+      boundedTraceQueue: true,
+      taglessProjectMetrics: true,
+      passed: true
+    }
+  }' > "$fixture_dir/telemetry-capacity.json"
+
 verify() {
   "$verifier" \
     "$repository_root" \
@@ -69,7 +106,8 @@ verify() {
     "$1" \
     "$2" \
     "$3" \
-    "$4"
+    "$4" \
+    "$5"
 }
 
 expect_failure() {
@@ -85,7 +123,8 @@ verify \
   "$fixture_dir/run.json" \
   "$fixture_dir/artifacts.json" \
   "$fixture_dir/provenance.json" \
-  "$fixture_dir/soak-host.json"
+  "$fixture_dir/soak-host.json" \
+  "$fixture_dir/telemetry-capacity.json"
 
 jq '.event = "workflow_dispatch"' \
   "$fixture_dir/run.json" > "$fixture_dir/run-dispatch.json"
@@ -93,7 +132,8 @@ verify \
   "$fixture_dir/run-dispatch.json" \
   "$fixture_dir/artifacts.json" \
   "$fixture_dir/provenance.json" \
-  "$fixture_dir/soak-host.json"
+  "$fixture_dir/soak-host.json" \
+  "$fixture_dir/telemetry-capacity.json"
 
 jq '.head_sha = "ffffffffffffffffffffffffffffffffffffffff"' \
   "$fixture_dir/run.json" > "$fixture_dir/run-wrong-sha.json"
@@ -101,7 +141,8 @@ expect_failure wrong-source \
   "$fixture_dir/run-wrong-sha.json" \
   "$fixture_dir/artifacts.json" \
   "$fixture_dir/provenance.json" \
-  "$fixture_dir/soak-host.json"
+  "$fixture_dir/soak-host.json" \
+  "$fixture_dir/telemetry-capacity.json"
 
 jq '.event = "pull_request"' \
   "$fixture_dir/run.json" > "$fixture_dir/run-pull-request.json"
@@ -109,7 +150,8 @@ expect_failure pull-request-run \
   "$fixture_dir/run-pull-request.json" \
   "$fixture_dir/artifacts.json" \
   "$fixture_dir/provenance.json" \
-  "$fixture_dir/soak-host.json"
+  "$fixture_dir/soak-host.json" \
+  "$fixture_dir/telemetry-capacity.json"
 
 jq '(.artifacts[] | select(.name == "runtime-acceptance-soak") | .expired) = true' \
   "$fixture_dir/artifacts.json" > "$fixture_dir/artifacts-expired.json"
@@ -117,7 +159,8 @@ expect_failure expired-soak \
   "$fixture_dir/run.json" \
   "$fixture_dir/artifacts-expired.json" \
   "$fixture_dir/provenance.json" \
-  "$fixture_dir/soak-host.json"
+  "$fixture_dir/soak-host.json" \
+  "$fixture_dir/telemetry-capacity.json"
 
 jq '.tickP99Milliseconds = 16.68' \
   "$fixture_dir/soak-host.json" > "$fixture_dir/soak-over-budget.json"
@@ -125,6 +168,16 @@ expect_failure over-budget \
   "$fixture_dir/run.json" \
   "$fixture_dir/artifacts.json" \
   "$fixture_dir/provenance.json" \
-  "$fixture_dir/soak-over-budget.json"
+  "$fixture_dir/soak-over-budget.json" \
+  "$fixture_dir/telemetry-capacity.json"
+
+jq '.exporterOutage.tickP99IncrementMilliseconds = 0.25' \
+  "$fixture_dir/telemetry-capacity.json" > "$fixture_dir/telemetry-at-limit.json"
+expect_failure telemetry-at-limit \
+  "$fixture_dir/run.json" \
+  "$fixture_dir/artifacts.json" \
+  "$fixture_dir/provenance.json" \
+  "$fixture_dir/soak-host.json" \
+  "$fixture_dir/telemetry-at-limit.json"
 
 echo "Battle Host qualification contract tests passed."
