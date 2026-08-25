@@ -81,12 +81,12 @@ The architecture-check command returns `0` for a valid repository, `1` for archi
 CI builds and validates the production Dockerfile without publishing it. The manual release workflow admits only an exact qualified `main` run, publishes the Linux x64 image to GHCR with SBOM/provenance and a GitHub artifact attestation, and records source, Fantasy, protocol, configuration, SDK/runtime, and image identities. Operators deploy an immutable digest and mount a reviewed configuration:
 
 ```bash
-AINATIVE_BATTLE_HOST_IMAGE='ghcr.io/rayss1/ai-native-battle-host@sha256:<digest>' \
+AINATIVE_BATTLE_HOST_IMAGE="$(tools/release/resolve-battle-host-release.sh "$PWD" 0.1.0)" \
 AINATIVE_FANTASY_CONFIG='/absolute/path/Fantasy.config' \
 docker compose -f infrastructure/battle-host/compose.yaml up -d
 ```
 
-Publishing never happens on a normal push or pull request. See [Battle Host Release Procedure](Docs/Architecture/battle-host-release.md) for the explicit release and rollback gate.
+The repository-retained [release ledger](infrastructure/battle-host/releases/README.md) maps an operator-selected version to its verified immutable digest. Publishing never happens on a normal push or pull request. See [Battle Host Release Procedure](Docs/Architecture/battle-host-release.md) for the explicit release and rollback gate.
 
 ## Documentation
 

@@ -1,0 +1,20 @@
+{
+  "version": "0.1.0",
+  "image": "ghcr.io/rayss1/ai-native-battle-host@sha256:a350b8329d142a07026ac0f0bb28a67baf106cfae3fcb1e292f0cfe17fdb7d5c",
+  "tags": [
+    "ghcr.io/rayss1/ai-native-battle-host:v0.1.0",
+    "ghcr.io/rayss1/ai-native-battle-host:sha-10b787c73cb78d13bbf5d45e9a6a1253fc88d75e"
+  ],
+  "sourceCommit": "10b787c73cb78d13bbf5d45e9a6a1253fc88d75e",
+  "sourceTree": "a22a949594a89e488125b84bf71577352830bc09",
+  "fantasyCommit": "f8bed0d464924f159d46498f1311206ea0694be8",
+  "protocolIdentity": "726a80d6a762913b87fe840f0be9086224598bcaadb0e4a7d4e3e44856c0b92c",
+  "configSha256": "fc0714bcbe7c8c673cf638506a45f3a4440585f4024ff78048434346ab8a66e4",
+  "sdkImage": "mcr.microsoft.com/dotnet/sdk:10.0.202-noble@sha256:adc02be8b87957d07208a4a3e51775935b33bad3317de8c45b1e67357b4c073b",
+  "runtimeImage": "mcr.microsoft.com/dotnet/aspnet:10.0.4-noble@sha256:8b75cdf59a5068d9adfd8a6d202cc7671b2dc8f5f46c51e3b88a0a632e8fad1f",
+  "qualifiedRun": "https://github.com/rayss1/ai-native-unity-framework/actions/runs/32823471154",
+  "qualificationProvenanceSha256": "dcc4271a1a3ffb45847cb3b9b549348aeebcb5646cb9396ccf5052344bb539db",
+  "qualificationSoakSha256": "fb6dafd8c540774e203fef40b5ee82372f260fa176d704c5711c331152988bf2",
+  "attestationUrl": "https://github.com/rayss1/ai-native-unity-framework/attestations/42806017",
+  "publishedAtUtc": "2026-08-25T09:14:31Z"
+}

@@ -14,4 +14,10 @@ docker compose -f infrastructure/battle-host/compose.yaml up -d
 
 The production validation workflow builds and probes this Dockerfile but does not push an image. The manual `Battle Host release publication` workflow accepts only the current `main` commit and an exact successful production-validation run. It publishes an immutable GHCR digest with SBOM/provenance and a GitHub artifact attestation, then promotes a new `v<semantic-version>` tag without ever updating `latest`.
 
+Published manifests are retained in the append-only [`releases`](releases/README.md) ledger. Resolve an approved version to its verified digest before setting `AINATIVE_BATTLE_HOST_IMAGE`:
+
+```bash
+tools/release/resolve-battle-host-release.sh "$(git rev-parse --show-toplevel)" 0.1.0
+```
+
 See [Battle Host Release Procedure](../../Docs/Architecture/battle-host-release.md) for qualification, publication, verification, deployment, and rollback instructions. Registry publication is explicit and does not deploy the image.
