@@ -53,6 +53,18 @@ gh attestation verify \
   --repo rayss1/ai-native-unity-framework
 ```
 
+After a successful publication, copy the emitted `battle-host-release-v<version>` manifest artifact unchanged into `infrastructure/battle-host/releases/v<version>.json` in a follow-up review. Validate the append-only record and resolve the operator-selected version to a digest:
+
+```bash
+tools/release/verify-battle-host-release.sh \
+  "$PWD" \
+  infrastructure/battle-host/releases/v0.1.0.json
+
+image="$(tools/release/resolve-battle-host-release.sh "$PWD" 0.1.0)"
+```
+
+The verifier binds the record to the historical source tree, Fantasy gitlink, protocol schema, application configuration, qualification run, attestation, and both immutable discovery tags. It also rejects duplicate versions, source commits, digests, or tags across the ledger. The resolver returns only the recorded `ghcr.io/...@sha256:<digest>` identity; it never resolves `latest` or another registry tag at deployment time.
+
 Deploy the exact digest with a reviewed read-only configuration:
 
 ```bash
@@ -63,6 +75,8 @@ docker compose -f infrastructure/battle-host/compose.yaml up -d
 
 The release manifest artifact records every identity needed to reproduce or audit the image. Registry publication does not imply that the image was deployed.
 
+The first qualified publication is [`v0.1.0`](../../infrastructure/battle-host/releases/v0.1.0.json), produced by [release run 32830738674](https://github.com/rayss1/ai-native-unity-framework/actions/runs/32830738674) from qualified [production run 32823471154](https://github.com/rayss1/ai-native-unity-framework/actions/runs/32823471154). Its digest-level smoke and [GitHub attestation 42806017](https://github.com/rayss1/ai-native-unity-framework/attestations/42806017) passed. No deployment or canary is implied by this evidence.
+
 ## Rollback and failure containment
 
 - Keep the previous qualified digest and compatible configuration throughout rollout.
@@ -71,3 +85,5 @@ The release manifest artifact records every identity needed to reproduce or audi
 - A failure before `v<version>` promotion can leave only a source-qualified `sha-<commit>` image. Investigate it as an unpromoted artifact; do not reuse or overwrite the tag.
 - A failure after version promotion requires a new version after correction. Published version/source tags remain immutable and auditable.
 - Changing the Fantasy baseline, license scope, protocol compatibility, or release distribution model reopens the corresponding ADR/legal gates.
+
+`v0.1.0` is the first retained release and therefore has no earlier Battle Host digest. Its initial canary must not be treated as rollback-qualified until the operator names a separately qualified fallback; before that point, containment is drain-and-stop rather than image rollback.
