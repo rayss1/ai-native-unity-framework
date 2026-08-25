@@ -26,8 +26,8 @@ fi
 
 jq -e '
   .evidenceClass == "release-equivalent-host-core"
-  and .sampleCount >= 1700
-  and .elapsedSeconds >= 39
+  and .sampleCount >= 17900
+  and .elapsedSeconds >= 309
   and .tickP99Milliseconds <= 16.67
   and .tickP999Milliseconds <= 20
   and .slowTickPercentage <= 0.1
@@ -50,8 +50,8 @@ jq -e '
 
 jq -e '
   .evidenceClass == "release-equivalent-host-core"
-  and .sampleCount >= 1700
-  and .elapsedSeconds >= 39
+  and .sampleCount >= 17900
+  and .elapsedSeconds >= 309
   and .tickP99Milliseconds <= 16.67
   and .tickP999Milliseconds <= 20
   and .slowTickPercentage <= 0.1
@@ -82,8 +82,8 @@ jq -e '
   .botCount == 64
   and .peakConnections == 64
   and .warmupSeconds >= 10
-  and .measuredSeconds >= 30
-  and .loadElapsedSeconds >= 40
+  and .measuredSeconds >= 300
+  and .loadElapsedSeconds >= 310
   and .measuredInputFrames == (.botCount * .measuredSeconds * 60)
   and .measuredInputRateHz >= 59.5
   and .measuredInputRateHz <= 60.1
@@ -98,8 +98,8 @@ jq -e '
   .botCount == 64
   and .peakConnections == 64
   and .warmupSeconds >= 10
-  and .measuredSeconds >= 30
-  and .loadElapsedSeconds >= 40
+  and .measuredSeconds >= 300
+  and .loadElapsedSeconds >= 310
   and .measuredInputFrames == (.botCount * .measuredSeconds * 60)
   and .measuredInputRateHz >= 59.5
   and .measuredInputRateHz <= 60.1

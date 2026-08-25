@@ -382,7 +382,7 @@ jobs:
               --env AINATIVE_ENABLE_EVALUATION_ENDPOINTS=true
               --env AINATIVE_ACCEPTANCE_REPORT_PATH="/evidence/$profile-host.json"
               --env AINATIVE_ACCEPTANCE_WARMUP_TICKS=600
-              --env AINATIVE_ACCEPTANCE_MAX_TICKS=6000
+              --env AINATIVE_ACCEPTANCE_MAX_TICKS=24000
               --env AINATIVE_DEPLOYMENT_ENVIRONMENT=continuous-integration
               --env AINATIVE_SERVICE_INSTANCE_ID="$profile"
               --env AINATIVE_SOURCE_COMMIT="$SOURCE_COMMIT"
@@ -410,8 +410,8 @@ jobs:
               sleep 0.25
             done
             load_file="$evidence_dir/$profile-load.json"
-            load_status="$(curl --silent --max-time 120 --output "$load_file" --write-out '%{http_code}' \
-              --request POST 'http://127.0.0.1:5084/admin/kcp-load?botCount=64&warmupSeconds=10&durationSeconds=30')"
+            load_status="$(curl --silent --max-time 420 --output "$load_file" --write-out '%{http_code}' \
+              --request POST 'http://127.0.0.1:5084/admin/kcp-load?botCount=64&warmupSeconds=10&durationSeconds=300')"
             if test "$load_status" != '200'; then
               cat "$load_file"
               docker logs "$active_container"
@@ -440,13 +440,14 @@ jobs:
           jq . "$evidence_dir/telemetry-capacity.json"
 
       - name: Upload telemetry outage and capacity evidence
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: runtime-telemetry-capacity
           path: |
             artifacts/runtime-acceptance/telemetry-*.json
             artifacts/runtime-acceptance/telemetry-*.log
-          if-no-files-found: error
+          if-no-files-found: warn
 
       - name: Run qualified Linux socket impairment profiles
         shell: bash

@@ -74,7 +74,7 @@ jq -n \
     protocolIdentity: $protocol,
     botCount: 64,
     warmupSeconds: 10,
-    measuredSeconds: 30,
+    measuredSeconds: 300,
     baseline: {
       processPeakWorkingSetBytes: 100000000
     },

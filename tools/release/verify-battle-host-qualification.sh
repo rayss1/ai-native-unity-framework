@@ -100,7 +100,7 @@ jq -e --arg source "$expected_source_sha" --arg fantasy "$fantasy_commit" --arg 
   and .protocolIdentity == $protocol
   and .botCount == 64
   and .warmupSeconds >= 10
-  and .measuredSeconds >= 30
+  and .measuredSeconds >= 300
   and .exporterOutage.tickP99IncrementMilliseconds < .gates.tickP99IncrementLimitMilliseconds
   and .gates.tickP99IncrementLimitMilliseconds == 0.25
   and .exporterOutage.metricExportAttempts >= 1

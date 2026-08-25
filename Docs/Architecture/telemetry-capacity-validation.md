@@ -23,7 +23,7 @@ The following configuration limits fail at startup when out of range:
 
 ## Release-equivalent comparison
 
-`Battle Host production validation` runs the same Linux x64 image twice on the same GitHub runner. Both profiles use 64 real Fantasy KCP sessions, ten seconds of warm-up, and 30 measured seconds at 60 Hz input/30 Hz batches/20 Hz snapshots:
+`Battle Host production validation` runs the same Linux x64 image twice on the same GitHub runner. Both profiles use 64 real Fantasy KCP sessions, ten seconds of warm-up, and 300 measured seconds at 60 Hz input/30 Hz batches/20 Hz snapshots. The measured window provides about 18,000 Tick samples so the P99 comparison is not decided by only a few scheduler-tail observations:
 
 1. exporter disabled, establishing the local baseline;
 2. OTLP configured to an unavailable loopback collector, exercising bounded failure behavior.
