@@ -19,6 +19,7 @@ public sealed class ArchitectureValidator
     private const string UnresolvedReferenceCode = "ARC005";
     private const string SolutionDriftCode = "ARC006";
     private const string UnityPackageGeneratedOutputCode = "ARC007";
+    private const string FantasyBoundaryCode = "ARC008";
 
     public ArchitectureValidationResult Validate(string repositoryRoot, string? rulesPath = null)
     {
@@ -39,6 +40,7 @@ public sealed class ArchitectureValidator
         ValidateDependencies(graph, rules, diagnostics);
         ValidateCycles(graph, diagnostics);
         ValidateSharedSources(root, files.CSharpFiles, rules, diagnostics);
+        ValidateFantasyBoundary(root, files.CSharpFiles, files.ProjectFiles, rules, diagnostics);
         ValidateSolutions(root, files, diagnostics);
         ValidateUnityPackageGeneratedDirectories(root, files.PackageManifests, rules, diagnostics);
 
@@ -436,6 +438,69 @@ public sealed class ArchitectureValidator
         || (expression.EndsWith("Task.Factory", StringComparison.Ordinal) && name == "StartNew")
         || expression.EndsWith("ThreadPool", StringComparison.Ordinal)
         || (expression.EndsWith("Thread", StringComparison.Ordinal) && name is "Sleep" or "Yield");
+
+    private static void ValidateFantasyBoundary(
+        string root,
+        IReadOnlyList<string> sourceFiles,
+        IReadOnlyList<string> projectFiles,
+        ArchitectureRules rules,
+        List<ArchitectureDiagnostic> diagnostics)
+    {
+        foreach (string path in sourceFiles)
+        {
+            string relativePath = Relative(root, path);
+            if (IsAllowedPath(relativePath, rules.FantasyNamespaceAllowedPathPrefixes))
+            {
+                continue;
+            }
+
+            CompilationUnitSyntax compilation = CSharpSyntaxTree.ParseText(File.ReadAllText(path)).GetCompilationUnitRoot();
+            bool referencesFantasy = compilation.Usings
+                .Select(directive => directive.Name?.ToString() ?? string.Empty)
+                .Any(IsFantasyNamespace)
+                || compilation.DescendantNodes().OfType<NameSyntax>()
+                    .Where(name => name is QualifiedNameSyntax or AliasQualifiedNameSyntax)
+                    .Select(name => name.ToString())
+                    .Any(IsFantasyNamespace);
+            if (referencesFantasy)
+            {
+                diagnostics.Add(new ArchitectureDiagnostic(
+                    FantasyBoundaryCode,
+                    relativePath,
+                    "Fantasy runtime namespaces must terminate inside the dedicated Server adapter."));
+            }
+        }
+
+        foreach (string path in projectFiles)
+        {
+            string relativePath = Relative(root, path);
+            XDocument document = XDocument.Load(path);
+            bool referencesFantasyPackage = document.Descendants("PackageReference")
+                .Select(reference => reference.Attribute("Include")?.Value ?? string.Empty)
+                .Any(package => package.Equals("Fantasy-Net", StringComparison.OrdinalIgnoreCase));
+            if (referencesFantasyPackage
+                && !IsAllowedPath(relativePath, rules.FantasyPackageReferenceAllowedPathPrefixes))
+            {
+                diagnostics.Add(new ArchitectureDiagnostic(
+                    FantasyBoundaryCode,
+                    relativePath,
+                    "Fantasy-Net may be referenced only by the dedicated Server adapter or Battle Host composition root."));
+            }
+        }
+    }
+
+    private static bool IsFantasyNamespace(string name)
+    {
+        string normalized = name.StartsWith("global::", StringComparison.Ordinal)
+            ? name[8..]
+            : name;
+        return normalized.Equals("Fantasy", StringComparison.Ordinal)
+            || normalized.StartsWith("Fantasy.", StringComparison.Ordinal);
+    }
+
+    private static bool IsAllowedPath(string path, IEnumerable<string> prefixes) =>
+        prefixes.Any(prefix => path.Equals(prefix, StringComparison.OrdinalIgnoreCase)
+            || path.StartsWith(prefix + "/", StringComparison.OrdinalIgnoreCase));
 
     private static void ValidateSolutions(
         string root,

@@ -22,6 +22,6 @@ Silently skipping the job would weaken the dual-runtime boundary and could be mi
 
 ## Consequences and restoration
 
-Manual execution is slower and depends on operator discipline, but retains auditable dual-compilation evidence without storing Unity credentials. PR #5 and ADR-0012 remain gated until the project owner supplies a passing bundle for the exact candidate commit.
+Manual execution is slower and depends on operator discipline, but retains auditable dual-compilation evidence without storing Unity credentials. The project owner supplied the seven-test ADR-0012 acceptance bundle; every subsequent relevant exact commit remains gated by this procedure until automated Unity CI is restored.
 
 Restore automatic CI when Unity authentication becomes available by re-enabling pull-request/push triggers, adding the appropriate GitHub Secrets or licensing-server configuration, and obtaining a green run. At that point a follow-up ADR must end this exception; ADR-0003's automated requirement becomes authoritative again without changing the Shared API.

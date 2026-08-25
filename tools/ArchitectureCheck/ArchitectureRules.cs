@@ -22,6 +22,10 @@ public sealed class ArchitectureRules
 
     public required string[] SharedPassiveContractAllowedNamespacePrefixes { get; init; }
 
+    public required string[] FantasyPackageReferenceAllowedPathPrefixes { get; init; }
+
+    public required string[] FantasyNamespaceAllowedPathPrefixes { get; init; }
+
     public static ArchitectureRules Load(string path)
     {
         using FileStream stream = File.OpenRead(path);

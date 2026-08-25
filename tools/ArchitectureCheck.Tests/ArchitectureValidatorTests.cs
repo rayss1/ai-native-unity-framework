@@ -176,6 +176,46 @@ public sealed class ArchitectureValidatorTests
         Assert.That(result.Diagnostics, Is.Empty);
     }
 
+    [Test]
+    public void FantasyPackageReferenceOutsideServerBoundaryIsReported()
+    {
+        Write(
+            "client/Client.csproj",
+            "<Project Sdk=\"Microsoft.NET.Sdk\"><ItemGroup><PackageReference Include=\"Fantasy-Net\" Version=\"1.0.0\" /></ItemGroup></Project>");
+        WriteSolution("client/Client.csproj");
+
+        AssertCode("ARC008");
+    }
+
+    [Test]
+    public void FantasyNamespaceOutsideDedicatedAdapterIsReported()
+    {
+        Write("server/src/Modules/Gameplay/Bad.cs", "using Fantasy.Network; class Bad { }");
+
+        AssertCode("ARC008");
+    }
+
+    [Test]
+    public void FantasyReferencesAreAllowedInAdapterAndCompositionRoot()
+    {
+        Write(
+            "server/src/Modules/AiNative.Server.Fantasy/AiNative.Server.Fantasy.csproj",
+            "<Project Sdk=\"Microsoft.NET.Sdk\"><ItemGroup><PackageReference Include=\"Fantasy-Net\" Version=\"1.0.0\" /></ItemGroup></Project>");
+        Write(
+            "server/src/Modules/AiNative.Server.Fantasy/Adapter.cs",
+            "using global::Fantasy.Network; class Adapter { }");
+        Write(
+            "server/src/Hosts/AiNative.BattleHost/AiNative.BattleHost.csproj",
+            "<Project Sdk=\"Microsoft.NET.Sdk.Web\"><ItemGroup><PackageReference Include=\"Fantasy-Net\" Version=\"1.0.0\" /></ItemGroup></Project>");
+        WriteSolution(
+            "server/src/Modules/AiNative.Server.Fantasy/AiNative.Server.Fantasy.csproj",
+            "server/src/Hosts/AiNative.BattleHost/AiNative.BattleHost.csproj");
+
+        ArchitectureValidationResult result = Validate();
+
+        Assert.That(result.Diagnostics, Is.Empty);
+    }
+
     private ArchitectureValidationResult Validate()
     {
         string rules = Path.Combine(AppContext.BaseDirectory, "architecture-rules.json");

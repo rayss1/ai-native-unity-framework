@@ -12,6 +12,7 @@ enum MessageId {
   MESSAGE_ID_INPUT_COMMAND = 1100;
   MESSAGE_ID_SNAPSHOT = 1101;
   MESSAGE_ID_RELIABLE_EVENT = 1102;
+  MESSAGE_ID_INPUT_BATCH = 1103;
   MESSAGE_ID_RECONNECT_REQUEST = 1200;
   MESSAGE_ID_RECONNECT_RESPONSE = 1201;
 }
@@ -48,6 +49,11 @@ message InputCommand {
   sint32 move_y_milli = 4;
   sint32 yaw_millidegrees = 5;
   uint32 buttons = 6;
+  reserved 100 to 199;
+}
+
+message InputBatch {
+  repeated InputCommand commands = 1;
   reserved 100 to 199;
 }
 

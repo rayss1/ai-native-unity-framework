@@ -2,7 +2,7 @@
 
 Status: Frozen
 Decision source: WS-11
-Last updated: 2026-08-19
+Last updated: 2026-08-24
 
 This page is the entry point for implementing the first vertical slice. It completes the follow-up ADR list in section 17 of the technology baseline; the accepted ADRs are authoritative where the baseline still describes an item as follow-up work.
 
@@ -14,7 +14,7 @@ Provide one implementation entry condition for the `Start -> Login -> Match -> A
 
 - Creating empty repository/module scaffolding before its first owned artifact.
 - Finalizing codec, snapshot rate, client prediction physics, nav options, HybridCLR adoption, or rooms per process without vertical-slice evidence.
-- Introducing a production Server Host or any product reference to Fantasy before the overdue runtime-successor gate is satisfied. The exact, unreferenced evaluation submodule is permitted as an opaque vendor boundary.
+- Referencing Fantasy outside the accepted Server adapter and Battle Host composition boundary, or changing the pinned runtime/fork without a superseding ADR and equivalent evidence.
 - Adopting deterministic lockstep, global DOTS, Addressables, runtime plugin discovery, Kubernetes/Agones, Redis, a broker, or a hosted cloud dependency as a default.
 - Freezing private implementation types. Only documented public contracts, ownership, dependency direction, lifecycle/threading behavior, compatibility policy, and gates are stable.
 
@@ -24,7 +24,7 @@ Provide one implementation entry condition for the `Start -> Login -> Match -> A
 | --- | --- |
 | Any new module, package, project, or reference | [Dependency matrix](dependency-matrix.md) and [ADR-0002](../ADR/0002-repository-layout-and-module-dependencies.md) |
 | Shared gameplay or public port | [Public API catalog](public-api-contracts.md), [ADR-0003](../ADR/0003-shared-gameplay-dual-compilation.md), and cross-runtime vectors |
-| Server Host/runtime dependency | [ADR-0001](../ADR/0001-fantasy-server-foundation.md), [ADR-0004](../ADR/0004-server-runtime-policy.md), and proposed [ADR-0012](../ADR/0012-server-runtime-successor.md) |
+| Server Host/runtime dependency | [ADR-0001](../ADR/0001-fantasy-server-foundation.md) and [ADR-0012](../ADR/0012-server-runtime-successor.md); ADR-0004 is historical |
 | Tick, prediction, replay, or lag compensation | [ADR-0005](../ADR/0005-authoritative-simulation-and-reconciliation.md) and [performance budgets](performance-budgets.md) |
 | Transport, replication, or protocol | [ADR-0006](../ADR/0006-realtime-transport-and-replication.md), [ADR-0009](../ADR/0009-protocol-evolution-and-code-generation.md), and impairment gates |
 | Physics or navigation | [ADR-0007](../ADR/0007-physics-and-navigation-boundaries.md) |

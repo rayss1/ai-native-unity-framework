@@ -17,7 +17,7 @@ The initial framework is optimized for the following target:
 - Authoritative server simulation at 60 ticks per second.
 - 200 ms round-trip time is the degradation boundary, not the normal latency target. Regional deployments should target 100 ms RTT or less.
 - The game server is independent of the Unity runtime. Physics and navigation are integrated separately.
-- The server foundation is the project-maintained [rayss1/Fantasy fork](https://github.com/rayss1/Fantasy), currently present only as an unreferenced evaluation submodule.
+- The server foundation is the exact, project-maintained [rayss1/Fantasy fork](https://github.com/rayss1/Fantasy), consumed only through the Server adapter and Battle Host composition root.
 - Client and server reuse the same Unity-independent gameplay simulation source code.
 - Client asset building, delivery, update, and cache management are implemented by this project rather than Addressables.
 - HybridCLR is a candidate for client code hot update.
@@ -143,18 +143,17 @@ Physics, navigation, HybridCLR, UI, DOTS, localization, platform services, and o
 
 ### 6.1 Runtime versions
 
-- `.NET 8` (`net8.0`) remains the accepted development and production policy until a successor ADR is accepted.
-- `.NET 9` (`net9.0`) remains the accepted compatibility lane, not a second production artifact.
+- `.NET 10` (`net10.0`) is the accepted development and production Server runtime.
 - Deployable Hosts target one runtime at a time; the project does not publish duplicate Host artifacts without a deployment need.
-- Reusable server libraries may multi-target `net8.0;net9.0` when publishing both assets is justified.
-- Code shared by the .NET 8 and .NET 9 builds uses the .NET 8 API surface and C# 12 as its common baseline. Shared gameplay remains `netstandard2.1` and C# 9 for Unity dual compilation.
+- Server libraries, tools, and .NET test executables target `net10.0` unless a consumer requires a narrower contract.
+- Server and tool code uses C# 14. Shared gameplay, realtime contracts, and protocol libraries remain `netstandard2.1` and C# 9 for Unity dual compilation.
 - The repository pins the SDK with `global.json`; local development, CI, and container builds use matching SDK versions.
 
-.NET 8 and .NET 9 both reach the end of Microsoft support on 2026-11-10, and the original successor deadline has been missed. An exact Fantasy evaluation submodule may be present, but no production Server Host or product reference to it may merge until a supported successor passes the ADR index gate. ADR-0012 proposes .NET 10 but is not accepted.
+[ADR-0012](../ADR/0012-server-runtime-successor.md) accepted .NET 10 after cross-platform fork validation, exact Unity/.NET vectors, protocol/replay/impairment evidence, a release-equivalent 60-minute 64-client soak, and project-owner license approval. Runtime upgrades continue to require an accepted ADR and exact release evidence before the current runtime support window closes.
 
 ### 6.2 Fantasy foundation and fork policy
 
-The server platform is based on the project-maintained [rayss1/Fantasy fork](https://github.com/rayss1/Fantasy). Its source is embedded at `server/vendor/Fantasy` as an exact, opaque evaluation gitlink; it is not yet a product runtime dependency.
+The server platform is based on the project-maintained [rayss1/Fantasy fork](https://github.com/rayss1/Fantasy). Its source is embedded at `server/vendor/Fantasy` as an exact, opaque gitlink. The tracked `Fantasy-Net` package is a production dependency only of `AiNative.Server.Fantasy` and the Battle Host composition root.
 
 Fantasy provides the initial server infrastructure for:
 
@@ -173,7 +172,7 @@ The fork follows these maintenance rules:
 - Never update the production baseline by floating package version or an unpinned branch.
 - Preserve required copyright and license notices.
 
-The reviewed public baseline is `493d5d4dd1dd009cdfcd2846b88ebab9746d4504`. The [WS-13 recovery](runtime-successor-spike-2026-08-13.md) established the .NET 10 composition, and WS-14 advanced the pin to `b65e6fd60224cf264a3ee62207f0f9041e9f6d92` with cancellation-aware host lifetime and bounded log shutdown. The exact commit passed the [SDK 10.0.202 Windows/Ubuntu graceful-shutdown matrix](https://github.com/rayss1/Fantasy/actions/runs/32248783092), including a real Linux SIGTERM exit within ten seconds. Parent [container run 32278435820](https://github.com/rayss1/ai-native-unity-framework/actions/runs/32278435820) also passed exact-source publish, non-root startup, bounded SIGTERM, and immutable provenance checks. Project-owned readiness/drain, integrated replay/load, observability, and legal evidence remain open, so ADR-0012 must pass before a product project references this source. The repository license is based on the MIT text but adds an entity-specific restriction; legal/license review remains a release gate before commercial distribution, redistribution, or publication of derived packages.
+The reviewed public baseline is `493d5d4dd1dd009cdfcd2846b88ebab9746d4504`. The [WS-13 recovery](runtime-successor-spike-2026-08-13.md) established the .NET 10 composition, and WS-14 advanced the pin to `b65e6fd60224cf264a3ee62207f0f9041e9f6d92` with cancellation-aware host lifetime and bounded log shutdown. WS-16 pins production to `f8bed0d464924f159d46498f1311206ea0694be8`, whose tracked package `2026.1.1003` exposes the cancellation-aware lifecycle, .NET KCP client, and startup-frozen outer MTU. The fork and project Host passed the exact socket, replay/load, image, shutdown, vulnerability, Unity, and 60-minute soak gates recorded by ADR-0012. The repository license is based on the MIT text but adds an entity-specific restriction; the project owner [accepted the current license and project risk](fantasy-license-approval-2026-08-24.md). Any license, ownership, prohibited-entity relationship, distribution-model, or adopted-baseline change reopens review.
 
 See [ADR-0001: Use Fantasy as the server foundation](../ADR/0001-fantasy-server-foundation.md) for the authoritative decision and validation conditions.
 
@@ -207,7 +206,7 @@ The client and server compile the same gameplay source rather than copying or tr
 shared/gameplay/Runtime/**/*.cs
         ├─ Unity asmdef build
         └─ Gameplay.Shared.csproj -> netstandard2.1
-                                      └─ referenced by net8.0/net9.0 server
+                                      └─ referenced by net10.0 server
 ```
 
 The Shared project targets:
@@ -217,7 +216,7 @@ The Shared project targets:
 <LangVersion>9.0</LangVersion>
 ```
 
-Unity 6 supports the .NET Standard 2.1 API profile, while .NET 8 and .NET 9 implement .NET Standard 2.1. A `net8.0` or `net9.0` server assembly must never be passed to Unity as a managed plugin.
+Unity 6 supports the .NET Standard 2.1 API profile, while .NET 10 implements .NET Standard 2.1. A `net10.0` server assembly must never be passed to Unity as a managed plugin.
 
 Shared gameplay may contain:
 
@@ -380,7 +379,7 @@ The following are not baseline commitments:
 - Redis, a message broker, Kubernetes, or Agones without measured need.
 - Unity Gaming Services or another cloud-provider-specific runtime dependency.
 - A2A or a complex Agent orchestration framework without a concrete workflow.
-- .NET 10 for Server Hosts before the proposed successor gate passes.
+- A Server runtime or Fantasy baseline change without a superseding ADR and the full acceptance matrix.
 
 ## 17. Required follow-up ADRs
 
@@ -389,7 +388,7 @@ The following decisions should be captured as individual ADRs before or during t
 1. Repository layout and module dependency policy.
 2. Shared gameplay source compilation through Unity and .NET Standard 2.1.
 3. Fantasy fork ownership, customization boundaries, upstream synchronization, and license release gate. Accepted as [ADR-0001](../ADR/0001-fantasy-server-foundation.md).
-4. Server runtime policy and support-expiry upgrade plan. [ADR-0012](../ADR/0012-server-runtime-successor.md) proposes .NET 10, but remains open pending full Fantasy server-stack evidence.
+4. Server runtime policy and support-expiry upgrade plan. Accepted as [ADR-0012](../ADR/0012-server-runtime-successor.md).
 5. Authoritative 60 Hz simulation, client prediction, reconciliation, and lag compensation.
 6. Fantasy KCP transport and replication validation criteria.
 7. Jolt integration boundary and client prediction strategy.
@@ -413,7 +412,7 @@ The following decisions should be captured as individual ADRs before or during t
 - [Recast Navigation](https://github.com/recastnavigation/recastnavigation)
 - [Project Fantasy fork](https://github.com/rayss1/Fantasy)
 - [Reviewed Fantasy baseline](https://github.com/rayss1/Fantasy/commit/493d5d4dd1dd009cdfcd2846b88ebab9746d4504)
-- [Pinned Fantasy fork commit](https://github.com/rayss1/Fantasy/commit/b65e6fd60224cf264a3ee62207f0f9041e9f6d92)
+- [Pinned Fantasy fork commit](https://github.com/rayss1/Fantasy/commit/f8bed0d464924f159d46498f1311206ea0694be8)
 - [Fantasy license](https://github.com/rayss1/Fantasy/blob/main/LICENSE)
 - [HybridCLR](https://github.com/focus-creative-games/hybridclr)
 - [Apple App Review Guidelines](https://developer.apple.com/app-store/review/guidelines/#software-requirements)
