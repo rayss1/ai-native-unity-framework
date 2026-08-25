@@ -1,0 +1,264 @@
+name: Battle Host release publication
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Semantic version without a leading v, for example 0.1.0
+        required: true
+        type: string
+      qualified_run_id:
+        description: Successful main Battle Host production validation run ID for this exact commit
+        required: true
+        type: string
+      confirmation:
+        description: Enter PUBLISH to authorize the immutable GHCR publication
+        required: true
+        type: string
+
+concurrency:
+  group: battle-host-release-publication
+  cancel-in-progress: false
+
+permissions:
+  actions: read
+  attestations: write
+  contents: read
+  id-token: write
+  packages: write
+
+env:
+  IMAGE_NAME: ghcr.io/rayss1/ai-native-battle-host
+  RELEASE_VERSION: ${{ inputs.version }}
+  QUALIFIED_RUN_ID: ${{ inputs.qualified_run_id }}
+  RELEASE_CONFIRMATION: ${{ inputs.confirmation }}
+
+jobs:
+  publish:
+    name: Publish qualified image
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: battle-host-release
+    steps:
+      - name: Checkout exact main state
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Validate release request
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = 'refs/heads/main'
+          test "$RELEASE_CONFIRMATION" = 'PUBLISH'
+          [[ "$RELEASE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z][0-9A-Za-z.-]*)?$ ]]
+          [[ "$QUALIFIED_RUN_ID" =~ ^[1-9][0-9]*$ ]]
+          git fetch origin main
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git rev-parse origin/main)" = "$GITHUB_SHA"
+          status="$(git submodule status --recursive)"
+          printf '%s\n' "$status"
+          if grep -Eq '^[-+U]' <<<"$status"; then
+            echo "Submodule state does not match the release gitlink." >&2
+            exit 1
+          fi
+
+      - name: Download and verify qualification evidence
+        id: qualification
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          qualification_dir="$GITHUB_WORKSPACE/artifacts/release/qualification"
+          mkdir -p "$qualification_dir/provenance" "$qualification_dir/soak"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$QUALIFIED_RUN_ID" > "$qualification_dir/run.json"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$QUALIFIED_RUN_ID/artifacts" > "$qualification_dir/artifacts.json"
+          gh run download "$QUALIFIED_RUN_ID" \
+            --name runtime-acceptance-provenance \
+            --dir "$qualification_dir/provenance"
+          gh run download "$QUALIFIED_RUN_ID" \
+            --name runtime-acceptance-soak \
+            --dir "$qualification_dir/soak"
+          tools/release/verify-battle-host-qualification.sh \
+            "$GITHUB_WORKSPACE" \
+            "$GITHUB_SHA" \
+            "$qualification_dir/run.json" \
+            "$qualification_dir/artifacts.json" \
+            "$qualification_dir/provenance/provenance.json" \
+            "$qualification_dir/soak/soak-host.json"
+          {
+            echo "sdk_image=$(jq -r '.sdkImage' "$qualification_dir/provenance/provenance.json")"
+            echo "runtime_image=$(jq -r '.runtimeImage' "$qualification_dir/provenance/provenance.json")"
+            echo "fantasy_commit=$(jq -r '.fantasyCommit' "$qualification_dir/provenance/provenance.json")"
+            echo "protocol_identity=$(jq -r '.protocolSha256' "$qualification_dir/provenance/provenance.json")"
+            echo "qualified_run_url=$(jq -r '.html_url' "$qualification_dir/run.json")"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+
+      - name: Log in to GHCR
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Enforce immutable release tags
+        shell: bash
+        run: |
+          set -euo pipefail
+          version_tag="$IMAGE_NAME:v$RELEASE_VERSION"
+          source_tag="$IMAGE_NAME:sha-$GITHUB_SHA"
+          for image_tag in "$version_tag" "$source_tag"; do
+            if docker buildx imagetools inspect "$image_tag" >/dev/null 2>&1; then
+              echo "Refusing to overwrite existing immutable tag: $image_tag" >&2
+              exit 1
+            fi
+          done
+
+      - name: Build and push source-qualified image
+        id: push
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: infrastructure/battle-host/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ env.IMAGE_NAME }}:sha-${{ github.sha }}
+          build-args: |
+            SDK_IMAGE=${{ steps.qualification.outputs.sdk_image }}
+            RUNTIME_IMAGE=${{ steps.qualification.outputs.runtime_image }}
+            SOURCE_COMMIT=${{ github.sha }}
+            FANTASY_COMMIT=${{ steps.qualification.outputs.fantasy_commit }}
+            PROTOCOL_IDENTITY=${{ steps.qualification.outputs.protocol_identity }}
+          labels: |
+            org.opencontainers.image.title=AI-Native Battle Host
+            org.opencontainers.image.description=Fantasy-backed authoritative Battle Host
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ env.RELEASE_VERSION }}
+          provenance: mode=max
+          sbom: true
+
+      - name: Smoke published digest
+        shell: bash
+        run: |
+          set -euo pipefail
+          image="$IMAGE_NAME@${{ steps.push.outputs.digest }}"
+          docker pull --platform linux/amd64 "$image"
+          test "$(docker image inspect "$image" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')" = "$GITHUB_SHA"
+          test "$(docker image inspect "$image" --format '{{index .Config.Labels "org.ainative.fantasy.revision"}}')" = '${{ steps.qualification.outputs.fantasy_commit }}'
+          test "$(docker image inspect "$image" --format '{{index .Config.Labels "org.ainative.protocol.identity"}}')" = '${{ steps.qualification.outputs.protocol_identity }}'
+          container_id="$(docker run --detach \
+            --read-only \
+            --tmpfs /tmp:size=64m,mode=1777 \
+            --cap-drop ALL \
+            --security-opt no-new-privileges \
+            --publish 127.0.0.1:5084:8080 \
+            "$image")"
+          cleanup() { docker rm --force "$container_id" >/dev/null 2>&1 || true; }
+          trap cleanup EXIT
+          deadline=$((SECONDS + 30))
+          until curl --fail --silent http://127.0.0.1:5084/health/ready >/dev/null; do
+            if ! docker inspect --format '{{.State.Running}}' "$container_id" | grep -q true || (( SECONDS >= deadline )); then
+              docker logs "$container_id"
+              exit 1
+            fi
+            sleep 0.25
+          done
+          test "$(docker exec "$container_id" id -u)" != '0'
+          curl --fail --silent http://127.0.0.1:5084/health/live >/dev/null
+          docker stop --signal TERM --timeout 10 "$container_id"
+          test "$(docker inspect --format '{{.State.ExitCode}}' "$container_id")" = '0'
+
+      - name: Generate GitHub artifact attestation
+        id: attest
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-name: ${{ env.IMAGE_NAME }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
+
+      - name: Verify attestation and promote version tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          digest='${{ steps.push.outputs.digest }}'
+          gh attestation verify "oci://$IMAGE_NAME@$digest" --repo "$GITHUB_REPOSITORY"
+          docker buildx imagetools create \
+            --tag "$IMAGE_NAME:v$RELEASE_VERSION" \
+            "$IMAGE_NAME@$digest"
+          resolved_digest="$(docker buildx imagetools inspect "$IMAGE_NAME:v$RELEASE_VERSION" | sed -n 's/^Digest:[[:space:]]*//p' | head -1)"
+          test "$resolved_digest" = "$digest"
+
+      - name: Record immutable release manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          qualification_dir="$GITHUB_WORKSPACE/artifacts/release/qualification"
+          manifest="$GITHUB_WORKSPACE/artifacts/release/battle-host-v$RELEASE_VERSION.json"
+          config_sha="$(sha256sum server/src/Hosts/AiNative.BattleHost/Fantasy.config | cut -d ' ' -f 1)"
+          provenance_sha="$(sha256sum "$qualification_dir/provenance/provenance.json" | cut -d ' ' -f 1)"
+          soak_sha="$(sha256sum "$qualification_dir/soak/soak-host.json" | cut -d ' ' -f 1)"
+          jq -n \
+            --arg version "$RELEASE_VERSION" \
+            --arg image "$IMAGE_NAME@${{ steps.push.outputs.digest }}" \
+            --arg sourceTag "$IMAGE_NAME:sha-$GITHUB_SHA" \
+            --arg versionTag "$IMAGE_NAME:v$RELEASE_VERSION" \
+            --arg sourceCommit "$GITHUB_SHA" \
+            --arg sourceTree "$(git rev-parse 'HEAD^{tree}')" \
+            --arg fantasyCommit '${{ steps.qualification.outputs.fantasy_commit }}' \
+            --arg protocolIdentity '${{ steps.qualification.outputs.protocol_identity }}' \
+            --arg configSha256 "$config_sha" \
+            --arg sdkImage '${{ steps.qualification.outputs.sdk_image }}' \
+            --arg runtimeImage '${{ steps.qualification.outputs.runtime_image }}' \
+            --arg qualifiedRun '${{ steps.qualification.outputs.qualified_run_url }}' \
+            --arg qualificationProvenanceSha256 "$provenance_sha" \
+            --arg qualificationSoakSha256 "$soak_sha" \
+            --arg attestationUrl '${{ steps.attest.outputs.attestation-url }}' \
+            --arg publishedAtUtc "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            '{
+              version: $version,
+              image: $image,
+              tags: [$versionTag, $sourceTag],
+              sourceCommit: $sourceCommit,
+              sourceTree: $sourceTree,
+              fantasyCommit: $fantasyCommit,
+              protocolIdentity: $protocolIdentity,
+              configSha256: $configSha256,
+              sdkImage: $sdkImage,
+              runtimeImage: $runtimeImage,
+              qualifiedRun: $qualifiedRun,
+              qualificationProvenanceSha256: $qualificationProvenanceSha256,
+              qualificationSoakSha256: $qualificationSoakSha256,
+              attestationUrl: $attestationUrl,
+              publishedAtUtc: $publishedAtUtc
+            }' > "$manifest"
+          jq . "$manifest"
+
+      - name: Upload release manifest
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: battle-host-release-v${{ env.RELEASE_VERSION }}
+          path: artifacts/release/battle-host-v${{ env.RELEASE_VERSION }}.json
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Write release summary
+        shell: bash
+        run: |
+          {
+            echo '## Battle Host release published'
+            echo
+            echo "- Version: \`v$RELEASE_VERSION\`"
+            echo "- Image: \`$IMAGE_NAME@${{ steps.push.outputs.digest }}\`"
+            echo "- Source: \`$GITHUB_SHA\`"
+            echo "- Qualification: ${{ steps.qualification.outputs.qualified_run_url }}"
+            echo "- Attestation: ${{ steps.attest.outputs.attestation-url }}"
+          } >> "$GITHUB_STEP_SUMMARY"

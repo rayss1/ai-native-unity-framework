@@ -30,6 +30,13 @@ jobs:
             exit 1
           fi
 
+      - name: Validate release qualification contract
+        shell: bash
+        run: |
+          bash -n tools/release/verify-battle-host-qualification.sh
+          bash -n tools/release/test-battle-host-qualification.sh
+          tools/release/test-battle-host-qualification.sh
+
       - name: Install .NET 10 SDK
         uses: actions/setup-dotnet@v4
         with:

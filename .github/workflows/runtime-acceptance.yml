@@ -537,7 +537,7 @@ jobs:
           if-no-files-found: error
 
       - name: Run qualified 60-minute release-equivalent 64-bot soak
-        if: github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'qualified-soak')
+        if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'qualified-soak')
         shell: bash
         run: |
           set -euo pipefail
@@ -593,7 +593,7 @@ jobs:
           test "$(jq -r '.sourceCommit' "$report")" = "$SOURCE_COMMIT"
 
       - name: Upload qualified-duration soak evidence
-        if: github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'qualified-soak')
+        if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'qualified-soak')
         uses: actions/upload-artifact@v4
         with:
           name: runtime-acceptance-soak

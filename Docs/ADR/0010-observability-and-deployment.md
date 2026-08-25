@@ -16,6 +16,8 @@ Runtime modules emit stable semantic events/measurements through a diagnostics a
 
 Docker and Docker Compose are the first deployment baseline. Build/test/deploy scripts remain runnable locally and avoid cloud-specific contracts. Kubernetes, Agones, Redis, and brokers require measured operational need and separate decisions.
 
+Battle Host publication is a separate manual operation after an exact successful `main` production-validation run. It publishes an immutable Linux x64 digest with source/Fantasy/protocol/configuration/base-image identities, an SBOM, build provenance, and a verifiable artifact attestation. Version and source tags are immutable aliases; deployment and rollback select digests, never `latest`.
+
 Health is split into liveness, readiness, and dependency/room-drain state. Graceful shutdown stops admission, drains or transfers supported sessions, flushes only within a bounded deadline, and then terminates. Deployments retain a last-known-good immutable image and compatible configuration.
 
 ## Consequences
@@ -28,3 +30,4 @@ Evidence is portable and backends remain replaceable. Cardinality, privacy, buff
 - Load tests verify label cardinality, sampling, trace volume, dashboard queries, alert signals, drain behavior, and immutable image/config provenance.
 - Backend migration duplicates export through adapters for a bounded comparison period without changing instrumentation contracts.
 - Rollback selects the previous image/config/exporter. Runtime correctness must not depend on telemetry availability.
+- The [Battle Host release procedure](../Architecture/battle-host-release.md) verifies the qualified run before publication, promotes the version tag only after digest-level smoke/attestation checks, and retains a machine-readable release manifest.
