@@ -12,4 +12,6 @@ AINATIVE_FANTASY_CONFIG='/absolute/path/Fantasy.config' \
 docker compose -f infrastructure/battle-host/compose.yaml up -d
 ```
 
-The production validation workflow builds and probes this Dockerfile but does not push an image. Publishing and promotion remain explicit release operations.
+The production validation workflow builds and probes this Dockerfile but does not push an image. The manual `Battle Host release publication` workflow accepts only the current `main` commit and an exact successful production-validation run. It publishes an immutable GHCR digest with SBOM/provenance and a GitHub artifact attestation, then promotes a new `v<semantic-version>` tag without ever updating `latest`.
+
+See [Battle Host Release Procedure](../../Docs/Architecture/battle-host-release.md) for qualification, publication, verification, deployment, and rollback instructions. Registry publication is explicit and does not deploy the image.
