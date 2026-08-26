@@ -1,17 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ $# -ne 4 ]]; then
-  echo "Usage: $0 <host.json> <load.json> <wire.json> <output.json>" >&2
+if [[ $# -ne 5 ]]; then
+  echo "Usage: $0 <host.json> <load.json> <wire.json> <replay.json> <output.json>" >&2
   exit 2
 fi
 
 host_json="$1"
 load_json="$2"
 wire_json="$3"
-output_json="$4"
+replay_json="$4"
+output_json="$5"
 
-for input_file in "$host_json" "$load_json" "$wire_json"; do
+for input_file in "$host_json" "$load_json" "$wire_json" "$replay_json"; do
   if [[ ! -s "$input_file" ]]; then
     echo "Required multi-room capacity input is missing or empty: $input_file" >&2
     exit 2
@@ -87,6 +88,17 @@ jq -e '
   and .gatesPassed == true
 ' "$wire_json" >/dev/null
 
+jq -e '
+  .FormatVersion == 2
+  and .RoomCount == 2
+  and .BotsPerRoom == 64
+  and .BotCount == 64
+  and .FinalTick > 0
+  and .InputCount > 0
+  and (.StateHashHex | test("^[0-9a-f]{16}$"))
+  and (.ConfigurationIdentity | test("^[0-9a-f]{64}$"))
+' "$replay_json" >/dev/null
+
 source_commit="$(jq -r '.sourceCommit' "$host_json")"
 fantasy_commit="$(jq -r '.fantasyCommit' "$host_json")"
 protocol_identity="$(jq -r '.protocolIdentity' "$host_json")"
@@ -100,13 +112,25 @@ jq -e --arg source "$source_commit" --arg fantasy "$fantasy_commit" --arg protoc
   and .fantasyCommit == $fantasy
   and .protocolIdentity == $protocol
 ' "$wire_json" >/dev/null
+jq -e --arg source "$source_commit" --arg fantasy "$fantasy_commit" --arg protocol "$protocol_identity" '
+  .SourceCommit == $source
+  and .FantasyCommit == $fantasy
+  and .ProtocolIdentity == $protocol
+' "$replay_json" >/dev/null
+jq -e --slurpfile host "$host_json" --slurpfile load "$load_json" '
+  .FinalTick == $host[0].finalTick
+  and .StateHashHex == $host[0].finalStateHash
+  and .InputCount >= $load[0].inputFrames
+  and (.InputCount - $load[0].inputFrames) <= ($load[0].botCount * 60)
+' "$replay_json" >/dev/null
 
 output_directory="$(dirname "$output_json")"
 mkdir -p "$output_directory"
 jq -n \
   --slurpfile host "$host_json" \
   --slurpfile load "$load_json" \
-  --slurpfile wire "$wire_json" '
+  --slurpfile wire "$wire_json" \
+  --slurpfile replay "$replay_json" '
   {
     evidenceClass: "multi-room-capacity-candidate",
     sourceCommit: $host[0].sourceCommit,
@@ -150,6 +174,15 @@ jq -n \
       upstreamP95Kbps: $wire[0].upstreamP95Kbps,
       datagramPayloadP95Bytes: $wire[0].datagramPayloadP95Bytes,
       maxDatagramPayloadBytes: $wire[0].maxDatagramPayloadBytes
+    },
+    replay: {
+      formatVersion: $replay[0].FormatVersion,
+      roomCount: $replay[0].RoomCount,
+      botsPerRoom: $replay[0].BotsPerRoom,
+      inputCount: $replay[0].InputCount,
+      finalTick: $replay[0].FinalTick,
+      stateHash: $replay[0].StateHashHex,
+      configurationIdentity: $replay[0].ConfigurationIdentity
     },
     gates: {
       headroomPercent: 20,

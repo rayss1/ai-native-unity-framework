@@ -470,10 +470,11 @@ jobs:
 
           start_multi_room_host() {
             report_name="$1"
-            active_container="$(docker run --detach \
+            replay_name="${2:-}"
+            docker_args=(docker run --detach \
               --read-only \
               --memory 512m \
-              --tmpfs /tmp:size=64m,mode=1777 \
+              --tmpfs '/tmp:size=64m,mode=1777' \
               --volume "$evidence_dir:/evidence" \
               --cap-drop ALL \
               --security-opt no-new-privileges \
@@ -487,8 +488,12 @@ jobs:
               --env AINATIVE_SERVICE_INSTANCE_ID=two-room-capacity \
               --env "AINATIVE_SOURCE_COMMIT=$SOURCE_COMMIT" \
               --env "AINATIVE_FANTASY_COMMIT=$fantasy_commit" \
-              --env "AINATIVE_PROTOCOL_IDENTITY=$protocol_identity" \
-              ainative/battle-host:production-validation)"
+              --env "AINATIVE_PROTOCOL_IDENTITY=$protocol_identity")
+            if test -n "$replay_name"; then
+              docker_args+=(--env "AINATIVE_REPLAY_CAPTURE_PATH=/evidence/$replay_name")
+            fi
+            docker_args+=(ainative/battle-host:production-validation)
+            active_container="$("${docker_args[@]}")"
             deadline=$((SECONDS + 30))
             until test "$(curl --fail --silent http://127.0.0.1:5085/health/ready | jq -r '.roomCount')" = '2'; do
               if ! docker inspect --format '{{.State.Running}}' "$active_container" | grep -q true || (( SECONDS >= deadline )); then
@@ -499,7 +504,7 @@ jobs:
             done
           }
 
-          start_multi_room_host multi-room-capacity-host.json
+          start_multi_room_host multi-room-capacity-host.json multi-room-capacity.anrp
           capacity_status="$(curl --silent --max-time 420 \
             --output "$evidence_dir/multi-room-capacity-load.json" \
             --write-out '%{http_code}' \
@@ -513,6 +518,26 @@ jobs:
           docker stop --signal TERM --timeout 30 "$active_container"
           test "$(docker inspect --format '{{.State.ExitCode}}' "$active_container")" = '0'
           docker logs "$active_container" > "$evidence_dir/multi-room-capacity-host.log" 2>&1
+          dotnet "$GITHUB_WORKSPACE/artifacts/battle-host/AiNative.BattleHost.dll" \
+            --verify-replay "$evidence_dir/multi-room-capacity.anrp" \
+            > "$evidence_dir/multi-room-capacity-replay.json"
+          jq . "$evidence_dir/multi-room-capacity-replay.json"
+          jq -e --slurpfile host "$evidence_dir/multi-room-capacity-host.json" \
+            --slurpfile load "$evidence_dir/multi-room-capacity-load.json" \
+            --arg source "$SOURCE_COMMIT" \
+            --arg fantasy "$fantasy_commit" \
+            --arg protocol "$protocol_identity" '
+            .FormatVersion == 2
+            and .RoomCount == 2
+            and .BotsPerRoom == 64
+            and .SourceCommit == $source
+            and .FantasyCommit == $fantasy
+            and .ProtocolIdentity == $protocol
+            and .FinalTick == $host[0].finalTick
+            and .StateHashHex == $host[0].finalStateHash
+            and .InputCount >= $load[0].inputFrames
+            and (.InputCount - $load[0].inputFrames) <= ($load[0].botCount * 60)
+          ' "$evidence_dir/multi-room-capacity-replay.json" >/dev/null
           docker rm "$active_container" >/dev/null
           active_container=''
 
@@ -577,6 +602,7 @@ jobs:
             "$evidence_dir/multi-room-capacity-host.json" \
             "$evidence_dir/multi-room-capacity-load.json" \
             "$evidence_dir/multi-room-wire.json" \
+            "$evidence_dir/multi-room-capacity-replay.json" \
             "$evidence_dir/multi-room-capacity.json"
           jq . "$evidence_dir/multi-room-capacity.json"
 
@@ -587,6 +613,7 @@ jobs:
           name: runtime-multi-room-capacity
           path: |
             artifacts/runtime-acceptance/multi-room-*.json
+            artifacts/runtime-acceptance/multi-room-*.anrp
             artifacts/runtime-acceptance/multi-room-*.log
             artifacts/runtime-acceptance/multi-room-*.txt
             artifacts/runtime-acceptance/multi-room-*.pcap
