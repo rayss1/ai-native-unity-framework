@@ -79,7 +79,7 @@ The correction numbers are tuning gates, not truth about game feel. If represent
 
 The telemetry gate uses two sequential 64-Bot profiles of the same release-equivalent image and runner: exporter disabled, then an unavailable OTLP endpoint. Both profiles record process working set/peak, CPU time, managed heap, committed GC memory, thread-pool count, runtime, OS, processor count, and immutable source identities. Passing this comparison establishes only the one-room baseline; it does not authorize additional rooms per process. See [telemetry and one-room capacity validation](telemetry-capacity-validation.md).
 
-The [multi-room capacity validation](multi-room-capacity-validation.md) evaluates a two-room/128-client candidate without changing the one-room production default. It applies the required 20% headroom to Tick, Gameplay, CPU, memory, per-client bandwidth, and typical datagram budgets and requires exact source identities. A passing candidate or PR run is not production authorization; exact-`main` evidence and the environment Canary remain separate gates.
+The [multi-room capacity validation](multi-room-capacity-validation.md) evaluates a two-room/128-client candidate without changing the one-room production default. It applies the required 20% headroom to Tick, Gameplay, CPU, memory, per-client bandwidth, and typical datagram budgets and requires exact source identities. Exact-`main` run `32946412201` passed those measurement gates on the recorded runner. Production authorization remains separate and still requires the room-aware replay decision plus a named environment canary and rollback target.
 
 ## Decision use
 

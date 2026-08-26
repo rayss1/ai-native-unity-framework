@@ -1,6 +1,6 @@
 # Battle Host Multi-Room Capacity Validation
 
-Status: Automated two-room candidate contract implemented; exact-`main` evidence pending
+Status: Exact-`main` two-room capacity evidence qualified; production rollout remains gated
 Last updated: 2026-08-26
 
 This validation is the measured gate for considering more than one 64-participant room in a Battle Host process. It does not change the production default, publish an image, or authorize a deployment.
@@ -38,8 +38,18 @@ The candidate must preserve at least 20% headroom in every directly affected har
 
 Gameplay steady-state allocation remains exactly zero, the absolute datagram maximum remains 1,200 bytes, all 128 clients must connect, and per-client input/batch rates must remain 60/30 Hz within the existing tolerance. `tools/release/verify-multi-room-capacity.sh` produces `multi-room-capacity.json` only when every identity and gate passes. CI retains the summary, raw Host/load reports, logs, netem configuration, PCAP, and wire report in `runtime-multi-room-capacity`.
 
+## Exact-main evidence
+
+[Battle Host production validation run 32946412201](https://github.com/rayss1/ai-native-unity-framework/actions/runs/32946412201) completed successfully on 2026-08-26 for exact source `1bfc4f09b6176c9a2b0d8cf04122dc9514134512`, Fantasy `f8bed0d464924f159d46498f1311206ea0694be8`, and protocol SHA-256 `726a80d6a762913b87fe840f0be9086224598bcaadb0e4a7d4e3e44856c0b92c`. The release-equivalent container used .NET `10.0.4`, four reported processors, a 512 MiB limit, and Linux `6.17.0.1022`.
+
+After 10 seconds of warm-up, the 300-second capacity window retained 18,011 Tick samples for two isolated 64-Bot rooms and all 128 Fantasy KCP connections. Tick P99/P99.9 were `1.2314/5.9158 ms`, no Tick exceeded `16.67 ms`, Gameplay P99 was `0.0017 ms`, and Gameplay steady-state allocation was zero. Average process CPU was `5.9990%`; peak working set was `169,668,608` bytes (`42.14%` of the `402,653,184` GC-reported available-memory baseline). The load held `60.0000 Hz` measured input and `30.0000 Hz` two-frame batches per client.
+
+The independent 60-second Regional capture retained all 128 clients under `50 +/- 10 ms` one-way netem delay, 1% loss, 0.5% duplication, and 1% reordering. Per-client downstream/upstream P95 were `178.384/43.544 kbit/s`; datagram payload P95 was `859` bytes and the absolute maximum was `944` bytes. The retained PCAP SHA-256 is `55a5461d9073a20fed9736bb721097f813957136c9fdef82b381a7697c6cf9c0`.
+
+The repository-owned verifier independently reproduced the retained `multi-room-capacity.json` byte-for-byte in normalized JSON form, the raw PCAP matched its recorded hash, and Host/load logs contained no failure, fatal, exception, forced-stop, or error records. The same exact-main workflow also completed its existing one-room 60-minute soak; that soak is continuity evidence for the accepted production default, not a multi-room soak claim.
+
 ## Interpretation and next gate
 
-A passing PR run proves the contract and candidate implementation, not the final measurement. The two-room density can be proposed for production only after an exact-`main` run retains the same complete artifact and its measured report is reviewed. A red gate keeps the production default at one room and requires profiling, reduced density, or an adapter/scheduler change; it does not weaken the budget.
+The exact-`main` result closes the two-room process-capacity measurement gate on the recorded runner. A future red gate keeps the production default at one room and requires profiling, reduced density, or an adapter/scheduler change; it does not weaken the budget.
 
-Even a passing exact-`main` result does not determine production cost or authorize rollout. The environment Canary still needs a named host, candidate and fallback digests/configurations, an SLO window, traffic/admission procedure, and operator authority to drain or switch the environment.
+This result does not determine production cost or authorize rollout. Production remains one room per process. A multi-room rollout still requires a room-aware replay decision or format, a named target host, qualified candidate and fallback digests/configurations, an SLO window, traffic/admission procedure, and operator authority to drain or switch the environment.
