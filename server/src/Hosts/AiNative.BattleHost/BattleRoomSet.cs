@@ -26,13 +26,6 @@ internal sealed record BattleHostCapacitySettings(int RoomCount)
                 "Multi-room execution is evaluation-only until its capacity evidence is accepted.");
         }
 
-        if (roomCount > 1 &&
-            !string.IsNullOrWhiteSpace(configuration["AINATIVE_REPLAY_CAPTURE_PATH"]))
-        {
-            throw new InvalidOperationException(
-                "The version 1 replay format is single-room; multi-room evaluation cannot enable replay capture.");
-        }
-
         return new BattleHostCapacitySettings(roomCount);
     }
 }
@@ -97,16 +90,24 @@ internal sealed class BattleRoomSet
     }
 
     public ulong ComputeCombinedStateHash()
+        => ComputeCombinedStateHash(_rooms);
+
+    internal static ulong ComputeCombinedStateHash(IReadOnlyList<SyntheticRoom> rooms)
     {
-        if (_rooms.Length == 1)
+        ArgumentOutOfRangeException.ThrowIfLessThan(rooms.Count, 1);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(
+            rooms.Count,
+            BattleHostCapacitySettings.MaximumEvaluationRooms);
+
+        if (rooms.Count == 1)
         {
-            return _rooms[0].ComputeStateHash();
+            return rooms[0].ComputeStateHash();
         }
 
         Span<byte> canonical = stackalloc byte[4 + (BattleHostCapacitySettings.MaximumEvaluationRooms * 8)];
-        BinaryPrimitives.WriteUInt32LittleEndian(canonical, checked((uint)_rooms.Length));
+        BinaryPrimitives.WriteUInt32LittleEndian(canonical, checked((uint)rooms.Count));
         int offset = 4;
-        foreach (SyntheticRoom room in _rooms)
+        foreach (SyntheticRoom room in rooms)
         {
             BinaryPrimitives.WriteUInt64LittleEndian(canonical[offset..], room.ComputeStateHash());
             offset += 8;

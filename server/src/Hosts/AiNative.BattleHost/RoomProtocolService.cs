@@ -206,7 +206,7 @@ internal sealed class RoomProtocolService(
         }
 
         session.LastInputSequence = command.Sequence;
-        replayCapture.TryRecordInput(roomTick, session.EntityIndex, frame);
+        replayCapture.TryRecordInput(session.RoomIndex, roomTick, session.EntityIndex, frame);
         rooms[session.RoomIndex].ApplyInput(
             session.EntityIndex,
             command.MoveXMilli,
@@ -238,7 +238,7 @@ internal sealed class RoomProtocolService(
             previousSequence = command.Sequence;
         }
 
-        replayCapture.TryRecordInput(roomTick, session.EntityIndex, frame);
+        replayCapture.TryRecordInput(session.RoomIndex, roomTick, session.EntityIndex, frame);
         foreach (InputCommand command in batch.Commands)
         {
             rooms[session.RoomIndex].ApplyInput(

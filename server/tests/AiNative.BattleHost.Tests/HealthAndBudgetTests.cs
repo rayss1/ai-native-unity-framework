@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Net;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using AiNative.BattleHost;
 using AiNative.Gameplay;
@@ -137,13 +138,14 @@ public sealed class HealthAndBudgetTests
     }
 
     [Test]
-    public void MultiRoomCapacityIsExplicitlyEvaluationOnlyAndReplaySafe()
+    public void MultiRoomCapacityIsExplicitlyEvaluationOnlyAndAcceptsRoomAwareReplay()
     {
         IConfiguration accepted = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["AINATIVE_ENABLE_EVALUATION_ENDPOINTS"] = "true",
                 ["AINATIVE_EVALUATION_ROOM_COUNT"] = "2",
+                ["AINATIVE_REPLAY_CAPTURE_PATH"] = "multi-room.anrp",
             })
             .Build();
         BattleHostCapacitySettings settings = BattleHostCapacitySettings.Create(accepted);
@@ -158,12 +160,6 @@ public sealed class HealthAndBudgetTests
             {
                 ["AINATIVE_ENABLE_EVALUATION_ENDPOINTS"] = "true",
                 ["AINATIVE_EVALUATION_ROOM_COUNT"] = "3",
-            },
-            new Dictionary<string, string?>
-            {
-                ["AINATIVE_ENABLE_EVALUATION_ENDPOINTS"] = "true",
-                ["AINATIVE_EVALUATION_ROOM_COUNT"] = "2",
-                ["AINATIVE_REPLAY_CAPTURE_PATH"] = "multi-room.anrp",
             },
         })
         {
@@ -407,7 +403,8 @@ public sealed class HealthAndBudgetTests
                 })
                 .Build();
             using BattleMetrics metrics = new();
-            await using BattleReplayCapture capture = new(configuration, metrics);
+            BattleHostCapacitySettings capacitySettings = new(1);
+            await using BattleReplayCapture capture = new(configuration, capacitySettings, metrics);
             SyntheticRoom recorded = new(64);
             Pcg32Random random = new(seed: 0xC0FFEEUL, sequence: 0x51UL);
             byte[] frame = new byte[RealtimeProtocolCodec.MaxDatagramBytes];
@@ -431,6 +428,7 @@ public sealed class HealthAndBudgetTests
                     out int writtenBytes), Is.True);
                 Assert.That(channel.Id, Is.EqualTo(2));
                 Assert.That(capture.TryRecordInput(
+                    0,
                     checked((ulong)tick),
                     entityIndex,
                     frame.AsSpan(0, writtenBytes)), Is.True);
@@ -463,6 +461,7 @@ public sealed class HealthAndBudgetTests
                 out int batchBytes), Is.True);
             Assert.That(batchChannel.Id, Is.EqualTo(2));
             Assert.That(capture.TryRecordInput(
+                0,
                 checked((ulong)ticks),
                 batchedEntityIndex,
                 frame.AsSpan(0, batchBytes)), Is.True);
@@ -477,6 +476,9 @@ public sealed class HealthAndBudgetTests
             await capture.CompleteAsync(ticks, recorded.ComputeStateHash());
             ReplayVerificationResult verified = BattleReplayVerifier.Verify(path);
 
+            Assert.That(verified.FormatVersion, Is.EqualTo(2));
+            Assert.That(verified.RoomCount, Is.EqualTo(1));
+            Assert.That(verified.BotsPerRoom, Is.EqualTo(64));
             Assert.That(verified.SourceCommit, Is.EqualTo("test-source"));
             Assert.That(verified.FantasyCommit, Is.EqualTo("test-fantasy"));
             Assert.That(verified.ProtocolIdentity, Is.EqualTo("test-protocol"));
@@ -484,6 +486,208 @@ public sealed class HealthAndBudgetTests
             Assert.That(verified.InputCount, Is.EqualTo(ticks + batch.Commands.Count));
             Assert.That(verified.FinalTick, Is.EqualTo((ulong)ticks));
             Assert.That(verified.StateHash, Is.EqualTo(recorded.ComputeStateHash()));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Test]
+    public async Task RoomAwareReplayCapturesTwoIndependentRoomsAndCombinedHash()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), $"ainative-multi-room-replay-{Guid.NewGuid():N}");
+        string path = Path.Combine(directory, "multi-room.anrp");
+        Directory.CreateDirectory(directory);
+
+        try
+        {
+            IConfiguration configuration = new ConfigurationBuilder()
+                .AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["AINATIVE_REPLAY_CAPTURE_PATH"] = path,
+                    ["AINATIVE_REPLAY_CAPTURE_CAPACITY"] = "4096",
+                    ["AINATIVE_SOURCE_COMMIT"] = "test-source",
+                    ["AINATIVE_FANTASY_COMMIT"] = "test-fantasy",
+                    ["AINATIVE_PROTOCOL_IDENTITY"] = "test-protocol",
+                    ["AINATIVE_CONFIGURATION_IDENTITY"] = "test-config",
+                })
+                .Build();
+            BattleHostCapacitySettings capacitySettings = new(2);
+            BattleRoomSet recorded = new(capacitySettings);
+            using BattleMetrics metrics = new();
+            await using BattleReplayCapture capture = new(configuration, capacitySettings, metrics);
+            byte[] frame = new byte[RealtimeProtocolCodec.MaxDatagramBytes];
+            const int ticks = 600;
+
+            for (int tick = 0; tick < ticks; tick++)
+            {
+                for (int roomIndex = 0; roomIndex < capacitySettings.RoomCount; roomIndex++)
+                {
+                    int entityIndex = tick % BattleHostCapacitySettings.BotsPerRoom;
+                    InputCommand command = new()
+                    {
+                        RoomTick = checked((ulong)tick),
+                        Sequence = checked((uint)tick + 1),
+                        MoveXMilli = roomIndex == 0 ? 1000 : -500,
+                        MoveYMilli = roomIndex == 0 ? -250 : 750,
+                    };
+                    Assert.That(RealtimeProtocolCodec.TryEncode(
+                        MessageId.InputCommand,
+                        command,
+                        frame,
+                        out _,
+                        out int writtenBytes), Is.True);
+                    Assert.That(capture.TryRecordInput(
+                        roomIndex,
+                        checked((ulong)tick),
+                        entityIndex,
+                        frame.AsSpan(0, writtenBytes)), Is.True);
+                    recorded[roomIndex].ApplyInput(
+                        entityIndex,
+                        command.MoveXMilli,
+                        command.MoveYMilli);
+                }
+
+                recorded.TickAll();
+            }
+
+            ulong expectedHash = recorded.ComputeCombinedStateHash();
+            await capture.CompleteAsync(ticks, expectedHash);
+            ReplayVerificationResult verified = BattleReplayVerifier.Verify(path);
+
+            Assert.That(verified.FormatVersion, Is.EqualTo(2));
+            Assert.That(verified.RoomCount, Is.EqualTo(2));
+            Assert.That(verified.BotsPerRoom, Is.EqualTo(64));
+            Assert.That(verified.InputCount, Is.EqualTo(ticks * 2));
+            Assert.That(verified.FinalTick, Is.EqualTo((ulong)ticks));
+            Assert.That(verified.StateHash, Is.EqualTo(expectedHash));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Test]
+    public void ReplayVerifierRetainsVersionOneReadCompatibility()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), $"ainative-v1-replay-{Guid.NewGuid():N}");
+        string path = Path.Combine(directory, "legacy.anrp");
+        Directory.CreateDirectory(directory);
+
+        try
+        {
+            SyntheticRoom room = new(BattleHostCapacitySettings.BotsPerRoom);
+            using (FileStream stream = File.Create(path))
+            using (BinaryWriter writer = new(stream, Encoding.UTF8, leaveOpen: false))
+            {
+                WriteReplayHeader(writer, version: 1, roomCount: 1);
+                writer.Write((byte)255);
+                writer.Write(0UL);
+                writer.Write(room.ComputeStateHash());
+                writer.Write(0L);
+            }
+
+            ReplayVerificationResult verified = BattleReplayVerifier.Verify(path);
+
+            Assert.That(verified.FormatVersion, Is.EqualTo(1));
+            Assert.That(verified.RoomCount, Is.EqualTo(1));
+            Assert.That(verified.BotsPerRoom, Is.EqualTo(64));
+            Assert.That(verified.InputCount, Is.Zero);
+            Assert.That(verified.StateHash, Is.EqualTo(room.ComputeStateHash()));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Test]
+    public void RoomAwareReplayFailsClosedForInvalidTopologyRoomOrderDropAndHash()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), $"ainative-invalid-replay-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        SyntheticRoom[] initialRooms =
+        {
+            new(BattleHostCapacitySettings.BotsPerRoom),
+            new(BattleHostCapacitySettings.BotsPerRoom),
+        };
+        ulong initialHash = BattleRoomSet.ComputeCombinedStateHash(initialRooms);
+
+        try
+        {
+            string topologyPath = Path.Combine(directory, "topology.anrp");
+            using (FileStream stream = File.Create(topologyPath))
+            using (BinaryWriter writer = new(stream, Encoding.UTF8, leaveOpen: false))
+            {
+                writer.Write(0x50524E41U);
+                writer.Write((ushort)2);
+                writer.Write(3);
+                writer.Write(BattleHostCapacitySettings.BotsPerRoom);
+            }
+
+            Assert.That(
+                () => BattleReplayVerifier.Verify(topologyPath),
+                Throws.TypeOf<InvalidDataException>());
+
+            string roomPath = Path.Combine(directory, "room.anrp");
+            using (FileStream stream = File.Create(roomPath))
+            using (BinaryWriter writer = new(stream, Encoding.UTF8, leaveOpen: false))
+            {
+                WriteReplayHeader(writer, version: 2, roomCount: 2);
+                writer.Write((byte)1);
+                writer.Write(2);
+                writer.Write(0UL);
+            }
+
+            Assert.That(
+                () => BattleReplayVerifier.Verify(roomPath),
+                Throws.TypeOf<InvalidDataException>());
+
+            string orderPath = Path.Combine(directory, "order.anrp");
+            byte[] frame = new byte[RealtimeProtocolCodec.MaxDatagramBytes];
+            Assert.That(RealtimeProtocolCodec.TryEncode(
+                MessageId.InputCommand,
+                new InputCommand { RoomTick = 1, Sequence = 1 },
+                frame,
+                out _,
+                out int writtenBytes), Is.True);
+            using (FileStream stream = File.Create(orderPath))
+            using (BinaryWriter writer = new(stream, Encoding.UTF8, leaveOpen: false))
+            {
+                WriteReplayHeader(writer, version: 2, roomCount: 2);
+                WriteRoomAwareInput(writer, roomIndex: 0, roomTick: 1, entityIndex: 0, frame, writtenBytes);
+                writer.Write((byte)1);
+                writer.Write(0);
+                writer.Write(0UL);
+            }
+
+            Assert.That(
+                () => BattleReplayVerifier.Verify(orderPath),
+                Throws.TypeOf<InvalidDataException>());
+
+            foreach ((string name, ulong hash, long dropped) in new[]
+            {
+                ("dropped", initialHash, 1L),
+                ("hash", initialHash ^ 1UL, 0L),
+            })
+            {
+                string footerPath = Path.Combine(directory, $"{name}.anrp");
+                using (FileStream stream = File.Create(footerPath))
+                using (BinaryWriter writer = new(stream, Encoding.UTF8, leaveOpen: false))
+                {
+                    WriteReplayHeader(writer, version: 2, roomCount: 2);
+                    writer.Write((byte)255);
+                    writer.Write(0UL);
+                    writer.Write(hash);
+                    writer.Write(dropped);
+                }
+
+                Assert.That(
+                    () => BattleReplayVerifier.Verify(footerPath),
+                    Throws.TypeOf<InvalidDataException>());
+            }
         }
         finally
         {
@@ -557,6 +761,45 @@ public sealed class HealthAndBudgetTests
 
     private static double ToMilliseconds(long timestampDelta) =>
         timestampDelta * 1000d / Stopwatch.Frequency;
+
+    private static void WriteReplayHeader(BinaryWriter writer, ushort version, int roomCount)
+    {
+        writer.Write(0x50524E41U);
+        writer.Write(version);
+        if (version == 1)
+        {
+            writer.Write(BattleHostCapacitySettings.BotsPerRoom);
+        }
+        else
+        {
+            writer.Write(roomCount);
+            writer.Write(BattleHostCapacitySettings.BotsPerRoom);
+        }
+
+        writer.Write(SyntheticRoom.InitialRandomState);
+        foreach (string identity in new[] { "test-source", "test-fantasy", "test-protocol", "test-config" })
+        {
+            byte[] bytes = Encoding.UTF8.GetBytes(identity);
+            writer.Write(checked((ushort)bytes.Length));
+            writer.Write(bytes);
+        }
+    }
+
+    private static void WriteRoomAwareInput(
+        BinaryWriter writer,
+        int roomIndex,
+        ulong roomTick,
+        int entityIndex,
+        byte[] frame,
+        int frameLength)
+    {
+        writer.Write((byte)1);
+        writer.Write(roomIndex);
+        writer.Write(roomTick);
+        writer.Write(entityIndex);
+        writer.Write(checked((ushort)frameLength));
+        writer.Write(frame, 0, frameLength);
+    }
 
     private readonly record struct RecordedInput(int EntityIndex, int MoveXMilli, int MoveYMilli);
 
