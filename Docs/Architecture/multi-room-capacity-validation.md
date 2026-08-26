@@ -1,6 +1,6 @@
 # Battle Host Multi-Room Capacity Validation
 
-Status: Exact-`main` capacity qualified without replay; replay-enabled rerun pending
+Status: Exact-`main` replay-enabled capacity qualified; environment rollout remains gated
 Last updated: 2026-08-26
 
 This validation is the measured gate for considering more than one 64-participant room in a Battle Host process. It does not change the production default, publish an image, or authorize a deployment.
@@ -40,6 +40,18 @@ Gameplay steady-state allocation remains exactly zero, the absolute datagram max
 
 ## Exact-main evidence
 
+[Battle Host production validation run 32976156874](https://github.com/rayss1/ai-native-unity-framework/actions/runs/32976156874) completed successfully on 2026-08-26 for exact source `ee080b4a2f1af218d909e733b6cc5f3c5e274167`, Fantasy `f8bed0d464924f159d46498f1311206ea0694be8`, protocol SHA-256 `726a80d6a762913b87fe840f0be9086224598bcaadb0e4a7d4e3e44856c0b92c`, and Fantasy configuration SHA-256 `fc0714bcbe7c8c673cf638506a45f3a4440585f4024ff78048434346ab8a66e4`. The release-equivalent container used .NET `10.0.4`, four reported processors, a 512 MiB limit, and Linux `6.17.0.1022`.
+
+After 10 seconds of warm-up, the 300-second replay-enabled capacity window retained 18,011 Tick samples for two isolated 64-Bot rooms and all 128 Fantasy KCP connections. Tick P99/P99.9 were `1.3684/5.9453 ms`, no Tick exceeded `16.67 ms`, Gameplay P99 was `0.0021 ms`, and Gameplay steady-state allocation was zero. Average process CPU was `7.0073%`; peak working set was `162,795,520` bytes (`40.43%` of the `402,653,184` GC-reported available-memory baseline). The load held `60.0001 Hz` measured input and `30.0001 Hz` two-frame batches per client.
+
+The retained format version 2 replay records two rooms with 64 Bots per room. It verified final Tick `21,212`, combined state hash `3683eb7143bc7f01`, and `2,381,794` Inputs. That covers all `2,380,800` load-reported Inputs with 994 setup/tail Inputs, below the one-second allowance of 7,680. The repository-built verifier reproduced the retained verification JSON exactly; the capture contained no dropped records and the final Tick/hash matched the Host report.
+
+The independent 60-second Regional capture retained all 128 clients under `50 +/- 10 ms` one-way netem delay, 1% loss, 0.5% duplication, and 1% reordering. Per-client downstream/upstream P95 were `178.888/43.816 kbit/s`; datagram payload P95 was `860` bytes and the absolute maximum was `923` bytes. The retained PCAP SHA-256 is `640c473ae680a5d32a8317096bc79b295039241fb1740e7c841ba5de2e0787dc`; independent hashing matched it and tcpdump reported zero kernel drops.
+
+`tools/release/verify-multi-room-capacity.sh` independently reproduced the retained summary in normalized JSON form. Host/load logs ended in graceful room and Fantasy gateway drain and contained no failure, fatal, exception, forced-stop, or error records. The same exact-main workflow completed the existing one-room 60-minute soak; that soak remains continuity evidence for the accepted production default rather than a multi-room soak claim.
+
+The earlier no-capture baseline is retained for comparison:
+
 [Battle Host production validation run 32946412201](https://github.com/rayss1/ai-native-unity-framework/actions/runs/32946412201) completed successfully on 2026-08-26 for exact source `1bfc4f09b6176c9a2b0d8cf04122dc9514134512`, Fantasy `f8bed0d464924f159d46498f1311206ea0694be8`, and protocol SHA-256 `726a80d6a762913b87fe840f0be9086224598bcaadb0e4a7d4e3e44856c0b92c`. The release-equivalent container used .NET `10.0.4`, four reported processors, a 512 MiB limit, and Linux `6.17.0.1022`.
 
 After 10 seconds of warm-up, the 300-second capacity window retained 18,011 Tick samples for two isolated 64-Bot rooms and all 128 Fantasy KCP connections. Tick P99/P99.9 were `1.2314/5.9158 ms`, no Tick exceeded `16.67 ms`, Gameplay P99 was `0.0017 ms`, and Gameplay steady-state allocation was zero. Average process CPU was `5.9990%`; peak working set was `169,668,608` bytes (`42.14%` of the `402,653,184` GC-reported available-memory baseline). The load held `60.0000 Hz` measured input and `30.0000 Hz` two-frame batches per client.
@@ -50,6 +62,6 @@ The repository-owned verifier independently reproduced the retained `multi-room-
 
 ## Interpretation and next gate
 
-The recorded exact-`main` result closes the two-room process-capacity measurement gate without capture overhead. Because it predates format v2, a new exact-`main` run must pass the same limits with room-aware replay enabled and retain the binary plus verified final Tick/hash. A red gate keeps the production default at one room and requires profiling, reduced density, or an adapter/scheduler change; it does not weaken the budget.
+The replay-enabled exact-`main` result closes the WS-22 room-aware replay and two-room process-capacity measurement gate. A future red gate keeps the production default at one room and requires profiling, reduced density, or an adapter/scheduler change; it does not weaken the budget.
 
-This result does not determine production cost or authorize rollout. Production remains one room per process. After replay-enabled evidence passes, a multi-room rollout still requires a named target host, qualified candidate and fallback digests/configurations, an SLO window, traffic/admission procedure, and operator authority to drain or switch the environment.
+This result does not determine production cost or authorize rollout. Production remains one room per process. A multi-room rollout still requires a named target host, qualified candidate and fallback digests/configurations, an SLO window, traffic/admission procedure, and operator authority to drain or switch the environment.
