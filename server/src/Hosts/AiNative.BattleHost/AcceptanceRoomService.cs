@@ -8,16 +8,18 @@ internal sealed class AcceptanceRoomService(
     RuntimeReadiness readiness,
     BattleMetrics metrics,
     RoomProtocolService protocol,
+    BattleRoomSet rooms,
     BattleReplayCapture replayCapture,
     ILogger<AcceptanceRoomService> logger) : BackgroundService
 {
-    private readonly SyntheticRoom _room = new(64);
-
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         MonotonicFixedRatePacer pacer = new(60);
         readiness.MarkRoomReady();
-        logger.LogInformation("Acceptance room ready with {BotCount} bots at 60 Hz", _room.BotCount);
+        logger.LogInformation(
+            "Acceptance room set ready with {RoomCount} room(s) and {BotCapacity} total bots at 60 Hz",
+            rooms.RoomCount,
+            rooms.Settings.TotalBotCapacity);
 
         try
         {
@@ -25,16 +27,16 @@ internal sealed class AcceptanceRoomService(
             {
                 await pacer.WaitForNextTickAsync(stoppingToken);
                 long started = Stopwatch.GetTimestamp();
-                protocol.PumpInbound(_room, checked((ulong)readiness.Tick));
+                protocol.PumpInbound(checked((ulong)readiness.Tick));
                 long gameplayStarted = Stopwatch.GetTimestamp();
                 long allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
-                _room.Tick();
+                rooms.TickAll();
                 long gameplayAllocated = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
                 metrics.RecordGameplayTick(
                     Stopwatch.GetElapsedTime(gameplayStarted).TotalMilliseconds,
                     gameplayAllocated);
                 readiness.AdvanceTick();
-                protocol.PublishSnapshot(_room, checked((ulong)readiness.Tick));
+                protocol.PublishSnapshots(checked((ulong)readiness.Tick));
                 metrics.RecordTick(Stopwatch.GetElapsedTime(started).TotalMilliseconds);
             }
         }
@@ -46,11 +48,14 @@ internal sealed class AcceptanceRoomService(
             readiness.BeginDrain();
             await replayCapture.CompleteAsync(
                 checked((ulong)readiness.Tick),
-                _room.ComputeStateHash());
+                rooms.ComputeCombinedStateHash());
             metrics.WriteAcceptanceReport(
                 checked((ulong)readiness.Tick),
-                _room.ComputeStateHash());
-            logger.LogInformation("Acceptance room drained at tick {Tick}", readiness.Tick);
+                rooms.ComputeCombinedStateHash());
+            logger.LogInformation(
+                "Acceptance room set drained at tick {Tick} with {RoomCount} room(s)",
+                readiness.Tick,
+                rooms.RoomCount);
         }
     }
 }
