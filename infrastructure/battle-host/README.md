@@ -4,7 +4,7 @@ This directory owns the Linux x64 production container contract for `AiNative.Ba
 
 The image listens on HTTP port `8080` and Fantasy KCP UDP port `22000`. It contains one application-owned default `Fantasy.config`; production deployment must replace it with a reviewed read-only mount. Evaluation-only administrative endpoints stay disabled unless `AINATIVE_ENABLE_EVALUATION_ENDPOINTS=true` is explicitly supplied by a validation environment.
 
-The production default is one 64-participant room per process. CI may set `AINATIVE_EVALUATION_ROOM_COUNT=2` only together with the evaluation endpoints to run the [two-room capacity candidate](../../Docs/Architecture/multi-room-capacity-validation.md). The Host rejects that setting in production mode and rejects multi-room evaluation with version 1 replay capture. Do not add this evaluation variable to a deployment configuration.
+The production default is one 64-participant room per process. CI may set `AINATIVE_EVALUATION_ROOM_COUNT=2` only together with the evaluation endpoints to run the [two-room capacity candidate](../../Docs/Architecture/multi-room-capacity-validation.md). New replay captures use the room-aware version 2 format; the verifier retains version 1 only as a one-room compatibility path. Do not add the evaluation room variable to a deployment configuration.
 
 Use the Compose contract only with an immutable image digest and an explicit configuration path:
 

@@ -20,7 +20,7 @@ Changing an accepted contract requires a superseding ADR that records compatibil
 | [0003](0003-shared-gameplay-dual-compilation.md) | Accepted | Shared gameplay dual compilation | One source set, Unity and `netstandard2.1`, identical golden vectors | Unity Batch Mode proof and state-hash corpus |
 | [0004](0004-server-runtime-policy.md) | Superseded | Former .NET runtime policy | Historical `net8.0`/`net9.0` baseline | Replaced by ADR-0012 |
 | [0005](0005-authoritative-simulation-and-reconciliation.md) | Accepted | 60 Hz authority model | Server authority, fixed Tick, prediction/reconciliation, no lockstep | Tuning of history and correction thresholds |
-| [0006](0006-realtime-transport-and-replication.md) | Accepted | Realtime transport and replication | Fantasy KCP adapter first; AOI/delta/backpressure are mandatory | Exact-main two-room/128-client capacity passed; room-aware replay and environment canary/rollback still gate production density |
+| [0006](0006-realtime-transport-and-replication.md) | Accepted | Realtime transport and replication | Fantasy KCP adapter first; AOI/delta/backpressure are mandatory | Exact-main two-room/128-client capacity passed; replay-enabled rerun and environment canary/rollback still gate production density |
 | [0007](0007-physics-and-navigation-boundaries.md) | Accepted | Physics and navigation boundaries | Jolt/Recast candidates behind Shared-owned ports | Binding, prediction and path-job benchmarks |
 | [0008](0008-client-content-and-hot-update.md) | Accepted | Content and hot update | Project-owned atomic content pipeline; HybridCLR optional | Manifest format Spike and per-release iOS policy review |
 | [0009](0009-protocol-evolution-and-code-generation.md) | Accepted | Protocol evolution | Protobuf-first, additive compatibility, reproducible generation | High-frequency codec threshold and compatibility harness |
@@ -29,6 +29,7 @@ Changing an accepted contract requires a superseding ADR that records compatibil
 | [0012](0012-server-runtime-successor.md) | Accepted | .NET 10 Server runtime | One `net10.0` product lane; Fantasy stays pinned behind the Server adapter/composition boundary | Ongoing release provenance, canary, and rollback discipline |
 | [0013](0013-passive-async-shared-contracts.md) | Accepted | Passive async Shared boundary types | `shared/realtime` may expose cancellation/value-task contracts but may not schedule work or perform I/O | Unity/.NET compilation and architecture checks |
 | [0014](0014-temporary-manual-unity-validation.md) | Accepted | Temporary manual Unity validation | Exact-commit Unity 6000.3.9f1 evidence is mandatory while credentialed CI is unavailable | Project-owner evidence bundle; restore automatic CI when authentication is available |
+| [0015](0015-room-aware-replay-format.md) | Accepted | Room-aware replay format | New captures use v2 room identity; the reader retains v1 one-room compatibility and fails closed | Exact-main replay-enabled two-room capacity evidence and environment canary/rollback |
 
 ## Open decision gates
 
