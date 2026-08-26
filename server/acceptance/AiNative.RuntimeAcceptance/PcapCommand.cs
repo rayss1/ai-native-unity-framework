@@ -14,11 +14,19 @@ internal static class PcapCommand
         int serverPort = int.Parse(values.GetValueOrDefault("server-port", "22000"), System.Globalization.CultureInfo.InvariantCulture);
         long startUnixMilliseconds = long.Parse(Require(values, "start-unix-ms"), System.Globalization.CultureInfo.InvariantCulture);
         int durationSeconds = int.Parse(Require(values, "duration-seconds"), System.Globalization.CultureInfo.InvariantCulture);
+        int expectedClientCount = int.Parse(
+            values.GetValueOrDefault("expected-clients", "64"),
+            System.Globalization.CultureInfo.InvariantCulture);
+        int headroomPercent = int.Parse(
+            values.GetValueOrDefault("headroom-percent", "0"),
+            System.Globalization.CultureInfo.InvariantCulture);
         PcapReport report = PcapAnalyzer.Analyze(
             pcapPath,
             serverPort,
             startUnixMilliseconds,
-            durationSeconds);
+            durationSeconds,
+            expectedClientCount,
+            headroomPercent);
         string json = JsonSerializer.Serialize(report, new JsonSerializerOptions
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -62,11 +70,17 @@ internal static class PcapAnalyzer
         string path,
         int serverPort,
         long startUnixMilliseconds,
-        int durationSeconds)
+        int durationSeconds,
+        int expectedClientCount = 64,
+        int headroomPercent = 0)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(serverPort, 1);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(serverPort, ushort.MaxValue);
         ArgumentOutOfRangeException.ThrowIfLessThan(durationSeconds, 1);
+        ArgumentOutOfRangeException.ThrowIfLessThan(expectedClientCount, 1);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(expectedClientCount, 128);
+        ArgumentOutOfRangeException.ThrowIfNegative(headroomPercent);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(headroomPercent, 50);
         byte[] fileHash;
         using (FileStream hashStream = File.OpenRead(path))
         {
@@ -160,12 +174,16 @@ internal static class PcapAnalyzer
         double downstreamP95 = Percentile(downstreamKbps, 0.95);
         double upstreamP95 = Percentile(upstreamKbps, 0.95);
         int datagramP95 = Percentile(datagramPayloadBytes, 0.95);
+        double retainedFraction = 1d - (headroomPercent / 100d);
+        double downstreamLimit = 256d * retainedFraction;
+        double upstreamLimit = 64d * retainedFraction;
+        double datagramLimit = 1200d * retainedFraction;
         bool gatesPassed =
-            clients.Count == 64 &&
+            clients.Count == expectedClientCount &&
             packetCount > 0 &&
-            downstreamP95 <= 256 &&
-            upstreamP95 <= 64 &&
-            datagramP95 <= 1200;
+            downstreamP95 <= downstreamLimit &&
+            upstreamP95 <= upstreamLimit &&
+            datagramP95 <= datagramLimit;
 
         return new PcapReport(
             EvidenceClass: "linux-loopback-netem-pcap",
@@ -176,7 +194,12 @@ internal static class PcapAnalyzer
             ServerPort: serverPort,
             StartUnixMilliseconds: startUnixMilliseconds,
             DurationSeconds: durationSeconds,
+            ExpectedClientCount: expectedClientCount,
             ClientCount: clients.Count,
+            HeadroomPercent: headroomPercent,
+            DownstreamP95LimitKbps: downstreamLimit,
+            UpstreamP95LimitKbps: upstreamLimit,
+            DatagramPayloadP95LimitBytes: datagramLimit,
             PacketCount: packetCount,
             CapturedIpBytes: capturedBytes,
             DownstreamP50Kbps: Percentile(downstreamKbps, 0.50),
@@ -304,7 +327,12 @@ internal sealed record PcapReport(
     int ServerPort,
     long StartUnixMilliseconds,
     int DurationSeconds,
+    int ExpectedClientCount,
     int ClientCount,
+    int HeadroomPercent,
+    double DownstreamP95LimitKbps,
+    double UpstreamP95LimitKbps,
+    double DatagramPayloadP95LimitBytes,
     long PacketCount,
     long CapturedIpBytes,
     double DownstreamP50Kbps,

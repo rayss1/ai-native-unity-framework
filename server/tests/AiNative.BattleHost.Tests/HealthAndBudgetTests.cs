@@ -57,6 +57,7 @@ public sealed class HealthAndBudgetTests
             .WithWebHostBuilder(builder =>
             {
                 builder.UseSetting("AINATIVE_ENABLE_EVALUATION_ENDPOINTS", "true");
+                builder.UseSetting("AINATIVE_EVALUATION_ROOM_COUNT", "2");
                 builder.UseSetting("AINATIVE_FANTASY_ENABLED", "false");
             });
         using HttpClient client = factory.CreateClient();
@@ -68,6 +69,10 @@ public sealed class HealthAndBudgetTests
 
         Assert.That(live.StatusCode, Is.EqualTo(HttpStatusCode.OK));
         Assert.That(ready.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        using (JsonDocument readyBody = JsonDocument.Parse(await ready.Content.ReadAsStringAsync()))
+        {
+            Assert.That(readyBody.RootElement.GetProperty("roomCount").GetInt32(), Is.EqualTo(2));
+        }
         Assert.That(drain.StatusCode, Is.EqualTo(HttpStatusCode.Accepted));
         Assert.That(draining.StatusCode, Is.EqualTo(HttpStatusCode.ServiceUnavailable));
     }
@@ -121,12 +126,75 @@ public sealed class HealthAndBudgetTests
             Assert.That(
                 attributes["ainative.configuration.identity"],
                 Is.EqualTo(Convert.ToHexString(SHA256.HashData(fantasyConfig)).ToLowerInvariant()));
-            Assert.That(attributes.Keys, Has.Count.EqualTo(7));
+            Assert.That(attributes["ainative.room.count"], Is.EqualTo(1));
+            Assert.That(attributes["ainative.room.capacity"], Is.EqualTo(64));
+            Assert.That(attributes.Keys, Has.Count.EqualTo(8));
         }
         finally
         {
             Directory.Delete(directory, recursive: true);
         }
+    }
+
+    [Test]
+    public void MultiRoomCapacityIsExplicitlyEvaluationOnlyAndReplaySafe()
+    {
+        IConfiguration accepted = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["AINATIVE_ENABLE_EVALUATION_ENDPOINTS"] = "true",
+                ["AINATIVE_EVALUATION_ROOM_COUNT"] = "2",
+            })
+            .Build();
+        BattleHostCapacitySettings settings = BattleHostCapacitySettings.Create(accepted);
+
+        Assert.That(settings.RoomCount, Is.EqualTo(2));
+        Assert.That(settings.TotalBotCapacity, Is.EqualTo(128));
+
+        foreach (Dictionary<string, string?> rejected in new[]
+        {
+            new Dictionary<string, string?> { ["AINATIVE_EVALUATION_ROOM_COUNT"] = "2" },
+            new Dictionary<string, string?>
+            {
+                ["AINATIVE_ENABLE_EVALUATION_ENDPOINTS"] = "true",
+                ["AINATIVE_EVALUATION_ROOM_COUNT"] = "3",
+            },
+            new Dictionary<string, string?>
+            {
+                ["AINATIVE_ENABLE_EVALUATION_ENDPOINTS"] = "true",
+                ["AINATIVE_EVALUATION_ROOM_COUNT"] = "2",
+                ["AINATIVE_REPLAY_CAPTURE_PATH"] = "multi-room.anrp",
+            },
+        })
+        {
+            IConfiguration invalid = new ConfigurationBuilder()
+                .AddInMemoryCollection(rejected)
+                .Build();
+            Assert.That(
+                () => BattleHostCapacitySettings.Create(invalid),
+                Throws.TypeOf<InvalidOperationException>());
+        }
+    }
+
+    [Test]
+    public void TwoRoomSetKeepsEntityOwnershipAndStateIndependent()
+    {
+        BattleRoomSet rooms = new(new BattleHostCapacitySettings(2));
+
+        Assert.That(rooms.TryAssignEntity(0, out int firstRoomEntity), Is.True);
+        Assert.That(rooms.TryAssignEntity(1, out int secondRoomEntity), Is.True);
+        Assert.That(firstRoomEntity, Is.Zero);
+        Assert.That(secondRoomEntity, Is.Zero);
+
+        ulong initialHash = rooms.ComputeCombinedStateHash();
+        rooms[1].ApplyInput(secondRoomEntity, 1000, -500);
+        rooms.TickAll();
+
+        Assert.That(rooms[0].ComputeStateHash(), Is.Not.EqualTo(rooms[1].ComputeStateHash()));
+        Assert.That(rooms.ComputeCombinedStateHash(), Is.Not.EqualTo(initialHash));
+        rooms.ReleaseEntity(0, firstRoomEntity);
+        Assert.That(rooms.TryAssignEntity(0, out int reassigned), Is.True);
+        Assert.That(reassigned, Is.Zero);
     }
 
     [TestCase("OTEL_EXPORTER_OTLP_ENDPOINT", "not-a-uri")]
@@ -247,6 +315,40 @@ public sealed class HealthAndBudgetTests
         Assert.That(p99, Is.LessThanOrEqualTo(16.67));
         Assert.That(p999, Is.LessThanOrEqualTo(20.0));
         Assert.That(slowTicks, Is.LessThanOrEqualTo((int)Math.Floor(measuredTicks * 0.001)));
+    }
+
+    [Test]
+    public void TwoRoomGameplayTickRetainsCandidateHeadroomWithoutAllocation()
+    {
+        BattleRoomSet rooms = new(new BattleHostCapacitySettings(2));
+        for (int index = 0; index < 600; index++)
+        {
+            rooms.TickAll();
+        }
+
+        const int measuredTicks = 3600;
+        long[] durations = new long[measuredTicks];
+        long before = GC.GetAllocatedBytesForCurrentThread();
+        for (int index = 0; index < measuredTicks; index++)
+        {
+            long started = Stopwatch.GetTimestamp();
+            rooms.TickAll();
+            durations[index] = Stopwatch.GetTimestamp() - started;
+        }
+
+        long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+        Array.Sort(durations);
+        double p99 = ToMilliseconds(durations[PercentileIndex(measuredTicks, 0.99)]);
+        double p999 = ToMilliseconds(durations[PercentileIndex(measuredTicks, 0.999)]);
+
+        TestContext.WriteLine(
+            $"rooms=2; bots=128; runtime={Environment.Version}; os={Environment.OSVersion}; " +
+            $"processors={Environment.ProcessorCount}; warmup=600; ticks={measuredTicks}; " +
+            $"p99_ms={p99:F4}; p999_ms={p999:F4}; allocated={allocated}");
+
+        Assert.That(allocated, Is.Zero);
+        Assert.That(p99, Is.LessThanOrEqualTo(13.336));
+        Assert.That(p999, Is.LessThanOrEqualTo(16));
     }
 
     [Test]
@@ -423,12 +525,26 @@ public sealed class HealthAndBudgetTests
             PcapReport report = PcapAnalyzer.Analyze(path, 22000, firstSecond * 1000L, 60);
 
             Assert.That(report.QualifiedSocketImpairment, Is.True);
+            Assert.That(report.ExpectedClientCount, Is.EqualTo(64));
             Assert.That(report.ClientCount, Is.EqualTo(64));
             Assert.That(report.PacketCount, Is.EqualTo(64L * 60 * 2));
             Assert.That(report.DownstreamP95Kbps, Is.EqualTo(1.024).Within(0.0001));
             Assert.That(report.UpstreamP95Kbps, Is.EqualTo(1.024).Within(0.0001));
             Assert.That(report.DatagramPayloadP95Bytes, Is.EqualTo(100));
             Assert.That(report.GatesPassed, Is.True);
+
+            PcapReport headroom = PcapAnalyzer.Analyze(
+                path,
+                22000,
+                firstSecond * 1000L,
+                60,
+                expectedClientCount: 64,
+                headroomPercent: 20);
+            Assert.That(headroom.HeadroomPercent, Is.EqualTo(20));
+            Assert.That(headroom.DownstreamP95LimitKbps, Is.EqualTo(204.8));
+            Assert.That(headroom.UpstreamP95LimitKbps, Is.EqualTo(51.2));
+            Assert.That(headroom.DatagramPayloadP95LimitBytes, Is.EqualTo(960));
+            Assert.That(headroom.GatesPassed, Is.True);
         }
         finally
         {

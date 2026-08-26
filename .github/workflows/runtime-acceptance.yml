@@ -18,6 +18,7 @@ on:
       - server/src/**
       - server/tests/**
       - tools/release/verify-telemetry-capacity.sh
+      - tools/release/verify-multi-room-capacity.sh
       - shared/gameplay/**
       - shared/protocol/**
       - shared/realtime/**
@@ -37,6 +38,7 @@ on:
       - server/src/**
       - server/tests/**
       - tools/release/verify-telemetry-capacity.sh
+      - tools/release/verify-multi-room-capacity.sh
       - shared/gameplay/**
       - shared/protocol/**
       - shared/realtime/**
@@ -49,7 +51,7 @@ permissions:
 jobs:
   production:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 110
     env:
       SOURCE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:
@@ -447,6 +449,147 @@ jobs:
           path: |
             artifacts/runtime-acceptance/telemetry-*.json
             artifacts/runtime-acceptance/telemetry-*.log
+          if-no-files-found: warn
+
+      - name: Qualify two-room process capacity with 20 percent headroom
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence_dir="$GITHUB_WORKSPACE/artifacts/runtime-acceptance"
+          chmod 0777 "$evidence_dir"
+          fantasy_commit="$(git -C server/vendor/Fantasy rev-parse HEAD)"
+          protocol_identity="$(sha256sum shared/schemas/ainative/v1/gameplay.proto | cut -d ' ' -f 1)"
+          runner="$GITHUB_WORKSPACE/artifacts/bin/AiNative.RuntimeAcceptance/Release/net10.0/AiNative.RuntimeAcceptance.dll"
+          active_container=''
+          capture_pid=''
+          cleanup_multi_room() {
+            if test -n "$capture_pid"; then sudo kill -INT "$capture_pid" >/dev/null 2>&1 || true; fi
+            if test -n "$active_container"; then docker rm --force "$active_container" >/dev/null 2>&1 || true; fi
+          }
+          trap cleanup_multi_room EXIT
+
+          start_multi_room_host() {
+            report_name="$1"
+            active_container="$(docker run --detach \
+              --read-only \
+              --memory 512m \
+              --tmpfs /tmp:size=64m,mode=1777 \
+              --volume "$evidence_dir:/evidence" \
+              --cap-drop ALL \
+              --security-opt no-new-privileges \
+              --publish 127.0.0.1:5085:8080 \
+              --env AINATIVE_ENABLE_EVALUATION_ENDPOINTS=true \
+              --env AINATIVE_EVALUATION_ROOM_COUNT=2 \
+              --env "AINATIVE_ACCEPTANCE_REPORT_PATH=/evidence/$report_name" \
+              --env AINATIVE_ACCEPTANCE_WARMUP_TICKS=600 \
+              --env AINATIVE_ACCEPTANCE_MAX_TICKS=24000 \
+              --env AINATIVE_DEPLOYMENT_ENVIRONMENT=continuous-integration \
+              --env AINATIVE_SERVICE_INSTANCE_ID=two-room-capacity \
+              --env "AINATIVE_SOURCE_COMMIT=$SOURCE_COMMIT" \
+              --env "AINATIVE_FANTASY_COMMIT=$fantasy_commit" \
+              --env "AINATIVE_PROTOCOL_IDENTITY=$protocol_identity" \
+              ainative/battle-host:production-validation)"
+            deadline=$((SECONDS + 30))
+            until test "$(curl --fail --silent http://127.0.0.1:5085/health/ready | jq -r '.roomCount')" = '2'; do
+              if ! docker inspect --format '{{.State.Running}}' "$active_container" | grep -q true || (( SECONDS >= deadline )); then
+                docker logs "$active_container"
+                exit 1
+              fi
+              sleep 0.25
+            done
+          }
+
+          start_multi_room_host multi-room-capacity-host.json
+          capacity_status="$(curl --silent --max-time 420 \
+            --output "$evidence_dir/multi-room-capacity-load.json" \
+            --write-out '%{http_code}' \
+            --request POST \
+            'http://127.0.0.1:5085/admin/kcp-load?botCount=128&roomCount=2&warmupSeconds=10&durationSeconds=300')"
+          if test "$capacity_status" != '200'; then
+            cat "$evidence_dir/multi-room-capacity-load.json"
+            docker logs "$active_container"
+            exit 1
+          fi
+          docker stop --signal TERM --timeout 30 "$active_container"
+          test "$(docker inspect --format '{{.State.ExitCode}}' "$active_container")" = '0'
+          docker logs "$active_container" > "$evidence_dir/multi-room-capacity-host.log" 2>&1
+          docker rm "$active_container" >/dev/null
+          active_container=''
+
+          start_multi_room_host multi-room-wire-host.json
+          container_pid="$(docker inspect --format '{{.State.Pid}}' "$active_container")"
+          sudo nsenter --target "$container_pid" --net \
+            tc qdisc replace dev lo root netem \
+            delay 50ms 10ms 25% \
+            loss random 1% \
+            duplicate 0.5% \
+            reorder 1% 50%
+          # The invoking runner owns the evidence file; sudo applies only to nsenter/tc.
+          # shellcheck disable=SC2024
+          sudo nsenter --target "$container_pid" --net tc qdisc show dev lo \
+            > "$evidence_dir/multi-room-wire-netem.txt"
+          pcap="$evidence_dir/multi-room-wire.pcap"
+          # The invoking runner owns the log; sudo applies only to nsenter/tcpdump.
+          # shellcheck disable=SC2024
+          sudo nsenter --target "$container_pid" --net \
+            tcpdump -U -s 0 -i lo -w "$pcap" 'udp port 22000' \
+            > "$evidence_dir/multi-room-wire-tcpdump.log" 2>&1 &
+          capture_pid=$!
+          sleep 0.5
+          if ! kill -0 "$capture_pid" 2>/dev/null; then
+            wait "$capture_pid" || true
+            capture_pid=''
+            cat "$evidence_dir/multi-room-wire-tcpdump.log"
+            exit 1
+          fi
+          wire_status="$(curl --silent --max-time 180 \
+            --output "$evidence_dir/multi-room-wire-load.json" \
+            --write-out '%{http_code}' \
+            --request POST \
+            'http://127.0.0.1:5085/admin/kcp-load?botCount=128&roomCount=2&warmupSeconds=10&durationSeconds=60')"
+          if test "$wire_status" != '200'; then
+            cat "$evidence_dir/multi-room-wire-load.json"
+            docker logs "$active_container"
+            exit 1
+          fi
+          sudo kill -INT "$capture_pid"
+          wait "$capture_pid"
+          capture_pid=''
+          test "$(stat --format '%s' "$pcap")" -gt 24
+          docker stop --signal TERM --timeout 30 "$active_container"
+          test "$(docker inspect --format '{{.State.ExitCode}}' "$active_container")" = '0'
+          docker logs "$active_container" > "$evidence_dir/multi-room-wire-host.log" 2>&1
+          docker rm "$active_container" >/dev/null
+          active_container=''
+
+          export AINATIVE_SOURCE_COMMIT="$SOURCE_COMMIT"
+          export AINATIVE_FANTASY_COMMIT="$fantasy_commit"
+          export AINATIVE_PROTOCOL_IDENTITY="$protocol_identity"
+          dotnet "$runner" \
+            --pcap "$pcap" \
+            --server-port 22000 \
+            --start-unix-ms "$(jq -r '.measuredStartedUnixMilliseconds' "$evidence_dir/multi-room-wire-load.json")" \
+            --duration-seconds 60 \
+            --expected-clients 128 \
+            --headroom-percent 20 \
+            --output "$evidence_dir/multi-room-wire.json"
+          tools/release/verify-multi-room-capacity.sh \
+            "$evidence_dir/multi-room-capacity-host.json" \
+            "$evidence_dir/multi-room-capacity-load.json" \
+            "$evidence_dir/multi-room-wire.json" \
+            "$evidence_dir/multi-room-capacity.json"
+          jq . "$evidence_dir/multi-room-capacity.json"
+
+      - name: Upload two-room capacity evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: runtime-multi-room-capacity
+          path: |
+            artifacts/runtime-acceptance/multi-room-*.json
+            artifacts/runtime-acceptance/multi-room-*.log
+            artifacts/runtime-acceptance/multi-room-*.txt
+            artifacts/runtime-acceptance/multi-room-*.pcap
           if-no-files-found: warn
 
       - name: Run qualified Linux socket impairment profiles

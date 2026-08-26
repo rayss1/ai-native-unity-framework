@@ -2,7 +2,7 @@
 
 Status: Provisional numeric budgets; architectural gates are frozen
 Scenario: one authoritative 64-player/bot room, 60 Hz, release-equivalent builds
-Last updated: 2026-08-13
+Last updated: 2026-08-26
 
 These are go/no-go engineering budgets, not marketing targets. A measurement report must record hardware/device, build SHA, configuration/content hashes, warm-up, duration, sample count, profiler overhead, and percentile method. Results without that context are diagnostic only.
 
@@ -78,6 +78,8 @@ The correction numbers are tuning gates, not truth about game feel. If represent
 | Telemetry outage | Buffers bounded; no Tick I/O wait; dropped telemetry counted; Tick delta < 0.25 ms P99 versus exporter disabled |
 
 The telemetry gate uses two sequential 64-Bot profiles of the same release-equivalent image and runner: exporter disabled, then an unavailable OTLP endpoint. Both profiles record process working set/peak, CPU time, managed heap, committed GC memory, thread-pool count, runtime, OS, processor count, and immutable source identities. Passing this comparison establishes only the one-room baseline; it does not authorize additional rooms per process. See [telemetry and one-room capacity validation](telemetry-capacity-validation.md).
+
+The [multi-room capacity validation](multi-room-capacity-validation.md) evaluates a two-room/128-client candidate without changing the one-room production default. It applies the required 20% headroom to Tick, Gameplay, CPU, memory, per-client bandwidth, and typical datagram budgets and requires exact source identities. A passing candidate or PR run is not production authorization; exact-`main` evidence and the environment Canary remain separate gates.
 
 ## Decision use
 

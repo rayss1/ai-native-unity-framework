@@ -16,16 +16,22 @@ if (args is ["--verify-replay", string replayPath])
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 bool fantasyEnabled = builder.Configuration.GetValue("AINATIVE_FANTASY_ENABLED", true);
 int outerKcpMtu = builder.Configuration.GetValue("AINATIVE_FANTASY_OUTER_KCP_MTU", 1150);
+BattleHostCapacitySettings capacitySettings = BattleHostCapacitySettings.Create(builder.Configuration);
 BattleTelemetrySettings telemetrySettings = BattleTelemetrySettings.Create(
     builder.Configuration,
-    builder.Environment.ContentRootPath);
+    builder.Environment.ContentRootPath,
+    capacitySettings);
 TelemetryExportHealth telemetryHealth = new(telemetrySettings.Endpoint is not null);
 builder.Services.AddSingleton(new RuntimeReadiness(networkRequired: fantasyEnabled));
+builder.Services.AddSingleton(capacitySettings);
+builder.Services.AddSingleton<BattleRoomSet>();
 builder.Services.AddSingleton(telemetrySettings);
 builder.Services.AddSingleton(telemetryHealth);
 builder.Services.AddSingleton<BattleMetrics>();
 builder.Services.AddSingleton<BattleReplayCapture>();
-builder.Services.AddSingleton(new FantasyKcpGateway(outerKcpMtu: outerKcpMtu));
+builder.Services.AddSingleton(new FantasyKcpGateway(
+    maxConnections: capacitySettings.TotalBotCapacity,
+    outerKcpMtu: outerKcpMtu));
 builder.Services.AddSingleton<RoomProtocolService>();
 if (fantasyEnabled)
 {
@@ -79,8 +85,10 @@ app.Lifetime.ApplicationStopping.Register(readiness.BeginDrain);
 
 app.MapGet("/health/live", () => Results.Ok(new { status = "live" }));
 app.MapGet("/health/ready", () => readiness.IsReady
-    ? Results.Ok(new { status = "ready", tick = readiness.Tick })
-    : Results.Json(new { status = "draining", tick = readiness.Tick }, statusCode: StatusCodes.Status503ServiceUnavailable));
+    ? Results.Ok(new { status = "ready", tick = readiness.Tick, capacitySettings.RoomCount })
+    : Results.Json(
+        new { status = "draining", tick = readiness.Tick, capacitySettings.RoomCount },
+        statusCode: StatusCodes.Status503ServiceUnavailable));
 app.MapGet("/health/telemetry", () =>
 {
     TelemetryExportSnapshot snapshot = telemetryHealth.Snapshot();
@@ -134,6 +142,7 @@ if (builder.Configuration.GetValue("AINATIVE_ENABLE_EVALUATION_ENDPOINTS", false
             FantasyKcpGateway gateway,
             BattleMetrics metrics,
             int? botCount,
+            int? roomCount,
             int? durationSeconds,
             int? warmupSeconds,
             CancellationToken cancellationToken) =>
@@ -141,7 +150,8 @@ if (builder.Configuration.GetValue("AINATIVE_ENABLE_EVALUATION_ENDPOINTS", false
             int requestedWarmupSeconds = warmupSeconds ?? 1;
             FantasyKcpLoadResult result = await FantasyKcpLoadProbe.RunAsync(
                 gateway,
-                botCount ?? 64,
+                botCount ?? capacitySettings.TotalBotCapacity,
+                roomCount ?? capacitySettings.RoomCount,
                 TimeSpan.FromSeconds(durationSeconds ?? 10),
                 TimeSpan.FromSeconds(requestedWarmupSeconds),
                 () => metrics.RequestAcceptanceMeasurement(checked(requestedWarmupSeconds * 60)),

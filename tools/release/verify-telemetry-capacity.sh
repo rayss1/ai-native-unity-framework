@@ -26,6 +26,9 @@ fi
 
 jq -e '
   .evidenceClass == "release-equivalent-host-core"
+  and .roomCount == 1
+  and .botsPerRoom == 64
+  and .totalBotCapacity == 64
   and .sampleCount >= 17900
   and .elapsedSeconds >= 309
   and .tickP99Milliseconds <= 16.67
@@ -50,6 +53,9 @@ jq -e '
 
 jq -e '
   .evidenceClass == "release-equivalent-host-core"
+  and .roomCount == 1
+  and .botsPerRoom == 64
+  and .totalBotCapacity == 64
   and .sampleCount >= 17900
   and .elapsedSeconds >= 309
   and .tickP99Milliseconds <= 16.67
@@ -80,6 +86,8 @@ jq -e '
 
 jq -e '
   .botCount == 64
+  and .roomCount == 1
+  and .botsPerRoom == 64
   and .peakConnections == 64
   and .warmupSeconds >= 10
   and .measuredSeconds >= 300
@@ -96,6 +104,8 @@ jq -e '
 
 jq -e '
   .botCount == 64
+  and .roomCount == 1
+  and .botsPerRoom == 64
   and .peakConnections == 64
   and .warmupSeconds >= 10
   and .measuredSeconds >= 300
@@ -136,6 +146,8 @@ jq -n \
     sourceCommit: $baseline[0].sourceCommit,
     fantasyCommit: $baseline[0].fantasyCommit,
     protocolIdentity: $baseline[0].protocolIdentity,
+    roomCount: 1,
+    botsPerRoom: 64,
     botCount: 64,
     warmupSeconds: $baselineLoad[0].warmupSeconds,
     measuredSeconds: $baselineLoad[0].measuredSeconds,

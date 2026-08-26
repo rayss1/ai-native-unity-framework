@@ -89,6 +89,6 @@ The soak intentionally ran without an exporter, so all telemetry export attempt/
 
 ## Interpretation and next gate
 
-The capacity fields describe one 64-participant room on the recorded runner. They support leak/regression comparisons but do not establish a rooms-per-process limit, production cost, autoscaling threshold, or reserved headroom. Increasing room density requires a separate multi-room harness and at least 20% headroom in every affected hard budget.
+The capacity fields describe one 64-participant room on the recorded runner. They support leak/regression comparisons but do not establish a rooms-per-process limit, production cost, autoscaling threshold, or reserved headroom. Increasing room density requires the separate [multi-room capacity validation](multi-room-capacity-validation.md) and at least 20% headroom in every affected hard budget.
 
 An environment canary remains an operator gate. It needs a named target host, SLO observation window, traffic/admission procedure, compatible fallback digest and configuration, and authority to drain or switch that environment. CI does not infer those details or deploy anything. This exact-`main` result therefore closes WS-20's one-room telemetry and soak evidence only; it does not establish multi-room density or authorize an environment rollout.

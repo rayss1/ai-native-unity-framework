@@ -20,8 +20,10 @@ internal sealed class BattleMetrics : IDisposable
     private readonly double[]? _gameplaySamples;
     private readonly long[]? _gameplayAllocations;
     private readonly int _outerKcpMtu;
+    private readonly BattleHostCapacitySettings _capacitySettings;
     private int _warmupTicks;
     private long _startedTimestamp = Stopwatch.GetTimestamp();
+    private double _startedProcessorMilliseconds = ReadProcessProcessorMilliseconds();
     private int _acceptanceReportWritten;
     private int _sampleCount;
     private int _observedTickCount;
@@ -29,8 +31,10 @@ internal sealed class BattleMetrics : IDisposable
 
     public BattleMetrics(
         IConfiguration? configuration = null,
-        TelemetryExportHealth? telemetryHealth = null)
+        TelemetryExportHealth? telemetryHealth = null,
+        BattleHostCapacitySettings? capacitySettings = null)
     {
+        _capacitySettings = capacitySettings ?? new BattleHostCapacitySettings(1);
         _telemetryHealth = telemetryHealth ?? new TelemetryExportHealth(exporterConfigured: false);
         _tickDurationMilliseconds = _meter.CreateHistogram<double>("battle.tick.duration", "ms");
         _droppedDiagnostics = _meter.CreateCounter<long>("battle.diagnostics.dropped");
@@ -70,6 +74,7 @@ internal sealed class BattleMetrics : IDisposable
             _sampleCount = 0;
             _observedTickCount = 0;
             Volatile.Write(ref _startedTimestamp, Stopwatch.GetTimestamp());
+            Volatile.Write(ref _startedProcessorMilliseconds, ReadProcessProcessorMilliseconds());
         }
 
         int observedTick = _observedTickCount++;
@@ -141,14 +146,25 @@ internal sealed class BattleMetrics : IDisposable
         using Process process = Process.GetCurrentProcess();
         GCMemoryInfo gc = GC.GetGCMemoryInfo();
         TelemetryExportSnapshot telemetry = _telemetryHealth.Snapshot();
+        double elapsedSeconds = Stopwatch.GetElapsedTime(Volatile.Read(ref _startedTimestamp)).TotalSeconds;
+        double processorMilliseconds = process.TotalProcessorTime.TotalMilliseconds;
+        double measurementProcessorMilliseconds = Math.Max(
+            0,
+            processorMilliseconds - Volatile.Read(ref _startedProcessorMilliseconds));
+        double cpuUtilizationPercentage = elapsedSeconds <= 0 || Environment.ProcessorCount <= 0
+            ? 0
+            : measurementProcessorMilliseconds / (elapsedSeconds * 1000d * Environment.ProcessorCount) * 100d;
         RuntimeSoakReport report = new(
             EvidenceClass: "release-equivalent-host-core",
+            RoomCount: _capacitySettings.RoomCount,
+            BotsPerRoom: BattleHostCapacitySettings.BotsPerRoom,
+            TotalBotCapacity: _capacitySettings.TotalBotCapacity,
             WarmupTicks: _warmupTicks,
             ObservedTickCount: _observedTickCount,
             SampleCount: count,
             FinalTick: finalTick,
             FinalStateHash: finalStateHash.ToString("x16", System.Globalization.CultureInfo.InvariantCulture),
-            ElapsedSeconds: Stopwatch.GetElapsedTime(Volatile.Read(ref _startedTimestamp)).TotalSeconds,
+            ElapsedSeconds: elapsedSeconds,
             TickP99Milliseconds: tickP99,
             TickP999Milliseconds: tickP999,
             SlowTickPercentage: count == 0 ? 100 : slowTicks * 100d / count,
@@ -159,9 +175,12 @@ internal sealed class BattleMetrics : IDisposable
             ProcessorCount: Environment.ProcessorCount,
             ProcessWorkingSetBytes: process.WorkingSet64,
             ProcessPeakWorkingSetBytes: process.PeakWorkingSet64,
-            ProcessTotalProcessorMilliseconds: process.TotalProcessorTime.TotalMilliseconds,
+            ProcessTotalProcessorMilliseconds: processorMilliseconds,
+            ProcessMeasurementProcessorMilliseconds: measurementProcessorMilliseconds,
+            ProcessCpuUtilizationPercentage: cpuUtilizationPercentage,
             ManagedHeapBytes: GC.GetTotalMemory(forceFullCollection: false),
             GcTotalCommittedBytes: gc.TotalCommittedBytes,
+            GcTotalAvailableMemoryBytes: gc.TotalAvailableMemoryBytes,
             ThreadPoolThreadCount: ThreadPool.ThreadCount,
             OuterKcpMtu: _outerKcpMtu,
             SourceCommit: Environment.GetEnvironmentVariable("AINATIVE_SOURCE_COMMIT") ?? "unrecorded",
@@ -188,6 +207,12 @@ internal sealed class BattleMetrics : IDisposable
 
     public void Dispose() => _meter.Dispose();
 
+    private static double ReadProcessProcessorMilliseconds()
+    {
+        using Process process = Process.GetCurrentProcess();
+        return process.TotalProcessorTime.TotalMilliseconds;
+    }
+
     private static double Percentile(double[] samples, double percentile) =>
         samples.Length == 0
             ? 0
@@ -196,6 +221,9 @@ internal sealed class BattleMetrics : IDisposable
 
 internal sealed record RuntimeSoakReport(
     string EvidenceClass,
+    int RoomCount,
+    int BotsPerRoom,
+    int TotalBotCapacity,
     int WarmupTicks,
     int ObservedTickCount,
     int SampleCount,
@@ -213,8 +241,11 @@ internal sealed record RuntimeSoakReport(
     long ProcessWorkingSetBytes,
     long ProcessPeakWorkingSetBytes,
     double ProcessTotalProcessorMilliseconds,
+    double ProcessMeasurementProcessorMilliseconds,
+    double ProcessCpuUtilizationPercentage,
     long ManagedHeapBytes,
     long GcTotalCommittedBytes,
+    long GcTotalAvailableMemoryBytes,
     int ThreadPoolThreadCount,
     int OuterKcpMtu,
     string SourceCommit,

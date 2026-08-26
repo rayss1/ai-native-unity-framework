@@ -11,13 +11,29 @@ internal static class FantasyKcpLoadProbe
     public static async Task<FantasyKcpLoadResult> RunAsync(
         FantasyKcpGateway gateway,
         int botCount,
+        int roomCount,
         TimeSpan measuredDuration,
         TimeSpan warmupDuration,
         Action loadReady,
         CancellationToken cancellationToken)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(botCount, 2);
-        ArgumentOutOfRangeException.ThrowIfGreaterThan(botCount, 64);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(
+            botCount,
+            BattleHostCapacitySettings.BotsPerRoom * BattleHostCapacitySettings.MaximumEvaluationRooms);
+        ArgumentOutOfRangeException.ThrowIfLessThan(roomCount, 1);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(
+            roomCount,
+            BattleHostCapacitySettings.MaximumEvaluationRooms);
+        if (botCount % roomCount != 0 ||
+            botCount / roomCount is < 2 or > BattleHostCapacitySettings.BotsPerRoom)
+        {
+            throw new ArgumentException(
+                "The KCP load probe requires 2-64 bots in each evenly populated room.",
+                nameof(botCount));
+        }
+
+        int botsPerRoom = botCount / roomCount;
         ArgumentNullException.ThrowIfNull(loadReady);
         if (measuredDuration <= TimeSpan.Zero || measuredDuration > TimeSpan.FromMinutes(60) ||
             warmupDuration < TimeSpan.Zero || warmupDuration > TimeSpan.FromMinutes(5))
@@ -43,7 +59,7 @@ internal static class FantasyKcpLoadProbe
 
         try
         {
-            HashSet<uint> assignedEntities = new(botCount);
+            HashSet<(uint RoomId, uint EntityId)> assignedEntities = new(botCount);
             const int connectionBatchSize = 8;
             uint setupSequence = 0;
             for (int batchStart = 0; batchStart < botCount; batchStart += connectionBatchSize)
@@ -81,26 +97,35 @@ internal static class FantasyKcpLoadProbe
                     await FantasyKcpLoopbackProbe.SendAsync(
                         probes[index],
                         MessageId.LoginRequest,
-                        new LoginRequest { ProtocolMajor = 1, ClientBuild = "kcp-64-bot-load" },
+                        new LoginRequest { ProtocolMajor = 1, ClientBuild = "kcp-multi-room-load" },
                         sendBuffer,
                         startupTimeout.Token);
                     LoginResponse login = await FantasyKcpLoopbackProbe.ReceiveAsync<LoginResponse>(
                         probes[index],
                         MessageId.LoginResponse,
                         startupTimeout.Token);
+                    uint requestedRoom = checked((uint)(index / botsPerRoom) + 1);
                     await FantasyKcpLoopbackProbe.SendAsync(
                         probes[index],
                         MessageId.JoinRoomRequest,
-                        new JoinRoomRequest { SessionId = login.SessionId, RequestedRoom = 1 },
+                        new JoinRoomRequest
+                        {
+                            SessionId = login.SessionId,
+                            RequestedRoom = requestedRoom,
+                        },
                         sendBuffer,
                         startupTimeout.Token);
                     JoinRoomResponse join = await FantasyKcpLoopbackProbe.ReceiveAsync<JoinRoomResponse>(
                         probes[index],
                         MessageId.JoinRoomResponse,
                         startupTimeout.Token);
-                    if (join.EntityId is 0 or > 64 || !assignedEntities.Add(join.EntityId) || join.TickRate != 60)
+                    if (join.RoomId != requestedRoom ||
+                        join.EntityId is 0 or > BattleHostCapacitySettings.BotsPerRoom ||
+                        !assignedEntities.Add((join.RoomId, join.EntityId)) ||
+                        join.TickRate != 60)
                     {
-                        throw new InvalidOperationException("The 64-bot KCP load probe received an invalid room assignment.");
+                        throw new InvalidOperationException(
+                            "The KCP load probe received an invalid room assignment.");
                     }
                 }
 
@@ -108,9 +133,10 @@ internal static class FantasyKcpLoadProbe
                 int connectedCount = batchStart + batchCount;
                 for (int index = 0; index < connectedCount; index++)
                 {
+                    int roomIndex = index / botsPerRoom;
                     InputCommand command = inputBatches[index].Commands[0];
                     command.Sequence = setupSequence;
-                    command.MoveXMilli = (index & 1) == 0 ? 1000 : -1000;
+                    command.MoveXMilli = ((index + roomIndex) & 1) == 0 ? 1000 : -1000;
                     command.MoveYMilli = 0;
                     await FantasyKcpLoopbackProbe.SendAsync(
                         probes[index],
@@ -144,12 +170,13 @@ internal static class FantasyKcpLoadProbe
                 int commandSlot = (int)(loadTick & 1);
                 for (int index = 0; index < botCount; index++)
                 {
+                    int roomIndex = index / botsPerRoom;
                     InputCommand command = inputBatches[index].Commands[commandSlot];
                     command.RoomTick = newestSnapshotTick;
                     command.Sequence = sequence;
-                    command.MoveXMilli = ((index + (int)sequence) & 1) == 0 ? 1000 : -1000;
-                    command.MoveYMilli = ((index + (int)(sequence / 30)) & 1) == 0 ? 500 : -500;
-                    command.Buttons = sequence % 6 == 0 ? 1U : 0U;
+                    command.MoveXMilli = ((index + roomIndex + (int)sequence) & 1) == 0 ? 1000 : -1000;
+                    command.MoveYMilli = ((index + roomIndex + (int)(sequence / 30)) & 1) == 0 ? 500 : -500;
+                    command.Buttons = (sequence + (uint)roomIndex) % 6 == 0 ? 1U : 0U;
                     inputFrames++;
                     if (loadTick >= warmupTicks)
                     {
@@ -207,6 +234,8 @@ internal static class FantasyKcpLoadProbe
                 Stopwatch.GetElapsedTime(measuredStartedTimestamp, completedTimestamp).TotalSeconds;
             return new FantasyKcpLoadResult(
                 botCount,
+                roomCount,
+                botsPerRoom,
                 SetupSeconds: Stopwatch.GetElapsedTime(started, loadStartedTimestamp).TotalSeconds,
                 LoadElapsedSeconds: Stopwatch.GetElapsedTime(loadStartedTimestamp, completedTimestamp).TotalSeconds,
                 WarmupSeconds: warmupDuration.TotalSeconds,
@@ -225,7 +254,10 @@ internal static class FantasyKcpLoadProbe
                 snapshotBytes,
                 newestSnapshotTick,
                 gateway.ConnectionCount,
-                gateway.OuterKcpMtu);
+                gateway.OuterKcpMtu,
+                Environment.GetEnvironmentVariable("AINATIVE_SOURCE_COMMIT") ?? "unrecorded",
+                Environment.GetEnvironmentVariable("AINATIVE_FANTASY_COMMIT") ?? "unrecorded",
+                Environment.GetEnvironmentVariable("AINATIVE_PROTOCOL_IDENTITY") ?? "unrecorded");
         }
         finally
         {
@@ -242,6 +274,8 @@ internal static class FantasyKcpLoadProbe
 
 internal readonly record struct FantasyKcpLoadResult(
     int BotCount,
+    int RoomCount,
+    int BotsPerRoom,
     double SetupSeconds,
     double LoadElapsedSeconds,
     double WarmupSeconds,
@@ -260,4 +294,7 @@ internal readonly record struct FantasyKcpLoadResult(
     long SnapshotBytes,
     ulong NewestSnapshotTick,
     int PeakConnections,
-    int OuterKcpMtu);
+    int OuterKcpMtu,
+    string SourceCommit,
+    string FantasyCommit,
+    string ProtocolIdentity);

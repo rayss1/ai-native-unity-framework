@@ -14,7 +14,8 @@ internal sealed record BattleTelemetryIdentity(
     string SourceCommit,
     string FantasyCommit,
     string ProtocolIdentity,
-    string ConfigurationIdentity)
+    string ConfigurationIdentity,
+    int RoomCount)
 {
     public IEnumerable<KeyValuePair<string, object>> ResourceAttributes
     {
@@ -26,7 +27,10 @@ internal sealed record BattleTelemetryIdentity(
             yield return new("ainative.fantasy.commit", FantasyCommit);
             yield return new("ainative.protocol.identity", ProtocolIdentity);
             yield return new("ainative.configuration.identity", ConfigurationIdentity);
-            yield return new("ainative.room.capacity", 64);
+            yield return new("ainative.room.count", RoomCount);
+            yield return new(
+                "ainative.room.capacity",
+                checked(RoomCount * BattleHostCapacitySettings.BotsPerRoom));
         }
     }
 }
@@ -40,8 +44,12 @@ internal sealed record BattleTelemetrySettings(
     int TraceExportDelayMilliseconds,
     int TraceExportBatchSize)
 {
-    public static BattleTelemetrySettings Create(IConfiguration configuration, string contentRootPath)
+    public static BattleTelemetrySettings Create(
+        IConfiguration configuration,
+        string contentRootPath,
+        BattleHostCapacitySettings? capacitySettings = null)
     {
+        capacitySettings ??= new BattleHostCapacitySettings(1);
         string? endpointValue = configuration["OTEL_EXPORTER_OTLP_ENDPOINT"];
         Uri? endpoint = null;
         if (!string.IsNullOrWhiteSpace(endpointValue) &&
@@ -66,7 +74,8 @@ internal sealed record BattleTelemetrySettings(
             FixedIdentity(configuration, "AINATIVE_SOURCE_COMMIT", 40),
             FixedIdentity(configuration, "AINATIVE_FANTASY_COMMIT", 40),
             FixedIdentity(configuration, "AINATIVE_PROTOCOL_IDENTITY", 64),
-            configurationIdentity);
+            configurationIdentity,
+            capacitySettings.RoomCount);
 
         int exportTimeout = BoundedInteger(
             configuration,

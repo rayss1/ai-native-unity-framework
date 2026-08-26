@@ -8,22 +8,22 @@ namespace AiNative.BattleHost;
 
 internal sealed class RoomProtocolService(
     FantasyKcpGateway gateway,
+    BattleRoomSet rooms,
     BattleMetrics metrics,
     BattleReplayCapture replayCapture,
     ILogger<RoomProtocolService> logger) : IAsyncDisposable
 {
-    private const int MaxConnections = 64;
     private const ulong ReconnectRetentionTicks = 60 * 30;
     private readonly byte[] _receiveBuffer = new byte[RealtimeProtocolCodec.MaxDatagramBytes];
     private readonly byte[] _sendBuffer = new byte[RealtimeProtocolCodec.MaxDatagramBytes];
-    private readonly List<ConnectionState> _connections = new(MaxConnections);
-    private readonly Dictionary<ulong, LogicalSession> _sessions = new(MaxConnections);
-    private readonly bool[] _assignedEntities = new bool[MaxConnections];
+    private readonly Snapshot?[] _snapshotCache = new Snapshot?[rooms.RoomCount];
+    private readonly List<ConnectionState> _connections = new(rooms.Settings.TotalBotCapacity);
+    private readonly Dictionary<ulong, LogicalSession> _sessions = new(rooms.Settings.TotalBotCapacity);
     private ulong _nextSessionId;
 
     public int ConnectedCount => _connections.Count;
 
-    public void PumpInbound(SyntheticRoom room, ulong roomTick)
+    public void PumpInbound(ulong roomTick)
     {
         AcceptConnections();
         ExpireDisconnectedSessions(roomTick);
@@ -58,27 +58,34 @@ internal sealed class RoomProtocolService(
                 Handle(
                     connection,
                     decoded,
-                    room,
                     roomTick,
                     _receiveBuffer.AsSpan(0, packet.WrittenBytes));
             }
         }
     }
 
-    public void PublishSnapshot(SyntheticRoom room, ulong roomTick)
+    public void PublishSnapshots(ulong roomTick)
     {
         if (roomTick == 0 || roomTick % 3 != 0)
         {
             return;
         }
 
-        Snapshot snapshot = room.CreateSnapshot(roomTick);
-        foreach (ConnectionState connection in _connections)
+        try
         {
-            if (connection.Session is { Joined: true })
+            foreach (ConnectionState connection in _connections)
             {
-                Send(connection, MessageId.Snapshot, snapshot);
+                if (connection.Session is { Joined: true } session)
+                {
+                    Snapshot snapshot = _snapshotCache[session.RoomIndex] ??=
+                        rooms[session.RoomIndex].CreateSnapshot(roomTick);
+                    Send(connection, MessageId.Snapshot, snapshot);
+                }
             }
+        }
+        finally
+        {
+            Array.Clear(_snapshotCache);
         }
     }
 
@@ -86,7 +93,7 @@ internal sealed class RoomProtocolService(
     {
         while (gateway.TryAccept(out FantasyKcpConnection? accepted) && accepted is not null)
         {
-            if (_connections.Count >= MaxConnections)
+            if (_connections.Count >= rooms.Settings.TotalBotCapacity)
             {
                 accepted.DisposeAsync().AsTask().GetAwaiter().GetResult();
                 metrics.RecordDroppedDiagnostic();
@@ -105,7 +112,6 @@ internal sealed class RoomProtocolService(
     private void Handle(
         ConnectionState connection,
         DecodedProtocolMessage decoded,
-        SyntheticRoom room,
         ulong roomTick,
         ReadOnlySpan<byte> frame)
     {
@@ -118,13 +124,13 @@ internal sealed class RoomProtocolService(
                 HandleJoin(connection, request);
                 return;
             case MessageId.InputCommand when decoded.Message is InputCommand command:
-                HandleInput(connection, command, room, roomTick, frame);
+                HandleInput(connection, command, roomTick, frame);
                 return;
             case MessageId.InputBatch when decoded.Message is InputBatch batch:
-                HandleInputBatch(connection, batch, room, roomTick, frame);
+                HandleInputBatch(connection, batch, roomTick, frame);
                 return;
             case MessageId.ReconnectRequest when decoded.Message is ReconnectRequest request:
-                HandleReconnect(connection, request, room, roomTick);
+                HandleReconnect(connection, request, roomTick);
                 return;
             default:
                 metrics.RecordDroppedDiagnostic();
@@ -161,19 +167,26 @@ internal sealed class RoomProtocolService(
             return;
         }
 
-        int entityIndex = FindAvailableEntity();
-        if (entityIndex < 0)
+        uint requestedRoom = request.RequestedRoom == 0 ? 1U : request.RequestedRoom;
+        if (requestedRoom > (uint)rooms.RoomCount)
         {
             metrics.RecordDroppedDiagnostic();
             return;
         }
 
-        _assignedEntities[entityIndex] = true;
+        int roomIndex = checked((int)requestedRoom - 1);
+        if (!rooms.TryAssignEntity(roomIndex, out int entityIndex))
+        {
+            metrics.RecordDroppedDiagnostic();
+            return;
+        }
+
+        session.RoomIndex = roomIndex;
         session.EntityIndex = entityIndex;
         session.Joined = true;
         Send(connection, MessageId.JoinRoomResponse, new JoinRoomResponse
         {
-            RoomId = request.RequestedRoom == 0 ? 1U : request.RequestedRoom,
+            RoomId = requestedRoom,
             EntityId = checked((uint)entityIndex + 1),
             TickRate = 60,
         });
@@ -182,7 +195,6 @@ internal sealed class RoomProtocolService(
     private void HandleInput(
         ConnectionState connection,
         InputCommand command,
-        SyntheticRoom room,
         ulong roomTick,
         ReadOnlySpan<byte> frame)
     {
@@ -195,13 +207,15 @@ internal sealed class RoomProtocolService(
 
         session.LastInputSequence = command.Sequence;
         replayCapture.TryRecordInput(roomTick, session.EntityIndex, frame);
-        room.ApplyInput(session.EntityIndex, command.MoveXMilli, command.MoveYMilli);
+        rooms[session.RoomIndex].ApplyInput(
+            session.EntityIndex,
+            command.MoveXMilli,
+            command.MoveYMilli);
     }
 
     private void HandleInputBatch(
         ConnectionState connection,
         InputBatch batch,
-        SyntheticRoom room,
         ulong roomTick,
         ReadOnlySpan<byte> frame)
     {
@@ -227,7 +241,10 @@ internal sealed class RoomProtocolService(
         replayCapture.TryRecordInput(roomTick, session.EntityIndex, frame);
         foreach (InputCommand command in batch.Commands)
         {
-            room.ApplyInput(session.EntityIndex, command.MoveXMilli, command.MoveYMilli);
+            rooms[session.RoomIndex].ApplyInput(
+                session.EntityIndex,
+                command.MoveXMilli,
+                command.MoveYMilli);
         }
 
         session.LastInputSequence = previousSequence;
@@ -236,7 +253,6 @@ internal sealed class RoomProtocolService(
     private void HandleReconnect(
         ConnectionState connection,
         ReconnectRequest request,
-        SyntheticRoom room,
         ulong roomTick)
     {
         if (connection.Session is not null ||
@@ -255,7 +271,7 @@ internal sealed class RoomProtocolService(
         {
             ConnectionEpoch = connection.Connection.ConnectionEpoch,
             ResumeTick = roomTick,
-            Snapshot = room.CreateSnapshot(roomTick),
+            Snapshot = rooms[session.RoomIndex].CreateSnapshot(roomTick),
         });
     }
 
@@ -281,19 +297,6 @@ internal sealed class RoomProtocolService(
         {
             metrics.RecordDroppedDiagnostic();
         }
-    }
-
-    private int FindAvailableEntity()
-    {
-        for (int index = 0; index < _assignedEntities.Length; index++)
-        {
-            if (!_assignedEntities[index])
-            {
-                return index;
-            }
-        }
-
-        return -1;
     }
 
     private void RemoveConnection(int index, ulong roomTick)
@@ -327,7 +330,7 @@ internal sealed class RoomProtocolService(
 
             if (session.EntityIndex >= 0)
             {
-                _assignedEntities[session.EntityIndex] = false;
+                rooms.ReleaseEntity(session.RoomIndex, session.EntityIndex);
             }
 
             _sessions.Remove(sessionId);
@@ -365,6 +368,8 @@ internal sealed class RoomProtocolService(
         public ConnectionState Connection { get; set; } = connection;
 
         public int EntityIndex { get; set; } = -1;
+
+        public int RoomIndex { get; set; } = -1;
 
         public uint LastInputSequence { get; set; }
 

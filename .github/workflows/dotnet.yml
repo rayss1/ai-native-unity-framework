@@ -44,6 +44,9 @@ jobs:
           bash -n tools/release/verify-telemetry-capacity.sh
           bash -n tools/release/test-telemetry-capacity.sh
           tools/release/test-telemetry-capacity.sh
+          bash -n tools/release/verify-multi-room-capacity.sh
+          bash -n tools/release/test-multi-room-capacity.sh
+          tools/release/test-multi-room-capacity.sh
 
       - name: Install .NET 10 SDK
         uses: actions/setup-dotnet@v4

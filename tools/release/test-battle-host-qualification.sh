@@ -50,6 +50,9 @@ jq -n \
   --arg protocol "$protocol_identity" \
   '{
     evidenceClass: "release-equivalent-host-core",
+    roomCount: 1,
+    botsPerRoom: 64,
+    totalBotCapacity: 64,
     sourceCommit: $source,
     fantasyCommit: $fantasy,
     protocolIdentity: $protocol,
@@ -69,6 +72,8 @@ jq -n \
   --arg protocol "$protocol_identity" \
   '{
     evidenceClass: "telemetry-capacity-comparison",
+    roomCount: 1,
+    botsPerRoom: 64,
     sourceCommit: $source,
     fantasyCommit: $fantasy,
     protocolIdentity: $protocol,
@@ -169,6 +174,15 @@ expect_failure over-budget \
   "$fixture_dir/artifacts.json" \
   "$fixture_dir/provenance.json" \
   "$fixture_dir/soak-over-budget.json" \
+  "$fixture_dir/telemetry-capacity.json"
+
+jq '.roomCount = 2 | .totalBotCapacity = 128' \
+  "$fixture_dir/soak-host.json" > "$fixture_dir/soak-room-drift.json"
+expect_failure room-drift \
+  "$fixture_dir/run.json" \
+  "$fixture_dir/artifacts.json" \
+  "$fixture_dir/provenance.json" \
+  "$fixture_dir/soak-room-drift.json" \
   "$fixture_dir/telemetry-capacity.json"
 
 jq '.exporterOutage.tickP99IncrementMilliseconds = 0.25' \
