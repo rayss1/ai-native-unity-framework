@@ -26,5 +26,6 @@ The first slice can use existing Fantasy networking while retaining a replaceabl
 
 - Impairment tests cover 100/200 ms RTT, 1%/5% loss, jitter, duplication, reordering, reconnect, and one deliberately stalled client.
 - Pass thresholds are the Tick, queue, packet, and bandwidth gates in `performance-budgets.md`; a stalled client must not move room Tick P99 outside its gate.
+- The [multi-room capacity validation](../Architecture/multi-room-capacity-validation.md) may evaluate two isolated 64-participant rooms behind explicit evaluation-only configuration. Production density remains one room until an exact-`main` 128-client run retains at least 20% headroom in every affected hard budget and its report is accepted.
 - Codec/transport migration uses capability negotiation and dual decode during a bounded compatibility window. Recorded packet fixtures and replay prove equivalence.
 - Rollback disables the new capability and routes clients to the last supported adapter/codec; manifests retain the prior client package until rollout completion.

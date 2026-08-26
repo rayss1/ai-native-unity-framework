@@ -1,7 +1,7 @@
 # Architecture Risk Register
 
 Status: Active for the first vertical slice
-Last updated: 2026-08-25
+Last updated: 2026-08-26
 
 Scale: likelihood and impact are Low/Medium/High. “Tripwire” is the earliest objective signal that forces action. Owners are roles until modules have maintainers.
 
@@ -26,6 +26,7 @@ Scale: likelihood and impact are Low/Medium/High. “Tripwire” is the earliest
 | R-17 | Premature infrastructure (Kubernetes/broker/Redis) expands failure surface | Medium | Medium | Infrastructure | Dependency proposed without measured bottleneck/availability requirement | Require ADR with workload, SLO, operational owner, exit criteria | Remove optional deployment component; return to Compose/simple topology |
 | R-18 | Performance results are not reproducible or hide tail failures | Medium | High | Performance owner | Missing SHA/config/seed/percentiles or run cannot replay | Standard report metadata, stored seeds/vectors, release-equivalent builds | Reject result and retain previous accepted budget/config |
 | R-19 | A mutable, unqualified, or unverifiable image is promoted or cannot be rolled back | Medium | High | Release owner | Tag already exists, qualification identity differs, attestation fails, or prior digest/config is unavailable | Manual exact-main gate; immutable source/version tags; SBOM/provenance/attestation; append-only repository release ledger; digest deployment; retained previous digest/config | Stop promotion, drain the new Host, restore the previous digest/config; never overwrite the failed version tag. The first release has no prior image, so its pre-success containment is drain-and-stop. |
+| R-20 | Increasing rooms per process hides aggregate CPU, memory, scheduler-tail, or per-client wire saturation | Medium | High | Server performance | Two-room Tick, CPU, memory, connection, or wire result loses 20% headroom; room routing or replay identity is ambiguous | Keep production at one room; use explicit evaluation-only room count, real 128-session KCP load, Regional PCAP, bounded container memory, and exact identities | Reject the density increase and return to one room per process; do not weaken budgets or reuse ambiguous replay evidence |
 
 ## Review cadence
 

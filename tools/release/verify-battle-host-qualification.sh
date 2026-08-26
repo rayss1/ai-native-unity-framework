@@ -80,6 +80,9 @@ jq -e --arg source "$expected_source_sha" --arg fantasy "$fantasy_commit" --arg 
 
 jq -e --arg source "$expected_source_sha" --arg fantasy "$fantasy_commit" --arg protocol "$protocol_identity" '
   .evidenceClass == "release-equivalent-host-core"
+  and .roomCount == 1
+  and .botsPerRoom == 64
+  and .totalBotCapacity == 64
   and .sourceCommit == $source
   and .fantasyCommit == $fantasy
   and .protocolIdentity == $protocol
@@ -95,6 +98,8 @@ jq -e --arg source "$expected_source_sha" --arg fantasy "$fantasy_commit" --arg 
 
 jq -e --arg source "$expected_source_sha" --arg fantasy "$fantasy_commit" --arg protocol "$protocol_identity" '
   .evidenceClass == "telemetry-capacity-comparison"
+  and .roomCount == 1
+  and .botsPerRoom == 64
   and .sourceCommit == $source
   and .fantasyCommit == $fantasy
   and .protocolIdentity == $protocol

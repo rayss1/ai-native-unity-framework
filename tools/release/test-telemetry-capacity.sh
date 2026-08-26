@@ -24,6 +24,9 @@ write_host() {
     --argjson seriesOverflow "$series_overflow" '
     {
       evidenceClass: "release-equivalent-host-core",
+      roomCount: 1,
+      botsPerRoom: 64,
+      totalBotCapacity: 64,
       sourceCommit: "1111111111111111111111111111111111111111",
       fantasyCommit: "2222222222222222222222222222222222222222",
       protocolIdentity: "3333333333333333333333333333333333333333333333333333333333333333",
@@ -60,6 +63,8 @@ write_host() {
 
 jq -n '{
   botCount: 64,
+  roomCount: 1,
+  botsPerRoom: 64,
   peakConnections: 64,
   warmupSeconds: 10,
   measuredSeconds: 300,
@@ -108,5 +113,8 @@ expect_failure tag-violation "$fixture_dir/tag-violation.json"
 
 jq '.projectMetricSeriesOverflow = 1' "$fixture_dir/outage.json" > "$fixture_dir/series-overflow.json"
 expect_failure series-overflow "$fixture_dir/series-overflow.json"
+
+jq '.roomCount = 2 | .totalBotCapacity = 128' "$fixture_dir/outage.json" > "$fixture_dir/room-drift.json"
+expect_failure room-drift "$fixture_dir/room-drift.json"
 
 echo "Telemetry capacity contract tests passed."
