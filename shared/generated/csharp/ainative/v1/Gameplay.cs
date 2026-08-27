@@ -39,26 +39,27 @@ namespace AiNative.Protocol.V1 {
             "BQhkEMgBIp8BCgtQbGF5ZXJTdGF0ZRIRCgllbnRpdHlfaWQYASABKA0SGAoQ",
             "cG9zaXRpb25feF9taWxsaRgCIAEoERIYChBwb3NpdGlvbl95X21pbGxpGAMg",
             "ASgREhgKEHBvc2l0aW9uX3pfbWlsbGkYBCABKBESGAoQeWF3X21pbGxpZGVn",
-            "cmVlcxgFIAEoERIOCgZoZWFsdGgYBiABKA1KBQhkEMgBIpIBCghTbmFwc2hv",
+            "cmVlcxgFIAEoERIOCgZoZWFsdGgYBiABKA1KBQhkEMgBIrkBCghTbmFwc2hv",
             "dBIWCg5wcm90b2NvbF9tYWpvchgBIAEoDRIRCglyb29tX3RpY2sYAiABKAYS",
             "FQoNYmFzZWxpbmVfdGljaxgDIAEoBhIpCgdwbGF5ZXJzGAQgAygLMhguYWlu",
-            "YXRpdmUudjEuUGxheWVyU3RhdGUSEgoKc3RhdGVfaGFzaBgFIAEoBkoFCGQQ",
-            "yAEiYAoNUmVsaWFibGVFdmVudBIRCglyb29tX3RpY2sYASABKAYSEAoIc2Vx",
-            "dWVuY2UYAiABKA0SEgoKZXZlbnRfdHlwZRgDIAEoDRIPCgdwYXlsb2FkGAQg",
-            "ASgMSgUIZBDIASJjChBSZWNvbm5lY3RSZXF1ZXN0EhIKCnNlc3Npb25faWQY",
-            "ASABKAYSGAoQY29ubmVjdGlvbl9lcG9jaBgCIAEoDRIaChJsYXN0X3JlY2Vp",
-            "dmVkX3RpY2sYAyABKAZKBQhkEMgBInIKEVJlY29ubmVjdFJlc3BvbnNlEhgK",
-            "EGNvbm5lY3Rpb25fZXBvY2gYASABKA0SEwoLcmVzdW1lX3RpY2sYAiABKAYS",
-            "JwoIc25hcHNob3QYAyABKAsyFS5haW5hdGl2ZS52MS5TbmFwc2hvdEoFCGQQ",
-            "yAEq6gIKCU1lc3NhZ2VJZBIaChZNRVNTQUdFX0lEX1VOU1BFQ0lGSUVEEAAS",
-            "HQoYTUVTU0FHRV9JRF9MT0dJTl9SRVFVRVNUEOgHEh4KGU1FU1NBR0VfSURf",
-            "TE9HSU5fUkVTUE9OU0UQ6QcSIQocTUVTU0FHRV9JRF9KT0lOX1JPT01fUkVR",
-            "VUVTVBDyBxIiCh1NRVNTQUdFX0lEX0pPSU5fUk9PTV9SRVNQT05TRRDzBxId",
-            "ChhNRVNTQUdFX0lEX0lOUFVUX0NPTU1BTkQQzAgSGAoTTUVTU0FHRV9JRF9T",
-            "TkFQU0hPVBDNCBIeChlNRVNTQUdFX0lEX1JFTElBQkxFX0VWRU5UEM4IEhsK",
-            "Fk1FU1NBR0VfSURfSU5QVVRfQkFUQ0gQzwgSIQocTUVTU0FHRV9JRF9SRUNP",
-            "Tk5FQ1RfUkVRVUVTVBCwCRIiCh1NRVNTQUdFX0lEX1JFQ09OTkVDVF9SRVNQ",
-            "T05TRRCxCUIXqgIUQWlOYXRpdmUuUHJvdG9jb2wuVjFiBnByb3RvMw=="));
+            "YXRpdmUudjEuUGxheWVyU3RhdGUSEgoKc3RhdGVfaGFzaBgFIAEoBhIlCh1s",
+            "YXN0X3Byb2Nlc3NlZF9pbnB1dF9zZXF1ZW5jZRgGIAEoDUoFCGQQyAEiYAoN",
+            "UmVsaWFibGVFdmVudBIRCglyb29tX3RpY2sYASABKAYSEAoIc2VxdWVuY2UY",
+            "AiABKA0SEgoKZXZlbnRfdHlwZRgDIAEoDRIPCgdwYXlsb2FkGAQgASgMSgUI",
+            "ZBDIASJjChBSZWNvbm5lY3RSZXF1ZXN0EhIKCnNlc3Npb25faWQYASABKAYS",
+            "GAoQY29ubmVjdGlvbl9lcG9jaBgCIAEoDRIaChJsYXN0X3JlY2VpdmVkX3Rp",
+            "Y2sYAyABKAZKBQhkEMgBInIKEVJlY29ubmVjdFJlc3BvbnNlEhgKEGNvbm5l",
+            "Y3Rpb25fZXBvY2gYASABKA0SEwoLcmVzdW1lX3RpY2sYAiABKAYSJwoIc25h",
+            "cHNob3QYAyABKAsyFS5haW5hdGl2ZS52MS5TbmFwc2hvdEoFCGQQyAEq6gIK",
+            "CU1lc3NhZ2VJZBIaChZNRVNTQUdFX0lEX1VOU1BFQ0lGSUVEEAASHQoYTUVT",
+            "U0FHRV9JRF9MT0dJTl9SRVFVRVNUEOgHEh4KGU1FU1NBR0VfSURfTE9HSU5f",
+            "UkVTUE9OU0UQ6QcSIQocTUVTU0FHRV9JRF9KT0lOX1JPT01fUkVRVUVTVBDy",
+            "BxIiCh1NRVNTQUdFX0lEX0pPSU5fUk9PTV9SRVNQT05TRRDzBxIdChhNRVNT",
+            "QUdFX0lEX0lOUFVUX0NPTU1BTkQQzAgSGAoTTUVTU0FHRV9JRF9TTkFQU0hP",
+            "VBDNCBIeChlNRVNTQUdFX0lEX1JFTElBQkxFX0VWRU5UEM4IEhsKFk1FU1NB",
+            "R0VfSURfSU5QVVRfQkFUQ0gQzwgSIQocTUVTU0FHRV9JRF9SRUNPTk5FQ1Rf",
+            "UkVRVUVTVBCwCRIiCh1NRVNTQUdFX0lEX1JFQ09OTkVDVF9SRVNQT05TRRCx",
+            "CUIXqgIUQWlOYXRpdmUuUHJvdG9jb2wuVjFiBnByb3RvMw=="));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { },
           new pbr::GeneratedClrTypeInfo(new[] {typeof(global::AiNative.Protocol.V1.MessageId), }, null, new pbr::GeneratedClrTypeInfo[] {
@@ -69,7 +70,7 @@ namespace AiNative.Protocol.V1 {
             new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.V1.InputCommand), global::AiNative.Protocol.V1.InputCommand.Parser, new[]{ "RoomTick", "Sequence", "MoveXMilli", "MoveYMilli", "YawMillidegrees", "Buttons" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.V1.InputBatch), global::AiNative.Protocol.V1.InputBatch.Parser, new[]{ "Commands" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.V1.PlayerState), global::AiNative.Protocol.V1.PlayerState.Parser, new[]{ "EntityId", "PositionXMilli", "PositionYMilli", "PositionZMilli", "YawMillidegrees", "Health" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.V1.Snapshot), global::AiNative.Protocol.V1.Snapshot.Parser, new[]{ "ProtocolMajor", "RoomTick", "BaselineTick", "Players", "StateHash" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.V1.Snapshot), global::AiNative.Protocol.V1.Snapshot.Parser, new[]{ "ProtocolMajor", "RoomTick", "BaselineTick", "Players", "StateHash", "LastProcessedInputSequence" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.V1.ReliableEvent), global::AiNative.Protocol.V1.ReliableEvent.Parser, new[]{ "RoomTick", "Sequence", "EventType", "Payload" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.V1.ReconnectRequest), global::AiNative.Protocol.V1.ReconnectRequest.Parser, new[]{ "SessionId", "ConnectionEpoch", "LastReceivedTick" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.V1.ReconnectResponse), global::AiNative.Protocol.V1.ReconnectResponse.Parser, new[]{ "ConnectionEpoch", "ResumeTick", "Snapshot" }, null, null, null, null)
@@ -2066,6 +2067,7 @@ namespace AiNative.Protocol.V1 {
       baselineTick_ = other.baselineTick_;
       players_ = other.players_.Clone();
       stateHash_ = other.stateHash_;
+      lastProcessedInputSequence_ = other.lastProcessedInputSequence_;
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
     }
 
@@ -2134,6 +2136,18 @@ namespace AiNative.Protocol.V1 {
       }
     }
 
+    /// <summary>Field number for the "last_processed_input_sequence" field.</summary>
+    public const int LastProcessedInputSequenceFieldNumber = 6;
+    private uint lastProcessedInputSequence_;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public uint LastProcessedInputSequence {
+      get { return lastProcessedInputSequence_; }
+      set {
+        lastProcessedInputSequence_ = value;
+      }
+    }
+
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override bool Equals(object other) {
@@ -2154,6 +2168,7 @@ namespace AiNative.Protocol.V1 {
       if (BaselineTick != other.BaselineTick) return false;
       if(!players_.Equals(other.players_)) return false;
       if (StateHash != other.StateHash) return false;
+      if (LastProcessedInputSequence != other.LastProcessedInputSequence) return false;
       return Equals(_unknownFields, other._unknownFields);
     }
 
@@ -2166,6 +2181,7 @@ namespace AiNative.Protocol.V1 {
       if (BaselineTick != 0UL) hash ^= BaselineTick.GetHashCode();
       hash ^= players_.GetHashCode();
       if (StateHash != 0UL) hash ^= StateHash.GetHashCode();
+      if (LastProcessedInputSequence != 0) hash ^= LastProcessedInputSequence.GetHashCode();
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
       }
@@ -2201,6 +2217,10 @@ namespace AiNative.Protocol.V1 {
         output.WriteRawTag(41);
         output.WriteFixed64(StateHash);
       }
+      if (LastProcessedInputSequence != 0) {
+        output.WriteRawTag(48);
+        output.WriteUInt32(LastProcessedInputSequence);
+      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(output);
       }
@@ -2228,6 +2248,10 @@ namespace AiNative.Protocol.V1 {
         output.WriteRawTag(41);
         output.WriteFixed64(StateHash);
       }
+      if (LastProcessedInputSequence != 0) {
+        output.WriteRawTag(48);
+        output.WriteUInt32(LastProcessedInputSequence);
+      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(ref output);
       }
@@ -2250,6 +2274,9 @@ namespace AiNative.Protocol.V1 {
       size += players_.CalculateSize(_repeated_players_codec);
       if (StateHash != 0UL) {
         size += 1 + 8;
+      }
+      if (LastProcessedInputSequence != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeUInt32Size(LastProcessedInputSequence);
       }
       if (_unknownFields != null) {
         size += _unknownFields.CalculateSize();
@@ -2275,6 +2302,9 @@ namespace AiNative.Protocol.V1 {
       players_.Add(other.players_);
       if (other.StateHash != 0UL) {
         StateHash = other.StateHash;
+      }
+      if (other.LastProcessedInputSequence != 0) {
+        LastProcessedInputSequence = other.LastProcessedInputSequence;
       }
       _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
     }
@@ -2315,6 +2345,10 @@ namespace AiNative.Protocol.V1 {
             StateHash = input.ReadFixed64();
             break;
           }
+          case 48: {
+            LastProcessedInputSequence = input.ReadUInt32();
+            break;
+          }
         }
       }
     #endif
@@ -2352,6 +2386,10 @@ namespace AiNative.Protocol.V1 {
           }
           case 41: {
             StateHash = input.ReadFixed64();
+            break;
+          }
+          case 48: {
+            LastProcessedInputSequence = input.ReadUInt32();
             break;
           }
         }

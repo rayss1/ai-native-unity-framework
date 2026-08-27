@@ -79,6 +79,9 @@ internal sealed class RoomProtocolService(
                 {
                     Snapshot snapshot = _snapshotCache[session.RoomIndex] ??=
                         rooms[session.RoomIndex].CreateSnapshot(roomTick);
+                    // Send encodes synchronously before returning, so the room snapshot can carry
+                    // one recipient-specific acknowledgement without cloning its 64-player state.
+                    snapshot.LastProcessedInputSequence = session.LastInputSequence;
                     Send(connection, MessageId.Snapshot, snapshot);
                 }
             }
@@ -267,11 +270,13 @@ internal sealed class RoomProtocolService(
         session.Connection = connection;
         session.DisconnectedAtTick = null;
         connection.Session = session;
+        Snapshot resumeSnapshot = rooms[session.RoomIndex].CreateSnapshot(roomTick);
+        resumeSnapshot.LastProcessedInputSequence = session.LastInputSequence;
         Send(connection, MessageId.ReconnectResponse, new ReconnectResponse
         {
             ConnectionEpoch = connection.Connection.ConnectionEpoch,
             ResumeTick = roomTick,
-            Snapshot = rooms[session.RoomIndex].CreateSnapshot(roomTick),
+            Snapshot = resumeSnapshot,
         });
     }
 

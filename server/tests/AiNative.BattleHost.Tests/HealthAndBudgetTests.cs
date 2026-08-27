@@ -193,6 +193,19 @@ public sealed class HealthAndBudgetTests
         Assert.That(reassigned, Is.Zero);
     }
 
+    [Test]
+    public void SyntheticRoomUsesTheSharedFixedIntegerMovementRule()
+    {
+        SyntheticRoom room = new(2);
+
+        room.ApplyInput(0, 1000, -500);
+        room.ApplyInput(0, -250, 750);
+        PlayerState player = room.CreateSnapshot(100).Players[0];
+
+        Assert.That(player.PositionXMilli, Is.EqualTo(38));
+        Assert.That(player.PositionZMilli, Is.EqualTo(12));
+    }
+
     [TestCase("OTEL_EXPORTER_OTLP_ENDPOINT", "not-a-uri")]
     [TestCase("AINATIVE_DEPLOYMENT_ENVIRONMENT", "contains spaces")]
     [TestCase("AINATIVE_OTEL_TRACE_QUEUE_SIZE", "64")]

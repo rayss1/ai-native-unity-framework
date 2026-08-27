@@ -88,8 +88,8 @@ result="$(xmllint --xpath 'string(/test-run/@result)' "$evidence_dir/editmode.xm
   echo "skipped=$skipped"
 } | tee "$evidence_dir/summary.txt"
 
-if [[ "$result" != "Passed" || "$passed" != "7" || "$failed" != "0" || "$skipped" != "0" ]]; then
-  echo "Expected exactly 7 passed, 0 failed, and 0 skipped EditMode tests." >&2
+if [[ "$result" != "Passed" || "$passed" != "14" || "$failed" != "0" || "$skipped" != "0" ]]; then
+  echo "Expected exactly 14 passed, 0 failed, and 0 skipped EditMode tests." >&2
   exit 1
 fi
 

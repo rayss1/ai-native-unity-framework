@@ -1,7 +1,7 @@
 # ai-native-unity-framework
 An AI-native full-stack Unity game development framework for autonomous AI agents, covering client, server, shared modules, development tools, testing, build pipelines, and automation.
 
-The repository contains the first production vertical-slice foundation: one Shared Gameplay source set compiled by Unity and .NET, project-owned realtime/protocol contracts, a .NET 10 Fantasy-backed Battle Host, cross-runtime vectors, deterministic replay/load evidence, a production container contract, and a manifest-derived architecture validator.
+The repository contains the first production vertical-slice foundation: one Shared Gameplay source set compiled by Unity and .NET, bounded client prediction/reconciliation primitives, project-owned realtime/protocol contracts, a .NET 10 Fantasy-backed Battle Host, cross-runtime vectors, deterministic replay/load evidence, a production container contract, and a manifest-derived architecture validator.
 
 ## Requirements
 
@@ -46,7 +46,7 @@ Until credentialed Unity CI is restored, run the Unity package tests manually on
 tools/run-unity-manual-validation.sh
 ```
 
-The required seven-test result and evidence bundle are defined in [Manual Unity Shared-Vector Validation](Docs/Architecture/unity-manual-validation.md).
+The required 14-test result and evidence bundle are defined in [Manual Unity Shared-Vector Validation](Docs/Architecture/unity-manual-validation.md).
 
 The equivalent direct invocation on Windows is:
 
@@ -96,5 +96,6 @@ The repository-retained [release ledger](infrastructure/battle-host/releases/REA
 - [Decision Alternatives and Trade-offs](Docs/Architecture/decision-tradeoffs.md)
 - [Module Dependency Matrix](Docs/Architecture/dependency-matrix.md)
 - [Public API Contract Catalog](Docs/Architecture/public-api-contracts.md)
+- [Client Prediction and Reconciliation Baseline](Docs/Architecture/client-prediction-baseline.md)
 - [First Vertical Slice Performance Budgets](Docs/Architecture/performance-budgets.md)
 - [Architecture Risk Register](Docs/Architecture/risk-register.md)
