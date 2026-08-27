@@ -1,7 +1,7 @@
 # Battle Host Release Procedure
 
 Status: Controlled publication procedure for the first vertical slice
-Last updated: 2026-08-25
+Last updated: 2026-08-27
 
 This procedure implements the immutable-image, provenance, and rollback requirements in [ADR-0010](../ADR/0010-observability-and-deployment.md) and [ADR-0012](../ADR/0012-server-runtime-successor.md). It publishes only the Linux x64 Battle Host image; it does not deploy a process, mutate an environment, or introduce an orchestrator.
 
@@ -77,6 +77,8 @@ The release manifest artifact records every identity needed to reproduce or audi
 
 The first qualified publication is [`v0.1.0`](../../infrastructure/battle-host/releases/v0.1.0.json), produced by [release run 32830738674](https://github.com/rayss1/ai-native-unity-framework/actions/runs/32830738674) from qualified [production run 32823471154](https://github.com/rayss1/ai-native-unity-framework/actions/runs/32823471154). Its digest-level smoke and [GitHub attestation 42806017](https://github.com/rayss1/ai-native-unity-framework/attestations/42806017) passed. No deployment or canary is implied by this evidence.
 
+The second qualified publication is [`v0.2.0`](../../infrastructure/battle-host/releases/v0.2.0.json), produced by [release run 33044385163](https://github.com/rayss1/ai-native-unity-framework/actions/runs/33044385163) from qualified [production run 32986680728](https://github.com/rayss1/ai-native-unity-framework/actions/runs/32986680728). Its immutable digest is `sha256:f6fd37c7ab048a99327dbe7f4f0e60d5689cd0f2fbc6c28aca51592aa7d0bbb8`; digest-level identity/readiness/drain/SIGTERM smoke, embedded SBOM/provenance, and [GitHub attestation 43313356](https://github.com/rayss1/ai-native-unity-framework/attestations/43313356) passed. The `v0.2.0` and exact-source tags independently resolve to that same digest. The project owner designated `v0.1.0` as the fallback for a future `v0.2.0` canary, but no deployment or environment canary is implied by publication.
+
 ## Rollback and failure containment
 
 - Keep the previous qualified digest and compatible configuration throughout rollout.
@@ -86,4 +88,4 @@ The first qualified publication is [`v0.1.0`](../../infrastructure/battle-host/r
 - A failure after version promotion requires a new version after correction. Published version/source tags remain immutable and auditable.
 - Changing the Fantasy baseline, license scope, protocol compatibility, or release distribution model reopens the corresponding ADR/legal gates.
 
-`v0.1.0` is the first retained release and therefore has no earlier Battle Host digest. Its initial canary must not be treated as rollback-qualified until the operator names a separately qualified fallback; before that point, containment is drain-and-stop rather than image rollback.
+`v0.1.0` remains the first retained release and had no earlier Battle Host digest. For a future `v0.2.0` canary, `v0.1.0` is now the named fallback: both releases retain the same Fantasy, protocol, and application-configuration identities. The operator must still verify both digests in the target registry, preserve the compatible configuration, name the target/SLO window/admission procedure, and hold authority to drain `v0.2.0` and switch to `v0.1.0`. Until that environment-specific procedure is approved and exercised, publication is not a rollback-qualified canary.
