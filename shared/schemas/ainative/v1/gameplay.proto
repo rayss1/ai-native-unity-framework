@@ -73,6 +73,7 @@ message Snapshot {
   fixed64 baseline_tick = 3;
   repeated PlayerState players = 4;
   fixed64 state_hash = 5;
+  uint32 last_processed_input_sequence = 6;
   reserved 100 to 199;
 }
 

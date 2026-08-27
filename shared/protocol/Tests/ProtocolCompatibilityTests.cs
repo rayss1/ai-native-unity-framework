@@ -44,6 +44,23 @@ public sealed class ProtocolCompatibilityTests
     }
 
     [Test]
+    public void SnapshotInputAcknowledgementIsAdditiveAndStable()
+    {
+        Snapshot current = new()
+        {
+            ProtocolMajor = 1,
+            LastProcessedInputSequence = 42,
+        };
+        Snapshot legacy = Snapshot.Parser.ParseFrom(new byte[] { 0x08, 0x01 });
+
+        Assert.That(
+            Convert.ToHexString(current.ToByteArray()),
+            Is.EqualTo("0801302A"));
+        Assert.That(legacy.ProtocolMajor, Is.EqualTo(1));
+        Assert.That(legacy.LastProcessedInputSequence, Is.Zero);
+    }
+
+    [Test]
     public void MalformedInputIsRejected()
     {
         Assert.That(

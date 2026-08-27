@@ -66,6 +66,12 @@ internal static class FantasyKcpLoopbackProbe
             }
             while (snapshot.Players.First(player => player.EntityId == join.EntityId).PositionXMilli <
                    baselinePlayer.PositionXMilli + 25);
+
+            if (snapshot.LastProcessedInputSequence != 1)
+            {
+                throw new InvalidOperationException(
+                    "Fantasy KCP snapshot did not acknowledge the processed prediction input.");
+            }
         }
 
         await using FantasyKcpProbe reconnectProbe = await gateway.ConnectLoopbackProbeAsync(timeout.Token);
@@ -86,7 +92,8 @@ internal static class FantasyKcpLoopbackProbe
 
         if (reconnect.ConnectionEpoch == login.ConnectionEpoch ||
             reconnect.Snapshot is null ||
-            reconnect.ResumeTick < snapshot.RoomTick)
+            reconnect.ResumeTick < snapshot.RoomTick ||
+            reconnect.Snapshot.LastProcessedInputSequence != 1)
         {
             throw new InvalidOperationException("Fantasy KCP reconnect returned an invalid epoch or snapshot.");
         }
@@ -98,7 +105,8 @@ internal static class FantasyKcpLoopbackProbe
             join.RoomId,
             join.EntityId,
             snapshot.RoomTick,
-            reconnect.ResumeTick);
+            reconnect.ResumeTick,
+            snapshot.LastProcessedInputSequence);
     }
 
     internal static Task SendAsync(
@@ -176,4 +184,5 @@ internal readonly record struct FantasyKcpProbeResult(
     uint RoomId,
     uint EntityId,
     ulong SnapshotTick,
-    ulong ResumeTick);
+    ulong ResumeTick,
+    uint LastProcessedInputSequence);

@@ -92,7 +92,13 @@ public sealed class RealtimeProtocolCodecTests
     [Test]
     public void SnapshotFrameForSixtyFourPlayersFitsTheDatagramBudget()
     {
-        Snapshot snapshot = new() { ProtocolMajor = 1, RoomTick = 60, BaselineTick = 57 };
+        Snapshot snapshot = new()
+        {
+            ProtocolMajor = 1,
+            RoomTick = 60,
+            BaselineTick = 57,
+            LastProcessedInputSequence = uint.MaxValue,
+        };
         for (uint entityId = 1; entityId <= 64; entityId++)
         {
             snapshot.Players.Add(new PlayerState

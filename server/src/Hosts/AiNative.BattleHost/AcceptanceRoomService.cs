@@ -107,8 +107,12 @@ internal sealed class SyntheticRoom
             throw new ArgumentOutOfRangeException(nameof(entityIndex));
         }
 
-        _positionX[entityIndex] += Math.Clamp(moveXMilli, -1000, 1000) / 20;
-        _positionZ[entityIndex] += Math.Clamp(moveYMilli, -1000, 1000) / 20;
+        _positionX[entityIndex] = KinematicMovement.ApplyAxis(
+            _positionX[entityIndex],
+            moveXMilli);
+        _positionZ[entityIndex] = KinematicMovement.ApplyAxis(
+            _positionZ[entityIndex],
+            moveYMilli);
     }
 
     public AiNative.Protocol.V1.Snapshot CreateSnapshot(ulong roomTick)

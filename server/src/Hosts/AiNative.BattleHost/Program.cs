@@ -135,6 +135,7 @@ if (builder.Configuration.GetValue("AINATIVE_ENABLE_EVALUATION_ENDPOINTS", false
                 result.EntityId,
                 result.SnapshotTick,
                 result.ResumeTick,
+                result.LastProcessedInputSequence,
             });
         });
 
