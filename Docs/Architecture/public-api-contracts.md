@@ -1,7 +1,7 @@
 # Public API Contract Catalog
 
 Status: Minimum contract frozen for the first vertical slice
-Last updated: 2026-08-13
+Last updated: 2026-08-27
 
 This catalog defines ownership and semantics before implementation. Names and invariants are stable; value layouts may be extended additively as Spikes reveal required data. Implementations must not expose engine/framework types through these ports.
 
@@ -137,6 +137,17 @@ Consumers: simulation rules, replay, golden-vector tests
 `IRandomSource` exposes `NextUInt32`, `CaptureState`, and `RestoreState`. The first implementation is portable PCG-XSH-RR 32 with an explicit 128-bit `(state, stream)` value. No global or wall-clock seed is permitted.
 
 `IStateHasher.ComputeHash(ReadOnlySpan<byte>)` hashes a caller-owned canonical representation. The first implementation is xxHash64 with seed zero; canonical state bytes are versioned, little-endian, and independent of object layout or locale.
+
+## Client prediction primitives
+
+Owner: Shared Gameplay
+Consumers: Unity client prediction, deterministic tests, future replay diagnostics
+
+`KinematicInput` contains a strictly increasing sequence and normalized X/Z movement axes. `KinematicState` contains the committed/predicted Tick, last processed input sequence, and integer-millimetre X/Z position. `KinematicMovement.Step` advances exactly one fixed Tick using the product-owned integer rule; it does not call Unity physics or another adapter.
+
+`ClientPredictionHistory` owns a constructor-bounded circular history. `Predict` never blocks and reports when it had to drop the oldest entry. `Reconcile` consumes an authoritative `KinematicState`, discards acknowledged inputs, replays only newer inputs, and returns a `ReconciliationResult` that distinguishes matched, corrected, stale, authoritative-ahead, and history-miss paths. Correction components are explicit millimetres; visual smoothing is not part of the Shared contract.
+
+The protocol adapter maps the recipient-specific `Snapshot.last_processed_input_sequence` into the authoritative state. Protobuf, Fantasy, transport, wall-clock, scheduling, and presentation types do not cross this API. See [Client Prediction and Reconciliation Baseline](client-prediction-baseline.md) for evidence and remaining gates.
 
 ## Supporting boundary contracts
 

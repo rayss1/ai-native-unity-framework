@@ -1,7 +1,7 @@
 # Architecture Risk Register
 
 Status: Active for the first vertical slice
-Last updated: 2026-08-26
+Last updated: 2026-08-27
 
 Scale: likelihood and impact are Low/Medium/High. “Tripwire” is the earliest objective signal that forces action. Owners are roles until modules have maintainers.
 
@@ -12,7 +12,7 @@ Scale: likelihood and impact are Low/Medium/High. “Tripwire” is the earliest
 | R-03 | Fantasy types leak into Shared or product modules | Medium | High | Architecture | Manifest/API validator finds forbidden reference or public signature | ADR-0002 validator; adapter contracts; review public APIs | Revert leaking API; compatibility shim with removal issue |
 | R-04 | The accepted .NET 10 production baseline ages past its support window | Low | High | Server platform + release | SDK/runtime/container pins fall behind servicing or no successor review is scheduled before support expiry | Track servicing releases, audit dependencies, and start a same-matrix successor Spike before the support deadline | Restore the last qualified image; keep Shared on `netstandard2.1`; adopt a replacement through a superseding ADR |
 | R-05 | Shared code compiles but diverges across Unity/server | Medium | High | Shared gameplay | Golden vector event/hash mismatch or conditional code added | Same source set; canonical hash; cross-runtime CI; explicit adapters | Revert incompatible change; never fork Shared source |
-| R-06 | Unity/server physics mismatch causes visible correction or invalid hit results | High | High | Gameplay + physics | Correction/error gates fail under Regional profile | Constrain predicted model, normalize queries, tune reconciliation; evaluate client Jolt | Return to simpler prediction/Unity adapter; server remains authoritative |
+| R-06 | Unity/server physics mismatch causes visible correction or invalid hit results | High | High | Gameplay + physics | Correction/error gates fail under Regional profile | Use the bounded Shared prediction/ACK baseline; constrain predicted model, normalize queries, tune reconciliation; evaluate client Jolt | Return to simpler prediction/Unity adapter; server remains authoritative |
 | R-07 | Jolt native binding is unstable, slow, or costly on mobile | Medium | High | Physics adapter | ABI crash/leak, >3 ms P99, nonzero Tick allocations, unacceptable binary cost | Stable C ABI, sanitizer/native tests, representative benchmark, isolated lifecycle | Swap adapter or restrict Jolt to server; retain test fake and Unity client path |
 | R-08 | Navigation work blocks fixed Tick or produces incompatible artifacts | Medium | High | Navigation + Tools | Tick wait detected, P99 path >25 ms, bake hash drift, version mismatch | Offline reproducible bake; bounded async jobs; versioned artifact/header | Disable affected nav feature, use prior artifact/adapter, fail safe on load |
 | R-09 | Replication exceeds CPU or bandwidth at 64 players | High | High | Realtime replication | Tick/packet/bandwidth gate red at 20 Hz | AOI, delta, quantization, priority; profile before bit-packed codec | Reduce snapshot rate/AOI/detail; return to prior codec/config |
