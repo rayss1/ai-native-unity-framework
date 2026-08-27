@@ -22,4 +22,6 @@ Published manifests are retained in the append-only [`releases`](releases/README
 tools/release/resolve-battle-host-release.sh "$(git rev-parse --show-toplevel)" 0.1.0
 ```
 
+The current environment-canary candidate is [`v0.2.0`](releases/v0.2.0.json), and the project owner has designated [`v0.1.0`](releases/v0.1.0.json) as its rollback version. Operators resolve both manifests to immutable digests before a rollout; neither version tag is a deployment identity. The designation alone does not start a canary or change the one-room production default.
+
 See [Battle Host Release Procedure](../../Docs/Architecture/battle-host-release.md) for qualification, publication, verification, deployment, and rollback instructions. Registry publication is explicit and does not deploy the image.
