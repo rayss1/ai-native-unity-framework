@@ -2,7 +2,7 @@
 
 Status: Provisional numeric budgets; architectural gates are frozen
 Scenario: one authoritative 64-player/bot room, 60 Hz, release-equivalent builds
-Last updated: 2026-08-27
+Last updated: 2026-08-28
 
 These are go/no-go engineering budgets, not marketing targets. A measurement report must record hardware/device, build SHA, configuration/content hashes, warm-up, duration, sample count, profiler overhead, and percentile method. Results without that context are diagnostic only.
 
@@ -65,7 +65,7 @@ Fragmentation, retransmission, headers, and encryption overhead are included in 
 | Reconnect to authoritative playable state | P95 <= 5 s after transport restoration |
 | Replay critical-state hash | Exact for non-physics vectors; physics fields use versioned tolerances |
 
-The [WS-24 client prediction baseline](client-prediction-baseline.md) provides the bounded, zero-allocation rewind/replay mechanism and recipient-specific server acknowledgement required to measure these correction gates. Its integer movement vectors do not by themselves pass the Regional magnitude/frequency thresholds; those require an exact-build client adapter and captured impairment traces.
+The [WS-24 client prediction baseline](client-prediction-baseline.md) provides the bounded, zero-allocation rewind/replay mechanism and recipient-specific server acknowledgement required to measure these correction gates. Exact-`main` [run 33071031962](https://github.com/rayss1/ai-native-unity-framework/actions/runs/33071031962) passed the Linux Regional/Degraded wire, replay, allocation, capacity, and soak gates with the acknowledgement-enabled protocol identity. Its synthetic load client does not execute reconciliation, so the integer movement vectors and server evidence do not by themselves pass the Regional correction-frequency/magnitude thresholds; those require an exact-build client adapter and captured correction traces.
 
 The correction numbers are tuning gates, not truth about game feel. If representative movement speed/map scale makes them invalid, change them only with captured traces, a replacement threshold, and no weakening of server authority.
 
