@@ -1,7 +1,7 @@
 # ai-native-unity-framework
 An AI-native full-stack Unity game development framework for autonomous AI agents, covering client, server, shared modules, development tools, testing, build pipelines, and automation.
 
-The repository contains the first production vertical-slice foundation: one Shared Gameplay source set compiled by Unity and .NET, bounded client prediction/reconciliation primitives, project-owned realtime/protocol contracts, a .NET 10 Fantasy-backed Battle Host, cross-runtime vectors, deterministic replay/load evidence, a production container contract, and a manifest-derived architecture validator.
+The repository contains the first production vertical-slice foundation: one Shared Gameplay source set compiled by Unity and .NET, a Unity-ready bounded client prediction/protocol adapter, project-owned realtime/protocol contracts, a .NET 10 Fantasy-backed Battle Host, cross-runtime vectors, deterministic replay/load evidence, a production container contract, and a manifest-derived architecture validator.
 
 ## Requirements
 
@@ -46,7 +46,7 @@ Until credentialed Unity CI is restored, run the Unity package tests manually on
 tools/run-unity-manual-validation.sh
 ```
 
-The required 14-test result and evidence bundle are defined in [Manual Unity Shared-Vector Validation](Docs/Architecture/unity-manual-validation.md).
+The required 22-test result and evidence bundle are defined in [Manual Unity Shared-Vector Validation](Docs/Architecture/unity-manual-validation.md).
 
 The equivalent direct invocation on Windows is:
 
@@ -68,6 +68,7 @@ The architecture-check command returns `0` for a valid repository, `1` for archi
 ## Current layout
 
 - `client/UnityProject`: minimal Unity composition project and local package manifest.
+- `packages/com.ainative.client.prediction`: Unity-ready input/Snapshot/reconnect adapter over project-owned Shared contracts.
 - `shared`: UPM/.NET Standard 2.1 Gameplay and realtime contracts, Protobuf schemas/generated code, and dual-runtime tests.
 - `server/src/Hosts/AiNative.BattleHost`: production `net10.0` composition root with health, drain, replay, and Fantasy KCP startup.
 - `server/src/Modules`: project-owned Fantasy and protocol adapters; Fantasy runtime types terminate at this boundary.

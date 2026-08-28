@@ -45,6 +45,7 @@ mkdir -p "$evidence_dir"
   sed -n '1,2p' "$repo_root/client/UnityProject/ProjectSettings/ProjectVersion.txt"
   echo "manifest_sha256=$(shasum -a 256 "$repo_root/client/UnityProject/Packages/manifest.json" | awk '{print $1}')"
   echo "packages_lock_sha256=$(shasum -a 256 "$repo_root/client/UnityProject/Packages/packages-lock.json" | awk '{print $1}')"
+  echo "client_prediction_package_sha256=$(shasum -a 256 "$repo_root/packages/com.ainative.client.prediction/package.json" | awk '{print $1}')"
   echo "acceptance_vector_sha256=$(shasum -a 256 "$repo_root/shared/test-vectors/acceptance-64-bot-v1.json" | awk '{print $1}')"
   git -C "$repo_root" submodule status --recursive
 } > "$evidence_dir/metadata.txt"
@@ -88,8 +89,8 @@ result="$(xmllint --xpath 'string(/test-run/@result)' "$evidence_dir/editmode.xm
   echo "skipped=$skipped"
 } | tee "$evidence_dir/summary.txt"
 
-if [[ "$result" != "Passed" || "$passed" != "14" || "$failed" != "0" || "$skipped" != "0" ]]; then
-  echo "Expected exactly 14 passed, 0 failed, and 0 skipped EditMode tests." >&2
+if [[ "$result" != "Passed" || "$passed" != "22" || "$failed" != "0" || "$skipped" != "0" ]]; then
+  echo "Expected exactly 22 passed, 0 failed, and 0 skipped EditMode tests." >&2
   exit 1
 fi
 

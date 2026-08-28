@@ -36,11 +36,20 @@ Repository-owned telemetry and multi-room verifiers were rerun against the downl
 
 This evidence proves that the additive acknowledgement and bounded Shared primitive preserve the existing server, protocol, replay, wire, capacity, and soak gates. The synthetic load client does not execute a Unity client adapter, so it does not measure correction frequency or magnitude and cannot close those product-visible gates.
 
+## WS-25 client adapter candidate
+
+`packages/com.ainative.client.prediction` is the first reusable Client-layer consumer of this baseline. It owns the local input sequence and bounded history, emits protocol-v1 InputCommand bytes, accepts routed Snapshot and ReconnectResponse frames, validates connection epochs and the recipient entity, and feeds the decoded acknowledgement and position into Shared reconciliation. It keeps packet routing, concrete KCP sockets, Unity presentation, and remote interpolation outside the package.
+
+The synchronous `PrepareInput` path uses a caller-owned fixed buffer and is allocation-free after initialization. The optional asynchronous send path reuses one 1,200-byte buffer, rejects overlapping sends, and preserves all `IRealtimeTransport` backpressure outcomes. Stable result values and diagnostic counters expose correction magnitude, corrections above 250 mm, history misses, stale snapshots, and bounded-history drops without referencing a telemetry SDK.
+
+The Runtime assembly contains no Unity, Fantasy, or Google.Protobuf reference. Eight Unity EditMode tests cover v1 bytes/channel selection, rewind/replay, matching state, malformed input, packet truncation/routing, reconnect epochs, backpressure, and steady-state allocation. Three additional .NET-only tests compare its handwritten Unity-compatible wire boundary with the tracked generated Protobuf InputCommand, Snapshot, and ReconnectResponse types. This is working-branch evidence until attached to an exact reviewed commit and executed through the ADR-0014 manual Unity gate.
+
 ## Next gates
 
-1. Add a client transport/protocol adapter that maps local inputs and authoritative snapshots to the Shared history without exposing generated or Fantasy types through Shared APIs.
-2. Capture correction magnitude and frequency from that exact-build client under the reproducible Regional impairment profile before accepting or changing the thresholds in `performance-budgets.md`.
-3. Exercise the adapter in Unity PlayMode and representative mobile IL2CPP builds; retain the manual evidence bundle while ADR-0014 is active.
-4. Keep the published candidate out of a production environment until the project owner supplies a real Linux target and approves the independent environment-canary and rollback procedure.
+1. Run the expanded 22-test Unity EditMode suite on the exact reviewed WS-25 commit and retain its ADR-0014 evidence bundle.
+2. Supply a concrete Unity client `IRealtimeTransport` implementation and wire login/join plus packet routing in the application Composition Root; the prediction package must remain transport-vendor independent.
+3. Capture correction magnitude and frequency from that exact-build client under the reproducible Regional impairment profile before accepting or changing the thresholds in `performance-budgets.md`.
+4. Exercise the composed client in Unity PlayMode and representative mobile IL2CPP builds.
+5. Keep the published server candidate out of a production environment until the project owner supplies a real Linux target and approves the independent environment-canary and rollback procedure.
 
 Until those gates pass, the implementation is a reusable baseline and not a claim that client prediction tuning, physics prediction, or production rollout is complete.
