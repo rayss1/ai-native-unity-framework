@@ -1,7 +1,7 @@
 # Client Prediction and Reconciliation Baseline
 
-Status: Implemented candidate; cross-runtime and impairment evidence still required
-Last updated: 2026-08-27
+Status: Implemented baseline; exact-main runtime evidence passed, real-client correction evidence still required
+Last updated: 2026-08-28
 Decision source: ADR-0005 and WS-24
 
 ## Scope
@@ -22,19 +22,25 @@ The Shared layer deliberately does not smooth presentation corrections, interpol
 
 ## Current evidence
 
-Local .NET 10 validation on the WS-24 working candidate used SDK `10.0.204`, selected by the repository's `10.0.202` `latestPatch` policy, and completed a zero-warning Release build and the repository test matrix. Shared prediction vectors cover clamping, exact fixed-step movement, acknowledged-input discard, rewind/replay, bounded-history loss, authoritative reset, and a 1,000-iteration steady-state zero-allocation loop. Protocol tests retain stable bytes for the additive acknowledgement and verify legacy defaulting.
+Local .NET 10 validation on the WS-24 working candidate used SDK `10.0.204`, selected by the repository's `10.0.202` `latestPatch` policy, and completed a zero-warning Release build and the repository test matrix. Shared prediction vectors cover clamping, exact fixed-step movement, acknowledged-input discard, rewind/replay, bounded-history loss, authoritative reset, and a 1,000-iteration steady-state zero-allocation loop. Protocol tests retain stable bytes for the additive acknowledgement and verify legacy defaulting. Unity 6000.3.9f1 manual validation on reviewed head `9d87fec6c3cf8eea259a957ed84d3e8ae3671ce3` passed all 14 shared EditMode vectors with zero failures or skips; PR #16 merged that reviewed tree without changing the prediction implementation.
 
 A real local Fantasy KCP Host probe then sent input sequence 1, received a Snapshot acknowledgement of 1, disconnected, reconnected with a new connection epoch, and received the same acknowledgement in the resume Snapshot. The Host drained normally after the probe.
 
-The deterministic macOS diagnostic profiles also remained green with protocol identity `3cb86e21687e65af0e0d409d9186384d0f959fd6aa873eb9e1cd0cb39c77d37d`: the worst Tick P99/P99.9 across Regional, Degraded, and Backpressure was `0.0821/0.1937 ms`, the Backpressure Tick P99 increment was `0.0545 ms`, per-client downstream/upstream P95 stayed at or below `144.368/26.424 kbit/s`, and the maximum application frame was `799 bytes`. These in-process profiles are not qualified Linux socket/netem evidence.
+The deterministic macOS diagnostic profiles also remained green with protocol identity `3cb86e21687e65af0e0d409d9186384d0f959fd6aa873eb9e1cd0cb39c77d37d`: the worst Tick P99/P99.9 across Regional, Degraded, and Backpressure was `0.0821/0.1937 ms`, the Backpressure Tick P99 increment was `0.0545 ms`, per-client downstream/upstream P95 stayed at or below `144.368/26.424 kbit/s`, and the maximum application frame was `799 bytes`.
 
-This is diagnostic candidate evidence until attached to an exact commit. It does not pass the Regional correction-frequency/magnitude gates, Unity exact-commit validation, mobile/IL2CPP behavior, or a Linux production-validation run.
+Exact-`main` source `d2979a742f15eaa1dcfd60f7e1a3292448ceaec9` with Fantasy `f8bed0d464924f159d46498f1311206ea0694be8` then passed [.NET validation run 33071031886](https://github.com/rayss1/ai-native-unity-framework/actions/runs/33071031886) and [Battle Host production-validation run 33071031962](https://github.com/rayss1/ai-native-unity-framework/actions/runs/33071031962). The .NET run completed the 78-test matrix, including all 12 Shared Gameplay vectors and the real Fantasy acknowledgement/reconnect probe, with zero build warnings or errors.
+
+The release-equivalent Linux x64 run retained the new protocol identity and passed Regional/Degraded socket impairment, replay, telemetry-outage, capacity, and 60-minute soak gates. Regional/Degraded downstream P95 was `178.048/198.544 kbit/s`, upstream P95 was `42.872/48.808 kbit/s`, and maximum UDP payload was `919/1019 bytes`. The two-room candidate reached Tick P99/P99.9 `1.1297/1.4529 ms`, `0` Gameplay allocation, `6.344%` process CPU, and exact room-aware replay at final Tick `21244`, combined hash `adc18718c44fe25b`, and configuration identity `fc0714bcbe7c8c673cf638506a45f3a4440585f4024ff78048434346ab8a66e4`. Its 128-client wire P95 was `179.28/43.752 kbit/s` downstream/upstream with `924-byte` maximum payload. The 64-Bot soak recorded 216,004 measured Ticks over 3,600 seconds at Tick P99/P99.9 `0.3329/0.9707 ms`, zero slow Ticks, and zero Gameplay allocation.
+
+Repository-owned telemetry and multi-room verifiers were rerun against the downloaded artifacts and reproduced their tracked summaries byte-for-byte. The replay verifier rebuilt from the exact-main checkout reproduced all source, Fantasy, protocol, configuration, final-Tick, Input-count, and combined-hash fields; all three retained PCAP hashes also matched their reports.
+
+This evidence proves that the additive acknowledgement and bounded Shared primitive preserve the existing server, protocol, replay, wire, capacity, and soak gates. The synthetic load client does not execute a Unity client adapter, so it does not measure correction frequency or magnitude and cannot close those product-visible gates.
 
 ## Next gates
 
-1. Run the shared prediction vectors in Unity 6000.3.9f1 on the exact reviewed commit and retain the manual evidence bundle while ADR-0014 is active.
-2. Run the existing Linux Regional, Degraded, Backpressure, replay, bandwidth, allocation, and soak workflows after the protocol identity changes.
-3. Add a client transport/protocol adapter that maps local inputs and authoritative snapshots to the Shared history without exposing generated or Fantasy types through Shared APIs.
-4. Capture correction magnitude and frequency under the reproducible impairment profiles before accepting or changing the thresholds in `performance-budgets.md`.
+1. Add a client transport/protocol adapter that maps local inputs and authoritative snapshots to the Shared history without exposing generated or Fantasy types through Shared APIs.
+2. Capture correction magnitude and frequency from that exact-build client under the reproducible Regional impairment profile before accepting or changing the thresholds in `performance-budgets.md`.
+3. Exercise the adapter in Unity PlayMode and representative mobile IL2CPP builds; retain the manual evidence bundle while ADR-0014 is active.
+4. Keep the published candidate out of a production environment until the project owner supplies a real Linux target and approves the independent environment-canary and rollback procedure.
 
 Until those gates pass, the implementation is a reusable baseline and not a claim that client prediction tuning, physics prediction, or production rollout is complete.
