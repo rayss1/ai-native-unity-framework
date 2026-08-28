@@ -15,13 +15,13 @@ Silently skipping the job would weaken the dual-runtime boundary and could be mi
 
 - Unity validation no longer runs automatically on pull requests or pushes. `.github/workflows/unity.yml` remains available only through `workflow_dispatch` for a future credentialed run.
 - Until automation is restored, the project owner runs [the manual Unity procedure](../Architecture/unity-manual-validation.md) on a clean checkout of each relevant exact commit.
-- A qualifying run uses Unity `6000.3.9f1` revision `7a9955a4f2fa` and reports exactly seven passed EditMode tests, zero failed, and zero skipped.
+- A qualifying run uses Unity `6000.3.9f1` revision `7a9955a4f2fa` and executes the exact named suite in the manual validation procedure. The current WS-25 suite reports exactly 22 passed EditMode tests, zero failed, and zero skipped; the expected count changes only when the named repository-owned suite changes.
 - The evidence bundle records the commit, recursive submodule state, Unity version, package manifest/lock hashes, golden-vector hash, NUnit XML, and Editor log.
 - Changes to Unity, Shared Gameplay, Shared Realtime, package resolution, or the tested commit invalidate earlier evidence.
 - Missing manual evidence is an open gate, not a pass. .NET test success cannot substitute for Unity execution.
 
 ## Consequences and restoration
 
-Manual execution is slower and depends on operator discipline, but retains auditable dual-compilation evidence without storing Unity credentials. The project owner supplied the seven-test ADR-0012 acceptance bundle; every subsequent relevant exact commit remains gated by this procedure until automated Unity CI is restored.
+Manual execution is slower and depends on operator discipline, but retains auditable dual-compilation evidence without storing Unity credentials. Earlier exact-commit bundles retain their historical named-test counts; every subsequent relevant exact commit is gated by the then-current named suite until automated Unity CI is restored.
 
 Restore automatic CI when Unity authentication becomes available by re-enabling pull-request/push triggers, adding the appropriate GitHub Secrets or licensing-server configuration, and obtaining a green run. At that point a follow-up ADR must end this exception; ADR-0003's automated requirement becomes authoritative again without changing the Shared API.

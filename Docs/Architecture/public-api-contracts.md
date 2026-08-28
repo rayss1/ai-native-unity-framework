@@ -1,7 +1,7 @@
 # Public API Contract Catalog
 
 Status: Minimum contract frozen for the first vertical slice
-Last updated: 2026-08-27
+Last updated: 2026-08-28
 
 This catalog defines ownership and semantics before implementation. Names and invariants are stable; value layouts may be extended additively as Spikes reveal required data. Implementations must not expose engine/framework types through these ports.
 
@@ -148,6 +148,25 @@ Consumers: Unity client prediction, deterministic tests, future replay diagnosti
 `ClientPredictionHistory` owns a constructor-bounded circular history. `Predict` never blocks and reports when it had to drop the oldest entry. `Reconcile` consumes an authoritative `KinematicState`, discards acknowledged inputs, replays only newer inputs, and returns a `ReconciliationResult` that distinguishes matched, corrected, stale, authoritative-ahead, and history-miss paths. Correction components are explicit millimetres; visual smoothing is not part of the Shared contract.
 
 The protocol adapter maps the recipient-specific `Snapshot.last_processed_input_sequence` into the authoritative state. Protobuf, Fantasy, transport, wall-clock, scheduling, and presentation types do not cross this API. See [Client Prediction and Reconciliation Baseline](client-prediction-baseline.md) for evidence and remaining gates.
+
+## `ClientPredictionAdapter`
+
+Owner: Client prediction package
+Consumers: Unity application Composition Root and client transport routing
+Dependencies: `AiNative.Gameplay`, `AiNative.Realtime`; no Unity, Fantasy, or generated Protobuf runtime dependency
+
+`ClientPredictionAdapter` owns one local entity's bounded `ClientPredictionHistory`, protocol-v1 input sequence, connection epoch, a reusable send buffer, and correction counters. It is constructed after JoinRoom identifies the local entity. The caller supplies an `IRealtimeTransport`; ownership and disposal are explicit.
+
+Contract:
+
+- `PrepareInput` is the synchronous prediction-owner-thread path. It requires a caller-owned buffer of `RequiredInputBufferBytes`, advances prediction and sequence only when it returns `Prepared`, emits the protocol-v1 InputCommand frame, and allocates nothing after initialization.
+- `SendInputAsync` is an outside-Tick convenience that forwards the prepared frame over the unreliable/sequenced Input channel. Only one send may be outstanding because the adapter reuses one bounded buffer. Cancellation, backpressure, policy drop, closure, payload rejection, sequence exhaustion, and transport fault remain distinguishable.
+- `ApplyPacket` accepts only a complete Snapshot-channel frame or ReconnectResponse control frame already routed by the caller. It validates the v1 message ID, wire types, protocol major, local entity, monotonic connection epoch, reconnect epoch agreement, and payload bounds before mutating prediction state.
+- Unknown additive Protobuf fields are skipped. Truncated, malformed, wrong-channel, wrong-message, incompatible-protocol, missing-player, stale-epoch, and arithmetic-overflow inputs fail closed with a stable result. An arithmetic overflow resets to the decoded authoritative state.
+- Snapshot acknowledgement maps to `KinematicState.LastProcessedInputSequence`; reconciliation remains server-authoritative and replays only newer local inputs. Diagnostics expose accepted snapshots, corrections, corrections above 250 mm, maximum correction, history misses, stale snapshots, and dropped inputs without binding to a telemetry SDK.
+- Packet polling/routing, login/join, visual smoothing, remote interpolation, concrete KCP sockets, and percentile aggregation stay in higher adapters or the Unity Composition Root.
+
+The runtime wire implementation is intentionally small and generated-type-free for Unity. .NET-only compatibility tests compare its InputCommand, Snapshot, and ReconnectResponse behavior with the tracked Google.Protobuf generation.
 
 ## Supporting boundary contracts
 

@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <AssemblyName>AiNative.Client.Prediction</AssemblyName>
+    <RootNamespace>AiNative.Client.Prediction</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Runtime/**/*.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../shared/gameplay/Gameplay.Shared.csproj" />
+    <ProjectReference Include="../../shared/realtime/Realtime.Shared.csproj" />
+  </ItemGroup>
+</Project>

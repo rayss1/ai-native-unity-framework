@@ -2,7 +2,7 @@
 
 Status: Frozen for the first vertical slice
 Authority: ADR-0002
-Last updated: 2026-08-24
+Last updated: 2026-08-28
 
 This document defines compile-time and runtime dependency direction. “May depend” still requires an explicit manifest reference and a concrete need; it is not a default reference.
 
@@ -47,6 +47,7 @@ Rows are consumers and columns are dependencies.
 - Core abstractions reference Shared; optional implementations reference Core abstractions and their third-party SDK.
 - The Unity application Composition Root references selected implementation packages. Core never references them back.
 - An optional package missing from `Packages/manifest.json` and package manifests contributes no assembly reference.
+- `com.ainative.client.prediction` is the first concrete package under `packages`: it depends only on Shared Gameplay/Realtime contracts; generated Protobuf compatibility code is confined to its Unity-ignored `.NET` test source.
 
 ### Server
 
