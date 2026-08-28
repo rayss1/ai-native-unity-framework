@@ -1,0 +1,25 @@
+{
+  "name": "AiNative.Client.Prediction.Tests",
+  "rootNamespace": "AiNative.Client.Prediction.Tests",
+  "references": [
+    "AiNative.Client.Prediction",
+    "AiNative.Gameplay",
+    "AiNative.Realtime"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": false,
+  "defineConstraints": [
+    "UNITY_INCLUDE_TESTS"
+  ],
+  "versionDefines": [],
+  "noEngineReferences": true,
+  "optionalUnityReferences": [
+    "TestAssemblies"
+  ]
+}

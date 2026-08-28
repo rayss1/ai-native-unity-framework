@@ -1,0 +1,17 @@
+{
+  "name": "AiNative.Client.Prediction",
+  "rootNamespace": "AiNative.Client.Prediction",
+  "references": [
+    "AiNative.Gameplay",
+    "AiNative.Realtime"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": true
+}

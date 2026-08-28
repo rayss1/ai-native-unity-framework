@@ -1,10 +1,12 @@
 {
   "dependencies": {
+    "com.ainative.client.prediction": "file:../../../packages/com.ainative.client.prediction",
     "com.ainative.gameplay": "file:../../../shared/gameplay",
     "com.ainative.realtime": "file:../../../shared/realtime",
     "com.unity.test-framework": "1.6.0"
   },
   "testables": [
+    "com.ainative.client.prediction",
     "com.ainative.gameplay",
     "com.ainative.realtime"
   ]

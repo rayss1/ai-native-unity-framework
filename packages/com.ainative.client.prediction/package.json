@@ -1,0 +1,14 @@
+{
+  "name": "com.ainative.client.prediction",
+  "version": "0.1.0",
+  "displayName": "AI-Native Client Prediction Adapter",
+  "description": "Unity-ready transport and protocol adapter for the product-owned prediction and reconciliation baseline.",
+  "unity": "6000.3",
+  "dependencies": {
+    "com.ainative.gameplay": "0.1.0",
+    "com.ainative.realtime": "0.1.0"
+  },
+  "author": {
+    "name": "AI-Native Unity Framework"
+  }
+}
