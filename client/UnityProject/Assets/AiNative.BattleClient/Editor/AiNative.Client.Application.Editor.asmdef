@@ -1,0 +1,12 @@
+{
+  "name": "AiNative.Client.Application.Editor",
+  "rootNamespace": "AiNative.Client.Editor",
+  "references": [
+    "AiNative.Client.Application",
+    "AiNative.Client.Fantasy"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "autoReferenced": true
+}

@@ -1,12 +1,12 @@
 # ai-native-unity-framework
 An AI-native full-stack Unity game development framework for autonomous AI agents, covering client, server, shared modules, development tools, testing, build pipelines, and automation.
 
-The repository contains the first production vertical-slice foundation: one Shared Gameplay source set compiled by Unity and .NET, a Unity-ready bounded client prediction/protocol adapter, project-owned realtime/protocol contracts, a .NET 10 Fantasy-backed Battle Host, cross-runtime vectors, deterministic replay/load evidence, a production container contract, and a manifest-derived architecture validator.
+The repository contains the first production vertical-slice foundation: one Shared Gameplay source set compiled by Unity and .NET, a Unity-ready bounded client prediction/protocol adapter, a dedicated Fantasy KCP client transport and Battle Client composition candidate, project-owned realtime/protocol contracts, a .NET 10 Fantasy-backed Battle Host, cross-runtime vectors, deterministic replay/load evidence, a production container contract, and a manifest-derived architecture validator.
 
 ## Requirements
 
 - .NET SDK 10.0.202. The repository `global.json` pins the exact SDK servicing version.
-- Unity 6000.3.9f1 for local package import and EditMode tests.
+- Unity 6000.3.9f1 revision `7a9955a4f2fa` for local package import, EditMode/PlayMode tests, and the Windows x64 Mono smoke build.
 
 ## Clone and initialize dependencies
 
@@ -46,22 +46,15 @@ Until credentialed Unity CI is restored, run the Unity package tests manually on
 tools/run-unity-manual-validation.sh
 ```
 
-The required 22-test result and evidence bundle are defined in [Manual Unity Shared-Vector Validation](Docs/Architecture/unity-manual-validation.md).
+The macOS script verifies the exact 36-test EditMode package/vector gate. The complete WS-26 evidence contract is defined in [Unity WS-26 Validation](Docs/Architecture/unity-manual-validation.md).
 
-The equivalent direct invocation on Windows is:
+The Windows entry point also launches the local Battle Host, requires exactly 36 EditMode and 2 real-KCP PlayMode passes, builds the Windows x64 Mono Player, runs the deterministic smoke, and retains the evidence bundle:
 
 ```powershell
-if (-not $env:ALLUSERSPROFILE) {
-  $env:ALLUSERSPROFILE = $env:PROGRAMDATA
-}
-
-& 'C:\Program Files\Unity\Hub\Editor\6000.3.9f1\Editor\Unity.exe' `
-  -batchmode -nographics `
-  -projectPath "$PWD/client/UnityProject" `
-  -runTests -testPlatform EditMode `
-  -testResults "$PWD/client/UnityProject/TestResults/editmode.xml" `
-  -logFile "$PWD/client/UnityProject/Logs/editmode.log"
+tools/run-unity-windows-validation.ps1
 ```
+
+Both scripts require a clean checkout so every result identifies one exact commit. The existence of WS-26 code or scripts is not a claim that its Unity gates passed; retain and review the generated bundle before updating milestone status.
 
 The architecture-check command returns `0` for a valid repository, `1` for architecture violations, and `2` for invalid arguments, configuration, or unreadable inputs. Use `--format json` for machine-readable diagnostics.
 
@@ -69,11 +62,12 @@ The architecture-check command returns `0` for a valid repository, `1` for archi
 
 - `client/UnityProject`: minimal Unity composition project and local package manifest.
 - `packages/com.ainative.client.prediction`: Unity-ready input/Snapshot/reconnect adapter over project-owned Shared contracts.
+- `packages/com.ainative.client.fantasy`: the sole Client Fantasy namespace boundary, implementing bounded Fantasy KCP behind `IRealtimeTransport` with pinned `Fantasy.Unity` and retained third-party notices.
 - `shared`: UPM/.NET Standard 2.1 Gameplay and realtime contracts, Protobuf schemas/generated code, and dual-runtime tests.
 - `server/src/Hosts/AiNative.BattleHost`: production `net10.0` composition root with health, drain, replay, and Fantasy KCP startup.
 - `server/src/Modules`: project-owned Fantasy and protocol adapters; Fantasy runtime types terminate at this boundary.
 - `tools/ArchitectureCheck`: architecture graph and forbidden-API validator.
-- `server/vendor/Fantasy`: pinned, opaque production vendor source; only the approved Server adapter/composition projects consume its tracked package.
+- `server/vendor/Fantasy`: pinned, opaque vendor source; approved Server adapter/composition projects consume `Fantasy-Net`, while only the dedicated Client transport consumes `Fantasy.Unity` from the same commit.
 - `infrastructure/battle-host`: non-root Linux production image and Compose deployment contract.
 - `Docs`: accepted ADRs and architecture contracts.
 

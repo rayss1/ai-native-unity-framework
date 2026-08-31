@@ -2,7 +2,7 @@
 
 Status: Frozen for the first vertical slice
 Authority: ADR-0002
-Last updated: 2026-08-28
+Last updated: 2026-08-31
 
 This document defines compile-time and runtime dependency direction. “May depend” still requires an explicit manifest reference and a concrete need; it is not a default reference.
 
@@ -48,6 +48,7 @@ Rows are consumers and columns are dependencies.
 - The Unity application Composition Root references selected implementation packages. Core never references them back.
 - An optional package missing from `Packages/manifest.json` and package manifests contributes no assembly reference.
 - `com.ainative.client.prediction` is the first concrete package under `packages`: it depends only on Shared Gameplay/Realtime contracts; generated Protobuf compatibility code is confined to its Unity-ignored `.NET` test source.
+- `com.ainative.client.fantasy` is the only Client package allowed to reference `Fantasy` namespaces. Its Runtime assembly depends on `AiNative.Realtime` and pinned `Fantasy.Unity`; Fantasy Session, generated registration, KCP, and socket types terminate there. The prediction package and Unity application Composition Root consume only project-owned contracts and application state.
 
 ### Server
 
@@ -78,6 +79,6 @@ Every plugin declares:
 
 ## Automated enforcement
 
-CI derives the graph from `package.json`, `.asmdef`, `.csproj`, solution/build manifests, and schema generator configuration. It fails on forbidden edges, cross-module cycles, Editor-to-Runtime edges, direct Shared forbidden APIs, Fantasy package/namespace use outside the approved adapter/composition boundary, runtime references to Tools/Infrastructure/Agents, or undocumented new public contracts.
+CI derives the graph from `package.json`, `.asmdef`, `.csproj`, solution/build manifests, and schema generator configuration. It fails on forbidden edges, cross-module cycles, Editor-to-Runtime edges, direct Shared forbidden APIs, Fantasy namespace use outside `AiNative.Server.Fantasy` and `com.ainative.client.fantasy`, disallowed Fantasy package references, runtime references to Tools/Infrastructure/Agents, or undocumented new public contracts.
 
 See [ADR-0002](../ADR/0002-repository-layout-and-module-dependencies.md) for migration and rollback rules.

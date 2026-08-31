@@ -1,0 +1,16 @@
+{
+  "name": "AiNative.Client.Application.Tests",
+  "rootNamespace": "AiNative.Client.Application.Tests",
+  "references": [
+    "AiNative.Client.Application",
+    "AiNative.Client.Prediction",
+    "AiNative.Realtime"
+  ],
+  "optionalUnityReferences": [
+    "TestAssemblies"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "autoReferenced": false
+}

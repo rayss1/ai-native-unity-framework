@@ -1,0 +1,12 @@
+{
+  "name": "AiNative.Client.Application.PlayModeTests",
+  "rootNamespace": "AiNative.Client.Application.PlayModeTests",
+  "references": [
+    "AiNative.Client.Application",
+    "AiNative.Client.Prediction"
+  ],
+  "optionalUnityReferences": [
+    "TestAssemblies"
+  ],
+  "autoReferenced": false
+}
