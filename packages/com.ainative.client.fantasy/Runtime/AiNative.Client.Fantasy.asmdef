@@ -1,0 +1,17 @@
+{
+  "name": "AiNative.Client.Fantasy",
+  "rootNamespace": "AiNative.Client.Fantasy",
+  "references": [
+    "AiNative.Realtime",
+    "Fantasy.Unity"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

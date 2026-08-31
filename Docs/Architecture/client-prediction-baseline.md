@@ -1,8 +1,8 @@
 # Client Prediction and Reconciliation Baseline
 
-Status: Implemented baseline; exact-main runtime evidence passed, real-client correction evidence still required
+Status: Implemented prediction baseline; WS-26 Unity transport/application validation pending
 Last updated: 2026-08-31
-Decision source: ADR-0005, WS-24, and WS-25
+Decision source: ADR-0005, WS-24, WS-25, and WS-26
 
 ## Scope
 
@@ -54,11 +54,19 @@ Telemetry outage comparison passed on exact main with exporter-disabled Tick P99
 
 Repository-owned qualification, telemetry-capacity, and multi-room-capacity verifiers were rerun against the downloaded exact-main artifacts. They confirmed the source, Fantasy, protocol, configuration, base-image and product-image identities, replay result, and PCAP hashes. These server-side and manual EditMode results prove compatibility of the WS-25 adapter boundary; they do not execute a concrete Unity network transport or measure player-visible correction behavior.
 
+## WS-26 Unity transport and application candidate
+
+`packages/com.ainative.client.fantasy` owns the concrete bounded Fantasy KCP transport. It is the only Client package permitted to reference Fantasy namespaces, consumes `Fantasy.Unity` `2026.1.1001` at the same approved fork commit, and exposes only project-owned connection results, diagnostics, and `IRealtimeTransport`. The transport fixes the outer MTU at 1,150 bytes, caps application frames at 1,200 bytes, bounds each direction to 1,024 packets/256 KiB by default, and keeps Fantasy serialization/socket work outside FixedUpdate.
+
+The Unity application Composition Root owns login, room join, reconnect, packet routing, and the replaceable active transport. Its state progression is `Connecting -> LoggingIn -> JoiningRoom -> Active`; disconnect enters `Reconnecting`, and terminal paths enter `Faulted` or `Disposed`. Protocol v1 uses room 1 and 60 Hz. FixedUpdate performs prediction and writes a preallocated input ring; Update pumps Fantasy and routes/sends queued frames. Reconnect retains the prediction instance and advances the transport epoch only after a successful decoded response.
+
+WS-26 acceptance is intentionally evidence-gated. The repository requires exactly 36 EditMode and 2 PlayMode passes, followed by a Windows x64 Mono Player smoke against a local Battle Host. The Windows entry point records the source/Fantasy/UPM/SDK/Unity identities, NUnit XML, Host and Player logs, and smoke JSON. No WS-26 Unity result is recorded as passed in this document until an exact clean-commit evidence bundle is reviewed.
+
 ## Next gates
 
-1. Supply a concrete Unity client `IRealtimeTransport` implementation and wire login/join plus packet routing in the application Composition Root; the prediction package must remain transport-vendor independent.
+1. Run and review the exact-clean-commit WS-26 Windows bundle: 36 EditMode, 2 real-KCP PlayMode, and the x64 Mono smoke must all pass with the pinned identities.
 2. Capture correction magnitude and frequency from that exact-build client under the reproducible Regional impairment profile before accepting or changing the thresholds in `performance-budgets.md`.
-3. Exercise the composed client in Unity PlayMode and representative mobile IL2CPP builds.
+3. Exercise the composed client in representative Android and iOS IL2CPP builds; Windows Mono evidence does not satisfy the mobile AOT/stripping gate.
 4. Keep the production room default unchanged and keep the published server candidate out of a production environment until the project owner supplies a real Linux target and approves the independent environment-canary and rollback procedure.
 
 Until those gates pass, the implementation is a reusable baseline and not a claim that client prediction tuning, physics prediction, or production rollout is complete.

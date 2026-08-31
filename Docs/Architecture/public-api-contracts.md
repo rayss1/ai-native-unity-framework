@@ -1,7 +1,7 @@
 # Public API Contract Catalog
 
 Status: Minimum contract frozen for the first vertical slice
-Last updated: 2026-08-28
+Last updated: 2026-08-31
 
 This catalog defines ownership and semantics before implementation. Names and invariants are stable; value layouts may be extended additively as Spikes reveal required data. Implementations must not expose engine/framework types through these ports.
 
@@ -104,6 +104,23 @@ Contract:
 - Queues are bounded. Backpressure is observable and one connection cannot block a room or another connection.
 - `TryReceive` is non-blocking and reports required/written size, channel, sequence/capability metadata, and connection epoch.
 - Fantasy Session, KCP control blocks, sockets, and native buffers do not cross the interface.
+
+## `FantasyKcpRealtimeTransport`
+
+Owner: `com.ainative.client.fantasy`
+Consumers: Unity application Composition Root through `IRealtimeTransport`
+Dependencies: `AiNative.Realtime`, pinned `Fantasy.Unity` `2026.1.1001`
+
+This is the first concrete Unity implementation of `IRealtimeTransport`; it does not change that shared port. `FantasyKcpTransportOptions` supplies Host, Port, and connection timeout. `ConnectAsync` returns `FantasyKcpConnectResult`, whose stable `FantasyKcpConnectStatus` distinguishes Connected, InvalidConfiguration, TimedOut, Cancelled, and Faulted without exposing Fantasy types.
+
+Contract:
+
+- The outer KCP MTU is 1,150 bytes and the maximum application frame is 1,200 bytes. Default inbound and outbound limits are 1,024 packets and 256 KiB per direction.
+- Accepted sends have been copied into transport-owned bounded storage only. Queue saturation returns `WouldBlock`; closed, oversized, cancelled, and faulted outcomes remain distinct.
+- Fixed Tick callers only copy into preallocated queues. Fantasy serialization, Session/KCP update, socket work, and potentially allocating callbacks run in the Fantasy main-thread update phase outside FixedUpdate.
+- `TryAdvanceConnectionEpoch` accepts only nonzero, monotonic values. Login and reconnect responses are decoded and bound by the application before prediction receives subsequent packets.
+- The read-only `FantasyKcpTransportDiagnostics` snapshot reports accepted sends/receives, send backpressure, oversized frames, invalid channels, stale sequences, inbound drops, and connection faults.
+- Disposal unregisters Session routing before releasing the Session; late callbacks are ignored. Fantasy Session, messages, and generated registration types do not enter prediction, Shared, or application state.
 
 ## `IAssetService`
 

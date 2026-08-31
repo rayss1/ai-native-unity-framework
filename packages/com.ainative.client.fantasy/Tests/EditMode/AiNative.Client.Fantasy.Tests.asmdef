@@ -1,0 +1,25 @@
+{
+  "name": "AiNative.Client.Fantasy.Tests",
+  "rootNamespace": "AiNative.Client.Fantasy.Tests",
+  "references": [
+    "AiNative.Client.Fantasy",
+    "AiNative.Realtime",
+    "Fantasy.Unity"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": false,
+  "defineConstraints": [
+    "UNITY_INCLUDE_TESTS"
+  ],
+  "versionDefines": [],
+  "noEngineReferences": false,
+  "optionalUnityReferences": [
+    "TestAssemblies"
+  ]
+}

@@ -17,7 +17,7 @@ The initial framework is optimized for the following target:
 - Authoritative server simulation at 60 ticks per second.
 - 200 ms round-trip time is the degradation boundary, not the normal latency target. Regional deployments should target 100 ms RTT or less.
 - The game server is independent of the Unity runtime. Physics and navigation are integrated separately.
-- The server foundation is the exact, project-maintained [rayss1/Fantasy fork](https://github.com/rayss1/Fantasy), consumed only through the Server adapter and Battle Host composition root.
+- The server foundation is the exact, project-maintained [rayss1/Fantasy fork](https://github.com/rayss1/Fantasy), consumed through the Server adapter/Battle Host boundary; its Unity client package is consumed only through the dedicated `com.ainative.client.fantasy` transport adapter.
 - Client and server reuse the same Unity-independent gameplay simulation source code.
 - Client asset building, delivery, update, and cache management are implemented by this project rather than Addressables.
 - HybridCLR is a candidate for client code hot update.
@@ -153,7 +153,7 @@ Physics, navigation, HybridCLR, UI, DOTS, localization, platform services, and o
 
 ### 6.2 Fantasy foundation and fork policy
 
-The server platform is based on the project-maintained [rayss1/Fantasy fork](https://github.com/rayss1/Fantasy). Its source is embedded at `server/vendor/Fantasy` as an exact, opaque gitlink. The tracked `Fantasy-Net` package is a production dependency only of `AiNative.Server.Fantasy` and the Battle Host composition root.
+The server platform is based on the project-maintained [rayss1/Fantasy fork](https://github.com/rayss1/Fantasy). Its source is embedded at `server/vendor/Fantasy` as an exact, opaque gitlink. The tracked `Fantasy-Net` package is a production dependency only of `AiNative.Server.Fantasy` and the Battle Host composition root. `Fantasy.Unity` `2026.1.1001` from the same commit is confined to `com.ainative.client.fantasy`; other Client packages, application code, Shared, and public transport ports do not reference Fantasy namespaces.
 
 Fantasy provides the initial server infrastructure for:
 
@@ -172,7 +172,7 @@ The fork follows these maintenance rules:
 - Never update the production baseline by floating package version or an unpinned branch.
 - Preserve required copyright and license notices.
 
-The reviewed public baseline is `493d5d4dd1dd009cdfcd2846b88ebab9746d4504`. The [WS-13 recovery](runtime-successor-spike-2026-08-13.md) established the .NET 10 composition, and WS-14 advanced the pin to `b65e6fd60224cf264a3ee62207f0f9041e9f6d92` with cancellation-aware host lifetime and bounded log shutdown. WS-16 pins production to `f8bed0d464924f159d46498f1311206ea0694be8`, whose tracked package `2026.1.1003` exposes the cancellation-aware lifecycle, .NET KCP client, and startup-frozen outer MTU. The fork and project Host passed the exact socket, replay/load, image, shutdown, vulnerability, Unity, and 60-minute soak gates recorded by ADR-0012. The repository license is based on the MIT text but adds an entity-specific restriction; the project owner [accepted the current license and project risk](fantasy-license-approval-2026-08-24.md). Any license, ownership, prohibited-entity relationship, distribution-model, or adopted-baseline change reopens review.
+The reviewed public baseline is `493d5d4dd1dd009cdfcd2846b88ebab9746d4504`. The [WS-13 recovery](runtime-successor-spike-2026-08-13.md) established the .NET 10 composition, and WS-14 advanced the pin to `b65e6fd60224cf264a3ee62207f0f9041e9f6d92` with cancellation-aware host lifetime and bounded log shutdown. WS-16 pins production to `f8bed0d464924f159d46498f1311206ea0694be8`, whose tracked `Fantasy-Net` `2026.1.1003` exposes the cancellation-aware lifecycle, .NET KCP client, and startup-frozen outer MTU. The fork and project Host passed the exact socket, replay/load, image, shutdown, vulnerability, Unity, and 60-minute soak gates recorded by ADR-0012. The repository license is based on the MIT text but adds an entity-specific restriction; the project owner [accepted the current license and project risk](fantasy-license-approval-2026-08-24.md), including WS-26 Windows distribution of `Fantasy.Unity` `2026.1.1001` from that same commit. Client distributions must retain the exact license and Third-Party Notices. Any license, ownership, prohibited-entity relationship, distribution-model, package/version, or adopted-baseline change reopens review.
 
 See [ADR-0001: Use Fantasy as the server foundation](../ADR/0001-fantasy-server-foundation.md) for the authoritative decision and validation conditions.
 
@@ -242,7 +242,7 @@ The Shared Tick path must avoid nondeterministic or platform-dependent inputs su
 
 ### 8.2 Transport and replication
 
-The first real-time data-plane implementation uses Fantasy's KCP/UDP stack behind `IRealtimeTransport`. The abstraction exposes delivery, ordering, congestion, timeout, and backpressure semantics rather than leaking Fantasy Session APIs into shared gameplay. The Unity client uses a thin Fantasy-compatible networking package or project adapter; generated wire contracts may be shared, but `Gameplay.Shared` does not reference Fantasy.
+The first real-time data-plane implementation uses Fantasy's KCP/UDP stack behind `IRealtimeTransport`. The abstraction exposes delivery, ordering, congestion, timeout, and backpressure semantics rather than leaking Fantasy Session APIs into shared gameplay. The Unity client adapter is `com.ainative.client.fantasy`; generated wire contracts may be shared, but `Gameplay.Shared`, client prediction, and the Unity application Composition Root do not reference Fantasy.
 
 Fantasy's general request/response protocol is used for login, routing, reliable gameplay events, and service-to-service messages. The 64-player vertical slice may deeply customize or bypass general message serialization on the high-frequency snapshot path when measurements justify a schema/codegen-driven bit-packed codec. Such customization stays inside the networking/replication modules and must remain compatible with packet capture and replay tooling.
 
@@ -372,7 +372,7 @@ The following are not baseline commitments:
 - Global DOTS adoption.
 - NGO followed by an assumed migration to Netcode for Entities.
 - Addressables.
-- Consuming an unpinned or unreviewed Fantasy release directly in production.
+- Consuming an unpinned or unreviewed Fantasy release directly in Server or Client production artifacts.
 - Placing product gameplay rules inside the Fantasy fork or exposing Fantasy types from `Gameplay.Shared`.
 - MemoryPack as a second general wire protocol before profiling.
 - Reflection-based plugin discovery or runtime server plugin unloading.

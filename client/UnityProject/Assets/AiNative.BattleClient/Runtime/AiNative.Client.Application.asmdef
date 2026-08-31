@@ -1,0 +1,10 @@
+{
+  "name": "AiNative.Client.Application",
+  "rootNamespace": "AiNative.Client.Application",
+  "references": [
+    "AiNative.Client.Fantasy",
+    "AiNative.Client.Prediction",
+    "AiNative.Realtime"
+  ],
+  "autoReferenced": true
+}

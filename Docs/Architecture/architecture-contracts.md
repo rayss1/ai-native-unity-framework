@@ -2,7 +2,7 @@
 
 Status: Frozen
 Decision source: WS-11
-Last updated: 2026-08-24
+Last updated: 2026-08-31
 
 This page is the entry point for implementing the first vertical slice. It completes the follow-up ADR list in section 17 of the technology baseline; the accepted ADRs are authoritative where the baseline still describes an item as follow-up work.
 
@@ -14,7 +14,7 @@ Provide one implementation entry condition for the `Start -> Login -> Match -> A
 
 - Creating empty repository/module scaffolding before its first owned artifact.
 - Finalizing codec, snapshot rate, client prediction physics, nav options, HybridCLR adoption, or rooms per process without vertical-slice evidence.
-- Referencing Fantasy outside the accepted Server adapter and Battle Host composition boundary, or changing the pinned runtime/fork without a superseding ADR and equivalent evidence.
+- Referencing Fantasy outside the accepted Server adapter/Battle Host boundary and the dedicated `com.ainative.client.fantasy` adapter, or changing the pinned runtime/fork without a superseding ADR and equivalent evidence.
 - Adopting deterministic lockstep, global DOTS, Addressables, runtime plugin discovery, Kubernetes/Agones, Redis, a broker, or a hosted cloud dependency as a default.
 - Freezing private implementation types. Only documented public contracts, ownership, dependency direction, lifecycle/threading behavior, compatibility policy, and gates are stable.
 

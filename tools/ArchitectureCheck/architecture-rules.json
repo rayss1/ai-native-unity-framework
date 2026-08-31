@@ -68,6 +68,7 @@
     "server/src/Hosts/AiNative.BattleHost"
   ],
   "fantasyNamespaceAllowedPathPrefixes": [
-    "server/src/Modules/AiNative.Server.Fantasy"
+    "server/src/Modules/AiNative.Server.Fantasy",
+    "packages/com.ainative.client.fantasy"
   ]
 }

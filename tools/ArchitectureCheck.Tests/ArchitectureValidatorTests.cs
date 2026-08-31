@@ -196,6 +196,39 @@ public sealed class ArchitectureValidatorTests
     }
 
     [Test]
+    public void FantasyNamespaceIsAllowedOnlyInsideDedicatedUnityClientAdapter()
+    {
+        Write(
+            "packages/com.ainative.client.fantasy/Runtime/FantasyKcpRealtimeTransport.cs",
+            "using global::Fantasy.Network; class FantasyKcpRealtimeTransport { }");
+
+        ArchitectureValidationResult result = Validate();
+
+        Assert.That(result.Diagnostics, Is.Empty);
+    }
+
+    [Test]
+    public void FantasyNamespaceInOtherClientAndSharedCodeIsReported()
+    {
+        Write(
+            "packages/com.ainative.client.prediction/Runtime/Bad.cs",
+            "using Fantasy.Network; class ClientBad { }");
+        Write(
+            "shared/realtime/Runtime/Bad.cs",
+            "using Fantasy.Network; class SharedBad { }");
+
+        ArchitectureValidationResult result = Validate();
+
+        Assert.That(
+            result.Diagnostics.Where(diagnostic => diagnostic.Code == "ARC008").Select(diagnostic => diagnostic.File),
+            Is.EquivalentTo(new[]
+            {
+                "packages/com.ainative.client.prediction/Runtime/Bad.cs",
+                "shared/realtime/Runtime/Bad.cs",
+            }));
+    }
+
+    [Test]
     public void FantasyReferencesAreAllowedInAdapterAndCompositionRoot()
     {
         Write(
