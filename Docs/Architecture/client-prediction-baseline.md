@@ -1,8 +1,8 @@
 # Client Prediction and Reconciliation Baseline
 
 Status: Implemented baseline; exact-main runtime evidence passed, real-client correction evidence still required
-Last updated: 2026-08-28
-Decision source: ADR-0005 and WS-24
+Last updated: 2026-08-31
+Decision source: ADR-0005, WS-24, and WS-25
 
 ## Scope
 
@@ -42,14 +42,23 @@ This evidence proves that the additive acknowledgement and bounded Shared primit
 
 The synchronous `PrepareInput` path uses a caller-owned fixed buffer and is allocation-free after initialization. The optional asynchronous send path reuses one 1,200-byte buffer, rejects overlapping sends, and preserves all `IRealtimeTransport` backpressure outcomes. Stable result values and diagnostic counters expose correction magnitude, corrections above 250 mm, history misses, stale snapshots, and bounded-history drops without referencing a telemetry SDK.
 
-The Runtime assembly contains no Unity, Fantasy, or Google.Protobuf reference. Eight Unity EditMode tests cover v1 bytes/channel selection, rewind/replay, matching state, malformed input, packet truncation/routing, reconnect epochs, backpressure, and steady-state allocation. Three additional .NET-only tests compare its handwritten Unity-compatible wire boundary with the tracked generated Protobuf InputCommand, Snapshot, and ReconnectResponse types. This is working-branch evidence until attached to an exact reviewed commit and executed through the ADR-0014 manual Unity gate.
+The Runtime assembly contains no Unity, Fantasy, or Google.Protobuf reference. Eight Unity EditMode tests cover v1 bytes/channel selection, rewind/replay, matching state, malformed input, packet truncation/routing, reconnect epochs, backpressure, and steady-state allocation. Three additional .NET-only tests compare its handwritten Unity-compatible wire boundary with the tracked generated Protobuf InputCommand, Snapshot, and ReconnectResponse types.
+
+Exact-`main` source `dfbc0534631ec7cc019919830a93472d3572f61c` passed [.NET run 33155894500](https://github.com/rayss1/ai-native-unity-framework/actions/runs/33155894500) and the complete [Battle Host production-validation run 33155894486](https://github.com/rayss1/ai-native-unity-framework/actions/runs/33155894486), both with Fantasy `f8bed0d464924f159d46498f1311206ea0694be8` and protocol identity `3cb86e21687e65af0e0d409d9186384d0f959fd6aa873eb9e1cd0cb39c77d37d`. Unity `6000.3.9f1` revision `7a9955a4f2fa` independently passed the exact-main 22-test EditMode suite with zero failures or skips; its NUnit XML SHA-256 is `c781a3e0f5d1f48811bd1c6eb0c89520d30532685a84b2fdf91288ad11df84bb`.
+
+The release-equivalent exact-main run retained the acknowledgement-compatible protocol across replay, wire, capacity, impairment, telemetry-outage, and 60-minute soak gates. The two-room/128-Bot profile recorded Tick P99/P99.9 `1.1757/1.4206 ms`, Gameplay P99 `0.0016 ms`, zero Gameplay allocation, `6.462342%` process CPU, `146,165,760`-byte working set, and per-client wire P95 `178.912/43.616 kbit/s` downstream/upstream with `928-byte` maximum UDP payload. Room-aware replay consumed `2,381,710` Inputs and reproduced final Tick `21246` with combined hash `07f5c22398b534ea`; the retained PCAP matched SHA-256 `e61bd9ce25273157db122278e6db700e14573433a6b8bc8f2e5ea6ff95af23d2`.
+
+The Regional/Degraded socket profiles stayed within wire budgets at downstream/upstream P95 `176.752/43.744` and `198.08/48.68 kbit/s`, with maximum payloads `927` and `988 bytes`. The 60-minute one-room/64-Bot soak recorded 216,004 measured Ticks at Tick P99/P99.9 `0.7948/1.0458 ms`, zero slow Ticks, zero Gameplay allocation, `3.767792%` process CPU, and final Tick/hash `217947`/`6a2800790eb00278`.
+
+Telemetry outage comparison passed on exact main with exporter-disabled Tick P99 `0.6834 ms`, unavailable-exporter Tick P99 `0.6195 ms`, zero measured P99 increment, bounded series `4/16`, and zero trace-record drops. On the PR head, an initial hosted-runner sample produced an unusually low `0.2637 ms` baseline and normal `0.7235 ms` outage, so the strict delta gate failed at `0.4598 ms`; a failed-job rerun, without a code or threshold change, passed at `0.5782/0.6931 ms` and `0.1149 ms` delta. The exact-main run passed on its first attempt. This fluctuation is retained as runner-variance evidence and does not weaken the `< 0.25 ms` gate.
+
+Repository-owned qualification, telemetry-capacity, and multi-room-capacity verifiers were rerun against the downloaded exact-main artifacts. They confirmed the source, Fantasy, protocol, configuration, base-image and product-image identities, replay result, and PCAP hashes. These server-side and manual EditMode results prove compatibility of the WS-25 adapter boundary; they do not execute a concrete Unity network transport or measure player-visible correction behavior.
 
 ## Next gates
 
-1. Run the expanded 22-test Unity EditMode suite on the exact reviewed WS-25 commit and retain its ADR-0014 evidence bundle.
-2. Supply a concrete Unity client `IRealtimeTransport` implementation and wire login/join plus packet routing in the application Composition Root; the prediction package must remain transport-vendor independent.
-3. Capture correction magnitude and frequency from that exact-build client under the reproducible Regional impairment profile before accepting or changing the thresholds in `performance-budgets.md`.
-4. Exercise the composed client in Unity PlayMode and representative mobile IL2CPP builds.
-5. Keep the published server candidate out of a production environment until the project owner supplies a real Linux target and approves the independent environment-canary and rollback procedure.
+1. Supply a concrete Unity client `IRealtimeTransport` implementation and wire login/join plus packet routing in the application Composition Root; the prediction package must remain transport-vendor independent.
+2. Capture correction magnitude and frequency from that exact-build client under the reproducible Regional impairment profile before accepting or changing the thresholds in `performance-budgets.md`.
+3. Exercise the composed client in Unity PlayMode and representative mobile IL2CPP builds.
+4. Keep the production room default unchanged and keep the published server candidate out of a production environment until the project owner supplies a real Linux target and approves the independent environment-canary and rollback procedure.
 
 Until those gates pass, the implementation is a reusable baseline and not a claim that client prediction tuning, physics prediction, or production rollout is complete.

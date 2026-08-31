@@ -20,6 +20,8 @@ Silently skipping the job would weaken the dual-runtime boundary and could be mi
 - Changes to Unity, Shared Gameplay, Shared Realtime, package resolution, or the tested commit invalidate earlier evidence.
 - Missing manual evidence is an open gate, not a pass. .NET test success cannot substitute for Unity execution.
 
+The WS-25 exact-main bundle for source `dfbc0534631ec7cc019919830a93472d3572f61c` used Unity `6000.3.9f1` revision `7a9955a4f2fa` and passed all 22 named EditMode tests with zero failures and zero skips. The retained NUnit XML SHA-256 is `c781a3e0f5d1f48811bd1c6eb0c89520d30532685a84b2fdf91288ad11df84bb`. This closes the WS-25 exact-commit EditMode gate only; it does not substitute for PlayMode, mobile IL2CPP, concrete transport, or real-client impairment evidence.
+
 ## Consequences and restoration
 
 Manual execution is slower and depends on operator discipline, but retains auditable dual-compilation evidence without storing Unity credentials. Earlier exact-commit bundles retain their historical named-test counts; every subsequent relevant exact commit is gated by the then-current named suite until automated Unity CI is restored.
