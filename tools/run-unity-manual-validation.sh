@@ -76,7 +76,7 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-for command_name in git docker curl jq xmllint shasum lipo plutil sw_vers uname awk grep cmp cp find seq; do
+for command_name in git docker colima curl jq xmllint shasum lipo plutil sw_vers uname awk grep cmp cp find seq; do
   require_command "$command_name"
 done
 
@@ -151,6 +151,10 @@ if ! docker info >/dev/null 2>&1; then
   echo 'A running Docker/Colima engine is required.' >&2
   exit 2
 fi
+if [[ "$(docker context show)" != 'colima' ]] || ! colima status >/dev/null 2>&1; then
+  echo 'The active Docker context must be a running Colima instance.' >&2
+  exit 2
+fi
 docker_server_os="$(docker info --format '{{.OSType}}' 2>/dev/null)"
 if [[ "$docker_server_os" != 'linux' ]]; then
   echo "Expected a Linux Docker engine, found: $docker_server_os" >&2
@@ -201,8 +205,8 @@ cp "$host_config" "$staged_host_config"
   echo "fantasy_client_package_sha256=$(sha256 "$fantasy_package")"
   echo "fantasy_client_notice_sha256=$(sha256 "$fantasy_notice")"
   echo "fantasy_unity_license_sha256=$(sha256 "$fantasy_license")"
-  echo "kcp_endpoint=127.0.0.1:$kcp_port"
   echo "health_endpoint=http://127.0.0.1:$health_port/health/ready"
+  echo "colima_status=$(colima status --json)"
   echo "$submodule_status"
 } >"$metadata"
 
@@ -245,8 +249,8 @@ docker run -d \
   --cap-drop ALL \
   --security-opt no-new-privileges:true \
   --volume "$staged_host_config:/app/Fantasy.config:ro" \
-  --publish "127.0.0.1:$health_port:8080/tcp" \
-  --publish "127.0.0.1:$kcp_port:22000/udp" \
+  --publish "$health_port:8080/tcp" \
+  --publish "$kcp_port:22000/udp" \
   --env "AINATIVE_SOURCE_COMMIT=$commit" \
   --env "AINATIVE_FANTASY_COMMIT=$fantasy_commit" \
   --env "AINATIVE_PROTOCOL_IDENTITY=$protocol_identity" \
@@ -270,6 +274,23 @@ for _ in $(seq 1 360); do
 done
 [[ "$ready" == 'true' ]] || fail 'The Battle Host did not become ready within 90 seconds.'
 
+kcp_host=''
+while IFS= read -r candidate; do
+  [[ -n "$candidate" ]] || continue
+  if response="$(curl --silent --show-error --max-time 2 "http://$candidate:$health_port/health/ready" 2>/dev/null)" &&
+     [[ "$(jq -r '.status // empty' <<<"$response")" == 'ready' ]]; then
+    kcp_host="$candidate"
+    break
+  fi
+done < <(colima ssh -- ip -o -4 addr show scope global | awk '{split($4, address, "/"); print address[1]}')
+if [[ -z "$kcp_host" ]]; then
+  fail 'Colima has no macOS-reachable VM address for UDP KCP. Restart it with --network-address and rerun the gate.'
+fi
+{
+  echo "colima_reachable_address=$kcp_host"
+  echo "kcp_endpoint=$kcp_host:$kcp_port"
+} >>"$metadata"
+
 echo 'Running 36 exact-commit Unity EditMode tests...'
 "$editor_path" \
   -batchmode \
@@ -283,7 +304,7 @@ assert_nunit_result "$editmode_xml" 36 'EditMode'
 
 echo 'Running 2 real Fantasy KCP Unity PlayMode tests...'
 AINATIVE_WS26_RUN_PLAYMODE=1 \
-AINATIVE_WS26_HOST=127.0.0.1 \
+AINATIVE_WS26_HOST="$kcp_host" \
 AINATIVE_WS26_PORT="$kcp_port" \
 "$editor_path" \
   -batchmode \
@@ -318,7 +339,7 @@ cmp -s "$player_license" "$fantasy_license" || fail 'The staged Fantasy license 
 echo 'Running the deterministic macOS Player smoke...'
 "$player_executable" \
   --ainative-smoke \
-  --ainative-host 127.0.0.1 \
+  --ainative-host "$kcp_host" \
   --ainative-port "$kcp_port" \
   --ainative-result "$smoke_json" \
   -batchmode \

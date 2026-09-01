@@ -7,7 +7,7 @@ The repository contains the first production vertical-slice foundation: one Shar
 
 - .NET SDK 10.0.202. The repository `global.json` pins the exact SDK servicing version.
 - Unity 6000.3.9f1 revision `7a9955a4f2fa` with Mac Build Support (Mono) for local package import, EditMode/PlayMode tests, and the Apple Silicon ARM64 smoke build.
-- Colima/Docker with Linux x64 emulation for the fixed-image Battle Host used by the macOS Unity gate.
+- Colima/Docker with Linux x64 emulation and a macOS-reachable VM address for the fixed-image Battle Host used by the macOS Unity gate. Start the Apple Silicon profile with `--vz-rosetta --network-address`; TCP-only SSH port forwarding cannot carry the real KCP/UDP gate.
 
 ## Clone and initialize dependencies
 
@@ -44,6 +44,7 @@ dotnet run --project tools/ArchitectureCheck -c Release --no-build -- --root . -
 Until credentialed Unity CI is restored, run the Unity package tests manually on the exact commit under review. On macOS:
 
 ```bash
+colima start --vm-type vz --vz-rosetta --arch aarch64 --cpus 4 --memory 8 --network-address
 tools/run-unity-manual-validation.sh
 ```
 

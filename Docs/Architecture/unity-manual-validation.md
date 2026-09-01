@@ -18,9 +18,10 @@ The run also fails if Unity reports compilation/package-resolution errors, selec
 
 ## macOS full command
 
-Start Colima with Linux x64 emulation available, then run from a clean Apple Silicon checkout:
+Start Colima with Linux x64 emulation and a macOS-reachable VM address, then run from a clean Apple Silicon checkout. The reachable address is required because Colima's default SSH port forward handles TCP readiness but does not expose the Fantasy KCP/UDP port:
 
 ```bash
+colima start --vm-type vz --vz-rosetta --arch aarch64 --cpus 4 --memory 8 --network-address
 tools/run-unity-manual-validation.sh
 ```
 
@@ -34,7 +35,7 @@ The script:
 
 1. verifies macOS ARM64, Unity, source, submodule, UPM, license, and tool identities;
 2. builds the exact-source Battle Host with the fixed .NET `10.0.202` SDK and `10.0.4` runtime image digests under Linux x64 emulation;
-3. starts only that container on KCP `127.0.0.1:22000` and readiness `127.0.0.1:22080`;
+3. starts only that container, keeps readiness available at `127.0.0.1:22080`, discovers and proves a macOS-reachable Colima address, and uses that address for KCP `22000/udp`;
 4. executes the exact 36/2 EditMode/PlayMode totals;
 5. builds an ARM64-only macOS Mono `.app`, verifies its notices, and runs the deterministic reconnect smoke;
 6. stops the Host normally and rejects any tracked worktree drift.
