@@ -6,7 +6,8 @@ The repository contains the first production vertical-slice foundation: one Shar
 ## Requirements
 
 - .NET SDK 10.0.202. The repository `global.json` pins the exact SDK servicing version.
-- Unity 6000.3.9f1 revision `7a9955a4f2fa` for local package import, EditMode/PlayMode tests, and the Windows x64 Mono smoke build.
+- Unity 6000.3.9f1 revision `7a9955a4f2fa` with Mac Build Support (Mono) for local package import, EditMode/PlayMode tests, and the Apple Silicon ARM64 smoke build.
+- Colima/Docker with Linux x64 emulation for the fixed-image Battle Host used by the macOS Unity gate.
 
 ## Clone and initialize dependencies
 
@@ -46,15 +47,15 @@ Until credentialed Unity CI is restored, run the Unity package tests manually on
 tools/run-unity-manual-validation.sh
 ```
 
-The macOS script verifies the exact 36-test EditMode package/vector gate. The complete WS-26 evidence contract is defined in [Unity WS-26 Validation](Docs/Architecture/unity-manual-validation.md).
+The macOS script is the complete WS-26 desktop gate. It builds the exact-source Host with fixed .NET images, verifies exactly 36 EditMode and 2 real-KCP PlayMode tests, builds an ARM64 Mono Player, runs the reconnect smoke, and retains the evidence bundle. The complete contract is defined in [Unity WS-26 macOS Validation](Docs/Architecture/unity-manual-validation.md).
 
-The Windows entry point also launches the local Battle Host, requires exactly 36 EditMode and 2 real-KCP PlayMode passes, builds the Windows x64 Mono Player, runs the deterministic smoke, and retains the evidence bundle:
+The Windows entry point remains available as a future supplemental platform gate, but it no longer blocks WS-26:
 
 ```powershell
 tools/run-unity-windows-validation.ps1
 ```
 
-Both scripts require a clean checkout so every result identifies one exact commit. The existence of WS-26 code or scripts is not a claim that its Unity gates passed; retain and review the generated bundle before updating milestone status.
+Both scripts require a clean checkout so every result identifies one exact commit. A macOS result does not imply Windows, Universal/x86_64, Android/iOS IL2CPP, or Regional real-client correction coverage. Retain and review the generated bundle before updating milestone status.
 
 The architecture-check command returns `0` for a valid repository, `1` for architecture violations, and `2` for invalid arguments, configuration, or unreadable inputs. Use `--format json` for machine-readable diagnostics.
 

@@ -1,46 +1,24 @@
-# Unity WS-26 Validation
+# Unity WS-26 macOS Validation
 
 Status: Required temporary validation path under ADR-0014
 Editor: Unity `6000.3.9f1` revision `7a9955a4f2fa`
+Primary desktop gate: macOS Apple Silicon ARM64 + Mono
 
 ## Scope and pass criteria
 
-Run the exact same source from `shared/gameplay`, `shared/realtime`, the client prediction and Fantasy transport packages, and the Battle Client application through Unity. A valid run must use a clean checkout of the exact commit under review and Unity `6000.3.9f1` revision `7a9955a4f2fa`.
+Run the exact same source from `shared/gameplay`, `shared/realtime`, the client prediction and Fantasy transport packages, and the Battle Client application through Unity. A valid run uses a clean checkout of the exact commit under review, Unity `6000.3.9f1` revision `7a9955a4f2fa`, and the repository-pinned Fantasy and .NET image identities.
 
-EditMode must report exactly 36 passed, zero failed, and zero skipped. The original 22 contract/prediction tests remain mandatory:
+EditMode must report exactly 36 passed, zero failed, and zero skipped. The original 22 contract/prediction tests remain mandatory, together with eight Fantasy transport tests and six application protocol/state tests covering envelope/channel mapping, sequence and epoch handling, truncation, bounded backpressure, disposal, allocation, login, join, routing, timeout, reconnect, and prediction continuity.
 
-1. `GameplayClockContractTests.ClockExposesCommittedTickAndFixedDelta`
-2. `DeterminismContractTests.Pcg32MatchesPublishedReferenceVector`
-3. `DeterminismContractTests.CapturedRandomStateReplaysTheSameSequence`
-4. `DeterminismContractTests.XxHash64MatchesCanonicalEmptyVector`
-5. `AcceptanceSimulationVectorTests.SixtyFourBotMovementAndFireVectorIsReplayable`
-6. `TransportContractTests.ReceivedPacketReportsTruncationWithoutHidingRequiredSize`
-7. `TransportContractTests.AcceptedSendRecordsCopiedByteCount`
-8. `ClientPredictionTests.IntegerMovementClampsInputAndAdvancesOneFixedTick`
-9. `ClientPredictionTests.ReconciliationReplaysOnlyUnacknowledgedInputs`
-10. `ClientPredictionTests.MatchingSnapshotRetainsPredictedStateWithoutCorrection`
-11. `ClientPredictionTests.FullHistoryDropsOldestAndIgnoresOlderSnapshot`
-12. `ClientPredictionTests.AuthoritativeSequenceAheadResetsPredictionEpoch`
-13. `ClientPredictionTests.MissingAcknowledgementFailsClosedToAuthoritativeState`
-14. `ClientPredictionTests.PredictionAndMatchingReconciliationAllocateNothingAfterWarmup`
-15. `ClientPredictionAdapterTests.InputSendUsesProtocolV1BytesAndInputChannel`
-16. `ClientPredictionAdapterTests.SnapshotAcknowledgementRewindsAndReplaysNewerInput`
-17. `ClientPredictionAdapterTests.MatchingSnapshotDoesNotRecordCorrection`
-18. `ClientPredictionAdapterTests.MissingPlayerAndProtocolMismatchFailClosed`
-19. `ClientPredictionAdapterTests.TruncatedAndWrongChannelPacketsDoNotChangePrediction`
-20. `ClientPredictionAdapterTests.ReconnectResponseAdvancesEpochAndReconciles`
-21. `ClientPredictionAdapterTests.TransportBackpressureRemainsObservableAfterPrediction`
-22. `ClientPredictionAdapterTests.SteadyStatePredictionAndInputEncodingAllocateNothing`
+PlayMode must report exactly 2 passed, zero failed, and zero skipped against the real Fantasy KCP Battle Host: one covers login/join/first Snapshot/deterministic Input acknowledgement, and one forces reconnect and proves a newer epoch plus continued prediction.
 
-The additional 14 EditMode tests comprise eight Fantasy transport tests (envelope/channel mapping, sequence handling, epoch monotonicity, truncation, backpressure/bounds, disposal/late callback handling, and the warmed-up allocation path) plus six application protocol/state tests (login, join, routing, timeout, reconnect, and prediction continuity).
+The macOS ARM64 Mono Player smoke must then exit zero and write parseable JSON with `success: true`. It must prove a nonzero session, an increased reconnect epoch, acknowledgement growth before and after reconnect, a nonzero received Tick, and zero dropped input frames.
 
-PlayMode must report exactly 2 passed, zero failed, and zero skipped against the local real Fantasy KCP Battle Host: one covers login/join/first Snapshot/deterministic Input acknowledgement, and one forces reconnect and proves a newer epoch plus continued prediction. The Windows x64 Mono Player smoke must then exit zero and write parseable JSON with `success: true` after completing the same local vertical path.
+The run also fails if Unity reports compilation/package-resolution errors, selects another Editor revision, cannot resolve the pinned local/Git UPM packages, produces a non-ARM64 Player, omits the Fantasy license or Third-Party Notices, uses an unpinned Server SDK/runtime image, force-terminates the Host, or changes the clean worktree.
 
-The run also fails if Unity reports compilation/package-resolution errors, selects another Editor revision, cannot resolve the pinned local/Git UPM packages, omits the license/Third-Party Notices from the Player, or does not produce the required NUnit XML and smoke JSON.
+## macOS full command
 
-## Preferred macOS command
-
-From the repository root, with no tracked changes:
+Start Colima with Linux x64 emulation available, then run from a clean Apple Silicon checkout:
 
 ```bash
 tools/run-unity-manual-validation.sh
@@ -52,36 +30,37 @@ If Unity is installed elsewhere:
 UNITY_EDITOR_PATH="/absolute/path/to/Unity" tools/run-unity-manual-validation.sh
 ```
 
-The script writes ignored evidence under `artifacts/unity-manual/<full-commit>/` and verifies the exact 36-test EditMode total. It is the cross-platform package/vector check; it does not claim the two real-KCP PlayMode or Windows Player gates.
+The script:
 
-## Windows full command
+1. verifies macOS ARM64, Unity, source, submodule, UPM, license, and tool identities;
+2. builds the exact-source Battle Host with the fixed .NET `10.0.202` SDK and `10.0.4` runtime image digests under Linux x64 emulation;
+3. starts only that container on KCP `127.0.0.1:22000` and readiness `127.0.0.1:22080`;
+4. executes the exact 36/2 EditMode/PlayMode totals;
+5. builds an ARM64-only macOS Mono `.app`, verifies its notices, and runs the deterministic reconnect smoke;
+6. stops the Host normally and rejects any tracked worktree drift.
 
-From a clean repository checkout in PowerShell:
+Evidence is written under `artifacts/unity-macos/<full-commit>/`. It includes metadata and identities, image build/Host logs, both NUnit XML/log pairs, Player build/run logs, the `.app`, smoke JSON, staged notices, key SHA-256 hashes, and a summary. Passing the script is required before recording WS-26 as validated; code or scripts alone are not evidence.
+
+## Windows supplemental command
+
+The Windows x64 Mono path remains available for future cross-platform evidence and is no longer the current WS-26 blocking gate:
 
 ```powershell
 tools/run-unity-windows-validation.ps1
 ```
 
-Set `UNITY_EDITOR_PATH` or pass `-UnityEditorPath` when Unity is installed elsewhere. The script verifies the exact SDK, Editor project revision, Fantasy gitlink, and clean source commit; publishes and starts the local Battle Host on KCP `127.0.0.1:22000`; waits for readiness on `127.0.0.1:22080`; executes exact 36/2 EditMode/PlayMode totals; builds a Windows x64 Mono Player; and runs smoke arguments `--ainative-smoke --ainative-host 127.0.0.1 --ainative-port 22000 --ainative-result <absolute-json>`. It stops only the exact Player and Host processes it created.
-
-Evidence is written under `artifacts/unity-windows/<full-commit>/` by default. It includes metadata and identities, package-lock hashes, both NUnit XML/log pairs, Host logs, Player build/run logs, the built Player, smoke JSON, and a summary. Passing the script is required before recording WS-26 as validated; adding the script or tests alone is not evidence.
+It retains its exact 36 EditMode, 2 real-KCP PlayMode, and Windows Player smoke contract. A macOS pass does not claim that Windows has passed, and a future Windows result must be recorded separately.
 
 ## Unity Editor UI alternative
 
-1. Open `client/UnityProject` with exactly Unity `6000.3.9f1`.
-2. Confirm both local packages resolve without Console errors.
-3. Open **Window > General > Test Runner**, select **EditMode**, then **Run All**.
-4. Confirm exactly 36 EditMode tests pass with no skipped test or compiler error.
-5. With the local Battle Host running, select **PlayMode**, run all, and confirm exactly two tests pass.
-6. Export/save both results and capture the Test Runner result plus Editor version. A UI-only run does not replace the Windows Player smoke.
+The Test Runner can diagnose EditMode or PlayMode failures, but a UI-only run does not replace the automated macOS ARM64 Player build, license checks, smoke JSON, exact image identity, or normal Host shutdown evidence.
 
 ## Evidence handoff
 
-For each reviewed commit, provide:
+For each reviewed commit, retain:
 
-- the full Git commit SHA and `git submodule status --recursive` output;
-- `metadata.txt`, `summary.txt`, both NUnit XML/log pairs, Host/Player logs, Player build log, and `smoke.json` from the Windows script; for the macOS partial gate, provide `editmode.xml` and `editmode.log` and label PlayMode/Player unverified;
-- the operator name and validation UTC timestamp;
-- any platform/license limitation encountered.
+- the full Git commit/tree identities and recursive submodule status;
+- `metadata.txt`, `summary.txt`, `hashes.sha256`, both NUnit XML/log pairs, Host/image build logs, Player build/run logs, `smoke.json`, the `.app`, and staged Fantasy notices;
+- the operator and UTC timestamp plus any Docker, Unity, license, or platform limitation.
 
-Evidence applies only to that commit. Any subsequent change to `client/UnityProject`, either client package, `shared/gameplay`, `shared/realtime`, their package manifests/lockfile, the Fantasy pin, or the Unity version requires a new run. Windows Mono evidence does not replace Regional real-client correction measurement, Android/iOS IL2CPP, .NET, protocol-generation, architecture, replay, load, legal, or production rollout gates.
+Evidence applies only to that commit. A later change to the Unity project, either client package, Shared Gameplay/Realtime, manifests/lockfile, Fantasy pin, validation script, or Unity version requires a new run. macOS ARM64 Mono evidence does not replace Windows, Universal/x86_64, Regional real-client correction, Android/iOS IL2CPP, protocol generation, architecture, replay/load, or production rollout gates.

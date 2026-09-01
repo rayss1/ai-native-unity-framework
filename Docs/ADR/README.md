@@ -28,7 +28,7 @@ Changing an accepted contract requires a superseding ADR that records compatibil
 | [0011](0011-agent-engineering-and-architecture-enforcement.md) | Accepted | Agent engineering | Repository-owned context plus automated boundary checks | First validator and drift-repair workflow |
 | [0012](0012-server-runtime-successor.md) | Accepted | .NET 10 Server runtime | One `net10.0` product lane; Fantasy stays pinned behind the Server adapter/composition boundary | Ongoing release provenance, canary, and rollback discipline |
 | [0013](0013-passive-async-shared-contracts.md) | Accepted | Passive async Shared boundary types | `shared/realtime` may expose cancellation/value-task contracts but may not schedule work or perform I/O | Unity/.NET compilation and architecture checks |
-| [0014](0014-temporary-manual-unity-validation.md) | Accepted | Temporary manual Unity validation | Exact-commit Unity 6000.3.9f1 evidence is mandatory while credentialed CI is unavailable | Project-owner evidence bundle; restore automatic CI when authentication is available |
+| [0014](0014-temporary-manual-unity-validation.md) | Accepted | Temporary manual Unity validation | Exact-commit Unity 6000.3.9f1 evidence is mandatory while credentialed CI is unavailable | WS-26 macOS ARM64 bundle; Windows/mobile remain separate; restore automatic CI when authentication is available |
 | [0015](0015-room-aware-replay-format.md) | Accepted | Room-aware replay format | New captures use v2 room identity; the reader retains v1 one-room compatibility and fails closed | Exact-main replay-enabled evidence passed; environment canary/rollback remains |
 
 ## Open decision gates

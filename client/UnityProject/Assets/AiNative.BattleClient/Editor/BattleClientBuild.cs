@@ -51,6 +51,57 @@ namespace AiNative.Client.Editor
             Debug.Log($"WS-26 Windows x64 Mono Player: {output}");
         }
 
+        public static void BuildMacOsArm64Smoke()
+        {
+            string output = ReadRequiredAbsolutePath(
+                Environment.GetCommandLineArgs(),
+                "--ainative-build-output");
+            if (!output.EndsWith(".app", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new ArgumentException("--ainative-build-output must name a .app bundle.");
+            }
+
+            string outputDirectory = Path.GetDirectoryName(output);
+            Directory.CreateDirectory(outputDirectory);
+
+            NamedBuildTarget standalone = NamedBuildTarget.Standalone;
+            ScriptingImplementation previousBackend =
+                PlayerSettings.GetScriptingBackend(standalone);
+            int previousArchitecture = PlayerSettings.GetArchitecture(standalone);
+            try
+            {
+                PlayerSettings.SetScriptingBackend(
+                    standalone,
+                    ScriptingImplementation.Mono2x);
+                PlayerSettings.SetArchitecture(standalone, 1); // ARM64
+
+                BuildPlayerOptions options = new BuildPlayerOptions
+                {
+                    scenes = new[] { ScenePath },
+                    locationPathName = output,
+                    target = BuildTarget.StandaloneOSX,
+                    targetGroup = BuildTargetGroup.Standalone,
+                    subtarget = (int)StandaloneBuildSubtarget.Player,
+                    options = BuildOptions.Development,
+                };
+                BuildReport report = BuildPipeline.BuildPlayer(options);
+                if (report.summary.result != BuildResult.Succeeded)
+                {
+                    throw new InvalidOperationException(
+                        $"macOS ARM64 smoke Player build failed: {report.summary.result}, " +
+                        $"errors={report.summary.totalErrors}.");
+                }
+            }
+            finally
+            {
+                PlayerSettings.SetArchitecture(standalone, previousArchitecture);
+                PlayerSettings.SetScriptingBackend(standalone, previousBackend);
+            }
+
+            CopyThirdPartyNotice(outputDirectory);
+            Debug.Log($"WS-26 macOS ARM64 Mono Player: {output}");
+        }
+
         private static void CopyThirdPartyNotice(string outputDirectory)
         {
             UnityEditor.PackageManager.PackageInfo clientPackage =
