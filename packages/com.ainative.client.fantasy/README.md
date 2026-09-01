@@ -26,4 +26,4 @@ Call `TryAdvanceConnectionEpoch` after decoding a successful login or reconnect 
 
 ## Third-party software
 
-Fantasy.Unity is consumed at version `2026.1.1001` from the repository-pinned Fantasy commit. See [Third Party Notices](THIRD-PARTY-NOTICES.md) for the complete applicable modified MIT text and explicit entity restriction. Windows Player distributions must carry that notice/license; the application-owned Player build script is responsible for copying it beside the built Player.
+Fantasy.Unity is consumed at version `2026.1.1001` from the repository-pinned Fantasy commit. See [Third Party Notices](THIRD-PARTY-NOTICES.md) for the complete applicable modified MIT text and explicit entity restriction. Approved Windows and macOS Player distributions must carry that notice/license; the application-owned Player build scripts are responsible for copying it beside the built Player.

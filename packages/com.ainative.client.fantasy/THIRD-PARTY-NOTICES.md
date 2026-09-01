@@ -9,9 +9,9 @@
 - Upstream project: <https://github.com/qq362946/Fantasy>
 - License: modified MIT text with an explicit entity restriction (full applicable text below)
 
-Copyright and license terms are provided by the Fantasy project. This notice and the Fantasy license must be retained with Windows Player distributions that include Fantasy.Unity.
+Copyright and license terms are provided by the Fantasy project. This notice and the Fantasy license must be retained with approved Windows and macOS Player distributions that include Fantasy.Unity.
 
-The AI-Native project owner approved extending use and Windows client distribution to Fantasy.Unity at the commit and package version listed above for WS-26.
+The AI-Native project owner approved extending Windows and macOS client use and distribution to Fantasy.Unity at the commit and package version listed above for WS-26.
 
 ### Applicable license text
 

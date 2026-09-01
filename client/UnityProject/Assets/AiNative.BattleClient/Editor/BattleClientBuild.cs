@@ -1,8 +1,10 @@
 using System;
 using System.IO;
+using System.Reflection;
 using AiNative.Client.Fantasy;
 using UnityEditor;
 using UnityEditor.Build;
+using UnityEditor.Build.Profile;
 using UnityEditor.Build.Reporting;
 using UnityEngine;
 
@@ -49,6 +51,160 @@ namespace AiNative.Client.Editor
 
             CopyThirdPartyNotice(outputDirectory);
             Debug.Log($"WS-26 Windows x64 Mono Player: {output}");
+        }
+
+        public static void BuildMacOsArm64Smoke()
+        {
+            string output = ReadRequiredAbsolutePath(
+                Environment.GetCommandLineArgs(),
+                "--ainative-build-output");
+            if (!output.EndsWith(".app", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new ArgumentException("--ainative-build-output must name a .app bundle.");
+            }
+
+            string outputDirectory = Path.GetDirectoryName(output);
+            Directory.CreateDirectory(outputDirectory);
+
+            NamedBuildTarget standalone = NamedBuildTarget.Standalone;
+            ScriptingImplementation previousBackend =
+                PlayerSettings.GetScriptingBackend(standalone);
+            BuildTarget previousBuildTarget = EditorUserBuildSettings.activeBuildTarget;
+            BuildTargetGroup previousBuildTargetGroup =
+                BuildPipeline.GetBuildTargetGroup(previousBuildTarget);
+            int previousArchitecture = 0;
+            object macBuildProfile = null;
+            BuildProfile macBuildProfileOwner = null;
+            PropertyInfo macArchitectureProperty = null;
+            object previousMacArchitecture = null;
+            string projectSettingsPath = Path.GetFullPath(
+                Path.Combine(UnityEngine.Application.dataPath, "..", "ProjectSettings", "ProjectSettings.asset"));
+            byte[] previousProjectSettings = File.ReadAllBytes(projectSettingsPath);
+            try
+            {
+                if (!EditorUserBuildSettings.SwitchActiveBuildTarget(
+                        BuildTargetGroup.Standalone,
+                        BuildTarget.StandaloneOSX))
+                {
+                    throw new InvalidOperationException(
+                        "Unity could not activate the StandaloneOSX build target.");
+                }
+
+                previousArchitecture = PlayerSettings.GetArchitecture(standalone);
+                PlayerSettings.SetScriptingBackend(
+                    standalone,
+                    ScriptingImplementation.Mono2x);
+                PlayerSettings.SetArchitecture(standalone, 1); // ARM64
+                previousMacArchitecture = SetActiveMacArchitecture(
+                    out macBuildProfile,
+                    out macBuildProfileOwner,
+                    out macArchitectureProperty);
+                AssetDatabase.SaveAssets();
+
+                BuildPlayerOptions options = new BuildPlayerOptions
+                {
+                    scenes = new[] { ScenePath },
+                    locationPathName = output,
+                    target = BuildTarget.StandaloneOSX,
+                    targetGroup = BuildTargetGroup.Standalone,
+                    subtarget = (int)StandaloneBuildSubtarget.Player,
+                    options = BuildOptions.Development,
+                };
+                BuildReport report = BuildPipeline.BuildPlayer(options);
+                if (report.summary.result != BuildResult.Succeeded)
+                {
+                    throw new InvalidOperationException(
+                        $"macOS ARM64 smoke Player build failed: {report.summary.result}, " +
+                        $"errors={report.summary.totalErrors}.");
+                }
+            }
+            finally
+            {
+                try
+                {
+                    if (macArchitectureProperty != null)
+                    {
+                        macArchitectureProperty.SetValue(
+                            macBuildProfile,
+                            previousMacArchitecture);
+                        EditorUtility.SetDirty(macBuildProfileOwner);
+                    }
+
+                    PlayerSettings.SetArchitecture(standalone, previousArchitecture);
+                    PlayerSettings.SetScriptingBackend(standalone, previousBackend);
+                    if (previousBuildTarget != BuildTarget.StandaloneOSX &&
+                        !EditorUserBuildSettings.SwitchActiveBuildTarget(
+                            previousBuildTargetGroup,
+                            previousBuildTarget))
+                    {
+                        throw new InvalidOperationException(
+                            $"Unity could not restore the {previousBuildTarget} build target.");
+                    }
+
+                    AssetDatabase.SaveAssets();
+                }
+                finally
+                {
+                    File.WriteAllBytes(projectSettingsPath, previousProjectSettings);
+                }
+            }
+
+            CopyThirdPartyNotice(outputDirectory);
+            Debug.Log($"WS-26 macOS ARM64 Mono Player: {output}");
+        }
+
+        private static object SetActiveMacArchitecture(
+            out object macBuildProfile,
+            out BuildProfile macBuildProfileOwner,
+            out PropertyInfo architectureProperty)
+        {
+            Type profileType = Type.GetType(
+                "UnityEditor.OSXStandalone.OSXStandaloneBuildProfile, UnityEditor.OSXStandalone.Extensions",
+                throwOnError: true);
+            PropertyInfo platformProfileProperty = typeof(BuildProfile).GetProperty(
+                "platformBuildProfile",
+                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+            if (platformProfileProperty == null)
+            {
+                throw new MissingMemberException(
+                    "Unity BuildProfile does not expose its platform build profile.");
+            }
+
+            macBuildProfile = null;
+            macBuildProfileOwner = null;
+            foreach (UnityEngine.Object candidate in
+                     Resources.FindObjectsOfTypeAll(typeof(BuildProfile)))
+            {
+                BuildProfile buildProfile = (BuildProfile)candidate;
+                object platformProfile = platformProfileProperty.GetValue(buildProfile);
+                if (platformProfile != null && profileType.IsInstanceOfType(platformProfile))
+                {
+                    macBuildProfile = platformProfile;
+                    macBuildProfileOwner = buildProfile;
+                    break;
+                }
+            }
+
+            if (macBuildProfile == null)
+            {
+                throw new InvalidOperationException(
+                    "Unity did not expose the active macOS build profile.");
+            }
+
+            architectureProperty = profileType.GetProperty(
+                "architecture",
+                BindingFlags.Public | BindingFlags.Instance);
+            if (architectureProperty == null || !architectureProperty.CanWrite)
+            {
+                throw new MissingMemberException(
+                    "The active macOS build profile does not expose a writable architecture.");
+            }
+
+            object previousArchitecture = architectureProperty.GetValue(macBuildProfile);
+            object arm64 = Enum.Parse(architectureProperty.PropertyType, "ARM64");
+            architectureProperty.SetValue(macBuildProfile, arm64);
+            EditorUtility.SetDirty(macBuildProfileOwner);
+            return previousArchitecture;
         }
 
         private static void CopyThirdPartyNotice(string outputDirectory)

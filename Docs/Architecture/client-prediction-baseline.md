@@ -1,7 +1,7 @@
 # Client Prediction and Reconciliation Baseline
 
 Status: Implemented prediction baseline; WS-26 Unity transport/application validation pending
-Last updated: 2026-08-31
+Last updated: 2026-09-01
 Decision source: ADR-0005, WS-24, WS-25, and WS-26
 
 ## Scope
@@ -60,13 +60,13 @@ Repository-owned qualification, telemetry-capacity, and multi-room-capacity veri
 
 The Unity application Composition Root owns login, room join, reconnect, packet routing, and the replaceable active transport. Its state progression is `Connecting -> LoggingIn -> JoiningRoom -> Active`; disconnect enters `Reconnecting`, and terminal paths enter `Faulted` or `Disposed`. Protocol v1 uses room 1 and 60 Hz. FixedUpdate performs prediction and writes a preallocated input ring; Update pumps Fantasy and routes/sends queued frames. Reconnect retains the prediction instance and advances the transport epoch only after a successful decoded response.
 
-WS-26 acceptance is intentionally evidence-gated. The repository requires exactly 36 EditMode and 2 PlayMode passes, followed by a Windows x64 Mono Player smoke against a local Battle Host. The Windows entry point records the source/Fantasy/UPM/SDK/Unity identities, NUnit XML, Host and Player logs, and smoke JSON. No WS-26 Unity result is recorded as passed in this document until an exact clean-commit evidence bundle is reviewed.
+WS-26 acceptance is intentionally evidence-gated. The current desktop gate requires exactly 36 EditMode and 2 PlayMode passes, followed by a macOS Apple Silicon ARM64 Mono Player smoke against an exact-source Battle Host built with fixed .NET images. The macOS entry point records source/tree/Fantasy/protocol/configuration/UPM/image/Unity identities, NUnit XML, Host and Player logs, staged notices, binary architecture, hashes, and smoke JSON. Windows remains a future supplemental platform gate. No WS-26 Unity result is recorded as passed in this document until an exact clean-commit macOS bundle is reviewed.
 
 ## Next gates
 
-1. Run and review the exact-clean-commit WS-26 Windows bundle: 36 EditMode, 2 real-KCP PlayMode, and the x64 Mono smoke must all pass with the pinned identities.
+1. Run and review the exact-clean-commit WS-26 macOS bundle: 36 EditMode, 2 real-KCP PlayMode, and the Apple Silicon ARM64 Mono smoke must all pass with the pinned identities.
 2. Capture correction magnitude and frequency from that exact-build client under the reproducible Regional impairment profile before accepting or changing the thresholds in `performance-budgets.md`.
-3. Exercise the composed client in representative Android and iOS IL2CPP builds; Windows Mono evidence does not satisfy the mobile AOT/stripping gate.
+3. Exercise the composed client in representative Android and iOS IL2CPP builds; macOS Mono evidence does not satisfy the mobile AOT/stripping gate.
 4. Keep the production room default unchanged and keep the published server candidate out of a production environment until the project owner supplies a real Linux target and approves the independent environment-canary and rollback procedure.
 
 Until those gates pass, the implementation is a reusable baseline and not a claim that client prediction tuning, physics prediction, or production rollout is complete.
