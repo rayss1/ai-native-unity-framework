@@ -12,6 +12,7 @@ expected_fantasy_url='https://github.com/rayss1/Fantasy.git?path=/Fantasy.Packag
 kcp_port=22000
 health_port=22080
 container_id=''
+container_name=''
 player_pid=''
 host_log=''
 
@@ -62,19 +63,20 @@ cleanup() {
     wait "$player_pid" >/dev/null 2>&1 || true
   fi
 
-  if [[ -n "$container_id" ]] && docker inspect "$container_id" >/dev/null 2>&1; then
-    docker stop --time 5 "$container_id" >/dev/null 2>&1 || docker kill "$container_id" >/dev/null 2>&1 || true
+  local cleanup_container="${container_id:-$container_name}"
+  if [[ -n "$cleanup_container" ]] && docker inspect "$cleanup_container" >/dev/null 2>&1; then
+    docker stop --time 5 "$cleanup_container" >/dev/null 2>&1 || docker kill "$cleanup_container" >/dev/null 2>&1 || true
     if [[ -n "$host_log" ]]; then
-      docker logs "$container_id" >"$host_log" 2>&1 || true
+      docker logs "$cleanup_container" >"$host_log" 2>&1 || true
     fi
-    docker rm "$container_id" >/dev/null 2>&1 || true
+    docker rm "$cleanup_container" >/dev/null 2>&1 || true
   fi
 
   exit "$exit_code"
 }
 trap cleanup EXIT INT TERM
 
-for command_name in git docker curl jq xmllint shasum lipo plutil sw_vers uname awk grep cmp find seq; do
+for command_name in git docker curl jq xmllint shasum lipo plutil sw_vers uname awk grep cmp cp find seq; do
   require_command "$command_name"
 done
 
@@ -169,12 +171,15 @@ player_build_log="$evidence_dir/player-build.log"
 player_stdout="$evidence_dir/player.stdout.log"
 player_stderr="$evidence_dir/player.stderr.log"
 smoke_json="$evidence_dir/smoke.json"
+staged_host_config="$evidence_dir/Fantasy.config"
 player_directory="$evidence_dir/player"
 player_bundle="$player_directory/AiNative.BattleClient.app"
 player_executable="$player_bundle/Contents/MacOS/AiNative.BattleClient"
 image_tag="ainative/battle-host:ws26-macos-${commit}"
 protocol_identity="$(sha256 "$protocol_schema")"
 configuration_identity="$(sha256 "$host_config")"
+cp "$host_config" "$staged_host_config"
+[[ "$(sha256 "$staged_host_config")" == "$configuration_identity" ]] || fail 'The staged Battle Host configuration identity changed.'
 
 {
   echo "commit=$commit"
@@ -230,13 +235,16 @@ image_protocol="$(docker image inspect "$image_tag" --format '{{index .Config.La
 } >>"$metadata"
 
 echo 'Starting the exact Battle Host container...'
-container_id="$(docker run -d \
+container_name="ainative-ws26-macos-${commit:0:12}-$$"
+container_id="$container_name"
+docker run -d \
+  --name "$container_name" \
   --platform linux/amd64 \
   --read-only \
   --tmpfs /tmp:size=64m,mode=1777 \
   --cap-drop ALL \
   --security-opt no-new-privileges:true \
-  --volume "$host_config:/app/Fantasy.config:ro" \
+  --volume "$staged_host_config:/app/Fantasy.config:ro" \
   --publish "127.0.0.1:$health_port:8080/tcp" \
   --publish "127.0.0.1:$kcp_port:22000/udp" \
   --env "AINATIVE_SOURCE_COMMIT=$commit" \
@@ -244,7 +252,8 @@ container_id="$(docker run -d \
   --env "AINATIVE_PROTOCOL_IDENTITY=$protocol_identity" \
   --env 'AINATIVE_FANTASY_ENABLED=true' \
   --env 'AINATIVE_FANTASY_OUTER_KCP_MTU=1150' \
-  "$image_tag")"
+  "$image_tag" >/dev/null
+container_id="$(docker inspect "$container_name" --format '{{.Id}}')"
 
 ready='false'
 for _ in $(seq 1 360); do
@@ -386,6 +395,7 @@ container_id=''
   shasum -a 256 \
     metadata.txt \
     summary.txt \
+    Fantasy.config \
     editmode.xml \
     editmode.log \
     playmode.xml \
