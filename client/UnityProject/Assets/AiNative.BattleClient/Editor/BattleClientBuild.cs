@@ -74,6 +74,7 @@ namespace AiNative.Client.Editor
                 BuildPipeline.GetBuildTargetGroup(previousBuildTarget);
             int previousArchitecture = 0;
             object macBuildProfile = null;
+            BuildProfile macBuildProfileOwner = null;
             PropertyInfo macArchitectureProperty = null;
             object previousMacArchitecture = null;
             string projectSettingsPath = Path.GetFullPath(
@@ -96,6 +97,7 @@ namespace AiNative.Client.Editor
                 PlayerSettings.SetArchitecture(standalone, 1); // ARM64
                 previousMacArchitecture = SetActiveMacArchitecture(
                     out macBuildProfile,
+                    out macBuildProfileOwner,
                     out macArchitectureProperty);
                 AssetDatabase.SaveAssets();
 
@@ -125,6 +127,7 @@ namespace AiNative.Client.Editor
                         macArchitectureProperty.SetValue(
                             macBuildProfile,
                             previousMacArchitecture);
+                        EditorUtility.SetDirty(macBuildProfileOwner);
                     }
 
                     PlayerSettings.SetArchitecture(standalone, previousArchitecture);
@@ -152,33 +155,36 @@ namespace AiNative.Client.Editor
 
         private static object SetActiveMacArchitecture(
             out object macBuildProfile,
+            out BuildProfile macBuildProfileOwner,
             out PropertyInfo architectureProperty)
         {
             Type profileType = Type.GetType(
                 "UnityEditor.OSXStandalone.OSXStandaloneBuildProfile, UnityEditor.OSXStandalone.Extensions",
                 throwOnError: true);
-            MethodInfo getActiveComponent = null;
-            foreach (MethodInfo method in typeof(BuildProfile).GetMethods(
-                         BindingFlags.Public | BindingFlags.Static))
+            PropertyInfo platformProfileProperty = typeof(BuildProfile).GetProperty(
+                "platformBuildProfile",
+                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+            if (platformProfileProperty == null)
             {
-                if (method.Name == nameof(BuildProfile.GetActiveComponent) &&
-                    method.IsGenericMethodDefinition &&
-                    method.GetParameters().Length == 0)
+                throw new MissingMemberException(
+                    "Unity BuildProfile does not expose its platform build profile.");
+            }
+
+            macBuildProfile = null;
+            macBuildProfileOwner = null;
+            foreach (UnityEngine.Object candidate in
+                     Resources.FindObjectsOfTypeAll(typeof(BuildProfile)))
+            {
+                BuildProfile buildProfile = (BuildProfile)candidate;
+                object platformProfile = platformProfileProperty.GetValue(buildProfile);
+                if (platformProfile != null && profileType.IsInstanceOfType(platformProfile))
                 {
-                    getActiveComponent = method;
+                    macBuildProfile = platformProfile;
+                    macBuildProfileOwner = buildProfile;
                     break;
                 }
             }
 
-            if (getActiveComponent == null)
-            {
-                throw new MissingMethodException(
-                    "Unity BuildProfile.GetActiveComponent<T>() is required.");
-            }
-
-            macBuildProfile = getActiveComponent
-                .MakeGenericMethod(profileType)
-                .Invoke(null, null);
             if (macBuildProfile == null)
             {
                 throw new InvalidOperationException(
@@ -197,6 +203,7 @@ namespace AiNative.Client.Editor
             object previousArchitecture = architectureProperty.GetValue(macBuildProfile);
             object arm64 = Enum.Parse(architectureProperty.PropertyType, "ARM64");
             architectureProperty.SetValue(macBuildProfile, arm64);
+            EditorUtility.SetDirty(macBuildProfileOwner);
             return previousArchitecture;
         }
 
