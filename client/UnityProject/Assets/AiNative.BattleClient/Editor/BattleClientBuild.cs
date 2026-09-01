@@ -1,8 +1,10 @@
 using System;
 using System.IO;
+using System.Reflection;
 using AiNative.Client.Fantasy;
 using UnityEditor;
 using UnityEditor.Build;
+using UnityEditor.Build.Profile;
 using UnityEditor.Build.Reporting;
 using UnityEngine;
 
@@ -71,6 +73,9 @@ namespace AiNative.Client.Editor
             BuildTargetGroup previousBuildTargetGroup =
                 BuildPipeline.GetBuildTargetGroup(previousBuildTarget);
             int previousArchitecture = 0;
+            object macBuildProfile = null;
+            PropertyInfo macArchitectureProperty = null;
+            object previousMacArchitecture = null;
             string projectSettingsPath = Path.GetFullPath(
                 Path.Combine(UnityEngine.Application.dataPath, "..", "ProjectSettings", "ProjectSettings.asset"));
             byte[] previousProjectSettings = File.ReadAllBytes(projectSettingsPath);
@@ -89,6 +94,10 @@ namespace AiNative.Client.Editor
                     standalone,
                     ScriptingImplementation.Mono2x);
                 PlayerSettings.SetArchitecture(standalone, 1); // ARM64
+                previousMacArchitecture = SetActiveMacArchitecture(
+                    out macBuildProfile,
+                    out macArchitectureProperty);
+                AssetDatabase.SaveAssets();
 
                 BuildPlayerOptions options = new BuildPlayerOptions
                 {
@@ -111,6 +120,13 @@ namespace AiNative.Client.Editor
             {
                 try
                 {
+                    if (macArchitectureProperty != null)
+                    {
+                        macArchitectureProperty.SetValue(
+                            macBuildProfile,
+                            previousMacArchitecture);
+                    }
+
                     PlayerSettings.SetArchitecture(standalone, previousArchitecture);
                     PlayerSettings.SetScriptingBackend(standalone, previousBackend);
                     if (previousBuildTarget != BuildTarget.StandaloneOSX &&
@@ -132,6 +148,56 @@ namespace AiNative.Client.Editor
 
             CopyThirdPartyNotice(outputDirectory);
             Debug.Log($"WS-26 macOS ARM64 Mono Player: {output}");
+        }
+
+        private static object SetActiveMacArchitecture(
+            out object macBuildProfile,
+            out PropertyInfo architectureProperty)
+        {
+            Type profileType = Type.GetType(
+                "UnityEditor.OSXStandalone.OSXStandaloneBuildProfile, UnityEditor.OSXStandalone.Extensions",
+                throwOnError: true);
+            MethodInfo getActiveComponent = null;
+            foreach (MethodInfo method in typeof(BuildProfile).GetMethods(
+                         BindingFlags.Public | BindingFlags.Static))
+            {
+                if (method.Name == nameof(BuildProfile.GetActiveComponent) &&
+                    method.IsGenericMethodDefinition &&
+                    method.GetParameters().Length == 0)
+                {
+                    getActiveComponent = method;
+                    break;
+                }
+            }
+
+            if (getActiveComponent == null)
+            {
+                throw new MissingMethodException(
+                    "Unity BuildProfile.GetActiveComponent<T>() is required.");
+            }
+
+            macBuildProfile = getActiveComponent
+                .MakeGenericMethod(profileType)
+                .Invoke(null, null);
+            if (macBuildProfile == null)
+            {
+                throw new InvalidOperationException(
+                    "Unity did not expose the active macOS build profile.");
+            }
+
+            architectureProperty = profileType.GetProperty(
+                "architecture",
+                BindingFlags.Public | BindingFlags.Instance);
+            if (architectureProperty == null || !architectureProperty.CanWrite)
+            {
+                throw new MissingMemberException(
+                    "The active macOS build profile does not expose a writable architecture.");
+            }
+
+            object previousArchitecture = architectureProperty.GetValue(macBuildProfile);
+            object arm64 = Enum.Parse(architectureProperty.PropertyType, "ARM64");
+            architectureProperty.SetValue(macBuildProfile, arm64);
+            return previousArchitecture;
         }
 
         private static void CopyThirdPartyNotice(string outputDirectory)
