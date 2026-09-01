@@ -67,12 +67,24 @@ namespace AiNative.Client.Editor
             NamedBuildTarget standalone = NamedBuildTarget.Standalone;
             ScriptingImplementation previousBackend =
                 PlayerSettings.GetScriptingBackend(standalone);
-            int previousArchitecture = PlayerSettings.GetArchitecture(standalone);
+            BuildTarget previousBuildTarget = EditorUserBuildSettings.activeBuildTarget;
+            BuildTargetGroup previousBuildTargetGroup =
+                BuildPipeline.GetBuildTargetGroup(previousBuildTarget);
+            int previousArchitecture = 0;
             string projectSettingsPath = Path.GetFullPath(
                 Path.Combine(UnityEngine.Application.dataPath, "..", "ProjectSettings", "ProjectSettings.asset"));
             byte[] previousProjectSettings = File.ReadAllBytes(projectSettingsPath);
             try
             {
+                if (!EditorUserBuildSettings.SwitchActiveBuildTarget(
+                        BuildTargetGroup.Standalone,
+                        BuildTarget.StandaloneOSX))
+                {
+                    throw new InvalidOperationException(
+                        "Unity could not activate the StandaloneOSX build target.");
+                }
+
+                previousArchitecture = PlayerSettings.GetArchitecture(standalone);
                 PlayerSettings.SetScriptingBackend(
                     standalone,
                     ScriptingImplementation.Mono2x);
@@ -101,6 +113,15 @@ namespace AiNative.Client.Editor
                 {
                     PlayerSettings.SetArchitecture(standalone, previousArchitecture);
                     PlayerSettings.SetScriptingBackend(standalone, previousBackend);
+                    if (previousBuildTarget != BuildTarget.StandaloneOSX &&
+                        !EditorUserBuildSettings.SwitchActiveBuildTarget(
+                            previousBuildTargetGroup,
+                            previousBuildTarget))
+                    {
+                        throw new InvalidOperationException(
+                            $"Unity could not restore the {previousBuildTarget} build target.");
+                    }
+
                     AssetDatabase.SaveAssets();
                 }
                 finally
