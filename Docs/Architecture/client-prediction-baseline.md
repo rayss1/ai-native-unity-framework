@@ -1,6 +1,6 @@
 # Client Prediction and Reconciliation Baseline
 
-Status: Implemented prediction baseline; WS-26 Unity transport/application validation pending
+Status: Implemented prediction baseline; WS-26 macOS Unity transport/application gate passed
 Last updated: 2026-09-01
 Decision source: ADR-0005, WS-24, WS-25, and WS-26
 
@@ -60,13 +60,19 @@ Repository-owned qualification, telemetry-capacity, and multi-room-capacity veri
 
 The Unity application Composition Root owns login, room join, reconnect, packet routing, and the replaceable active transport. Its state progression is `Connecting -> LoggingIn -> JoiningRoom -> Active`; disconnect enters `Reconnecting`, and terminal paths enter `Faulted` or `Disposed`. Protocol v1 uses room 1 and 60 Hz. FixedUpdate performs prediction and writes a preallocated input ring; Update pumps Fantasy and routes/sends queued frames. Reconnect retains the prediction instance and advances the transport epoch only after a successful decoded response.
 
-WS-26 acceptance is intentionally evidence-gated. The current desktop gate requires exactly 36 EditMode and 2 PlayMode passes, followed by a macOS Apple Silicon ARM64 Mono Player smoke against an exact-source Battle Host built with fixed .NET images. The macOS entry point records source/tree/Fantasy/protocol/configuration/UPM/image/Unity identities, NUnit XML, Host and Player logs, staged notices, binary architecture, hashes, and smoke JSON. Windows remains a future supplemental platform gate. No WS-26 Unity result is recorded as passed in this document until an exact clean-commit macOS bundle is reviewed.
+WS-26 acceptance is intentionally evidence-gated. The current desktop gate requires exactly 36 EditMode and 2 PlayMode passes, followed by a macOS Apple Silicon ARM64 Mono Player smoke against an exact-source Battle Host built with fixed .NET images. The macOS entry point records source/tree/Fantasy/protocol/configuration/UPM/image/Unity identities, NUnit XML, Host and Player logs, staged notices, binary architecture, hashes, and smoke JSON. Windows remains a future supplemental platform gate.
+
+Exact-`main` source `2987ce08475b2cf2342a98326ff86fa422a3a6a5`, tree `1f441d2cfbadd009533f707da3a78ddabbefbc0a`, and Fantasy `f8bed0d464924f159d46498f1311206ea0694be8` passed the reviewed macOS bundle. Unity `6000.3.9f1` revision `7a9955a4f2fa` completed 36/36 EditMode and 2/2 real-KCP PlayMode tests. The ARM64 Mono Player logged in, joined, acknowledged inputs, forced a reconnect, advanced epoch `4 -> 5`, advanced acknowledgement `30 -> 31`, received Tick `2319`, and reported zero dropped input frames; the exact-source Host then drained normally with exit code zero. The bundle hash manifest SHA-256 is `308b1fea377b1509cd8e9fa6a31dddbd2da832830ad451a5936f6858d1e5b538`.
+
+The same source passed [.NET run 33486172442](https://github.com/rayss1/ai-native-unity-framework/actions/runs/33486172442) and [Battle Host run 33500838422](https://github.com/rayss1/ai-native-unity-framework/actions/runs/33500838422). Repository-owned verifiers confirmed source, Fantasy, protocol, configuration, telemetry, replay, wire, impairment, capacity, and 60-minute soak evidence. The two-room/128-Bot profile recorded Tick P99/P99.9 `1.5372/6.1424 ms`, zero slow Ticks and Gameplay allocation, `7.5024%` process CPU, `149,823,488`-byte working set, and per-client downstream/upstream P95 `173.896/43.632 kbit/s` with a `929-byte` maximum datagram. Replay consumed `2,381,638` Inputs and reproduced final Tick/hash `21275`/`7b3d1ab98cfcd13d`. The 60-minute one-room/64-Bot soak recorded 216,005 measured Ticks at Tick P99/P99.9 `1.1245/1.7049 ms`, zero slow Ticks, zero Gameplay allocation, and final Tick/hash `217952`/`0c8e36c2de78e947`.
+
+Attempt 1 of the Battle Host run failed only the unchanged telemetry comparison because an anomalously low `0.2685 ms` baseline made the normal `0.6833 ms` outage sample appear as a `0.4148 ms` increment. One controlled failed-job rerun, without source or threshold changes, passed at `0.7970/0.9864 ms` and `0.1894 ms` delta. This is retained as hosted-runner variance evidence and does not weaken the `< 0.25 ms` gate.
 
 ## Next gates
 
-1. Run and review the exact-clean-commit WS-26 macOS bundle: 36 EditMode, 2 real-KCP PlayMode, and the Apple Silicon ARM64 Mono smoke must all pass with the pinned identities.
-2. Capture correction magnitude and frequency from that exact-build client under the reproducible Regional impairment profile before accepting or changing the thresholds in `performance-budgets.md`.
-3. Exercise the composed client in representative Android and iOS IL2CPP builds; macOS Mono evidence does not satisfy the mobile AOT/stripping gate.
+1. Capture correction magnitude and frequency from the exact-build Unity client under the reproducible Regional impairment profile before accepting or changing the thresholds in `performance-budgets.md`.
+2. Exercise the composed client in representative Android and iOS IL2CPP builds; macOS Mono evidence does not satisfy the mobile AOT/stripping gate.
+3. Retain Windows as a supplemental desktop validation target; the macOS result does not claim Windows compatibility.
 4. Keep the production room default unchanged and keep the published server candidate out of a production environment until the project owner supplies a real Linux target and approves the independent environment-canary and rollback procedure.
 
 Until those gates pass, the implementation is a reusable baseline and not a claim that client prediction tuning, physics prediction, or production rollout is complete.

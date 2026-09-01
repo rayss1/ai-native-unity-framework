@@ -42,6 +42,16 @@ The script:
 
 Evidence is written under `artifacts/unity-macos/<full-commit>/`. It includes metadata and identities, image build/Host logs, both NUnit XML/log pairs, Player build/run logs, the `.app`, smoke JSON, staged notices, key SHA-256 hashes, and a summary. Passing the script is required before recording WS-26 as validated; code or scripts alone are not evidence.
 
+## Recorded exact-main result
+
+The reviewed bundle for exact `main` source `2987ce08475b2cf2342a98326ff86fa422a3a6a5` (tree `1f441d2cfbadd009533f707da3a78ddabbefbc0a`) passed on macOS Apple Silicon with Fantasy `f8bed0d464924f159d46498f1311206ea0694be8`, protocol SHA-256 `3cb86e21687e65af0e0d409d9186384d0f959fd6aa873eb9e1cd0cb39c77d37d`, and configuration SHA-256 `fc0714bcbe7c8c673cf638506a45f3a4440585f4024ff78048434346ab8a66e4`.
+
+Unity `6000.3.9f1` revision `7a9955a4f2fa` reported 36/36 EditMode and 2/2 real-Fantasy-KCP PlayMode tests. The ARM64 Mono Player completed login, room join, input acknowledgement, forced reconnect, epoch `4 -> 5`, acknowledgement `30 -> 31`, and continued to Tick `2319` with `droppedInputFrames = 0`. The Host exited `0`, drained rooms and KCP, and was not force-terminated. The bundle used the fixed .NET SDK/runtime image digests and staged byte-matching Fantasy license and Third-Party Notices beside the `.app`.
+
+The retained bundle is under `artifacts/unity-macos/2987ce08475b2cf2342a98326ff86fa422a3a6a5/`. Its hash manifest SHA-256 is `308b1fea377b1509cd8e9fa6a31dddbd2da832830ad451a5936f6858d1e5b538`; the EditMode XML, PlayMode XML, smoke JSON, and Player executable SHA-256 values are `07771b88b205206d36a24d0606169904acadda000eed16c4e59d4cb18deef71f`, `8991225d6f2dbf8b42c405ac957ea37bec3b91d1a88eef7c6961b16c510617df`, `10d0fb06b46fe116b9560f7c31810894e18c68e920c398c915daacb46c8108e7`, and `fefeba6994eb09fa3ed503666e510a115f3b1db3f7a2a9a3a2ab907d8dd8ced7`. The hashes were independently rechecked during evidence review.
+
+The same source passed [.NET run 33486172442](https://github.com/rayss1/ai-native-unity-framework/actions/runs/33486172442) and the complete [Battle Host production-validation run 33500838422](https://github.com/rayss1/ai-native-unity-framework/actions/runs/33500838422). Attempt 1 of the latter hit only the unchanged telemetry comparison gate because its exporter-disabled baseline was anomalously low; one controlled failed-job rerun, with no source or threshold change, passed the full qualification including the 60-minute soak. This hosted Ubuntu evidence is release-equivalent validation, not a real Linux environment canary.
+
 ## Windows supplemental command
 
 The Windows x64 Mono path remains available for future cross-platform evidence and is no longer the current WS-26 blocking gate:

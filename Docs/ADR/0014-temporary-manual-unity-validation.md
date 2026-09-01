@@ -22,6 +22,8 @@ Silently skipping the job would weaken the dual-runtime boundary and could be mi
 
 The WS-25 exact-main bundle for source `dfbc0534631ec7cc019919830a93472d3572f61c` used Unity `6000.3.9f1` revision `7a9955a4f2fa` and passed all 22 named EditMode tests with zero failures and zero skips. The retained NUnit XML SHA-256 is `c781a3e0f5d1f48811bd1c6eb0c89520d30532685a84b2fdf91288ad11df84bb`. This closes the WS-25 exact-commit EditMode gate only; it does not substitute for PlayMode, mobile IL2CPP, concrete transport, or real-client impairment evidence.
 
+The WS-26 exact-main bundle for source `2987ce08475b2cf2342a98326ff86fa422a3a6a5` and tree `1f441d2cfbadd009533f707da3a78ddabbefbc0a` used the same Unity identity and pinned Fantasy commit `f8bed0d464924f159d46498f1311206ea0694be8`. It passed 36/36 EditMode and 2/2 real-KCP PlayMode tests plus the ARM64 Mono Player login/join/input/reconnect smoke with zero dropped input frames and normal Host drain. The retained bundle hash manifest SHA-256 is `308b1fea377b1509cd8e9fa6a31dddbd2da832830ad451a5936f6858d1e5b538`. This closes the WS-26 macOS desktop gate for that exact commit only; Windows, Regional real-client correction, and Android/iOS IL2CPP remain separate evidence gates.
+
 ## Consequences and restoration
 
 Manual execution is slower and depends on operator discipline, but retains auditable dual-compilation evidence without storing Unity credentials. Earlier exact-commit bundles retain their historical named-test counts; every subsequent relevant exact commit is gated by the then-current named suite until automated Unity CI is restored.
