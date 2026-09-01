@@ -68,6 +68,9 @@ namespace AiNative.Client.Editor
             ScriptingImplementation previousBackend =
                 PlayerSettings.GetScriptingBackend(standalone);
             int previousArchitecture = PlayerSettings.GetArchitecture(standalone);
+            string projectSettingsPath = Path.GetFullPath(
+                Path.Combine(Application.dataPath, "..", "ProjectSettings", "ProjectSettings.asset"));
+            byte[] previousProjectSettings = File.ReadAllBytes(projectSettingsPath);
             try
             {
                 PlayerSettings.SetScriptingBackend(
@@ -94,8 +97,16 @@ namespace AiNative.Client.Editor
             }
             finally
             {
-                PlayerSettings.SetArchitecture(standalone, previousArchitecture);
-                PlayerSettings.SetScriptingBackend(standalone, previousBackend);
+                try
+                {
+                    PlayerSettings.SetArchitecture(standalone, previousArchitecture);
+                    PlayerSettings.SetScriptingBackend(standalone, previousBackend);
+                    AssetDatabase.SaveAssets();
+                }
+                finally
+                {
+                    File.WriteAllBytes(projectSettingsPath, previousProjectSettings);
+                }
             }
 
             CopyThirdPartyNotice(outputDirectory);
