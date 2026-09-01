@@ -390,7 +390,9 @@ host_exit="$(docker inspect "$container_id" --format '{{.State.ExitCode}}')"
 host_oom="$(docker inspect "$container_id" --format '{{.State.OOMKilled}}')"
 docker logs "$container_id" >"$host_log" 2>&1
 [[ "$host_exit" == '0' && "$host_oom" == 'false' ]] || fail "The Battle Host did not stop normally: exit=$host_exit oom=$host_oom"
-grep -q 'Shutdown Complete' "$host_log" || fail 'The Battle Host log does not contain Shutdown Complete.'
+grep -q 'Application is shutting down...' "$host_log" || fail 'The Battle Host log does not contain the application shutdown marker.'
+grep -q 'Acceptance room set drained' "$host_log" || fail 'The Battle Host log does not prove that rooms drained.'
+grep -q 'Fantasy KCP gateway drained' "$host_log" || fail 'The Battle Host log does not prove that the KCP gateway drained.'
 docker rm "$container_id" >/dev/null
 container_id=''
 
@@ -416,6 +418,8 @@ container_id=''
   echo "smoke_last_received_tick=$(jq -r '.lastReceivedTick' "$smoke_json")"
   echo "smoke_dropped_input_frames=$(jq -r '.droppedInputFrames' "$smoke_json")"
   echo "battle_host_exit_code=$host_exit"
+  echo 'battle_host_rooms_drained=true'
+  echo 'battle_host_kcp_drained=true'
   echo 'battle_host_forced_termination=false'
 } | tee "$summary"
 
