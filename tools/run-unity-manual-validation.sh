@@ -178,7 +178,8 @@ smoke_json="$evidence_dir/smoke.json"
 staged_host_config="$evidence_dir/Fantasy.config"
 player_directory="$evidence_dir/player"
 player_bundle="$player_directory/AiNative.BattleClient.app"
-player_executable="$player_bundle/Contents/MacOS/AiNative.BattleClient"
+player_info_plist="$player_bundle/Contents/Info.plist"
+player_executable=''
 image_tag="ainative/battle-host:ws26-macos-${commit}"
 protocol_identity="$(sha256 "$protocol_schema")"
 configuration_identity="$(sha256 "$host_config")"
@@ -327,7 +328,13 @@ mkdir -p "$player_directory"
   --ainative-build-output "$player_bundle" \
   -logFile "$player_build_log"
 
-[[ -x "$player_executable" ]] || fail "Unity did not produce the macOS Player executable at: $player_executable"
+[[ -s "$player_info_plist" ]] || fail "Unity did not produce the macOS Player Info.plist at: $player_info_plist"
+player_executable_name="$(plutil -extract CFBundleExecutable raw "$player_info_plist")"
+if [[ -z "$player_executable_name" || "$player_executable_name" == */* ]]; then
+  fail "The macOS Player has an invalid CFBundleExecutable: $player_executable_name"
+fi
+player_executable="$player_bundle/Contents/MacOS/$player_executable_name"
+[[ -x "$player_executable" ]] || fail "Unity did not produce the CFBundleExecutable at: $player_executable"
 player_architectures="$(lipo -archs "$player_executable")"
 [[ "$player_architectures" == 'arm64' ]] || fail "Expected an ARM64-only Player, found: $player_architectures"
 player_notice="$player_directory/THIRD-PARTY-NOTICES.md"
@@ -398,6 +405,7 @@ container_id=''
   echo 'player_target=StandaloneOSX'
   echo 'player_architecture=arm64'
   echo 'player_scripting_backend=Mono'
+  echo "player_executable=$player_executable_name"
   echo 'smoke_exit_code=0'
   echo 'smoke_success=true'
   echo "smoke_session_id=$(jq -r '.sessionId' "$smoke_json")"
