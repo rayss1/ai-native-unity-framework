@@ -441,7 +441,7 @@ container_id=''
     smoke.json \
     player/THIRD-PARTY-NOTICES.md \
     player/Fantasy-LICENSE.txt \
-    player/AiNative.BattleClient.app/Contents/MacOS/AiNative.BattleClient \
+    "player/AiNative.BattleClient.app/Contents/MacOS/$player_executable_name" \
     > hashes.sha256
 )
 
