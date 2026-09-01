@@ -69,7 +69,7 @@ namespace AiNative.Client.Editor
                 PlayerSettings.GetScriptingBackend(standalone);
             int previousArchitecture = PlayerSettings.GetArchitecture(standalone);
             string projectSettingsPath = Path.GetFullPath(
-                Path.Combine(Application.dataPath, "..", "ProjectSettings", "ProjectSettings.asset"));
+                Path.Combine(UnityEngine.Application.dataPath, "..", "ProjectSettings", "ProjectSettings.asset"));
             byte[] previousProjectSettings = File.ReadAllBytes(projectSettingsPath);
             try
             {
