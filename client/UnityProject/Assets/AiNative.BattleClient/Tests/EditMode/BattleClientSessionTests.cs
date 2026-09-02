@@ -119,6 +119,21 @@ namespace AiNative.Client.Application.Tests
         }
 
         [Test]
+        public void PredictionDiagnosticsWindowCanResetAfterInitialization()
+        {
+            FakeTransport transport = new FakeTransport();
+            BattleClientSession session = CreateActiveSession(transport, out _);
+            transport.Enqueue(TestFrames.Snapshot(7, 10, 0), BattleClientProtocolV1.SnapshotChannel, 1);
+            session.Pump(0);
+            Assert.That(session.PredictionDiagnostics.AcceptedSnapshots, Is.EqualTo(1));
+
+            Assert.That(session.ResetPredictionDiagnostics(), Is.True);
+
+            Assert.That(session.PredictionDiagnostics.AcceptedSnapshots, Is.Zero);
+            Assert.That(session.PredictionDiagnostics.ReconciliationSamples, Is.Zero);
+        }
+
+        [Test]
         public void InvalidLoginEpochFailsBeforeJoin()
         {
             FakeTransport transport = new FakeTransport();

@@ -130,6 +130,31 @@ namespace AiNative.Client.Prediction
             long historyMisses,
             long staleSnapshots,
             long droppedInputs)
+            : this(
+                acceptedSnapshots,
+                corrections,
+                correctionsOver250Millimetres,
+                maximumCorrectionMillimetres,
+                historyMisses,
+                staleSnapshots,
+                droppedInputs,
+                0,
+                0,
+                0)
+        {
+        }
+
+        public PredictionDiagnostics(
+            long acceptedSnapshots,
+            long corrections,
+            long correctionsOver250Millimetres,
+            int maximumCorrectionMillimetres,
+            long historyMisses,
+            long staleSnapshots,
+            long droppedInputs,
+            long reconciliationSamples,
+            int correctionP95Millimetres,
+            int correctionP99Millimetres)
         {
             AcceptedSnapshots = acceptedSnapshots;
             Corrections = corrections;
@@ -138,6 +163,9 @@ namespace AiNative.Client.Prediction
             HistoryMisses = historyMisses;
             StaleSnapshots = staleSnapshots;
             DroppedInputs = droppedInputs;
+            ReconciliationSamples = reconciliationSamples;
+            CorrectionP95Millimetres = correctionP95Millimetres;
+            CorrectionP99Millimetres = correctionP99Millimetres;
         }
 
         public long AcceptedSnapshots { get; }
@@ -153,6 +181,12 @@ namespace AiNative.Client.Prediction
         public long StaleSnapshots { get; }
 
         public long DroppedInputs { get; }
+
+        public long ReconciliationSamples { get; }
+
+        public int CorrectionP95Millimetres { get; }
+
+        public int CorrectionP99Millimetres { get; }
     }
 
     /// <summary>
@@ -163,11 +197,15 @@ namespace AiNative.Client.Prediction
     {
         public const int RequiredInputBufferBytes = ClientPredictionProtocolV1.MaxInputFrameBytes;
 
+        private const int CorrectionHistogramMaximumMillimetres = 8192;
+
         private readonly IRealtimeTransport _transport;
         private readonly ClientPredictionHistory _history;
         private readonly byte[] _sendBuffer = new byte[ClientPredictionProtocolV1.MaxDatagramBytes];
         private readonly bool _ownsTransport;
         private readonly uint _entityId;
+        private readonly long[] _correctionHistogram =
+            new long[CorrectionHistogramMaximumMillimetres + 2];
         private uint _nextInputSequence;
         private uint _connectionEpoch;
         private int _sendInFlight;
@@ -179,6 +217,8 @@ namespace AiNative.Client.Prediction
         private int _maximumCorrectionMillimetres;
         private long _historyMisses;
         private long _staleSnapshots;
+        private long _reconciliationSamples;
+        private long _droppedInputBaseline;
 
         public ClientPredictionAdapter(
             IRealtimeTransport transport,
@@ -210,7 +250,27 @@ namespace AiNative.Client.Prediction
             _maximumCorrectionMillimetres,
             _historyMisses,
             _staleSnapshots,
-            _history.DroppedInputCount);
+            _history.DroppedInputCount - _droppedInputBaseline,
+            _reconciliationSamples,
+            CalculateCorrectionPercentile(95),
+            CalculateCorrectionPercentile(99));
+
+        /// <summary>
+        /// Starts a new bounded diagnostics window without changing prediction state.
+        /// </summary>
+        public void ResetDiagnostics()
+        {
+            if (_disposed) return;
+            _acceptedSnapshots = 0;
+            _corrections = 0;
+            _correctionsOver250Millimetres = 0;
+            _maximumCorrectionMillimetres = 0;
+            _historyMisses = 0;
+            _staleSnapshots = 0;
+            _reconciliationSamples = 0;
+            _droppedInputBaseline = _history.DroppedInputCount;
+            Array.Clear(_correctionHistogram, 0, _correctionHistogram.Length);
+        }
 
         public bool TryGetPredictedState(out KinematicState state)
         {
@@ -523,7 +583,11 @@ namespace AiNative.Client.Prediction
         {
             switch (status)
             {
+                case ReconciliationStatus.Matched:
+                    RecordCorrectionSample(magnitude);
+                    break;
                 case ReconciliationStatus.Corrected:
+                    RecordCorrectionSample(magnitude);
                     _corrections++;
                     if (magnitude > 250)
                     {
@@ -543,6 +607,34 @@ namespace AiNative.Client.Prediction
                     _staleSnapshots++;
                     break;
             }
+        }
+
+        private void RecordCorrectionSample(int magnitude)
+        {
+            int bucket = magnitude <= CorrectionHistogramMaximumMillimetres
+                ? magnitude
+                : CorrectionHistogramMaximumMillimetres + 1;
+            _correctionHistogram[bucket]++;
+            _reconciliationSamples++;
+        }
+
+        private int CalculateCorrectionPercentile(int percentile)
+        {
+            if (_reconciliationSamples == 0) return 0;
+            long rank = (long)Math.Ceiling(_reconciliationSamples * (percentile / 100d));
+            long cumulative = 0;
+            for (int index = 0; index < _correctionHistogram.Length; index++)
+            {
+                cumulative += _correctionHistogram[index];
+                if (cumulative >= rank)
+                {
+                    return index <= CorrectionHistogramMaximumMillimetres
+                        ? index
+                        : _maximumCorrectionMillimetres;
+                }
+            }
+
+            return _maximumCorrectionMillimetres;
         }
 
         private static int CalculateMagnitude(int x, int z)

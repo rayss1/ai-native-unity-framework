@@ -106,6 +106,41 @@ namespace AiNative.Client.Prediction.Tests
         }
 
         [Test]
+        public void BoundedCorrectionHistogramReportsPercentilesAndResets()
+        {
+            FakeRealtimeTransport transport = new FakeRealtimeTransport();
+            ClientPredictionAdapter adapter = InitializedAdapter(transport, 7, 1);
+            int position = 0;
+            for (int magnitude = 1; magnitude <= 100; magnitude++)
+            {
+                position += magnitude;
+                byte[] snapshot = ProtocolFrameFixtures.Snapshot(
+                    7,
+                    (ulong)(10 + magnitude),
+                    0,
+                    position,
+                    0);
+                adapter.ApplyPacket(
+                    snapshot,
+                    ProtocolFrameFixtures.Packet(snapshot, SnapshotChannel, 1));
+            }
+
+            PredictionDiagnostics measured = adapter.Diagnostics;
+            Assert.That(measured.ReconciliationSamples, Is.EqualTo(100));
+            Assert.That(measured.CorrectionP95Millimetres, Is.EqualTo(95));
+            Assert.That(measured.CorrectionP99Millimetres, Is.EqualTo(99));
+            Assert.That(measured.MaximumCorrectionMillimetres, Is.EqualTo(100));
+
+            adapter.ResetDiagnostics();
+
+            PredictionDiagnostics reset = adapter.Diagnostics;
+            Assert.That(reset.AcceptedSnapshots, Is.Zero);
+            Assert.That(reset.ReconciliationSamples, Is.Zero);
+            Assert.That(reset.CorrectionP95Millimetres, Is.Zero);
+            Assert.That(reset.CorrectionP99Millimetres, Is.Zero);
+        }
+
+        [Test]
         public void MissingPlayerAndProtocolMismatchFailClosed()
         {
             FakeRealtimeTransport transport = new FakeRealtimeTransport();
