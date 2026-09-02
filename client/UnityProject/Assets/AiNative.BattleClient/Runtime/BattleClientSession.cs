@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using AiNative.Client.Fantasy;
 using AiNative.Client.Prediction;
+using AiNative.Gameplay;
 using AiNative.Realtime;
 
 namespace AiNative.Client.Application
@@ -86,6 +87,8 @@ namespace AiNative.Client.Application
         private readonly IBattleTransportConnector _connector;
         private readonly ReplaceableRealtimeTransportSlot _transportSlot = new ReplaceableRealtimeTransportSlot();
         private readonly InputFrameRing _inputRing;
+        private readonly PresentationCorrectionSmoother _presentation =
+            new PresentationCorrectionSmoother();
         private readonly byte[] _receiveBuffer = new byte[BattleClientProtocolV1.MaxFrameBytes];
         private readonly byte[] _controlBuffer = new byte[BattleClientProtocolV1.MaxFrameBytes];
         private CancellationTokenSource _connectCancellation;
@@ -155,10 +158,35 @@ namespace AiNative.Client.Application
 
         public PredictionDiagnostics PredictionDiagnostics => _prediction?.Diagnostics ?? default;
 
+        public PresentationCorrectionDiagnostics PresentationDiagnostics =>
+            _presentation.Diagnostics;
+
         public bool ResetPredictionDiagnostics()
         {
             if (_disposed || _prediction is null || !_prediction.IsInitialized) return false;
             _prediction.ResetDiagnostics();
+            return true;
+        }
+
+        public bool ResetPresentationDiagnostics()
+        {
+            if (_disposed || !_presentation.IsInitialized) return false;
+            _presentation.ResetDiagnostics();
+            return true;
+        }
+
+        public bool TryAdvancePresentation(
+            float unscaledDeltaSeconds,
+            out PresentationPosition position)
+        {
+            if (_disposed || _prediction is null ||
+                !_prediction.TryGetPredictedState(out KinematicState simulationState))
+            {
+                position = default;
+                return false;
+            }
+
+            position = _presentation.Advance(simulationState, unscaledDeltaSeconds);
             return true;
         }
 
@@ -510,6 +538,8 @@ namespace AiNative.Client.Application
                 return;
             }
 
+            ApplyPresentationReconciliation(applied);
+
             _connectionEpoch = epoch;
             _lastReceivedTick = resumeTick;
             _awaitingReconnectResponse = false;
@@ -522,6 +552,7 @@ namespace AiNative.Client.Application
             SnapshotApplyResult applied = _prediction.ApplyPacket(frame, packet);
             if (applied.Status is SnapshotApplyStatus.Initialized or SnapshotApplyStatus.Reconciled)
             {
+                ApplyPresentationReconciliation(applied);
                 _connectionEpoch = applied.ConnectionEpoch;
                 if (BattleClientProtocolV1.TryReadSnapshotMetadata(
                         frame,
@@ -577,6 +608,7 @@ namespace AiNative.Client.Application
             }
 
             State = BattleClientState.Reconnecting;
+            _presentation.ResetState();
             _awaitingReconnectResponse = false;
             _reconnectAttempts = 1;
             _retryDelayRemainingSeconds = ReconnectDelaySeconds[0];
@@ -604,6 +636,21 @@ namespace AiNative.Client.Application
             _faultReason = string.IsNullOrWhiteSpace(reason) ? "Unknown battle client failure." : reason;
             State = BattleClientState.Faulted;
             _connectCancellation?.Cancel();
+            _presentation.ResetState();
+        }
+
+        private void ApplyPresentationReconciliation(in SnapshotApplyResult applied)
+        {
+            if (applied.HasReconciliation)
+            {
+                _presentation.ApplyReconciliation(applied.Reconciliation);
+                return;
+            }
+
+            if (_prediction.TryGetPredictedState(out KinematicState initializedState))
+            {
+                _presentation.Initialize(initializedState);
+            }
         }
 
         private sealed class ReplaceableRealtimeTransportSlot : IRealtimeTransport

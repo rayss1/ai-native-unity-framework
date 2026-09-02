@@ -69,6 +69,8 @@ The [WS-24 through WS-27 client prediction baseline](client-prediction-baseline.
 
 The correction numbers are tuning gates, not truth about game feel. If representative movement speed/map scale makes them invalid, change them only with captured traces, a replacement threshold, and no weakening of server authority.
 
+The WS-28 presentation candidate decays visual residuals at or below 250 mm over 100 ms and snaps above that boundary. These are bounded initial presentation parameters, not a relaxation of the correction-frequency budgets above. Simulation accepts authority immediately, and the render-time `Advance` path must remain allocation-free. Representative animation, camera, game-physics, and device captures are still required before treating the parameters as product-quality tuning.
+
 ## Navigation, content, and telemetry
 
 | Area | Gate |

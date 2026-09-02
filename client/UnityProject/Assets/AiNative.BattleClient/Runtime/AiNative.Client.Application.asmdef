@@ -4,6 +4,7 @@
   "references": [
     "AiNative.Client.Fantasy",
     "AiNative.Client.Prediction",
+    "AiNative.Gameplay",
     "AiNative.Realtime"
   ],
   "autoReferenced": true

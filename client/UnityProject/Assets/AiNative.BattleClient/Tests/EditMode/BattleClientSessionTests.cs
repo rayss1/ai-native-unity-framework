@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using AiNative.Client.Prediction;
+using AiNative.Gameplay;
 using AiNative.Realtime;
 using NUnit.Framework;
 
@@ -131,6 +132,29 @@ namespace AiNative.Client.Application.Tests
 
             Assert.That(session.PredictionDiagnostics.AcceptedSnapshots, Is.Zero);
             Assert.That(session.PredictionDiagnostics.ReconciliationSamples, Is.Zero);
+        }
+
+        [Test]
+        public void PresentationCorrectionDoesNotMutateAuthoritativePrediction()
+        {
+            FakeTransport transport = new FakeTransport();
+            BattleClientSession session = CreateActiveSession(transport, out _);
+            transport.Enqueue(TestFrames.Snapshot(7, 10, 0), BattleClientProtocolV1.SnapshotChannel, 1);
+            session.Pump(0);
+            session.PredictAndQueueInput(11, 1000, 0);
+            transport.Enqueue(TestFrames.Snapshot(7, 11, 1, 40), BattleClientProtocolV1.SnapshotChannel, 1);
+            session.Pump(0);
+
+            Assert.That(session.TryAdvancePresentation(0, out PresentationPosition initial), Is.True);
+            Assert.That(session.PredictionAdapter.TryGetPredictedState(out KinematicState simulation), Is.True);
+            Assert.That(initial.XMillimetres, Is.EqualTo(50d));
+            Assert.That(simulation.PositionXMillimetres, Is.EqualTo(40));
+
+            session.TryAdvancePresentation(0.05f, out PresentationPosition halfway);
+            session.TryAdvancePresentation(0.05f, out PresentationPosition settled);
+            Assert.That(halfway.XMillimetres, Is.EqualTo(45d).Within(0.0001d));
+            Assert.That(settled.XMillimetres, Is.EqualTo(40d));
+            Assert.That(session.PresentationDiagnostics.SmoothedCorrections, Is.EqualTo(1));
         }
 
         [Test]
@@ -294,17 +318,34 @@ namespace AiNative.Client.Application.Tests
             return payload.ToArray();
         }
 
-        internal static byte[] Snapshot(uint entityId, ulong tick, uint acknowledgement)
+        internal static byte[] Snapshot(
+            uint entityId,
+            ulong tick,
+            uint acknowledgement,
+            int positionXMillimetres = 0)
         {
             List<byte> frame = Header(BattleClientProtocolV1.SnapshotMessageId);
-            frame.AddRange(SnapshotPayload(entityId, tick, acknowledgement));
+            frame.AddRange(SnapshotPayload(
+                entityId,
+                tick,
+                acknowledgement,
+                positionXMillimetres));
             return frame.ToArray();
         }
 
-        internal static byte[] SnapshotPayload(uint entityId, ulong tick, uint acknowledgement)
+        internal static byte[] SnapshotPayload(
+            uint entityId,
+            ulong tick,
+            uint acknowledgement,
+            int positionXMillimetres = 0)
         {
             List<byte> player = new List<byte> { 0x08 };
             AddVarint(player, entityId);
+            if (positionXMillimetres != 0)
+            {
+                player.Add(0x10);
+                AddVarint(player, ZigZag(positionXMillimetres));
+            }
             List<byte> payload = new List<byte> { 0x08, 0x01, 0x11 };
             AddFixed64(payload, tick);
             payload.Add(0x22); AddVarint(payload, (ulong)player.Count); payload.AddRange(player);
@@ -343,5 +384,8 @@ namespace AiNative.Client.Application.Tests
             }
             while (value != 0);
         }
+
+        private static ulong ZigZag(int value) =>
+            unchecked((ulong)((value << 1) ^ (value >> 31)));
     }
 }
