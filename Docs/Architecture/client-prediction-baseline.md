@@ -1,7 +1,7 @@
 # Client Prediction and Reconciliation Baseline
 
-Status: Implemented prediction baseline; WS-26 macOS Unity transport/application gate passed
-Last updated: 2026-09-01
+Status: Implemented prediction baseline; WS-27 macOS Regional real-client gate passed
+Last updated: 2026-09-02
 Decision source: ADR-0005, WS-24, WS-25, WS-26, and WS-27
 
 ## Scope
@@ -68,19 +68,23 @@ The same source passed [.NET run 33486172442](https://github.com/rayss1/ai-nativ
 
 Attempt 1 of the Battle Host run failed only the unchanged telemetry comparison because an anomalously low `0.2685 ms` baseline made the normal `0.6833 ms` outage sample appear as a `0.4148 ms` increment. One controlled failed-job rerun, without source or threshold changes, passed at `0.7970/0.9864 ms` and `0.1894 ms` delta. This is retained as hosted-runner variance evidence and does not weaken the `< 0.25 ms` gate.
 
-## WS-27 Regional real-client correction candidate
+## WS-27 Regional real-client correction evidence
 
 The prediction adapter now maintains a fixed-size millimetre histogram for matched and corrected reconciliations and exposes P95/P99 through `PredictionDiagnostics`. Resetting the diagnostics window clears only bounded counters and histogram state; it does not reset the session, input sequence, prediction history, protocol epoch, or transport. Snapshot processing performs no per-sample allocation.
 
 The macOS validation uses the same exact ARM64 Mono Player and exact-source Host as the WS-26 smoke. After the smoke, it applies `50 +/- 10 ms` one-way delay with 25% correlation, 1% random loss, 0.5% duplication, and 1% reordering with 50% correlation in both directions of the Colima bridge. A ten-second warm-up precedes the 60-second measured window. The gate enforces at least 1,000 reconciliation samples, P95 `<= 250 mm`, P99 `<= 750 mm`, corrections above 250 mm `<= 2` per player-minute, and zero history misses or dropped inputs/frames. The qdisc configuration and statistics are retained with the Player result.
 
-No result is recorded until the complete gate passes on a clean exact branch commit. A local Colima measurement is real-client transport evidence, but it is not a physical Regional network, mobile-device result, production deployment, or real Linux environment canary.
+Exact-`main` source `6376265658a26fa07b08fc737c3932d52212314a`, tree `e5ea86c01e85e55475052e75f2fcd876db7069e3`, and Fantasy `f8bed0d464924f159d46498f1311206ea0694be8` passed the reviewed bundle with Unity `6000.3.9f1` revision `7a9955a4f2fa`. After `10.0017 s` warm-up, the ARM64 Mono Player measured `60.0169 s` and produced `1,219` reconciliation samples, correction P95/P99 `9/10 mm`, maximum correction `12 mm`, zero corrections above `250 mm`, and zero history misses, stale Snapshots, dropped prediction inputs, or dropped input frames. The symmetric qdiscs recorded `172` packet drops and were restored afterward.
+
+The enclosing gate passed 38/38 EditMode and 2/2 real-KCP PlayMode tests, the reconnect smoke advanced epoch `4 -> 5` and acknowledgement `30 -> 32`, and the Host drained rooms/KCP with exit code zero and no forced termination. The bundle hash manifest SHA-256 is `1d9a8f403114c9cdcbbc45ebb42f2d0e95b7539ccffa161d5b5e7aeec4339591`. Exact-main [.NET run 33604282890](https://github.com/rayss1/ai-native-unity-framework/actions/runs/33604282890) passed 92/92 tests, its zero-warning build, dependency audit, generated-protocol check, Host publish, and architecture check.
+
+This passes the frozen local macOS Mono Regional correction magnitude/frequency budgets for the deterministic first-slice movement. A local Colima measurement is real-client transport evidence, but it is not a physical Regional network, mobile-device result, game-specific prediction-physics result, production deployment, or real Linux environment canary.
 
 ## Next gates
 
-1. Run and review the exact-clean-commit WS-27 macOS bundle; do not mark the Regional correction budgets passed from implementation alone.
-2. Exercise the composed client in representative Android and iOS IL2CPP builds; macOS Mono evidence does not satisfy the mobile AOT/stripping gate.
-3. Retain Windows as a supplemental desktop validation target; the macOS result does not claim Windows compatibility.
+1. Exercise the composed client in representative Android and iOS IL2CPP builds; macOS Mono evidence does not satisfy the mobile AOT/stripping gate.
+2. Retain Windows as a supplemental desktop validation target; the macOS result does not claim Windows compatibility.
+3. Measure game-specific physics prediction, correction smoothing, and representative visual quality; the deterministic integer movement result does not close those gates.
 4. Keep the production room default unchanged and keep the published server candidate out of a production environment until the project owner supplies a real Linux target and approves the independent environment-canary and rollback procedure.
 
 Until those gates pass, the implementation is a reusable baseline and not a claim that client prediction tuning, physics prediction, or production rollout is complete.

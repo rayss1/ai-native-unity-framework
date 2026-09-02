@@ -55,6 +55,14 @@ The retained bundle is under `artifacts/unity-macos/2987ce08475b2cf2342a98326ff8
 
 The same source passed [.NET run 33486172442](https://github.com/rayss1/ai-native-unity-framework/actions/runs/33486172442) and the complete [Battle Host production-validation run 33500838422](https://github.com/rayss1/ai-native-unity-framework/actions/runs/33500838422). Attempt 1 of the latter hit only the unchanged telemetry comparison gate because its exporter-disabled baseline was anomalously low; one controlled failed-job rerun, with no source or threshold change, passed the full qualification including the 60-minute soak. This hosted Ubuntu evidence is release-equivalent validation, not a real Linux environment canary.
 
+### WS-27 exact-main Regional result
+
+The reviewed bundle for exact `main` source `6376265658a26fa07b08fc737c3932d52212314a` (tree `e5ea86c01e85e55475052e75f2fcd876db7069e3`) passed with the same pinned Fantasy, protocol, configuration, Unity, SDK, and runtime identities. Unity reported 38/38 EditMode and 2/2 real-Fantasy-KCP PlayMode tests. The ARM64 Mono reconnect smoke advanced epoch `4 -> 5` and acknowledgement `30 -> 32` with zero dropped input frames; the Host exited zero after draining rooms and KCP without forced termination.
+
+Under the frozen symmetric Regional profile, the Player completed `10.0017 s` warm-up plus `60.0169 s` measurement. Its `1,219` reconciliation samples produced correction P95/P99 `9/10 mm`, maximum `12 mm`, zero corrections above `250 mm`, and zero history misses, stale Snapshots, dropped prediction inputs, or dropped application frames. The ingress/egress qdiscs recorded `34/138` dropped packets and were restored to their original classes.
+
+The retained bundle is under `artifacts/unity-macos/6376265658a26fa07b08fc737c3932d52212314a/`. Its hash manifest SHA-256 is `1d9a8f403114c9cdcbbc45ebb42f2d0e95b7539ccffa161d5b5e7aeec4339591`; the EditMode XML, PlayMode XML, smoke JSON, Regional JSON, and Player executable SHA-256 values are `139f0e25d5778307bf08982575ab655a72a3936ce81938aa60b282dd8581504b`, `0bcfa4a4dc20fe4adc54bd432f37e332eb37ecc5ba60080ded09dfa0615e4081`, `c20e55c58be518b221a8b593b36a79953830644a2f8bec1da3b5c32f9d4745a5`, `6585ada48f97493e9b03805c95402f7906ec18aa77e1dd7fcddb92c86b0734c9`, and `99a8bb4062cb82bb6db4180250003a372789346455ec8e8d17142aa2fea4e784`. All manifest entries, binary architecture, and staged notices were independently rechecked. Exact-main [.NET run 33604282890](https://github.com/rayss1/ai-native-unity-framework/actions/runs/33604282890) passed 92/92 tests and all product checks.
+
 ## Windows supplemental command
 
 The Windows x64 Mono path remains available for future cross-platform evidence and is no longer the current WS-26 blocking gate:
