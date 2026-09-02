@@ -2,7 +2,7 @@
 
 Status: Provisional numeric budgets; architectural gates are frozen
 Scenario: one authoritative 64-player/bot room, 60 Hz, release-equivalent builds
-Last updated: 2026-09-01
+Last updated: 2026-09-02
 
 These are go/no-go engineering budgets, not marketing targets. A measurement report must record hardware/device, build SHA, configuration/content hashes, warm-up, duration, sample count, profiler overhead, and percentile method. Results without that context are diagnostic only.
 
@@ -15,7 +15,7 @@ These are go/no-go engineering budgets, not marketing targets. A measurement rep
 | Backpressure | Regional | 1% | One client consumes no outbound data for bounded intervals | Isolation |
 | Soak | Regional | 1% | At least 60 minutes after warm-up | Leaks, queues, drift |
 
-Exact jitter distributions and impairment seed are stored with the test artifact so runs are reproducible.
+Exact jitter distributions and any impairment seed supported by the selected harness are stored with the test artifact. The macOS `tc netem` real-client gate records active configuration and observed statistics but does not claim a deterministic random seed.
 
 ## Server room Tick budget
 
@@ -65,7 +65,7 @@ Fragmentation, retransmission, headers, and encryption overhead are included in 
 | Reconnect to authoritative playable state | P95 <= 5 s after transport restoration |
 | Replay critical-state hash | Exact for non-physics vectors; physics fields use versioned tolerances |
 
-The [WS-24 through WS-26 client prediction baseline](client-prediction-baseline.md) provides the bounded, zero-allocation rewind/replay mechanism, recipient-specific server acknowledgement, concrete Unity Fantasy KCP transport, and application composition required to measure these correction gates. Exact-`main` source `2987ce08475b2cf2342a98326ff86fa422a3a6a5` passed the reviewed 36/2 macOS Apple Silicon Unity gate and [Battle Host run 33500838422](https://github.com/rayss1/ai-native-unity-framework/actions/runs/33500838422), including replay, Regional/Degraded wire, allocation, two-room capacity, telemetry outage, and the 60-minute soak. The automated impairment clients are synthetic and the local Player smoke is not run through the reproducible Regional impairment profile, so this evidence still does not pass the real-client correction-frequency or magnitude thresholds.
+The [WS-24 through WS-27 client prediction baseline](client-prediction-baseline.md) provides the bounded, zero-allocation rewind/replay mechanism, recipient-specific server acknowledgement, concrete Unity Fantasy KCP transport, application composition, and bounded correction histogram required to measure these gates. Exact-`main` source `6376265658a26fa07b08fc737c3932d52212314a` passed the reviewed local macOS ARM64 Mono Regional real-client profile with 1,219 reconciliation samples, correction P95/P99 `9/10 mm`, maximum `12 mm`, zero corrections above `250 mm`, and zero history/input/frame loss. This passes the frozen correction magnitude and frequency budgets for the deterministic first-slice movement on that platform. The prior release-equivalent [Battle Host run 33500838422](https://github.com/rayss1/ai-native-unity-framework/actions/runs/33500838422) remains the server replay, Regional/Degraded wire, allocation, capacity, telemetry-outage, and 60-minute soak evidence because WS-27 does not change server, Shared, protocol, or production configuration code.
 
 The correction numbers are tuning gates, not truth about game feel. If representative movement speed/map scale makes them invalid, change them only with captured traces, a replacement threshold, and no weakening of server authority.
 

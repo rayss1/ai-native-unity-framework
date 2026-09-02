@@ -1,6 +1,6 @@
 # Regional Real-Client Correction Validation
 
-Status: WS-27 candidate; exact-commit evidence required
+Status: WS-27 exact-main macOS gate passed
 Platform: macOS Apple Silicon ARM64 Mono Player
 Decision source: ADR-0005 and `performance-budgets.md`
 
@@ -31,6 +31,14 @@ tools/run-unity-manual-validation.sh
 ```
 
 The reviewed evidence must include `regional-correction.json`, Regional Player stdout/stderr, ingress and egress qdisc state before/during/after measurement, qdisc statistics, exact source/tree/Fantasy/protocol/configuration/Unity/image identities, the Player binary hash, Host shutdown evidence, and the enclosing `hashes.sha256` manifest.
+
+## Recorded exact-main result
+
+Exact `main` source `6376265658a26fa07b08fc737c3932d52212314a`, tree `e5ea86c01e85e55475052e75f2fcd876db7069e3`, and Fantasy `f8bed0d464924f159d46498f1311206ea0694be8` passed the complete gate on 2026-09-02. The bundle used Unity `6000.3.9f1` revision `7a9955a4f2fa`, protocol identity `3cb86e21687e65af0e0d409d9186384d0f959fd6aa873eb9e1cd0cb39c77d37d`, and configuration identity `fc0714bcbe7c8c673cf638506a45f3a4440585f4024ff78048434346ab8a66e4`.
+
+After `10.0017 s` warm-up, the ARM64 Mono Player measured `60.0169 s` under the frozen symmetric Regional profile. It accepted `1,219` Snapshots/reconciliation samples and recorded `1,205` nonzero corrections: P95 `9 mm`, P99 `10 mm`, maximum `12 mm`, and zero corrections above `250 mm`. History misses, stale Snapshots, dropped prediction inputs, and dropped application input frames were all zero. The ingress/egress qdiscs recorded `34/138` dropped packets, for `172` total, and were restored after the run.
+
+The enclosing macOS gate also passed 38/38 EditMode and 2/2 real-Fantasy-KCP PlayMode tests with no failures or skips. The reconnect smoke advanced epoch `4 -> 5` and acknowledgement `30 -> 32`; the exact-source Host exited zero after draining rooms and KCP without forced termination. The bundle hash manifest SHA-256 is `1d9a8f403114c9cdcbbc45ebb42f2d0e95b7539ccffa161d5b5e7aeec4339591`, and all listed hashes were independently rechecked. Exact-main [.NET run 33604282890](https://github.com/rayss1/ai-native-unity-framework/actions/runs/33604282890) passed the 92-test matrix, zero-warning build, dependency audit, protocol drift check, Battle Host publish, and architecture check.
 
 ## Interpretation
 
