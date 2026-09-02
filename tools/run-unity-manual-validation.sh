@@ -485,7 +485,7 @@ if [[ "$regional_player_exit" != '0' ]]; then
   tail -n 100 "$regional_stderr" >&2 || true
   fail "The Regional correction Player exited with code $regional_player_exit."
 fi
-regional_qdisc_drops="$(awk '/dropped/ { for (index = 1; index <= NF; index++) if ($index == "dropped") total += $(index + 1) } END { print total + 0 }' "$regional_ingress_stats" "$regional_egress_stats")"
+regional_qdisc_drops="$(awk '/\(dropped/ { for (field_index = 1; field_index <= NF; field_index++) if ($field_index == "(dropped") { dropped = $(field_index + 1); gsub(/[^0-9]/, "", dropped); total += dropped } } END { print total + 0 }' "$regional_ingress_stats" "$regional_egress_stats")"
 [[ "$regional_qdisc_drops" -gt 0 ]] || fail 'The Regional qdisc did not record any packet loss.'
 jq -e '
   .success == true
