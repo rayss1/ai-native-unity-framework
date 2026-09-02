@@ -15,6 +15,9 @@ container_id=''
 container_name=''
 player_pid=''
 host_log=''
+regional_impairment_applied='false'
+colima_reachable_interface=''
+docker_bridge_interface='docker0'
 
 fail() {
   echo "$1" >&2
@@ -50,9 +53,21 @@ assert_nunit_result() {
   fi
 }
 
+clear_regional_impairment() {
+  if [[ "$regional_impairment_applied" != 'true' ]]; then
+    return
+  fi
+
+  colima ssh -- sudo -n tc qdisc del dev "$docker_bridge_interface" root >/dev/null 2>&1 || true
+  colima ssh -- sudo -n tc qdisc replace dev "$colima_reachable_interface" root fq_codel >/dev/null 2>&1 || true
+  regional_impairment_applied='false'
+}
+
 cleanup() {
   local exit_code=$?
   trap - EXIT INT TERM
+
+  clear_regional_impairment
 
   if [[ -n "$player_pid" ]] && kill -0 "$player_pid" >/dev/null 2>&1; then
     kill -TERM "$player_pid" >/dev/null 2>&1 || true
@@ -155,6 +170,8 @@ if [[ "$(docker context show)" != 'colima' ]] || ! colima status >/dev/null 2>&1
   echo 'The active Docker context must be a running Colima instance.' >&2
   exit 2
 fi
+colima ssh -- command -v tc >/dev/null || fail 'The Colima VM does not provide tc for the Regional gate.'
+colima ssh -- sudo -n true >/dev/null || fail 'Passwordless Colima sudo is required for scoped qdisc management.'
 docker_server_os="$(docker info --format '{{.OSType}}' 2>/dev/null)"
 if [[ "$docker_server_os" != 'linux' ]]; then
   echo "Expected a Linux Docker engine, found: $docker_server_os" >&2
@@ -175,6 +192,17 @@ player_build_log="$evidence_dir/player-build.log"
 player_stdout="$evidence_dir/player.stdout.log"
 player_stderr="$evidence_dir/player.stderr.log"
 smoke_json="$evidence_dir/smoke.json"
+regional_json="$evidence_dir/regional-correction.json"
+regional_stdout="$evidence_dir/regional-player.stdout.log"
+regional_stderr="$evidence_dir/regional-player.stderr.log"
+regional_ingress_before="$evidence_dir/regional-ingress-qdisc-before.txt"
+regional_egress_before="$evidence_dir/regional-egress-qdisc-before.txt"
+regional_ingress_active="$evidence_dir/regional-ingress-qdisc.txt"
+regional_egress_active="$evidence_dir/regional-egress-qdisc.txt"
+regional_ingress_stats="$evidence_dir/regional-ingress-qdisc-stats.txt"
+regional_egress_stats="$evidence_dir/regional-egress-qdisc-stats.txt"
+regional_ingress_after="$evidence_dir/regional-ingress-qdisc-after.txt"
+regional_egress_after="$evidence_dir/regional-egress-qdisc-after.txt"
 staged_host_config="$evidence_dir/Fantasy.config"
 player_directory="$evidence_dir/player"
 player_bundle="$player_directory/AiNative.BattleClient.app"
@@ -276,23 +304,26 @@ done
 [[ "$ready" == 'true' ]] || fail 'The Battle Host did not become ready within 90 seconds.'
 
 kcp_host=''
-while IFS= read -r candidate; do
+while read -r candidate_interface candidate; do
   [[ -n "$candidate" ]] || continue
   if response="$(curl --silent --show-error --max-time 2 "http://$candidate:$health_port/health/ready" 2>/dev/null)" &&
      [[ "$(jq -r '.status // empty' <<<"$response")" == 'ready' ]]; then
     kcp_host="$candidate"
+    colima_reachable_interface="$candidate_interface"
     break
   fi
-done < <(colima ssh -- ip -o -4 addr show scope global | awk '{split($4, address, "/"); print address[1]}')
+done < <(colima ssh -- ip -o -4 addr show scope global | awk '{split($4, address, "/"); print $2, address[1]}')
 if [[ -z "$kcp_host" ]]; then
   fail 'Colima has no macOS-reachable VM address for UDP KCP. Restart it with --network-address and rerun the gate.'
 fi
 {
   echo "colima_reachable_address=$kcp_host"
+  echo "colima_reachable_interface=$colima_reachable_interface"
+  echo "docker_bridge_interface=$docker_bridge_interface"
   echo "kcp_endpoint=$kcp_host:$kcp_port"
 } >>"$metadata"
 
-echo 'Running 36 exact-commit Unity EditMode tests...'
+echo 'Running 38 exact-commit Unity EditMode tests...'
 "$editor_path" \
   -batchmode \
   -nographics \
@@ -301,7 +332,7 @@ echo 'Running 36 exact-commit Unity EditMode tests...'
   -testPlatform EditMode \
   -testResults "$editmode_xml" \
   -logFile "$editmode_log"
-assert_nunit_result "$editmode_xml" 36 'EditMode'
+assert_nunit_result "$editmode_xml" 38 'EditMode'
 
 echo 'Running 2 real Fantasy KCP Unity PlayMode tests...'
 AINATIVE_WS26_RUN_PLAYMODE=1 \
@@ -384,6 +415,105 @@ jq -e '
   and .droppedInputFrames == 0
 ' "$smoke_json" >/dev/null || fail 'The macOS smoke did not prove login, reconnect continuity, acknowledgement growth, and zero dropped input frames.'
 
+echo 'Applying the symmetric Regional profile for real-client correction measurement...'
+colima ssh -- ip link show dev "$docker_bridge_interface" >/dev/null || fail 'The Colima Docker bridge interface is unavailable.'
+colima ssh -- ip link show dev "$colima_reachable_interface" >/dev/null || fail 'The macOS-reachable Colima interface is unavailable.'
+colima ssh -- tc qdisc show dev "$docker_bridge_interface" >"$regional_ingress_before"
+colima ssh -- tc qdisc show dev "$colima_reachable_interface" >"$regional_egress_before"
+grep -q 'qdisc noqueue' "$regional_ingress_before" || fail 'The Docker bridge has an unexpected pre-existing qdisc.'
+grep -q 'qdisc fq_codel' "$regional_egress_before" || fail 'The Colima egress interface has an unexpected pre-existing qdisc.'
+regional_impairment_applied='true'
+colima ssh -- sudo -n tc qdisc replace dev "$docker_bridge_interface" root netem \
+  delay 50ms 10ms 25% \
+  loss random 1% \
+  duplicate .5% \
+  reorder 1% 50%
+colima ssh -- sudo -n tc qdisc replace dev "$colima_reachable_interface" root netem \
+  delay 50ms 10ms 25% \
+  loss random 1% \
+  duplicate .5% \
+  reorder 1% 50%
+colima ssh -- tc qdisc show dev "$docker_bridge_interface" >"$regional_ingress_active"
+colima ssh -- tc qdisc show dev "$colima_reachable_interface" >"$regional_egress_active"
+for qdisc_evidence in "$regional_ingress_active" "$regional_egress_active"; do
+  grep -q 'netem' "$qdisc_evidence" || fail 'The Regional qdisc was not active.'
+  grep -Eq 'delay 50ms +10ms 25%' "$qdisc_evidence" || fail 'The Regional delay/jitter qdisc differs from the frozen profile.'
+  grep -q 'loss 1%' "$qdisc_evidence" || fail 'The Regional loss qdisc differs from the frozen profile.'
+  grep -q 'duplicate 0.5%' "$qdisc_evidence" || fail 'The Regional duplication qdisc differs from the frozen profile.'
+  grep -q 'reorder 1% 50%' "$qdisc_evidence" || fail 'The Regional reorder qdisc differs from the frozen profile.'
+done
+
+echo 'Running the 10-second warm-up and 60-second real-client correction measurement...'
+"$player_executable" \
+  --ainative-regional-correction \
+  --ainative-host "$kcp_host" \
+  --ainative-port "$kcp_port" \
+  --ainative-result "$regional_json" \
+  -batchmode \
+  -nographics >"$regional_stdout" 2>"$regional_stderr" &
+player_pid=$!
+deadline=$((SECONDS + 110))
+while kill -0 "$player_pid" >/dev/null 2>&1; do
+  if (( SECONDS >= deadline )); then
+    kill -TERM "$player_pid" >/dev/null 2>&1 || true
+    sleep 2
+    if kill -0 "$player_pid" >/dev/null 2>&1; then
+      kill -KILL "$player_pid" >/dev/null 2>&1 || true
+    fi
+    wait "$player_pid" >/dev/null 2>&1 || true
+    player_pid=''
+    fail 'The Regional correction Player timed out after 110 seconds.'
+  fi
+  sleep 1
+done
+set +e
+wait "$player_pid"
+regional_player_exit=$?
+set -e
+player_pid=''
+colima ssh -- tc -s qdisc show dev "$docker_bridge_interface" >"$regional_ingress_stats"
+colima ssh -- tc -s qdisc show dev "$colima_reachable_interface" >"$regional_egress_stats"
+clear_regional_impairment
+colima ssh -- tc qdisc show dev "$docker_bridge_interface" >"$regional_ingress_after"
+colima ssh -- tc qdisc show dev "$colima_reachable_interface" >"$regional_egress_after"
+grep -q 'qdisc noqueue' "$regional_ingress_after" || fail 'The Docker bridge qdisc was not restored.'
+grep -q 'qdisc fq_codel' "$regional_egress_after" || fail 'The Colima egress qdisc was not restored.'
+[[ -s "$regional_json" ]] || fail 'The Regional correction Player did not produce regional-correction.json.'
+if [[ "$regional_player_exit" != '0' ]]; then
+  jq . "$regional_json" >&2 || true
+  tail -n 100 "$regional_stdout" >&2 || true
+  tail -n 100 "$regional_stderr" >&2 || true
+  fail "The Regional correction Player exited with code $regional_player_exit."
+fi
+regional_qdisc_drops="$(awk '/dropped/ { for (index = 1; index <= NF; index++) if ($index == "dropped") total += $(index + 1) } END { print total + 0 }' "$regional_ingress_stats" "$regional_egress_stats")"
+[[ "$regional_qdisc_drops" -gt 0 ]] || fail 'The Regional qdisc did not record any packet loss.'
+jq -e '
+  .success == true
+  and .evidenceClass == "macos-arm64-mono-regional-real-client"
+  and .profile == "Regional"
+  and .configuredRttMilliseconds == 100
+  and .configuredOneWayDelayMilliseconds == 50
+  and .configuredJitterMilliseconds == 10
+  and .configuredJitterCorrelationPercent == 25
+  and .configuredLossPercent == 1
+  and .configuredDuplicatePercent == 0.5
+  and .configuredReorderPercent == 1
+  and .configuredReorderCorrelationPercent == 50
+  and .warmupSeconds >= 10
+  and .measuredSeconds >= 60
+  and (.sessionId | tonumber) > 0
+  and .connectionEpoch > 0
+  and .lastAcknowledgedSequence > 0
+  and (.lastReceivedTick | tonumber) > 0
+  and .reconciliationSamples >= 1000
+  and .correctionP95Millimetres <= 250
+  and .correctionP99Millimetres <= 750
+  and .correctionsOver250PerPlayerMinute <= 2
+  and .historyMisses == 0
+  and .droppedPredictionInputs == 0
+  and .droppedInputFrames == 0
+' "$regional_json" >/dev/null || fail 'The real-client Regional correction gates failed.'
+
 echo 'Stopping the Battle Host normally...'
 docker stop --time 30 "$container_id" >/dev/null
 host_exit="$(docker inspect "$container_id" --format '{{.State.ExitCode}}')"
@@ -398,7 +528,7 @@ container_id=''
 
 {
   echo 'result=Passed'
-  echo 'editmode_passed=36'
+  echo 'editmode_passed=38'
   echo 'editmode_failed=0'
   echo 'editmode_skipped=0'
   echo 'playmode_passed=2'
@@ -417,6 +547,12 @@ container_id=''
   echo "smoke_post_reconnect_ack=$(jq -r '.lastAcknowledgedSequence' "$smoke_json")"
   echo "smoke_last_received_tick=$(jq -r '.lastReceivedTick' "$smoke_json")"
   echo "smoke_dropped_input_frames=$(jq -r '.droppedInputFrames' "$smoke_json")"
+  echo 'regional_correction_success=true'
+  echo "regional_reconciliation_samples=$(jq -r '.reconciliationSamples' "$regional_json")"
+  echo "regional_correction_p95_millimetres=$(jq -r '.correctionP95Millimetres' "$regional_json")"
+  echo "regional_correction_p99_millimetres=$(jq -r '.correctionP99Millimetres' "$regional_json")"
+  echo "regional_corrections_over_250_per_player_minute=$(jq -r '.correctionsOver250PerPlayerMinute' "$regional_json")"
+  echo "regional_qdisc_drops=$regional_qdisc_drops"
   echo "battle_host_exit_code=$host_exit"
   echo 'battle_host_rooms_drained=true'
   echo 'battle_host_kcp_drained=true'
@@ -439,6 +575,17 @@ container_id=''
     player.stdout.log \
     player.stderr.log \
     smoke.json \
+    regional-correction.json \
+    regional-player.stdout.log \
+    regional-player.stderr.log \
+    regional-ingress-qdisc-before.txt \
+    regional-egress-qdisc-before.txt \
+    regional-ingress-qdisc.txt \
+    regional-egress-qdisc.txt \
+    regional-ingress-qdisc-stats.txt \
+    regional-egress-qdisc-stats.txt \
+    regional-ingress-qdisc-after.txt \
+    regional-egress-qdisc-after.txt \
     player/THIRD-PARTY-NOTICES.md \
     player/Fantasy-LICENSE.txt \
     "player/AiNative.BattleClient.app/Contents/MacOS/$player_executable_name" \

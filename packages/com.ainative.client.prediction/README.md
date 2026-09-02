@@ -16,6 +16,12 @@ concrete transport. Concurrent input sends are rejected, history is bounded, and
 transport backpressure remains visible. `DisposeAsync` disposes the supplied
 transport only when `ownsTransport` was selected at construction.
 
+`PredictionDiagnostics` exposes a fixed-size millimetre correction histogram,
+P95/P99 correction values, threshold counts, history misses, and bounded-input
+drops. `ResetDiagnostics` starts a new measurement window without resetting the
+session, transport, connection epoch, input sequence, or prediction history.
+Histogram storage is allocated with the adapter and does not grow per Snapshot.
+
 Runtime code contains no Google.Protobuf dependency. The .NET-only compatibility
 tests compare emitted and accepted bytes with the tracked generated Protobuf
 types; Unity EditMode tests use fixed protocol fixtures.

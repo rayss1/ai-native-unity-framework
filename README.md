@@ -48,7 +48,7 @@ colima start --vm-type vz --vz-rosetta --arch aarch64 --cpus 4 --memory 8 --netw
 tools/run-unity-manual-validation.sh
 ```
 
-The macOS script is the complete WS-26 desktop gate. It builds the exact-source Host with fixed .NET images, verifies exactly 36 EditMode and 2 real-KCP PlayMode tests, builds an ARM64 Mono Player, runs the reconnect smoke, and retains the evidence bundle. The complete contract is defined in [Unity WS-26 macOS Validation](Docs/Architecture/unity-manual-validation.md).
+The macOS script is the complete WS-26/WS-27 desktop and real-client correction gate. It builds the exact-source Host with fixed .NET images, verifies exactly 38 EditMode and 2 real-KCP PlayMode tests, builds an ARM64 Mono Player, runs the reconnect smoke, applies the symmetric Regional network profile, measures correction percentiles for 60 seconds after warm-up, and retains the evidence bundle. The complete contracts are defined in [Unity macOS Validation](Docs/Architecture/unity-manual-validation.md) and [Regional Real-Client Correction Validation](Docs/Architecture/regional-client-correction-validation.md).
 
 The Windows entry point remains available as a future supplemental platform gate, but it no longer blocks WS-26:
 
@@ -56,7 +56,7 @@ The Windows entry point remains available as a future supplemental platform gate
 tools/run-unity-windows-validation.ps1
 ```
 
-Both scripts require a clean checkout so every result identifies one exact commit. A macOS result does not imply Windows, Universal/x86_64, Android/iOS IL2CPP, or Regional real-client correction coverage. Retain and review the generated bundle before updating milestone status.
+Both scripts require a clean checkout so every result identifies one exact commit. A passing current macOS bundle includes the local Regional real-client correction profile, but does not imply Windows, Universal/x86_64, Android/iOS IL2CPP, production deployment, or a real Linux environment canary. Retain and review the generated bundle before updating milestone status.
 
 The architecture-check command returns `0` for a valid repository, `1` for architecture violations, and `2` for invalid arguments, configuration, or unreadable inputs. Use `--format json` for machine-readable diagnostics.
 

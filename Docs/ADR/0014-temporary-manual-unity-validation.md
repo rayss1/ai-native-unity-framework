@@ -15,7 +15,7 @@ Silently skipping the job would weaken the dual-runtime boundary and could be mi
 
 - Unity validation no longer runs automatically on pull requests or pushes. `.github/workflows/unity.yml` remains available only through `workflow_dispatch` for a future credentialed run.
 - Until automation is restored, the project owner runs [the manual Unity procedure](../Architecture/unity-manual-validation.md) on a clean checkout of each relevant exact commit.
-- A qualifying run uses Unity `6000.3.9f1` revision `7a9955a4f2fa` and executes the exact named suite in the manual validation procedure. The current WS-26 macOS gate requires 36 passed EditMode tests, 2 passed real-KCP PlayMode tests, and one successful Apple Silicon ARM64 Mono Player smoke, with zero failures or skips.
+- A qualifying run uses Unity `6000.3.9f1` revision `7a9955a4f2fa` and executes the exact named suite in the manual validation procedure. Beginning with WS-27, the current macOS gate requires 38 passed EditMode tests, 2 passed real-KCP PlayMode tests, one successful Apple Silicon ARM64 Mono Player smoke, and the 10+60-second Regional real-client correction profile, with zero failures or skips.
 - The evidence bundle records commit/tree/submodule, Unity, package, Fantasy, protocol, configuration, fixed Host image, NUnit, Player architecture, license, smoke, log, and SHA-256 identities.
 - Changes to Unity, Shared Gameplay, Shared Realtime, package resolution, or the tested commit invalidate earlier evidence.
 - Missing manual evidence is an open gate, not a pass. .NET test success cannot substitute for Unity execution.

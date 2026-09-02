@@ -155,6 +155,13 @@ namespace AiNative.Client.Application
 
         public PredictionDiagnostics PredictionDiagnostics => _prediction?.Diagnostics ?? default;
 
+        public bool ResetPredictionDiagnostics()
+        {
+            if (_disposed || _prediction is null || !_prediction.IsInitialized) return false;
+            _prediction.ResetDiagnostics();
+            return true;
+        }
+
         internal ClientPredictionAdapter PredictionAdapter => _prediction;
 
         public void Start()

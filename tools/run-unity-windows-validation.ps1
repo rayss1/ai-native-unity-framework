@@ -304,7 +304,7 @@ try {
         '-testResults', $editModeXml,
         '-logFile', $editModeLog
     )
-    $editMode = Assert-NUnitResult -Path $editModeXml -ExpectedPassed 36 -Label 'EditMode'
+    $editMode = Assert-NUnitResult -Path $editModeXml -ExpectedPassed 38 -Label 'EditMode'
 
     Invoke-Unity -Description 'Unity PlayMode validation' -ArgumentList @(
         '-batchmode', '-nographics',
