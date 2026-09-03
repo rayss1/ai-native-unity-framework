@@ -4,6 +4,7 @@
   "references": [
     "AiNative.Client.Application",
     "AiNative.Client.Prediction",
+    "AiNative.Gameplay",
     "AiNative.Realtime"
   ],
   "optionalUnityReferences": [

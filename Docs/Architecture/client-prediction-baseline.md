@@ -1,8 +1,8 @@
 # Client Prediction and Reconciliation Baseline
 
-Status: Implemented prediction baseline; WS-27 macOS Regional real-client gate passed
+Status: Implemented prediction baseline; WS-27 Regional gate passed; WS-28 smoothing candidate pending exact-commit evidence
 Last updated: 2026-09-02
-Decision source: ADR-0005, WS-24, WS-25, WS-26, and WS-27
+Decision source: ADR-0005, WS-24, WS-25, WS-26, WS-27, and WS-28
 
 ## Scope
 
@@ -80,11 +80,17 @@ The enclosing gate passed 38/38 EditMode and 2/2 real-KCP PlayMode tests, the re
 
 This passes the frozen local macOS Mono Regional correction magnitude/frequency budgets for the deterministic first-slice movement. A local Colima measurement is real-client transport evidence, but it is not a physical Regional network, mobile-device result, game-specific prediction-physics result, production deployment, or real Linux environment canary.
 
+## WS-28 presentation correction candidate
+
+`PresentationCorrectionSmoother` keeps authority and rendering separate. After reconciliation has already updated `ClientPredictionHistory`, the client composes the old display residual with the new simulation displacement. Corrections and accumulated residuals at or below 250 mm decay linearly to zero over 100 ms; larger or untrusted corrections snap. Reconnect and fault boundaries clear the residual before a new epoch can render.
+
+The Battle Client session owns the smoother and the Unity Composition Root applies its millimetre result in `LateUpdate`. Five cross-runtime package tests cover continuity, repeated correction composition, snap behavior, reconnect reset, and zero allocation. One application test proves that a visible correction can remain continuous while the underlying predicted state immediately takes the authoritative value. Exact-commit macOS Player evidence is required before this candidate is recorded as passed.
+
 ## Next gates
 
 1. Exercise the composed client in representative Android and iOS IL2CPP builds; macOS Mono evidence does not satisfy the mobile AOT/stripping gate.
 2. Retain Windows as a supplemental desktop validation target; the macOS result does not claim Windows compatibility.
-3. Measure game-specific physics prediction, correction smoothing, and representative visual quality; the deterministic integer movement result does not close those gates.
+3. Validate WS-28 on the exact macOS Player commit, then measure the chosen smoothing parameters with game-specific physics, animation/camera presentation, and representative visual-quality captures; the engine-neutral integer candidate alone does not close those product gates.
 4. Keep the production room default unchanged and keep the published server candidate out of a production environment until the project owner supplies a real Linux target and approves the independent environment-canary and rollback procedure.
 
 Until those gates pass, the implementation is a reusable baseline and not a claim that client prediction tuning, physics prediction, or production rollout is complete.

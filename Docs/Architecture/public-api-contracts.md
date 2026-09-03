@@ -1,7 +1,7 @@
 # Public API Contract Catalog
 
 Status: Minimum contract frozen for the first vertical slice
-Last updated: 2026-08-31
+Last updated: 2026-09-02
 
 This catalog defines ownership and semantics before implementation. Names and invariants are stable; value layouts may be extended additively as Spikes reveal required data. Implementations must not expose engine/framework types through these ports.
 
@@ -181,9 +181,19 @@ Contract:
 - `ApplyPacket` accepts only a complete Snapshot-channel frame or ReconnectResponse control frame already routed by the caller. It validates the v1 message ID, wire types, protocol major, local entity, monotonic connection epoch, reconnect epoch agreement, and payload bounds before mutating prediction state.
 - Unknown additive Protobuf fields are skipped. Truncated, malformed, wrong-channel, wrong-message, incompatible-protocol, missing-player, stale-epoch, and arithmetic-overflow inputs fail closed with a stable result. An arithmetic overflow resets to the decoded authoritative state.
 - Snapshot acknowledgement maps to `KinematicState.LastProcessedInputSequence`; reconciliation remains server-authoritative and replays only newer local inputs. Diagnostics expose accepted snapshots, bounded correction-sample count, corrections, corrections above 250 mm, exact maximum, P95/P99, history misses, stale snapshots, and dropped inputs without binding to a telemetry SDK. The fixed histogram has exact millimetre buckets through 8,192 mm and one bounded overflow bucket; `ResetDiagnostics` starts a new observation window without changing prediction/session state.
-- Packet polling/routing, login/join, visual smoothing, remote interpolation, concrete KCP sockets, elapsed-time/rate calculation, and evidence serialization stay in higher adapters or the Unity Composition Root.
+- Packet polling/routing, login/join, presentation-smoother ownership, remote interpolation, concrete KCP sockets, elapsed-time/rate calculation, and evidence serialization stay in higher adapters or the Unity Composition Root.
 
 The runtime wire implementation is intentionally small and generated-type-free for Unity. .NET-only compatibility tests compare its InputCommand, Snapshot, and ReconnectResponse behavior with the tracked Google.Protobuf generation.
+
+## `PresentationCorrectionSmoother`
+
+Owner: Client prediction package
+Consumers: Unity application Composition Root; future presentation adapters
+Dependencies: `AiNative.Gameplay`; no Unity, Fantasy, Protobuf, transport, or telemetry dependency
+
+The smoother consumes the project-owned `ReconciliationResult` after simulation has already accepted authority. It maintains only a bounded X/Z visual residual. The WS-28 candidate preserves continuity for corrections at or below 250 mm and linearly removes that residual within 100 ms of render time. A single correction or accumulated residual above 250 mm, an authoritative-ahead/history-miss result, or a reconnect boundary snaps to current simulation state.
+
+`Advance` receives caller-supplied delta time and the latest predicted state and returns millimetre presentation coordinates. It never writes prediction history, changes acknowledgements, delays authority, reads wall-clock time, or allocates after construction. Diagnostics expose smoothed/snap counts and the current residual without binding to Unity or a telemetry SDK. Remote-entity interpolation and game-specific physics presentation remain outside this contract.
 
 ## Supporting boundary contracts
 

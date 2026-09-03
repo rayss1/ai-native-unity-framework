@@ -1,7 +1,7 @@
 # ai-native-unity-framework
 An AI-native full-stack Unity game development framework for autonomous AI agents, covering client, server, shared modules, development tools, testing, build pipelines, and automation.
 
-The repository contains the first production vertical-slice foundation: one Shared Gameplay source set compiled by Unity and .NET, a Unity-ready bounded client prediction/protocol adapter, a dedicated Fantasy KCP client transport and Battle Client composition candidate, project-owned realtime/protocol contracts, a .NET 10 Fantasy-backed Battle Host, cross-runtime vectors, deterministic replay/load evidence, a production container contract, and a manifest-derived architecture validator.
+The repository contains the first production vertical-slice foundation: one Shared Gameplay source set compiled by Unity and .NET, a Unity-ready bounded client prediction/protocol adapter with presentation-only correction smoothing, a dedicated Fantasy KCP client transport and Battle Client composition candidate, project-owned realtime/protocol contracts, a .NET 10 Fantasy-backed Battle Host, cross-runtime vectors, deterministic replay/load evidence, a production container contract, and a manifest-derived architecture validator.
 
 ## Requirements
 
@@ -48,7 +48,7 @@ colima start --vm-type vz --vz-rosetta --arch aarch64 --cpus 4 --memory 8 --netw
 tools/run-unity-manual-validation.sh
 ```
 
-The macOS script is the complete WS-26/WS-27 desktop and real-client correction gate. It builds the exact-source Host with fixed .NET images, verifies exactly 38 EditMode and 2 real-KCP PlayMode tests, builds an ARM64 Mono Player, runs the reconnect smoke, applies the symmetric Regional network profile, measures correction percentiles for 60 seconds after warm-up, and retains the evidence bundle. The complete contracts are defined in [Unity macOS Validation](Docs/Architecture/unity-manual-validation.md) and [Regional Real-Client Correction Validation](Docs/Architecture/regional-client-correction-validation.md).
+The macOS script is the complete WS-26 through WS-28 desktop, real-client correction, and presentation-smoothing gate. It builds the exact-source Host with fixed .NET images, verifies exactly 44 EditMode and 2 real-KCP PlayMode tests, builds an ARM64 Mono Player, runs the reconnect smoke, applies the symmetric Regional network profile, measures correction percentiles for 60 seconds after warm-up, and retains the evidence bundle. The complete contracts are defined in [Unity macOS Validation](Docs/Architecture/unity-manual-validation.md), [Regional Real-Client Correction Validation](Docs/Architecture/regional-client-correction-validation.md), and [Presentation Correction Smoothing](Docs/Architecture/presentation-correction-smoothing.md).
 
 The Windows entry point remains available as a future supplemental platform gate, but it no longer blocks WS-26:
 
@@ -63,7 +63,7 @@ The architecture-check command returns `0` for a valid repository, `1` for archi
 ## Current layout
 
 - `client/UnityProject`: minimal Unity composition project and local package manifest.
-- `packages/com.ainative.client.prediction`: Unity-ready input/Snapshot/reconnect adapter over project-owned Shared contracts.
+- `packages/com.ainative.client.prediction`: Unity-ready input/Snapshot/reconnect adapter and presentation-only correction smoother over project-owned Shared contracts.
 - `packages/com.ainative.client.fantasy`: the sole Client Fantasy namespace boundary, implementing bounded Fantasy KCP behind `IRealtimeTransport` with pinned `Fantasy.Unity` and retained third-party notices.
 - `shared`: UPM/.NET Standard 2.1 Gameplay and realtime contracts, Protobuf schemas/generated code, and dual-runtime tests.
 - `server/src/Hosts/AiNative.BattleHost`: production `net10.0` composition root with health, drain, replay, and Fantasy KCP startup.

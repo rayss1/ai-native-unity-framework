@@ -323,7 +323,7 @@ fi
   echo "kcp_endpoint=$kcp_host:$kcp_port"
 } >>"$metadata"
 
-echo 'Running 38 exact-commit Unity EditMode tests...'
+echo 'Running 44 exact-commit Unity EditMode tests...'
 "$editor_path" \
   -batchmode \
   -nographics \
@@ -332,7 +332,7 @@ echo 'Running 38 exact-commit Unity EditMode tests...'
   -testPlatform EditMode \
   -testResults "$editmode_xml" \
   -logFile "$editmode_log"
-assert_nunit_result "$editmode_xml" 38 'EditMode'
+assert_nunit_result "$editmode_xml" 44 'EditMode'
 
 echo 'Running 2 real Fantasy KCP Unity PlayMode tests...'
 AINATIVE_WS26_RUN_PLAYMODE=1 \
@@ -512,6 +512,9 @@ jq -e '
   and .historyMisses == 0
   and .droppedPredictionInputs == 0
   and .droppedInputFrames == 0
+  and .presentationSmoothedCorrections > 0
+  and .presentationSnappedCorrections == 0
+  and .presentationResidualMillimetres <= 250
 ' "$regional_json" >/dev/null || fail 'The real-client Regional correction gates failed.'
 
 echo 'Stopping the Battle Host normally...'
@@ -528,7 +531,7 @@ container_id=''
 
 {
   echo 'result=Passed'
-  echo 'editmode_passed=38'
+  echo 'editmode_passed=44'
   echo 'editmode_failed=0'
   echo 'editmode_skipped=0'
   echo 'playmode_passed=2'
@@ -552,6 +555,9 @@ container_id=''
   echo "regional_correction_p95_millimetres=$(jq -r '.correctionP95Millimetres' "$regional_json")"
   echo "regional_correction_p99_millimetres=$(jq -r '.correctionP99Millimetres' "$regional_json")"
   echo "regional_corrections_over_250_per_player_minute=$(jq -r '.correctionsOver250PerPlayerMinute' "$regional_json")"
+  echo "regional_presentation_smoothed_corrections=$(jq -r '.presentationSmoothedCorrections' "$regional_json")"
+  echo "regional_presentation_snapped_corrections=$(jq -r '.presentationSnappedCorrections' "$regional_json")"
+  echo "regional_presentation_residual_millimetres=$(jq -r '.presentationResidualMillimetres' "$regional_json")"
   echo "regional_qdisc_drops=$regional_qdisc_drops"
   echo "battle_host_exit_code=$host_exit"
   echo 'battle_host_rooms_drained=true'

@@ -107,6 +107,20 @@ namespace AiNative.Client.Application
             _session.PredictAndQueueInput(_roomTick, moveX, moveZ);
         }
 
+        private void LateUpdate()
+        {
+            if (_session.TryAdvancePresentation(
+                    Time.unscaledDeltaTime,
+                    out PresentationPosition position))
+            {
+                Vector3 current = transform.localPosition;
+                transform.localPosition = new Vector3(
+                    (float)(position.XMillimetres / 1000d),
+                    current.y,
+                    (float)(position.ZMillimetres / 1000d));
+            }
+        }
+
         private async void OnDestroy()
         {
             if (_session is not null)
@@ -166,9 +180,12 @@ namespace AiNative.Client.Application
             {
                 _regionalWarmupElapsed += Time.unscaledDeltaTime;
                 if (_regionalWarmupElapsed < RegionalWarmupSeconds) return;
-                if (!_session.ResetPredictionDiagnostics())
+                if (!_session.ResetPredictionDiagnostics() ||
+                    !_session.ResetPresentationDiagnostics())
                 {
-                    FinishRegionalCorrection(false, "Prediction diagnostics could not be reset after warm-up.");
+                    FinishRegionalCorrection(
+                        false,
+                        "Prediction or presentation diagnostics could not be reset after warm-up.");
                     return;
                 }
 
@@ -186,6 +203,7 @@ namespace AiNative.Client.Application
         private void FinishRegionalCorrection(bool completed, string error)
         {
             PredictionDiagnostics diagnostics = _session.PredictionDiagnostics;
+            PresentationCorrectionDiagnostics presentation = _session.PresentationDiagnostics;
             double measuredMinutes = _regionalMeasurementElapsed / 60d;
             double correctionsOver250PerPlayerMinute = measuredMinutes > 0
                 ? diagnostics.CorrectionsOver250Millimetres / measuredMinutes
@@ -198,6 +216,9 @@ namespace AiNative.Client.Application
                                correctionsOver250PerPlayerMinute <= 2d &&
                                diagnostics.HistoryMisses == 0 &&
                                diagnostics.DroppedInputs == 0 &&
+                               presentation.SmoothedCorrections > 0 &&
+                               presentation.SnappedCorrections == 0 &&
+                               presentation.ResidualMillimetres <= 250 &&
                                _session.DroppedInputFrames == 0 &&
                                _session.State == BattleClientState.Active;
             _finished = true;
@@ -237,6 +258,9 @@ namespace AiNative.Client.Application
                 staleSnapshots = diagnostics.StaleSnapshots,
                 droppedPredictionInputs = diagnostics.DroppedInputs,
                 droppedInputFrames = _session.DroppedInputFrames,
+                presentationSmoothedCorrections = presentation.SmoothedCorrections,
+                presentationSnappedCorrections = presentation.SnappedCorrections,
+                presentationResidualMillimetres = presentation.ResidualMillimetres,
             };
 
             WriteResult(result, ref gatesPassed);
@@ -310,6 +334,9 @@ namespace AiNative.Client.Application
             public long staleSnapshots;
             public long droppedPredictionInputs;
             public long droppedInputFrames;
+            public long presentationSmoothedCorrections;
+            public long presentationSnappedCorrections;
+            public int presentationResidualMillimetres;
         }
     }
 

@@ -8,13 +8,13 @@ Primary desktop gate: macOS Apple Silicon ARM64 + Mono
 
 Run the exact same source from `shared/gameplay`, `shared/realtime`, the client prediction and Fantasy transport packages, and the Battle Client application through Unity. A valid run uses a clean checkout of the exact commit under review, Unity `6000.3.9f1` revision `7a9955a4f2fa`, and the repository-pinned Fantasy and .NET image identities.
 
-EditMode must report exactly 38 passed, zero failed, and zero skipped. The original contract, prediction, Fantasy transport, and application protocol/state tests remain mandatory. Two additional tests freeze the bounded correction histogram/reset behavior used by the WS-27 measurement without adding per-Snapshot allocation.
+EditMode must report exactly 44 passed, zero failed, and zero skipped. The original contract, prediction, Fantasy transport, and application protocol/state tests remain mandatory. The WS-27 histogram tests and six WS-28 presentation-smoothing/composition tests freeze bounded correction measurement, render continuity, snap/reset behavior, authority separation, and zero allocation.
 
 PlayMode must report exactly 2 passed, zero failed, and zero skipped against the real Fantasy KCP Battle Host: one covers login/join/first Snapshot/deterministic Input acknowledgement, and one forces reconnect and proves a newer epoch plus continued prediction.
 
 The macOS ARM64 Mono Player smoke must then exit zero and write parseable JSON with `success: true`. It must prove a nonzero session, an increased reconnect epoch, acknowledgement growth before and after reconnect, a nonzero received Tick, and zero dropped input frames.
 
-The same Player binary must then run for a ten-second warm-up and a 60-second measured window under the symmetric Regional profile: `50 +/- 10 ms` delay with 25% correlation in each direction, 1% random loss, 0.5% duplication, and 1% reordering with 50% correlation. The result must contain at least 1,000 reconciliation samples, correction P95 at or below 250 mm, correction P99 at or below 750 mm, no more than two corrections above 250 mm per player-minute, and zero history misses, dropped prediction inputs, or dropped input frames. Both qdiscs must record their exact active configuration and at least one packet drop across the run.
+The same Player binary must then run for a ten-second warm-up and a 60-second measured window under the symmetric Regional profile: `50 +/- 10 ms` delay with 25% correlation in each direction, 1% random loss, 0.5% duplication, and 1% reordering with 50% correlation. The result must contain at least 1,000 reconciliation samples, correction P95 at or below 250 mm, correction P99 at or below 750 mm, no more than two corrections above 250 mm per player-minute, and zero history misses, dropped prediction inputs, or dropped input frames. WS-28 additionally requires at least one smoothed presentation correction, zero presentation snaps, and a final residual no greater than 250 mm. Both qdiscs must record their exact active configuration and at least one packet drop across the run.
 
 The run also fails if Unity reports compilation/package-resolution errors, selects another Editor revision, cannot resolve the pinned local/Git UPM packages, produces a non-ARM64 Player, omits the Fantasy license or Third-Party Notices, uses an unpinned Server SDK/runtime image, force-terminates the Host, or changes the clean worktree.
 
@@ -38,12 +38,12 @@ The script:
 1. verifies macOS ARM64, Unity, source, submodule, UPM, license, and tool identities;
 2. builds the exact-source Battle Host with the fixed .NET `10.0.202` SDK and `10.0.4` runtime image digests under Linux x64 emulation;
 3. starts only that container, keeps readiness available at `127.0.0.1:22080`, discovers and proves a macOS-reachable Colima address, and uses that address for KCP `22000/udp`;
-4. executes the exact 38/2 EditMode/PlayMode totals;
+4. executes the exact 44/2 EditMode/PlayMode totals;
 5. builds an ARM64-only macOS Mono `.app`, verifies its notices, and runs the deterministic reconnect smoke;
 6. applies the symmetric Regional qdiscs only to the Colima-to-container path, runs the 10+60-second real-client correction measurement, records qdisc statistics, and restores the original interface classes;
 7. stops the Host normally and rejects any tracked worktree drift.
 
-Evidence is written under `artifacts/unity-macos/<full-commit>/`. It includes metadata and identities, image build/Host logs, both NUnit XML/log pairs, Player build/run logs, the `.app`, smoke and Regional correction JSON, qdisc configuration/statistics, staged notices, key SHA-256 hashes, and a summary. Passing the script is required before recording WS-26/WS-27 as validated; code or scripts alone are not evidence.
+Evidence is written under `artifacts/unity-macos/<full-commit>/`. It includes metadata and identities, image build/Host logs, both NUnit XML/log pairs, Player build/run logs, the `.app`, smoke and Regional correction JSON, qdisc configuration/statistics, staged notices, key SHA-256 hashes, and a summary. Passing the script is required before recording a current WS-26 through WS-28 candidate as validated; code or scripts alone are not evidence.
 
 ## Recorded exact-main result
 
@@ -71,7 +71,7 @@ The Windows x64 Mono path remains available for future cross-platform evidence a
 tools/run-unity-windows-validation.ps1
 ```
 
-It retains its exact 38 EditMode, 2 real-KCP PlayMode, and Windows Player smoke contract. A macOS pass does not claim that Windows has passed, and a future Windows result must be recorded separately.
+It retains the current exact 44 EditMode, 2 real-KCP PlayMode, and Windows Player smoke contract. A macOS pass does not claim that Windows has passed, and a future Windows result must be recorded separately.
 
 ## Unity Editor UI alternative
 

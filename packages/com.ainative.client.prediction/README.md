@@ -11,8 +11,12 @@ Snapshot-channel and ReconnectResponse control frames into `ApplyPacket`. Call
 predict/encode path, or use `SendInputAsync` outside the fixed-Tick critical path
 when the adapter should forward the prepared frame through its transport.
 
-The caller owns packet routing, visual smoothing, remote interpolation, and the
-concrete transport. Concurrent input sends are rejected, history is bounded, and
+The caller owns packet routing, remote interpolation, and the concrete transport.
+`PresentationCorrectionSmoother` is an optional presentation-only primitive: it
+preserves visual continuity for corrections at or below 250 mm and linearly
+decays the residual over 100 ms. Larger or untrusted corrections snap, and a
+reconnect resets residual state. It never delays or mutates authoritative
+prediction. Concurrent input sends are rejected, history is bounded, and
 transport backpressure remains visible. `DisposeAsync` disposes the supplied
 transport only when `ownsTransport` was selected at construction.
 
