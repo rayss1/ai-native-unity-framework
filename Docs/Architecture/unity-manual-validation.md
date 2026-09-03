@@ -47,6 +47,16 @@ Evidence is written under `artifacts/unity-macos/<full-commit>/`. It includes me
 
 ## Recorded exact-main result
 
+### WS-28 exact-main presentation result
+
+The reviewed bundle for exact `main` source `b8d4228c20cd9bf05054a956c5cc168711bfdff9` (tree `2241de28438df0a56fa354d42130741f92a978f8`) passed with Fantasy `f8bed0d464924f159d46498f1311206ea0694be8`, protocol SHA-256 `3cb86e21687e65af0e0d409d9186384d0f959fd6aa873eb9e1cd0cb39c77d37d`, and configuration SHA-256 `fc0714bcbe7c8c673cf638506a45f3a4440585f4024ff78048434346ab8a66e4`. Unity `6000.3.9f1` revision `7a9955a4f2fa` reported 44/44 EditMode and 2/2 real-Fantasy-KCP PlayMode passes with no failures or skips.
+
+The ARM64 Mono Player completed login, join, input acknowledgement, forced reconnect, epoch `4 -> 5`, acknowledgement `30 -> 31`, and zero dropped input frames. Under the 10+60-second symmetric Regional gate, 1,221 reconciliation samples produced correction P95/P99 `9/10 mm`, maximum `12 mm`, zero corrections above `250 mm`, 1,207 smoothed corrections, zero presentation snaps, final residual `1 mm`, and zero history misses, stale Snapshots, dropped prediction inputs, or dropped frames. The qdiscs recorded 168 packet drops. The Host exited zero after draining rooms and KCP without forced termination.
+
+The retained bundle is under `artifacts/unity-macos/b8d4228c20cd9bf05054a956c5cc168711bfdff9/`. Its hash-manifest SHA-256 is `496da779c7449f2a6ffb1e59d3a37d99f34dba2ae6f73b40d6f3187569fb2604`; the EditMode XML, PlayMode XML, smoke JSON, Regional JSON, and Player executable SHA-256 values are `c14be4ff60725752c567f640996f73a9afcddbb98dec846d413627eab24c80d1`, `a3028bd421f8b76d569dfc8d3494461712e851e9f736c5ea340c2f5176a448a8`, `a7bb1c1ce09f7e834a16f617bfd50a1ee21f47be634634ecb2d137a8e7b65dd4`, `707da0088c86d25e3156ce84e9b062eeb6393d6a8e0ad20b28d8bd8480d68b93`, and `28cddb9b6f37ebd94588994d17a110d42111f1ca81fe3b3fee45cd5578f1b9c7`. Every manifest entry, staged notice, and binary architecture was independently rechecked. Exact-main [.NET run 33755796726](https://github.com/rayss1/ai-native-unity-framework/actions/runs/33755796726) passed 97/97 tests and all product checks.
+
+### WS-26 exact-main desktop result
+
 The reviewed bundle for exact `main` source `2987ce08475b2cf2342a98326ff86fa422a3a6a5` (tree `1f441d2cfbadd009533f707da3a78ddabbefbc0a`) passed on macOS Apple Silicon with Fantasy `f8bed0d464924f159d46498f1311206ea0694be8`, protocol SHA-256 `3cb86e21687e65af0e0d409d9186384d0f959fd6aa873eb9e1cd0cb39c77d37d`, and configuration SHA-256 `fc0714bcbe7c8c673cf638506a45f3a4440585f4024ff78048434346ab8a66e4`.
 
 Unity `6000.3.9f1` revision `7a9955a4f2fa` reported 36/36 EditMode and 2/2 real-Fantasy-KCP PlayMode tests. The ARM64 Mono Player completed login, room join, input acknowledgement, forced reconnect, epoch `4 -> 5`, acknowledgement `30 -> 31`, and continued to Tick `2319` with `droppedInputFrames = 0`. The Host exited `0`, drained rooms and KCP, and was not force-terminated. The bundle used the fixed .NET SDK/runtime image digests and staged byte-matching Fantasy license and Third-Party Notices beside the `.app`.
