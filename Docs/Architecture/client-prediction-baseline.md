@@ -1,7 +1,7 @@
 # Client Prediction and Reconciliation Baseline
 
-Status: Implemented prediction baseline; WS-27 Regional gate passed; WS-28 smoothing candidate pending exact-commit evidence
-Last updated: 2026-09-02
+Status: Implemented prediction baseline; WS-28 exact-main macOS smoothing gate passed
+Last updated: 2026-09-03
 Decision source: ADR-0005, WS-24, WS-25, WS-26, WS-27, and WS-28
 
 ## Scope
@@ -80,17 +80,21 @@ The enclosing gate passed 38/38 EditMode and 2/2 real-KCP PlayMode tests, the re
 
 This passes the frozen local macOS Mono Regional correction magnitude/frequency budgets for the deterministic first-slice movement. A local Colima measurement is real-client transport evidence, but it is not a physical Regional network, mobile-device result, game-specific prediction-physics result, production deployment, or real Linux environment canary.
 
-## WS-28 presentation correction candidate
+## WS-28 presentation correction evidence
 
 `PresentationCorrectionSmoother` keeps authority and rendering separate. After reconciliation has already updated `ClientPredictionHistory`, the client composes the old display residual with the new simulation displacement. Corrections and accumulated residuals at or below 250 mm decay linearly to zero over 100 ms; larger or untrusted corrections snap. Reconnect and fault boundaries clear the residual before a new epoch can render.
 
-The Battle Client session owns the smoother and the Unity Composition Root applies its millimetre result in `LateUpdate`. Five cross-runtime package tests cover continuity, repeated correction composition, snap behavior, reconnect reset, and zero allocation. One application test proves that a visible correction can remain continuous while the underlying predicted state immediately takes the authoritative value. Exact-commit macOS Player evidence is required before this candidate is recorded as passed.
+The Battle Client session owns the smoother and the Unity Composition Root applies its millimetre result in `LateUpdate`. Five cross-runtime package tests cover continuity, repeated correction composition, snap behavior, reconnect reset, and zero allocation. One application test proves that a visible correction can remain continuous while the underlying predicted state immediately takes the authoritative value.
+
+Exact-`main` source `b8d4228c20cd9bf05054a956c5cc168711bfdff9`, tree `2241de28438df0a56fa354d42130741f92a978f8`, and Fantasy `f8bed0d464924f159d46498f1311206ea0694be8` passed [.NET run 33755796726](https://github.com/rayss1/ai-native-unity-framework/actions/runs/33755796726) and the reviewed macOS Unity bundle. Unity `6000.3.9f1` revision `7a9955a4f2fa` passed 44/44 EditMode and 2/2 real-KCP PlayMode tests. The ARM64 Mono reconnect smoke advanced epoch `4 -> 5` and acknowledgement `30 -> 31` with zero dropped input frames, and the Host drained normally.
+
+After a ten-second warm-up, the Regional run measured 1,221 reconciliations over 60 seconds: correction P95/P99 `9/10 mm`, maximum `12 mm`, zero corrections above `250 mm`, 1,207 smoothed corrections, zero presentation snaps, final residual `1 mm`, and zero history/input/frame loss. The retained hash-manifest SHA-256 is `496da779c7449f2a6ffb1e59d3a37d99f34dba2ae6f73b40d6f3187569fb2604`; all entries and the `arm64` executable were independently verified. This passes the bounded local macOS composition gate, but it does not establish representative game feel or cross-platform/mobile quality.
 
 ## Next gates
 
 1. Exercise the composed client in representative Android and iOS IL2CPP builds; macOS Mono evidence does not satisfy the mobile AOT/stripping gate.
 2. Retain Windows as a supplemental desktop validation target; the macOS result does not claim Windows compatibility.
-3. Validate WS-28 on the exact macOS Player commit, then measure the chosen smoothing parameters with game-specific physics, animation/camera presentation, and representative visual-quality captures; the engine-neutral integer candidate alone does not close those product gates.
+3. Measure the chosen smoothing parameters with game-specific physics, animation/camera presentation, and representative visual-quality captures; the engine-neutral integer baseline alone does not close those product gates.
 4. Keep the production room default unchanged and keep the published server candidate out of a production environment until the project owner supplies a real Linux target and approves the independent environment-canary and rollback procedure.
 
 Until those gates pass, the implementation is a reusable baseline and not a claim that client prediction tuning, physics prediction, or production rollout is complete.

@@ -2,7 +2,7 @@
 
 Status: Provisional numeric budgets; architectural gates are frozen
 Scenario: one authoritative 64-player/bot room, 60 Hz, release-equivalent builds
-Last updated: 2026-09-02
+Last updated: 2026-09-03
 
 These are go/no-go engineering budgets, not marketing targets. A measurement report must record hardware/device, build SHA, configuration/content hashes, warm-up, duration, sample count, profiler overhead, and percentile method. Results without that context are diagnostic only.
 
@@ -65,11 +65,11 @@ Fragmentation, retransmission, headers, and encryption overhead are included in 
 | Reconnect to authoritative playable state | P95 <= 5 s after transport restoration |
 | Replay critical-state hash | Exact for non-physics vectors; physics fields use versioned tolerances |
 
-The [WS-24 through WS-27 client prediction baseline](client-prediction-baseline.md) provides the bounded, zero-allocation rewind/replay mechanism, recipient-specific server acknowledgement, concrete Unity Fantasy KCP transport, application composition, and bounded correction histogram required to measure these gates. Exact-`main` source `6376265658a26fa07b08fc737c3932d52212314a` passed the reviewed local macOS ARM64 Mono Regional real-client profile with 1,219 reconciliation samples, correction P95/P99 `9/10 mm`, maximum `12 mm`, zero corrections above `250 mm`, and zero history/input/frame loss. This passes the frozen correction magnitude and frequency budgets for the deterministic first-slice movement on that platform. The prior release-equivalent [Battle Host run 33500838422](https://github.com/rayss1/ai-native-unity-framework/actions/runs/33500838422) remains the server replay, Regional/Degraded wire, allocation, capacity, telemetry-outage, and 60-minute soak evidence because WS-27 does not change server, Shared, protocol, or production configuration code.
+The [WS-24 through WS-28 client prediction baseline](client-prediction-baseline.md) provides the bounded, zero-allocation rewind/replay mechanism, recipient-specific server acknowledgement, concrete Unity Fantasy KCP transport, application composition, bounded correction histogram, and presentation-only smoother required to measure these gates. Exact-`main` source `b8d4228c20cd9bf05054a956c5cc168711bfdff9` passed the reviewed local macOS ARM64 Mono Regional profile with 1,221 reconciliation samples, correction P95/P99 `9/10 mm`, maximum `12 mm`, zero corrections above `250 mm`, 1,207 smoothed corrections, zero snaps, final residual `1 mm`, and zero history/input/frame loss. This passes the frozen correction magnitude/frequency and bounded presentation-composition gates for the deterministic first-slice movement on that platform. The prior release-equivalent [Battle Host run 33500838422](https://github.com/rayss1/ai-native-unity-framework/actions/runs/33500838422) remains the server replay, Regional/Degraded wire, allocation, capacity, telemetry-outage, and 60-minute soak evidence because WS-28 does not change server, Shared, protocol, or production configuration code.
 
 The correction numbers are tuning gates, not truth about game feel. If representative movement speed/map scale makes them invalid, change them only with captured traces, a replacement threshold, and no weakening of server authority.
 
-The WS-28 presentation candidate decays visual residuals at or below 250 mm over 100 ms and snaps above that boundary. These are bounded initial presentation parameters, not a relaxation of the correction-frequency budgets above. Simulation accepts authority immediately, and the render-time `Advance` path must remain allocation-free. Representative animation, camera, game-physics, and device captures are still required before treating the parameters as product-quality tuning.
+The WS-28 presentation implementation decays visual residuals at or below 250 mm over 100 ms and snaps above that boundary. These are bounded initial presentation parameters, not a relaxation of the correction-frequency budgets above. Simulation accepts authority immediately, and the render-time `Advance` path remains allocation-free in the frozen tests. Representative animation, camera, game-physics, and device captures are still required before treating the parameters as product-quality tuning.
 
 ## Navigation, content, and telemetry
 
