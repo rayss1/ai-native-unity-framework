@@ -1,4 +1,5 @@
 using AiNative.Protocol.V1;
+using AiNative.Gameplay;
 using AiNative.Realtime;
 using AiNative.Server.Fantasy;
 using AiNative.Server.Protocol;
@@ -9,6 +10,8 @@ namespace AiNative.BattleHost;
 internal sealed class RoomProtocolService(
     FantasyKcpGateway gateway,
     BattleRoomSet rooms,
+    ArenaRoom arenaRoom,
+    BattleGameModeSettings gameMode,
     BattleMetrics metrics,
     BattleReplayCapture replayCapture,
     ILogger<RoomProtocolService> logger) : IAsyncDisposable
@@ -77,8 +80,10 @@ internal sealed class RoomProtocolService(
             {
                 if (connection.Session is { Joined: true } session)
                 {
-                    Snapshot snapshot = _snapshotCache[session.RoomIndex] ??=
-                        rooms[session.RoomIndex].CreateSnapshot(roomTick);
+                    Snapshot snapshot = gameMode.IsArena
+                        ? CreateArenaSnapshot(session, roomTick)
+                        : _snapshotCache[session.RoomIndex] ??=
+                            rooms[session.RoomIndex].CreateSnapshot(roomTick);
                     // Send encodes synchronously before returning, so the room snapshot can carry
                     // one recipient-specific acknowledgement without cloning its 64-player state.
                     snapshot.LastProcessedInputSequence = session.LastInputSequence;
@@ -96,7 +101,7 @@ internal sealed class RoomProtocolService(
     {
         while (gateway.TryAccept(out FantasyKcpConnection? accepted) && accepted is not null)
         {
-            if (_connections.Count >= rooms.Settings.TotalBotCapacity)
+            if (_connections.Count >= gameMode.ConnectionCapacity)
             {
                 accepted.DisposeAsync().AsTask().GetAwaiter().GetResult();
                 metrics.RecordDroppedDiagnostic();
@@ -178,7 +183,18 @@ internal sealed class RoomProtocolService(
         }
 
         int roomIndex = checked((int)requestedRoom - 1);
-        if (!rooms.TryAssignEntity(roomIndex, out int entityIndex))
+        int entityIndex;
+        if (gameMode.IsArena)
+        {
+            if (!arenaRoom.TryJoin(out uint arenaEntityId))
+            {
+                metrics.RecordDroppedDiagnostic();
+                return;
+            }
+
+            entityIndex = checked((int)arenaEntityId - 1);
+        }
+        else if (!rooms.TryAssignEntity(roomIndex, out entityIndex))
         {
             metrics.RecordDroppedDiagnostic();
             return;
@@ -208,12 +224,30 @@ internal sealed class RoomProtocolService(
             return;
         }
 
+        if (gameMode.IsArena)
+        {
+            ArenaInput input = new(
+                command.Sequence,
+                command.RoomTick,
+                command.MoveXMilli,
+                command.MoveYMilli,
+                command.LookYawMilli,
+                command.LookPitchMilli,
+                (ArenaButtons)command.Buttons,
+                (AiNative.Gameplay.ArenaWeaponId)command.WeaponId);
+            if (!arenaRoom.SubmitInput(checked((uint)session.EntityIndex + 1), input))
+            {
+                metrics.RecordDroppedDiagnostic();
+                return;
+            }
+
+            session.LastInputSequence = command.Sequence;
+            return;
+        }
+
         session.LastInputSequence = command.Sequence;
         replayCapture.TryRecordInput(session.RoomIndex, roomTick, session.EntityIndex, frame);
-        rooms[session.RoomIndex].ApplyInput(
-            session.EntityIndex,
-            command.MoveXMilli,
-            command.MoveYMilli);
+        rooms[session.RoomIndex].ApplyInput(session.EntityIndex, command.MoveXMilli, command.MoveYMilli);
     }
 
     private void HandleInputBatch(
@@ -239,6 +273,30 @@ internal sealed class RoomProtocolService(
             }
 
             previousSequence = command.Sequence;
+        }
+
+        if (gameMode.IsArena)
+        {
+            foreach (InputCommand command in batch.Commands)
+            {
+                ArenaInput input = new(
+                    command.Sequence,
+                    command.RoomTick,
+                    command.MoveXMilli,
+                    command.MoveYMilli,
+                    command.LookYawMilli,
+                    command.LookPitchMilli,
+                    (ArenaButtons)command.Buttons,
+                    (AiNative.Gameplay.ArenaWeaponId)command.WeaponId);
+                if (!arenaRoom.SubmitInput(checked((uint)session.EntityIndex + 1), input))
+                {
+                    metrics.RecordDroppedDiagnostic();
+                    return;
+                }
+            }
+
+            session.LastInputSequence = previousSequence;
+            return;
         }
 
         replayCapture.TryRecordInput(session.RoomIndex, roomTick, session.EntityIndex, frame);
@@ -270,7 +328,9 @@ internal sealed class RoomProtocolService(
         session.Connection = connection;
         session.DisconnectedAtTick = null;
         connection.Session = session;
-        Snapshot resumeSnapshot = rooms[session.RoomIndex].CreateSnapshot(roomTick);
+        Snapshot resumeSnapshot = gameMode.IsArena
+            ? CreateArenaSnapshot(session, roomTick)
+            : rooms[session.RoomIndex].CreateSnapshot(roomTick);
         resumeSnapshot.LastProcessedInputSequence = session.LastInputSequence;
         Send(connection, MessageId.ReconnectResponse, new ReconnectResponse
         {
@@ -313,6 +373,10 @@ internal sealed class RoomProtocolService(
         {
             session.DisconnectedAtTick = roomTick;
             connection.Session = null;
+            if (gameMode.IsArena)
+            {
+                // Keep the logical slot reserved during reconnect retention.
+            }
         }
 
         else if (connection.Session is { } unjoined)
@@ -335,7 +399,14 @@ internal sealed class RoomProtocolService(
 
             if (session.EntityIndex >= 0)
             {
-                rooms.ReleaseEntity(session.RoomIndex, session.EntityIndex);
+                if (gameMode.IsArena)
+                {
+                    arenaRoom.Leave(checked((uint)session.EntityIndex + 1));
+                }
+                else
+                {
+                    rooms.ReleaseEntity(session.RoomIndex, session.EntityIndex);
+                }
             }
 
             _sessions.Remove(sessionId);
@@ -381,5 +452,65 @@ internal sealed class RoomProtocolService(
         public bool Joined { get; set; }
 
         public ulong? DisconnectedAtTick { get; set; }
+    }
+
+    private Snapshot CreateArenaSnapshot(LogicalSession session, ulong roomTick)
+    {
+        Snapshot snapshot = new()
+        {
+            ProtocolMajor = 1,
+            RoomTick = roomTick,
+            BaselineTick = roomTick > 3 ? roomTick - 3 : 0,
+            StateHash = arenaRoom.ComputeStateHash(),
+            LastProcessedInputSequence = session.LastInputSequence,
+            MatchPhase = (AiNative.Protocol.V1.ArenaMatchPhase)(int)arenaRoom.Phase,
+            RemainingTicks = checked((uint)Math.Min(uint.MaxValue, arenaRoom.RemainingTicks)),
+            LeaderEntityId = arenaRoom.LeaderEntityId,
+        };
+
+        for (uint entityId = 1; entityId <= ArenaRoom.MaxPlayers; entityId++)
+        {
+            if (!arenaRoom.TryGetPlayer(entityId, out ArenaPlayerState state))
+            {
+                continue;
+            }
+
+            snapshot.Players.Add(new PlayerState
+            {
+                EntityId = entityId,
+                PositionXMilli = state.PositionXMillimetres,
+                PositionYMilli = state.PositionYMillimetres,
+                PositionZMilli = state.PositionZMillimetres,
+                YawMillidegrees = state.YawMillidegrees,
+                PitchMillidegrees = state.PitchMillidegrees,
+                Health = checked((uint)Math.Max(0, state.Health)),
+                VelocityXMilliPerSecond = state.VelocityXMillimetresPerSecond,
+                VelocityYMilliPerSecond = state.VelocityYMillimetresPerSecond,
+                VelocityZMilliPerSecond = state.VelocityZMillimetresPerSecond,
+                WeaponId = (uint)state.Weapon,
+                Armor = checked((uint)Math.Max(0, state.Armor)),
+                Alive = state.Alive,
+                Kills = state.Kills,
+            });
+        }
+
+        Span<ArenaPickupState> pickups = stackalloc ArenaPickupState[8];
+        int pickupCount = arenaRoom.CopyPickups(pickups);
+        for (int index = 0; index < pickupCount; index++)
+        {
+            ArenaPickupState pickup = pickups[index];
+            snapshot.Pickups.Add(new PickupState
+            {
+                PickupId = checked((uint)pickup.Id),
+                PickupType = (AiNative.Protocol.V1.ArenaPickupType)(int)pickup.Type,
+                PositionXMilli = pickup.PositionXMillimetres,
+                PositionYMilli = pickup.PositionYMillimetres,
+                PositionZMilli = pickup.PositionZMillimetres,
+                Active = pickup.Active,
+                RespawnTick = pickup.RespawnTick,
+            });
+        }
+
+        return snapshot;
     }
 }

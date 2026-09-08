@@ -107,6 +107,11 @@ namespace AiNative.Client.Application
         private ulong _lastReceivedTick;
         private uint _lastAcknowledgedSequence;
         private long _droppedInputFrames;
+        private ArenaPlayerState _arenaState;
+        private ArenaMatchPhase _arenaPhase;
+        private uint _arenaRemainingTicks;
+        private uint _arenaLeaderEntityId;
+        private bool _hasArenaState;
 
         public BattleClientSession(
             string host,
@@ -151,6 +156,16 @@ namespace AiNative.Client.Application
         public uint LastAcknowledgedSequence => _lastAcknowledgedSequence;
 
         public long DroppedInputFrames => _droppedInputFrames;
+
+        public ArenaMatchPhase ArenaPhase => _arenaPhase;
+        public uint ArenaRemainingTicks => _arenaRemainingTicks;
+        public uint ArenaLeaderEntityId => _arenaLeaderEntityId;
+
+        public bool TryGetArenaState(out ArenaPlayerState state)
+        {
+            state = _arenaState;
+            return _hasArenaState;
+        }
 
         public int QueuedInputFrames => _inputRing.Count;
 
@@ -284,6 +299,53 @@ namespace AiNative.Client.Application
             }
 
             return result.Status;
+        }
+
+        /// <summary>Queues an arena command while advancing the existing prediction history.</summary>
+        public PredictionPrepareStatus PredictAndQueueArenaInput(
+            ulong roomTick,
+            int moveXMilli,
+            int moveZMilli,
+            int lookYawMilli,
+            int lookPitchMilli,
+            ArenaButtons buttons,
+            ArenaWeaponId weapon)
+        {
+            if (_disposed) return PredictionPrepareStatus.Disposed;
+            if (State != BattleClientState.Active || _prediction is null || !_prediction.IsInitialized)
+            {
+                return PredictionPrepareStatus.NotInitialized;
+            }
+
+            if (!_inputRing.TryGetWriteBuffer(out byte[] buffer))
+            {
+                _droppedInputFrames++;
+                return PredictionPrepareStatus.BufferTooSmall;
+            }
+
+            PredictionPrepareResult predicted = _prediction.PrepareInput(
+                roomTick, moveXMilli, moveZMilli, buffer);
+            if (predicted.Status != PredictionPrepareStatus.Prepared)
+            {
+                return predicted.Status;
+            }
+
+            ArenaInput arenaInput = new(
+                _prediction.LastPreparedInputSequence,
+                roomTick,
+                moveXMilli,
+                moveZMilli,
+                lookYawMilli,
+                lookPitchMilli,
+                buttons,
+                weapon);
+            if (!ArenaClientProtocolV1.TryEncodeInput(arenaInput, buffer, out int writtenBytes))
+            {
+                return PredictionPrepareStatus.BufferTooSmall;
+            }
+
+            _inputRing.CommitWrite(writtenBytes);
+            return PredictionPrepareStatus.Prepared;
         }
 
         public void RequestReconnect()
@@ -549,6 +611,14 @@ namespace AiNative.Client.Application
 
         private void ApplySnapshot(ReadOnlySpan<byte> frame, in ReceivedPacket packet)
         {
+            if (ArenaClientProtocolV1.TryDecodeSnapshot(frame, _entityId, out DecodedArenaSnapshot arena))
+            {
+                _arenaState = arena.State;
+                _arenaPhase = arena.Phase;
+                _arenaRemainingTicks = arena.RemainingTicks;
+                _arenaLeaderEntityId = arena.LeaderEntityId;
+                _hasArenaState = true;
+            }
             SnapshotApplyResult applied = _prediction.ApplyPacket(frame, packet);
             if (applied.Status is SnapshotApplyStatus.Initialized or SnapshotApplyStatus.Reconciled)
             {

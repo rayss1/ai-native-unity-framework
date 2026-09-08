@@ -61,6 +61,73 @@ public sealed class ProtocolCompatibilityTests
     }
 
     [Test]
+    public void ArenaFieldsAreAdditiveAndRoundTrip()
+    {
+        InputCommand input = new()
+        {
+            RoomTick = 12,
+            Sequence = 4,
+            WeaponId = (uint)ArenaWeaponId.ArenaWeaponRocket,
+            LookYawMilli = 1250,
+            LookPitchMilli = -400,
+            Buttons = (uint)(ArenaButton.Fire | ArenaButton.Jump),
+        };
+        Snapshot snapshot = new()
+        {
+            ProtocolMajor = 1,
+            MatchPhase = ArenaMatchPhase.ArenaMatchActive,
+            RemainingTicks = 36000,
+            LeaderEntityId = 2,
+        };
+        snapshot.Players.Add(new PlayerState
+        {
+            EntityId = 2,
+            PositionYMilli = 1200,
+            VelocityYMilliPerSecond = 5500,
+            WeaponId = (uint)ArenaWeaponId.ArenaWeaponRocket,
+            Health = 75,
+            Armor = 25,
+            Alive = true,
+            Kills = 3,
+        });
+
+        InputCommand parsedInput = InputCommand.Parser.ParseFrom(input.ToByteArray());
+        Snapshot parsedSnapshot = Snapshot.Parser.ParseFrom(snapshot.ToByteArray());
+
+        Assert.That(parsedInput.WeaponId, Is.EqualTo((uint)ArenaWeaponId.ArenaWeaponRocket));
+        Assert.That(parsedInput.LookYawMilli, Is.EqualTo(1250));
+        Assert.That(parsedInput.LookPitchMilli, Is.EqualTo(-400));
+        Assert.That(parsedSnapshot.MatchPhase, Is.EqualTo(ArenaMatchPhase.ArenaMatchActive));
+        Assert.That(parsedSnapshot.Players[0].VelocityYMilliPerSecond, Is.EqualTo(5500));
+        Assert.That(parsedSnapshot.Players[0].Kills, Is.EqualTo(3));
+    }
+
+    [Test]
+    public void ReliableCombatEventRoundTripsWithoutChangingLegacyPayload()
+    {
+        ReliableEvent legacy = new() { RoomTick = 8, Sequence = 2, EventType = 7, Payload = ByteString.CopyFromUtf8("legacy") };
+        ReliableEvent current = new(legacy)
+        {
+            CombatEvent = new ArenaCombatEvent
+            {
+                EventType = ArenaCombatEventType.ArenaEventKill,
+                EventTick = 8,
+                SourceEntityId = 1,
+                TargetEntityId = 2,
+                WeaponId = ArenaWeaponId.ArenaWeaponMachinegun,
+                Damage = 20,
+            },
+        };
+
+        ReliableEvent parsed = ReliableEvent.Parser.ParseFrom(current.ToByteArray());
+
+        Assert.That(parsed.Payload.ToStringUtf8(), Is.EqualTo("legacy"));
+        Assert.That(parsed.CombatEvent.EventType, Is.EqualTo(ArenaCombatEventType.ArenaEventKill));
+        Assert.That(parsed.CombatEvent.SourceEntityId, Is.EqualTo(1));
+        Assert.That(parsed.CombatEvent.TargetEntityId, Is.EqualTo(2));
+    }
+
+    [Test]
     public void MalformedInputIsRejected()
     {
         Assert.That(

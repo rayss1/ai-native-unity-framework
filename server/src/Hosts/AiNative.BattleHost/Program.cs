@@ -16,6 +16,7 @@ if (args is ["--verify-replay", string replayPath])
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 bool fantasyEnabled = builder.Configuration.GetValue("AINATIVE_FANTASY_ENABLED", true);
 int outerKcpMtu = builder.Configuration.GetValue("AINATIVE_FANTASY_OUTER_KCP_MTU", 1150);
+BattleGameModeSettings gameMode = BattleGameModeSettings.Create(builder.Configuration);
 BattleHostCapacitySettings capacitySettings = BattleHostCapacitySettings.Create(builder.Configuration);
 BattleTelemetrySettings telemetrySettings = BattleTelemetrySettings.Create(
     builder.Configuration,
@@ -23,8 +24,10 @@ BattleTelemetrySettings telemetrySettings = BattleTelemetrySettings.Create(
     capacitySettings);
 TelemetryExportHealth telemetryHealth = new(telemetrySettings.Endpoint is not null);
 builder.Services.AddSingleton(new RuntimeReadiness(networkRequired: fantasyEnabled));
+builder.Services.AddSingleton(gameMode);
 builder.Services.AddSingleton(capacitySettings);
 builder.Services.AddSingleton<BattleRoomSet>();
+builder.Services.AddSingleton<ArenaRoom>();
 builder.Services.AddSingleton(telemetrySettings);
 builder.Services.AddSingleton(telemetryHealth);
 builder.Services.AddSingleton<BattleMetrics>();
