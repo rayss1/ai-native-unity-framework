@@ -120,7 +120,7 @@ jq -e '
   and .outerKcpMtu == 1150
 ' "$outage_load" >/dev/null
 
-jq -e -n \
+if ! jq -e -n \
   --slurpfile baseline "$baseline_host" \
   --slurpfile outage "$outage_host" '
     ($baseline[0].sourceCommit == $outage[0].sourceCommit)
@@ -132,8 +132,23 @@ jq -e -n \
     and ($baseline[0].telemetryTraceExportAttempts == 0)
     and ($baseline[0].telemetryTraceExportFailures == 0)
     and ($baseline[0].telemetryTraceRecordsDropped == 0)
-    and (($outage[0].tickP99Milliseconds - $baseline[0].tickP99Milliseconds) < 0.25)
-  ' >/dev/null
+  ' >/dev/null; then
+  echo "Telemetry comparison failed: source/Fantasy/protocol identities differ or the disabled exporter recorded activity." >&2
+  exit 1
+fi
+
+if ! jq -e -n \
+  --slurpfile baseline "$baseline_host" \
+  --slurpfile outage "$outage_host" '
+    ($outage[0].tickP99Milliseconds - $baseline[0].tickP99Milliseconds) < 0.25
+  ' >/dev/null; then
+  jq -r -n \
+    --slurpfile baseline "$baseline_host" \
+    --slurpfile outage "$outage_host" '
+      "Telemetry Tick P99 increment failed: baseline=\($baseline[0].tickP99Milliseconds) ms, outage=\($outage[0].tickP99Milliseconds) ms, increment=\($outage[0].tickP99Milliseconds - $baseline[0].tickP99Milliseconds) ms; required < 0.25 ms."
+    ' >&2
+  exit 1
+fi
 
 mkdir -p "$(dirname "$output_file")"
 jq -n \

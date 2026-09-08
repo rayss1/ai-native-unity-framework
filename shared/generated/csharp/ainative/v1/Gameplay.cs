@@ -31,47 +31,85 @@ namespace AiNative.Protocol.V1 {
             "IkQKD0pvaW5Sb29tUmVxdWVzdBISCgpzZXNzaW9uX2lkGAEgASgGEhYKDnJl",
             "cXVlc3RlZF9yb29tGAIgASgNSgUIZBDIASJQChBKb2luUm9vbVJlc3BvbnNl",
             "Eg8KB3Jvb21faWQYASABKA0SEQoJZW50aXR5X2lkGAIgASgNEhEKCXRpY2tf",
-            "cmF0ZRgDIAEoDUoFCGQQyAEikQEKDElucHV0Q29tbWFuZBIRCglyb29tX3Rp",
+            "cmF0ZRgDIAEoDUoFCGQQyAEi1gEKDElucHV0Q29tbWFuZBIRCglyb29tX3Rp",
             "Y2sYASABKAYSEAoIc2VxdWVuY2UYAiABKA0SFAoMbW92ZV94X21pbGxpGAMg",
             "ASgREhQKDG1vdmVfeV9taWxsaRgEIAEoERIYChB5YXdfbWlsbGlkZWdyZWVz",
-            "GAUgASgREg8KB2J1dHRvbnMYBiABKA1KBQhkEMgBIkAKCklucHV0QmF0Y2gS",
-            "KwoIY29tbWFuZHMYASADKAsyGS5haW5hdGl2ZS52MS5JbnB1dENvbW1hbmRK",
-            "BQhkEMgBIp8BCgtQbGF5ZXJTdGF0ZRIRCgllbnRpdHlfaWQYASABKA0SGAoQ",
-            "cG9zaXRpb25feF9taWxsaRgCIAEoERIYChBwb3NpdGlvbl95X21pbGxpGAMg",
-            "ASgREhgKEHBvc2l0aW9uX3pfbWlsbGkYBCABKBESGAoQeWF3X21pbGxpZGVn",
-            "cmVlcxgFIAEoERIOCgZoZWFsdGgYBiABKA1KBQhkEMgBIrkBCghTbmFwc2hv",
-            "dBIWCg5wcm90b2NvbF9tYWpvchgBIAEoDRIRCglyb29tX3RpY2sYAiABKAYS",
-            "FQoNYmFzZWxpbmVfdGljaxgDIAEoBhIpCgdwbGF5ZXJzGAQgAygLMhguYWlu",
-            "YXRpdmUudjEuUGxheWVyU3RhdGUSEgoKc3RhdGVfaGFzaBgFIAEoBhIlCh1s",
-            "YXN0X3Byb2Nlc3NlZF9pbnB1dF9zZXF1ZW5jZRgGIAEoDUoFCGQQyAEiYAoN",
-            "UmVsaWFibGVFdmVudBIRCglyb29tX3RpY2sYASABKAYSEAoIc2VxdWVuY2UY",
-            "AiABKA0SEgoKZXZlbnRfdHlwZRgDIAEoDRIPCgdwYXlsb2FkGAQgASgMSgUI",
-            "ZBDIASJjChBSZWNvbm5lY3RSZXF1ZXN0EhIKCnNlc3Npb25faWQYASABKAYS",
-            "GAoQY29ubmVjdGlvbl9lcG9jaBgCIAEoDRIaChJsYXN0X3JlY2VpdmVkX3Rp",
-            "Y2sYAyABKAZKBQhkEMgBInIKEVJlY29ubmVjdFJlc3BvbnNlEhgKEGNvbm5l",
-            "Y3Rpb25fZXBvY2gYASABKA0SEwoLcmVzdW1lX3RpY2sYAiABKAYSJwoIc25h",
-            "cHNob3QYAyABKAsyFS5haW5hdGl2ZS52MS5TbmFwc2hvdEoFCGQQyAEq6gIK",
-            "CU1lc3NhZ2VJZBIaChZNRVNTQUdFX0lEX1VOU1BFQ0lGSUVEEAASHQoYTUVT",
-            "U0FHRV9JRF9MT0dJTl9SRVFVRVNUEOgHEh4KGU1FU1NBR0VfSURfTE9HSU5f",
-            "UkVTUE9OU0UQ6QcSIQocTUVTU0FHRV9JRF9KT0lOX1JPT01fUkVRVUVTVBDy",
-            "BxIiCh1NRVNTQUdFX0lEX0pPSU5fUk9PTV9SRVNQT05TRRDzBxIdChhNRVNT",
-            "QUdFX0lEX0lOUFVUX0NPTU1BTkQQzAgSGAoTTUVTU0FHRV9JRF9TTkFQU0hP",
-            "VBDNCBIeChlNRVNTQUdFX0lEX1JFTElBQkxFX0VWRU5UEM4IEhsKFk1FU1NB",
-            "R0VfSURfSU5QVVRfQkFUQ0gQzwgSIQocTUVTU0FHRV9JRF9SRUNPTk5FQ1Rf",
-            "UkVRVUVTVBCwCRIiCh1NRVNTQUdFX0lEX1JFQ09OTkVDVF9SRVNQT05TRRCx",
-            "CUIXqgIUQWlOYXRpdmUuUHJvdG9jb2wuVjFiBnByb3RvMw=="));
+            "GAUgASgREg8KB2J1dHRvbnMYBiABKA0SEQoJd2VhcG9uX2lkGAcgASgNEhYK",
+            "Dmxvb2tfeWF3X21pbGxpGAggASgREhgKEGxvb2tfcGl0Y2hfbWlsbGkYCSAB",
+            "KBFKBQhkEMgBIkAKCklucHV0QmF0Y2gSKwoIY29tbWFuZHMYASADKAsyGS5h",
+            "aW5hdGl2ZS52MS5JbnB1dENvbW1hbmRKBQhkEMgBIuoCCgtQbGF5ZXJTdGF0",
+            "ZRIRCgllbnRpdHlfaWQYASABKA0SGAoQcG9zaXRpb25feF9taWxsaRgCIAEo",
+            "ERIYChBwb3NpdGlvbl95X21pbGxpGAMgASgREhgKEHBvc2l0aW9uX3pfbWls",
+            "bGkYBCABKBESGAoQeWF3X21pbGxpZGVncmVlcxgFIAEoERIOCgZoZWFsdGgY",
+            "BiABKA0SIwobdmVsb2NpdHlfeF9taWxsaV9wZXJfc2Vjb25kGAcgASgREiMK",
+            "G3ZlbG9jaXR5X3lfbWlsbGlfcGVyX3NlY29uZBgIIAEoERIjCht2ZWxvY2l0",
+            "eV96X21pbGxpX3Blcl9zZWNvbmQYCSABKBESEQoJd2VhcG9uX2lkGAogASgN",
+            "Eg0KBWFybW9yGAsgASgNEg0KBWFsaXZlGAwgASgIEg0KBWtpbGxzGA0gASgN",
+            "EhoKEnBpdGNoX21pbGxpZGVncmVlcxgOIAEoEUoFCGQQyAEizgEKC1BpY2t1",
+            "cFN0YXRlEhEKCXBpY2t1cF9pZBgBIAEoDRIxCgtwaWNrdXBfdHlwZRgCIAEo",
+            "DjIcLmFpbmF0aXZlLnYxLkFyZW5hUGlja3VwVHlwZRIYChBwb3NpdGlvbl94",
+            "X21pbGxpGAMgASgREhgKEHBvc2l0aW9uX3lfbWlsbGkYBCABKBESGAoQcG9z",
+            "aXRpb25fel9taWxsaRgFIAEoERIOCgZhY3RpdmUYBiABKAgSFAoMcmVzcGF3",
+            "bl90aWNrGAcgASgGSgUIZBDIASLKAgoIU25hcHNob3QSFgoOcHJvdG9jb2xf",
+            "bWFqb3IYASABKA0SEQoJcm9vbV90aWNrGAIgASgGEhUKDWJhc2VsaW5lX3Rp",
+            "Y2sYAyABKAYSKQoHcGxheWVycxgEIAMoCzIYLmFpbmF0aXZlLnYxLlBsYXll",
+            "clN0YXRlEhIKCnN0YXRlX2hhc2gYBSABKAYSJQodbGFzdF9wcm9jZXNzZWRf",
+            "aW5wdXRfc2VxdWVuY2UYBiABKA0SMQoLbWF0Y2hfcGhhc2UYByABKA4yHC5h",
+            "aW5hdGl2ZS52MS5BcmVuYU1hdGNoUGhhc2USFwoPcmVtYWluaW5nX3RpY2tz",
+            "GAggASgNEhgKEGxlYWRlcl9lbnRpdHlfaWQYCSABKA0SKQoHcGlja3VwcxgK",
+            "IAMoCzIYLmFpbmF0aXZlLnYxLlBpY2t1cFN0YXRlSgUIZBDIASKlAgoQQXJl",
+            "bmFDb21iYXRFdmVudBI1CgpldmVudF90eXBlGAEgASgOMiEuYWluYXRpdmUu",
+            "djEuQXJlbmFDb21iYXRFdmVudFR5cGUSEgoKZXZlbnRfdGljaxgCIAEoBhIY",
+            "ChBzb3VyY2VfZW50aXR5X2lkGAMgASgNEhgKEHRhcmdldF9lbnRpdHlfaWQY",
+            "BCABKA0SLQoJd2VhcG9uX2lkGAUgASgOMhouYWluYXRpdmUudjEuQXJlbmFX",
+            "ZWFwb25JZBIOCgZkYW1hZ2UYBiABKA0SGAoQcG9zaXRpb25feF9taWxsaRgH",
+            "IAEoERIYChBwb3NpdGlvbl95X21pbGxpGAggASgREhgKEHBvc2l0aW9uX3pf",
+            "bWlsbGkYCSABKBFKBQhkEMgBIpUBCg1SZWxpYWJsZUV2ZW50EhEKCXJvb21f",
+            "dGljaxgBIAEoBhIQCghzZXF1ZW5jZRgCIAEoDRISCgpldmVudF90eXBlGAMg",
+            "ASgNEg8KB3BheWxvYWQYBCABKAwSMwoMY29tYmF0X2V2ZW50GAUgASgLMh0u",
+            "YWluYXRpdmUudjEuQXJlbmFDb21iYXRFdmVudEoFCGQQyAEiYwoQUmVjb25u",
+            "ZWN0UmVxdWVzdBISCgpzZXNzaW9uX2lkGAEgASgGEhgKEGNvbm5lY3Rpb25f",
+            "ZXBvY2gYAiABKA0SGgoSbGFzdF9yZWNlaXZlZF90aWNrGAMgASgGSgUIZBDI",
+            "ASJyChFSZWNvbm5lY3RSZXNwb25zZRIYChBjb25uZWN0aW9uX2Vwb2NoGAEg",
+            "ASgNEhMKC3Jlc3VtZV90aWNrGAIgASgGEicKCHNuYXBzaG90GAMgASgLMhUu",
+            "YWluYXRpdmUudjEuU25hcHNob3RKBQhkEMgBKuoCCglNZXNzYWdlSWQSGgoW",
+            "TUVTU0FHRV9JRF9VTlNQRUNJRklFRBAAEh0KGE1FU1NBR0VfSURfTE9HSU5f",
+            "UkVRVUVTVBDoBxIeChlNRVNTQUdFX0lEX0xPR0lOX1JFU1BPTlNFEOkHEiEK",
+            "HE1FU1NBR0VfSURfSk9JTl9ST09NX1JFUVVFU1QQ8gcSIgodTUVTU0FHRV9J",
+            "RF9KT0lOX1JPT01fUkVTUE9OU0UQ8wcSHQoYTUVTU0FHRV9JRF9JTlBVVF9D",
+            "T01NQU5EEMwIEhgKE01FU1NBR0VfSURfU05BUFNIT1QQzQgSHgoZTUVTU0FH",
+            "RV9JRF9SRUxJQUJMRV9FVkVOVBDOCBIbChZNRVNTQUdFX0lEX0lOUFVUX0JB",
+            "VENIEM8IEiEKHE1FU1NBR0VfSURfUkVDT05ORUNUX1JFUVVFU1QQsAkSIgod",
+            "TUVTU0FHRV9JRF9SRUNPTk5FQ1RfUkVTUE9OU0UQsQkqqwEKC0FyZW5hQnV0",
+            "dG9uEhUKEUFSRU5BX0JVVFRPTl9OT05FEAASFQoRQVJFTkFfQlVUVE9OX0ZJ",
+            "UkUQARIVChFBUkVOQV9CVVRUT05fSlVNUBACEhcKE0FSRU5BX0JVVFRPTl9S",
+            "RUxPQUQQBBIcChhBUkVOQV9CVVRUT05fTkVYVF9XRUFQT04QCBIgChxBUkVO",
+            "QV9CVVRUT05fUFJFVklPVVNfV0VBUE9OEBAqdgoNQXJlbmFXZWFwb25JZBIV",
+            "ChFBUkVOQV9XRUFQT05fTk9ORRAAEhsKF0FSRU5BX1dFQVBPTl9NQUNISU5F",
+            "R1VOEAESGAoUQVJFTkFfV0VBUE9OX1NIT1RHVU4QAhIXChNBUkVOQV9XRUFQ",
+            "T05fUk9DS0VUEAMqXAoPQXJlbmFNYXRjaFBoYXNlEhcKE0FSRU5BX01BVENI",
+            "X1dBSVRJTkcQABIWChJBUkVOQV9NQVRDSF9BQ1RJVkUQARIYChRBUkVOQV9N",
+            "QVRDSF9GSU5JU0hFRBACKlwKD0FyZW5hUGlja3VwVHlwZRIYChRBUkVOQV9Q",
+            "SUNLVVBfVU5LTk9XThAAEhcKE0FSRU5BX1BJQ0tVUF9IRUFMVEgQARIWChJB",
+            "UkVOQV9QSUNLVVBfQVJNT1IQAiqnAQoUQXJlbmFDb21iYXRFdmVudFR5cGUS",
+            "FAoQQVJFTkFfRVZFTlRfRklSRRAAEhMKD0FSRU5BX0VWRU5UX0hJVBABEhQK",
+            "EEFSRU5BX0VWRU5UX0tJTEwQAhIXChNBUkVOQV9FVkVOVF9SRVNQQVdOEAMS",
+            "FgoSQVJFTkFfRVZFTlRfUElDS1VQEAQSHQoZQVJFTkFfRVZFTlRfV0VBUE9O",
+            "X1NXSVRDSBAFQheqAhRBaU5hdGl2ZS5Qcm90b2NvbC5WMWIGcHJvdG8z"));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { },
-          new pbr::GeneratedClrTypeInfo(new[] {typeof(global::AiNative.Protocol.V1.MessageId), }, null, new pbr::GeneratedClrTypeInfo[] {
+          new pbr::GeneratedClrTypeInfo(new[] {typeof(global::AiNative.Protocol.V1.MessageId), typeof(global::AiNative.Protocol.V1.ArenaButton), typeof(global::AiNative.Protocol.V1.ArenaWeaponId), typeof(global::AiNative.Protocol.V1.ArenaMatchPhase), typeof(global::AiNative.Protocol.V1.ArenaPickupType), typeof(global::AiNative.Protocol.V1.ArenaCombatEventType), }, null, new pbr::GeneratedClrTypeInfo[] {
             new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.V1.LoginRequest), global::AiNative.Protocol.V1.LoginRequest.Parser, new[]{ "ProtocolMajor", "ClientBuild" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.V1.LoginResponse), global::AiNative.Protocol.V1.LoginResponse.Parser, new[]{ "SessionId", "ConnectionEpoch" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.V1.JoinRoomRequest), global::AiNative.Protocol.V1.JoinRoomRequest.Parser, new[]{ "SessionId", "RequestedRoom" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.V1.JoinRoomResponse), global::AiNative.Protocol.V1.JoinRoomResponse.Parser, new[]{ "RoomId", "EntityId", "TickRate" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.V1.InputCommand), global::AiNative.Protocol.V1.InputCommand.Parser, new[]{ "RoomTick", "Sequence", "MoveXMilli", "MoveYMilli", "YawMillidegrees", "Buttons" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.V1.InputCommand), global::AiNative.Protocol.V1.InputCommand.Parser, new[]{ "RoomTick", "Sequence", "MoveXMilli", "MoveYMilli", "YawMillidegrees", "Buttons", "WeaponId", "LookYawMilli", "LookPitchMilli" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.V1.InputBatch), global::AiNative.Protocol.V1.InputBatch.Parser, new[]{ "Commands" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.V1.PlayerState), global::AiNative.Protocol.V1.PlayerState.Parser, new[]{ "EntityId", "PositionXMilli", "PositionYMilli", "PositionZMilli", "YawMillidegrees", "Health" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.V1.Snapshot), global::AiNative.Protocol.V1.Snapshot.Parser, new[]{ "ProtocolMajor", "RoomTick", "BaselineTick", "Players", "StateHash", "LastProcessedInputSequence" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.V1.ReliableEvent), global::AiNative.Protocol.V1.ReliableEvent.Parser, new[]{ "RoomTick", "Sequence", "EventType", "Payload" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.V1.PlayerState), global::AiNative.Protocol.V1.PlayerState.Parser, new[]{ "EntityId", "PositionXMilli", "PositionYMilli", "PositionZMilli", "YawMillidegrees", "Health", "VelocityXMilliPerSecond", "VelocityYMilliPerSecond", "VelocityZMilliPerSecond", "WeaponId", "Armor", "Alive", "Kills", "PitchMillidegrees" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.V1.PickupState), global::AiNative.Protocol.V1.PickupState.Parser, new[]{ "PickupId", "PickupType", "PositionXMilli", "PositionYMilli", "PositionZMilli", "Active", "RespawnTick" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.V1.Snapshot), global::AiNative.Protocol.V1.Snapshot.Parser, new[]{ "ProtocolMajor", "RoomTick", "BaselineTick", "Players", "StateHash", "LastProcessedInputSequence", "MatchPhase", "RemainingTicks", "LeaderEntityId", "Pickups" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.V1.ArenaCombatEvent), global::AiNative.Protocol.V1.ArenaCombatEvent.Parser, new[]{ "EventType", "EventTick", "SourceEntityId", "TargetEntityId", "WeaponId", "Damage", "PositionXMilli", "PositionYMilli", "PositionZMilli" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.V1.ReliableEvent), global::AiNative.Protocol.V1.ReliableEvent.Parser, new[]{ "RoomTick", "Sequence", "EventType", "Payload", "CombatEvent" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.V1.ReconnectRequest), global::AiNative.Protocol.V1.ReconnectRequest.Parser, new[]{ "SessionId", "ConnectionEpoch", "LastReceivedTick" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.V1.ReconnectResponse), global::AiNative.Protocol.V1.ReconnectResponse.Parser, new[]{ "ConnectionEpoch", "ResumeTick", "Snapshot" }, null, null, null, null)
           }));
@@ -92,6 +130,43 @@ namespace AiNative.Protocol.V1 {
     [pbr::OriginalName("MESSAGE_ID_INPUT_BATCH")] InputBatch = 1103,
     [pbr::OriginalName("MESSAGE_ID_RECONNECT_REQUEST")] ReconnectRequest = 1200,
     [pbr::OriginalName("MESSAGE_ID_RECONNECT_RESPONSE")] ReconnectResponse = 1201,
+  }
+
+  public enum ArenaButton {
+    [pbr::OriginalName("ARENA_BUTTON_NONE")] None = 0,
+    [pbr::OriginalName("ARENA_BUTTON_FIRE")] Fire = 1,
+    [pbr::OriginalName("ARENA_BUTTON_JUMP")] Jump = 2,
+    [pbr::OriginalName("ARENA_BUTTON_RELOAD")] Reload = 4,
+    [pbr::OriginalName("ARENA_BUTTON_NEXT_WEAPON")] NextWeapon = 8,
+    [pbr::OriginalName("ARENA_BUTTON_PREVIOUS_WEAPON")] PreviousWeapon = 16,
+  }
+
+  public enum ArenaWeaponId {
+    [pbr::OriginalName("ARENA_WEAPON_NONE")] ArenaWeaponNone = 0,
+    [pbr::OriginalName("ARENA_WEAPON_MACHINEGUN")] ArenaWeaponMachinegun = 1,
+    [pbr::OriginalName("ARENA_WEAPON_SHOTGUN")] ArenaWeaponShotgun = 2,
+    [pbr::OriginalName("ARENA_WEAPON_ROCKET")] ArenaWeaponRocket = 3,
+  }
+
+  public enum ArenaMatchPhase {
+    [pbr::OriginalName("ARENA_MATCH_WAITING")] ArenaMatchWaiting = 0,
+    [pbr::OriginalName("ARENA_MATCH_ACTIVE")] ArenaMatchActive = 1,
+    [pbr::OriginalName("ARENA_MATCH_FINISHED")] ArenaMatchFinished = 2,
+  }
+
+  public enum ArenaPickupType {
+    [pbr::OriginalName("ARENA_PICKUP_UNKNOWN")] ArenaPickupUnknown = 0,
+    [pbr::OriginalName("ARENA_PICKUP_HEALTH")] ArenaPickupHealth = 1,
+    [pbr::OriginalName("ARENA_PICKUP_ARMOR")] ArenaPickupArmor = 2,
+  }
+
+  public enum ArenaCombatEventType {
+    [pbr::OriginalName("ARENA_EVENT_FIRE")] ArenaEventFire = 0,
+    [pbr::OriginalName("ARENA_EVENT_HIT")] ArenaEventHit = 1,
+    [pbr::OriginalName("ARENA_EVENT_KILL")] ArenaEventKill = 2,
+    [pbr::OriginalName("ARENA_EVENT_RESPAWN")] ArenaEventRespawn = 3,
+    [pbr::OriginalName("ARENA_EVENT_PICKUP")] ArenaEventPickup = 4,
+    [pbr::OriginalName("ARENA_EVENT_WEAPON_SWITCH")] ArenaEventWeaponSwitch = 5,
   }
 
   #endregion
@@ -1115,6 +1190,9 @@ namespace AiNative.Protocol.V1 {
       moveYMilli_ = other.moveYMilli_;
       yawMillidegrees_ = other.yawMillidegrees_;
       buttons_ = other.buttons_;
+      weaponId_ = other.weaponId_;
+      lookYawMilli_ = other.lookYawMilli_;
+      lookPitchMilli_ = other.lookPitchMilli_;
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
     }
 
@@ -1196,6 +1274,42 @@ namespace AiNative.Protocol.V1 {
       }
     }
 
+    /// <summary>Field number for the "weapon_id" field.</summary>
+    public const int WeaponIdFieldNumber = 7;
+    private uint weaponId_;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public uint WeaponId {
+      get { return weaponId_; }
+      set {
+        weaponId_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "look_yaw_milli" field.</summary>
+    public const int LookYawMilliFieldNumber = 8;
+    private int lookYawMilli_;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public int LookYawMilli {
+      get { return lookYawMilli_; }
+      set {
+        lookYawMilli_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "look_pitch_milli" field.</summary>
+    public const int LookPitchMilliFieldNumber = 9;
+    private int lookPitchMilli_;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public int LookPitchMilli {
+      get { return lookPitchMilli_; }
+      set {
+        lookPitchMilli_ = value;
+      }
+    }
+
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override bool Equals(object other) {
@@ -1217,6 +1331,9 @@ namespace AiNative.Protocol.V1 {
       if (MoveYMilli != other.MoveYMilli) return false;
       if (YawMillidegrees != other.YawMillidegrees) return false;
       if (Buttons != other.Buttons) return false;
+      if (WeaponId != other.WeaponId) return false;
+      if (LookYawMilli != other.LookYawMilli) return false;
+      if (LookPitchMilli != other.LookPitchMilli) return false;
       return Equals(_unknownFields, other._unknownFields);
     }
 
@@ -1230,6 +1347,9 @@ namespace AiNative.Protocol.V1 {
       if (MoveYMilli != 0) hash ^= MoveYMilli.GetHashCode();
       if (YawMillidegrees != 0) hash ^= YawMillidegrees.GetHashCode();
       if (Buttons != 0) hash ^= Buttons.GetHashCode();
+      if (WeaponId != 0) hash ^= WeaponId.GetHashCode();
+      if (LookYawMilli != 0) hash ^= LookYawMilli.GetHashCode();
+      if (LookPitchMilli != 0) hash ^= LookPitchMilli.GetHashCode();
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
       }
@@ -1272,6 +1392,18 @@ namespace AiNative.Protocol.V1 {
         output.WriteRawTag(48);
         output.WriteUInt32(Buttons);
       }
+      if (WeaponId != 0) {
+        output.WriteRawTag(56);
+        output.WriteUInt32(WeaponId);
+      }
+      if (LookYawMilli != 0) {
+        output.WriteRawTag(64);
+        output.WriteSInt32(LookYawMilli);
+      }
+      if (LookPitchMilli != 0) {
+        output.WriteRawTag(72);
+        output.WriteSInt32(LookPitchMilli);
+      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(output);
       }
@@ -1306,6 +1438,18 @@ namespace AiNative.Protocol.V1 {
         output.WriteRawTag(48);
         output.WriteUInt32(Buttons);
       }
+      if (WeaponId != 0) {
+        output.WriteRawTag(56);
+        output.WriteUInt32(WeaponId);
+      }
+      if (LookYawMilli != 0) {
+        output.WriteRawTag(64);
+        output.WriteSInt32(LookYawMilli);
+      }
+      if (LookPitchMilli != 0) {
+        output.WriteRawTag(72);
+        output.WriteSInt32(LookPitchMilli);
+      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(ref output);
       }
@@ -1333,6 +1477,15 @@ namespace AiNative.Protocol.V1 {
       }
       if (Buttons != 0) {
         size += 1 + pb::CodedOutputStream.ComputeUInt32Size(Buttons);
+      }
+      if (WeaponId != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeUInt32Size(WeaponId);
+      }
+      if (LookYawMilli != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeSInt32Size(LookYawMilli);
+      }
+      if (LookPitchMilli != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeSInt32Size(LookPitchMilli);
       }
       if (_unknownFields != null) {
         size += _unknownFields.CalculateSize();
@@ -1363,6 +1516,15 @@ namespace AiNative.Protocol.V1 {
       }
       if (other.Buttons != 0) {
         Buttons = other.Buttons;
+      }
+      if (other.WeaponId != 0) {
+        WeaponId = other.WeaponId;
+      }
+      if (other.LookYawMilli != 0) {
+        LookYawMilli = other.LookYawMilli;
+      }
+      if (other.LookPitchMilli != 0) {
+        LookPitchMilli = other.LookPitchMilli;
       }
       _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
     }
@@ -1407,6 +1569,18 @@ namespace AiNative.Protocol.V1 {
             Buttons = input.ReadUInt32();
             break;
           }
+          case 56: {
+            WeaponId = input.ReadUInt32();
+            break;
+          }
+          case 64: {
+            LookYawMilli = input.ReadSInt32();
+            break;
+          }
+          case 72: {
+            LookPitchMilli = input.ReadSInt32();
+            break;
+          }
         }
       }
     #endif
@@ -1448,6 +1622,18 @@ namespace AiNative.Protocol.V1 {
           }
           case 48: {
             Buttons = input.ReadUInt32();
+            break;
+          }
+          case 56: {
+            WeaponId = input.ReadUInt32();
+            break;
+          }
+          case 64: {
+            LookYawMilli = input.ReadSInt32();
+            break;
+          }
+          case 72: {
+            LookPitchMilli = input.ReadSInt32();
             break;
           }
         }
@@ -1685,6 +1871,14 @@ namespace AiNative.Protocol.V1 {
       positionZMilli_ = other.positionZMilli_;
       yawMillidegrees_ = other.yawMillidegrees_;
       health_ = other.health_;
+      velocityXMilliPerSecond_ = other.velocityXMilliPerSecond_;
+      velocityYMilliPerSecond_ = other.velocityYMilliPerSecond_;
+      velocityZMilliPerSecond_ = other.velocityZMilliPerSecond_;
+      weaponId_ = other.weaponId_;
+      armor_ = other.armor_;
+      alive_ = other.alive_;
+      kills_ = other.kills_;
+      pitchMillidegrees_ = other.pitchMillidegrees_;
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
     }
 
@@ -1766,6 +1960,102 @@ namespace AiNative.Protocol.V1 {
       }
     }
 
+    /// <summary>Field number for the "velocity_x_milli_per_second" field.</summary>
+    public const int VelocityXMilliPerSecondFieldNumber = 7;
+    private int velocityXMilliPerSecond_;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public int VelocityXMilliPerSecond {
+      get { return velocityXMilliPerSecond_; }
+      set {
+        velocityXMilliPerSecond_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "velocity_y_milli_per_second" field.</summary>
+    public const int VelocityYMilliPerSecondFieldNumber = 8;
+    private int velocityYMilliPerSecond_;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public int VelocityYMilliPerSecond {
+      get { return velocityYMilliPerSecond_; }
+      set {
+        velocityYMilliPerSecond_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "velocity_z_milli_per_second" field.</summary>
+    public const int VelocityZMilliPerSecondFieldNumber = 9;
+    private int velocityZMilliPerSecond_;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public int VelocityZMilliPerSecond {
+      get { return velocityZMilliPerSecond_; }
+      set {
+        velocityZMilliPerSecond_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "weapon_id" field.</summary>
+    public const int WeaponIdFieldNumber = 10;
+    private uint weaponId_;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public uint WeaponId {
+      get { return weaponId_; }
+      set {
+        weaponId_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "armor" field.</summary>
+    public const int ArmorFieldNumber = 11;
+    private uint armor_;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public uint Armor {
+      get { return armor_; }
+      set {
+        armor_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "alive" field.</summary>
+    public const int AliveFieldNumber = 12;
+    private bool alive_;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool Alive {
+      get { return alive_; }
+      set {
+        alive_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "kills" field.</summary>
+    public const int KillsFieldNumber = 13;
+    private uint kills_;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public uint Kills {
+      get { return kills_; }
+      set {
+        kills_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "pitch_millidegrees" field.</summary>
+    public const int PitchMillidegreesFieldNumber = 14;
+    private int pitchMillidegrees_;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public int PitchMillidegrees {
+      get { return pitchMillidegrees_; }
+      set {
+        pitchMillidegrees_ = value;
+      }
+    }
+
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override bool Equals(object other) {
@@ -1787,6 +2077,14 @@ namespace AiNative.Protocol.V1 {
       if (PositionZMilli != other.PositionZMilli) return false;
       if (YawMillidegrees != other.YawMillidegrees) return false;
       if (Health != other.Health) return false;
+      if (VelocityXMilliPerSecond != other.VelocityXMilliPerSecond) return false;
+      if (VelocityYMilliPerSecond != other.VelocityYMilliPerSecond) return false;
+      if (VelocityZMilliPerSecond != other.VelocityZMilliPerSecond) return false;
+      if (WeaponId != other.WeaponId) return false;
+      if (Armor != other.Armor) return false;
+      if (Alive != other.Alive) return false;
+      if (Kills != other.Kills) return false;
+      if (PitchMillidegrees != other.PitchMillidegrees) return false;
       return Equals(_unknownFields, other._unknownFields);
     }
 
@@ -1800,6 +2098,14 @@ namespace AiNative.Protocol.V1 {
       if (PositionZMilli != 0) hash ^= PositionZMilli.GetHashCode();
       if (YawMillidegrees != 0) hash ^= YawMillidegrees.GetHashCode();
       if (Health != 0) hash ^= Health.GetHashCode();
+      if (VelocityXMilliPerSecond != 0) hash ^= VelocityXMilliPerSecond.GetHashCode();
+      if (VelocityYMilliPerSecond != 0) hash ^= VelocityYMilliPerSecond.GetHashCode();
+      if (VelocityZMilliPerSecond != 0) hash ^= VelocityZMilliPerSecond.GetHashCode();
+      if (WeaponId != 0) hash ^= WeaponId.GetHashCode();
+      if (Armor != 0) hash ^= Armor.GetHashCode();
+      if (Alive != false) hash ^= Alive.GetHashCode();
+      if (Kills != 0) hash ^= Kills.GetHashCode();
+      if (PitchMillidegrees != 0) hash ^= PitchMillidegrees.GetHashCode();
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
       }
@@ -1842,6 +2148,38 @@ namespace AiNative.Protocol.V1 {
         output.WriteRawTag(48);
         output.WriteUInt32(Health);
       }
+      if (VelocityXMilliPerSecond != 0) {
+        output.WriteRawTag(56);
+        output.WriteSInt32(VelocityXMilliPerSecond);
+      }
+      if (VelocityYMilliPerSecond != 0) {
+        output.WriteRawTag(64);
+        output.WriteSInt32(VelocityYMilliPerSecond);
+      }
+      if (VelocityZMilliPerSecond != 0) {
+        output.WriteRawTag(72);
+        output.WriteSInt32(VelocityZMilliPerSecond);
+      }
+      if (WeaponId != 0) {
+        output.WriteRawTag(80);
+        output.WriteUInt32(WeaponId);
+      }
+      if (Armor != 0) {
+        output.WriteRawTag(88);
+        output.WriteUInt32(Armor);
+      }
+      if (Alive != false) {
+        output.WriteRawTag(96);
+        output.WriteBool(Alive);
+      }
+      if (Kills != 0) {
+        output.WriteRawTag(104);
+        output.WriteUInt32(Kills);
+      }
+      if (PitchMillidegrees != 0) {
+        output.WriteRawTag(112);
+        output.WriteSInt32(PitchMillidegrees);
+      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(output);
       }
@@ -1876,6 +2214,38 @@ namespace AiNative.Protocol.V1 {
         output.WriteRawTag(48);
         output.WriteUInt32(Health);
       }
+      if (VelocityXMilliPerSecond != 0) {
+        output.WriteRawTag(56);
+        output.WriteSInt32(VelocityXMilliPerSecond);
+      }
+      if (VelocityYMilliPerSecond != 0) {
+        output.WriteRawTag(64);
+        output.WriteSInt32(VelocityYMilliPerSecond);
+      }
+      if (VelocityZMilliPerSecond != 0) {
+        output.WriteRawTag(72);
+        output.WriteSInt32(VelocityZMilliPerSecond);
+      }
+      if (WeaponId != 0) {
+        output.WriteRawTag(80);
+        output.WriteUInt32(WeaponId);
+      }
+      if (Armor != 0) {
+        output.WriteRawTag(88);
+        output.WriteUInt32(Armor);
+      }
+      if (Alive != false) {
+        output.WriteRawTag(96);
+        output.WriteBool(Alive);
+      }
+      if (Kills != 0) {
+        output.WriteRawTag(104);
+        output.WriteUInt32(Kills);
+      }
+      if (PitchMillidegrees != 0) {
+        output.WriteRawTag(112);
+        output.WriteSInt32(PitchMillidegrees);
+      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(ref output);
       }
@@ -1903,6 +2273,30 @@ namespace AiNative.Protocol.V1 {
       }
       if (Health != 0) {
         size += 1 + pb::CodedOutputStream.ComputeUInt32Size(Health);
+      }
+      if (VelocityXMilliPerSecond != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeSInt32Size(VelocityXMilliPerSecond);
+      }
+      if (VelocityYMilliPerSecond != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeSInt32Size(VelocityYMilliPerSecond);
+      }
+      if (VelocityZMilliPerSecond != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeSInt32Size(VelocityZMilliPerSecond);
+      }
+      if (WeaponId != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeUInt32Size(WeaponId);
+      }
+      if (Armor != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeUInt32Size(Armor);
+      }
+      if (Alive != false) {
+        size += 1 + 1;
+      }
+      if (Kills != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeUInt32Size(Kills);
+      }
+      if (PitchMillidegrees != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeSInt32Size(PitchMillidegrees);
       }
       if (_unknownFields != null) {
         size += _unknownFields.CalculateSize();
@@ -1933,6 +2327,30 @@ namespace AiNative.Protocol.V1 {
       }
       if (other.Health != 0) {
         Health = other.Health;
+      }
+      if (other.VelocityXMilliPerSecond != 0) {
+        VelocityXMilliPerSecond = other.VelocityXMilliPerSecond;
+      }
+      if (other.VelocityYMilliPerSecond != 0) {
+        VelocityYMilliPerSecond = other.VelocityYMilliPerSecond;
+      }
+      if (other.VelocityZMilliPerSecond != 0) {
+        VelocityZMilliPerSecond = other.VelocityZMilliPerSecond;
+      }
+      if (other.WeaponId != 0) {
+        WeaponId = other.WeaponId;
+      }
+      if (other.Armor != 0) {
+        Armor = other.Armor;
+      }
+      if (other.Alive != false) {
+        Alive = other.Alive;
+      }
+      if (other.Kills != 0) {
+        Kills = other.Kills;
+      }
+      if (other.PitchMillidegrees != 0) {
+        PitchMillidegrees = other.PitchMillidegrees;
       }
       _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
     }
@@ -1975,6 +2393,38 @@ namespace AiNative.Protocol.V1 {
           }
           case 48: {
             Health = input.ReadUInt32();
+            break;
+          }
+          case 56: {
+            VelocityXMilliPerSecond = input.ReadSInt32();
+            break;
+          }
+          case 64: {
+            VelocityYMilliPerSecond = input.ReadSInt32();
+            break;
+          }
+          case 72: {
+            VelocityZMilliPerSecond = input.ReadSInt32();
+            break;
+          }
+          case 80: {
+            WeaponId = input.ReadUInt32();
+            break;
+          }
+          case 88: {
+            Armor = input.ReadUInt32();
+            break;
+          }
+          case 96: {
+            Alive = input.ReadBool();
+            break;
+          }
+          case 104: {
+            Kills = input.ReadUInt32();
+            break;
+          }
+          case 112: {
+            PitchMillidegrees = input.ReadSInt32();
             break;
           }
         }
@@ -2020,6 +2470,458 @@ namespace AiNative.Protocol.V1 {
             Health = input.ReadUInt32();
             break;
           }
+          case 56: {
+            VelocityXMilliPerSecond = input.ReadSInt32();
+            break;
+          }
+          case 64: {
+            VelocityYMilliPerSecond = input.ReadSInt32();
+            break;
+          }
+          case 72: {
+            VelocityZMilliPerSecond = input.ReadSInt32();
+            break;
+          }
+          case 80: {
+            WeaponId = input.ReadUInt32();
+            break;
+          }
+          case 88: {
+            Armor = input.ReadUInt32();
+            break;
+          }
+          case 96: {
+            Alive = input.ReadBool();
+            break;
+          }
+          case 104: {
+            Kills = input.ReadUInt32();
+            break;
+          }
+          case 112: {
+            PitchMillidegrees = input.ReadSInt32();
+            break;
+          }
+        }
+      }
+    }
+    #endif
+
+  }
+
+  [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
+  public sealed partial class PickupState : pb::IMessage<PickupState>
+  #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      , pb::IBufferMessage
+  #endif
+  {
+    private static readonly pb::MessageParser<PickupState> _parser = new pb::MessageParser<PickupState>(() => new PickupState());
+    private pb::UnknownFieldSet _unknownFields;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pb::MessageParser<PickupState> Parser { get { return _parser; } }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pbr::MessageDescriptor Descriptor {
+      get { return global::AiNative.Protocol.V1.GameplayReflection.Descriptor.MessageTypes[7]; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    pbr::MessageDescriptor pb::IMessage.Descriptor {
+      get { return Descriptor; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public PickupState() {
+      OnConstruction();
+    }
+
+    partial void OnConstruction();
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public PickupState(PickupState other) : this() {
+      pickupId_ = other.pickupId_;
+      pickupType_ = other.pickupType_;
+      positionXMilli_ = other.positionXMilli_;
+      positionYMilli_ = other.positionYMilli_;
+      positionZMilli_ = other.positionZMilli_;
+      active_ = other.active_;
+      respawnTick_ = other.respawnTick_;
+      _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public PickupState Clone() {
+      return new PickupState(this);
+    }
+
+    /// <summary>Field number for the "pickup_id" field.</summary>
+    public const int PickupIdFieldNumber = 1;
+    private uint pickupId_;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public uint PickupId {
+      get { return pickupId_; }
+      set {
+        pickupId_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "pickup_type" field.</summary>
+    public const int PickupTypeFieldNumber = 2;
+    private global::AiNative.Protocol.V1.ArenaPickupType pickupType_ = global::AiNative.Protocol.V1.ArenaPickupType.ArenaPickupUnknown;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::AiNative.Protocol.V1.ArenaPickupType PickupType {
+      get { return pickupType_; }
+      set {
+        pickupType_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "position_x_milli" field.</summary>
+    public const int PositionXMilliFieldNumber = 3;
+    private int positionXMilli_;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public int PositionXMilli {
+      get { return positionXMilli_; }
+      set {
+        positionXMilli_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "position_y_milli" field.</summary>
+    public const int PositionYMilliFieldNumber = 4;
+    private int positionYMilli_;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public int PositionYMilli {
+      get { return positionYMilli_; }
+      set {
+        positionYMilli_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "position_z_milli" field.</summary>
+    public const int PositionZMilliFieldNumber = 5;
+    private int positionZMilli_;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public int PositionZMilli {
+      get { return positionZMilli_; }
+      set {
+        positionZMilli_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "active" field.</summary>
+    public const int ActiveFieldNumber = 6;
+    private bool active_;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool Active {
+      get { return active_; }
+      set {
+        active_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "respawn_tick" field.</summary>
+    public const int RespawnTickFieldNumber = 7;
+    private ulong respawnTick_;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public ulong RespawnTick {
+      get { return respawnTick_; }
+      set {
+        respawnTick_ = value;
+      }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override bool Equals(object other) {
+      return Equals(other as PickupState);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool Equals(PickupState other) {
+      if (ReferenceEquals(other, null)) {
+        return false;
+      }
+      if (ReferenceEquals(other, this)) {
+        return true;
+      }
+      if (PickupId != other.PickupId) return false;
+      if (PickupType != other.PickupType) return false;
+      if (PositionXMilli != other.PositionXMilli) return false;
+      if (PositionYMilli != other.PositionYMilli) return false;
+      if (PositionZMilli != other.PositionZMilli) return false;
+      if (Active != other.Active) return false;
+      if (RespawnTick != other.RespawnTick) return false;
+      return Equals(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override int GetHashCode() {
+      int hash = 1;
+      if (PickupId != 0) hash ^= PickupId.GetHashCode();
+      if (PickupType != global::AiNative.Protocol.V1.ArenaPickupType.ArenaPickupUnknown) hash ^= PickupType.GetHashCode();
+      if (PositionXMilli != 0) hash ^= PositionXMilli.GetHashCode();
+      if (PositionYMilli != 0) hash ^= PositionYMilli.GetHashCode();
+      if (PositionZMilli != 0) hash ^= PositionZMilli.GetHashCode();
+      if (Active != false) hash ^= Active.GetHashCode();
+      if (RespawnTick != 0UL) hash ^= RespawnTick.GetHashCode();
+      if (_unknownFields != null) {
+        hash ^= _unknownFields.GetHashCode();
+      }
+      return hash;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override string ToString() {
+      return pb::JsonFormatter.ToDiagnosticString(this);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void WriteTo(pb::CodedOutputStream output) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      output.WriteRawMessage(this);
+    #else
+      if (PickupId != 0) {
+        output.WriteRawTag(8);
+        output.WriteUInt32(PickupId);
+      }
+      if (PickupType != global::AiNative.Protocol.V1.ArenaPickupType.ArenaPickupUnknown) {
+        output.WriteRawTag(16);
+        output.WriteEnum((int) PickupType);
+      }
+      if (PositionXMilli != 0) {
+        output.WriteRawTag(24);
+        output.WriteSInt32(PositionXMilli);
+      }
+      if (PositionYMilli != 0) {
+        output.WriteRawTag(32);
+        output.WriteSInt32(PositionYMilli);
+      }
+      if (PositionZMilli != 0) {
+        output.WriteRawTag(40);
+        output.WriteSInt32(PositionZMilli);
+      }
+      if (Active != false) {
+        output.WriteRawTag(48);
+        output.WriteBool(Active);
+      }
+      if (RespawnTick != 0UL) {
+        output.WriteRawTag(57);
+        output.WriteFixed64(RespawnTick);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(output);
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
+      if (PickupId != 0) {
+        output.WriteRawTag(8);
+        output.WriteUInt32(PickupId);
+      }
+      if (PickupType != global::AiNative.Protocol.V1.ArenaPickupType.ArenaPickupUnknown) {
+        output.WriteRawTag(16);
+        output.WriteEnum((int) PickupType);
+      }
+      if (PositionXMilli != 0) {
+        output.WriteRawTag(24);
+        output.WriteSInt32(PositionXMilli);
+      }
+      if (PositionYMilli != 0) {
+        output.WriteRawTag(32);
+        output.WriteSInt32(PositionYMilli);
+      }
+      if (PositionZMilli != 0) {
+        output.WriteRawTag(40);
+        output.WriteSInt32(PositionZMilli);
+      }
+      if (Active != false) {
+        output.WriteRawTag(48);
+        output.WriteBool(Active);
+      }
+      if (RespawnTick != 0UL) {
+        output.WriteRawTag(57);
+        output.WriteFixed64(RespawnTick);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(ref output);
+      }
+    }
+    #endif
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public int CalculateSize() {
+      int size = 0;
+      if (PickupId != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeUInt32Size(PickupId);
+      }
+      if (PickupType != global::AiNative.Protocol.V1.ArenaPickupType.ArenaPickupUnknown) {
+        size += 1 + pb::CodedOutputStream.ComputeEnumSize((int) PickupType);
+      }
+      if (PositionXMilli != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeSInt32Size(PositionXMilli);
+      }
+      if (PositionYMilli != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeSInt32Size(PositionYMilli);
+      }
+      if (PositionZMilli != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeSInt32Size(PositionZMilli);
+      }
+      if (Active != false) {
+        size += 1 + 1;
+      }
+      if (RespawnTick != 0UL) {
+        size += 1 + 8;
+      }
+      if (_unknownFields != null) {
+        size += _unknownFields.CalculateSize();
+      }
+      return size;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(PickupState other) {
+      if (other == null) {
+        return;
+      }
+      if (other.PickupId != 0) {
+        PickupId = other.PickupId;
+      }
+      if (other.PickupType != global::AiNative.Protocol.V1.ArenaPickupType.ArenaPickupUnknown) {
+        PickupType = other.PickupType;
+      }
+      if (other.PositionXMilli != 0) {
+        PositionXMilli = other.PositionXMilli;
+      }
+      if (other.PositionYMilli != 0) {
+        PositionYMilli = other.PositionYMilli;
+      }
+      if (other.PositionZMilli != 0) {
+        PositionZMilli = other.PositionZMilli;
+      }
+      if (other.Active != false) {
+        Active = other.Active;
+      }
+      if (other.RespawnTick != 0UL) {
+        RespawnTick = other.RespawnTick;
+      }
+      _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(pb::CodedInputStream input) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      input.ReadRawMessage(this);
+    #else
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+      if ((tag & 7) == 4) {
+        // Abort on any end group tag.
+        return;
+      }
+      switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, input);
+            break;
+          case 8: {
+            PickupId = input.ReadUInt32();
+            break;
+          }
+          case 16: {
+            PickupType = (global::AiNative.Protocol.V1.ArenaPickupType) input.ReadEnum();
+            break;
+          }
+          case 24: {
+            PositionXMilli = input.ReadSInt32();
+            break;
+          }
+          case 32: {
+            PositionYMilli = input.ReadSInt32();
+            break;
+          }
+          case 40: {
+            PositionZMilli = input.ReadSInt32();
+            break;
+          }
+          case 48: {
+            Active = input.ReadBool();
+            break;
+          }
+          case 57: {
+            RespawnTick = input.ReadFixed64();
+            break;
+          }
+        }
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalMergeFrom(ref pb::ParseContext input) {
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+      if ((tag & 7) == 4) {
+        // Abort on any end group tag.
+        return;
+      }
+      switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, ref input);
+            break;
+          case 8: {
+            PickupId = input.ReadUInt32();
+            break;
+          }
+          case 16: {
+            PickupType = (global::AiNative.Protocol.V1.ArenaPickupType) input.ReadEnum();
+            break;
+          }
+          case 24: {
+            PositionXMilli = input.ReadSInt32();
+            break;
+          }
+          case 32: {
+            PositionYMilli = input.ReadSInt32();
+            break;
+          }
+          case 40: {
+            PositionZMilli = input.ReadSInt32();
+            break;
+          }
+          case 48: {
+            Active = input.ReadBool();
+            break;
+          }
+          case 57: {
+            RespawnTick = input.ReadFixed64();
+            break;
+          }
         }
       }
     }
@@ -2042,7 +2944,7 @@ namespace AiNative.Protocol.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::AiNative.Protocol.V1.GameplayReflection.Descriptor.MessageTypes[7]; }
+      get { return global::AiNative.Protocol.V1.GameplayReflection.Descriptor.MessageTypes[8]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -2068,6 +2970,10 @@ namespace AiNative.Protocol.V1 {
       players_ = other.players_.Clone();
       stateHash_ = other.stateHash_;
       lastProcessedInputSequence_ = other.lastProcessedInputSequence_;
+      matchPhase_ = other.matchPhase_;
+      remainingTicks_ = other.remainingTicks_;
+      leaderEntityId_ = other.leaderEntityId_;
+      pickups_ = other.pickups_.Clone();
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
     }
 
@@ -2148,6 +3054,53 @@ namespace AiNative.Protocol.V1 {
       }
     }
 
+    /// <summary>Field number for the "match_phase" field.</summary>
+    public const int MatchPhaseFieldNumber = 7;
+    private global::AiNative.Protocol.V1.ArenaMatchPhase matchPhase_ = global::AiNative.Protocol.V1.ArenaMatchPhase.ArenaMatchWaiting;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::AiNative.Protocol.V1.ArenaMatchPhase MatchPhase {
+      get { return matchPhase_; }
+      set {
+        matchPhase_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "remaining_ticks" field.</summary>
+    public const int RemainingTicksFieldNumber = 8;
+    private uint remainingTicks_;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public uint RemainingTicks {
+      get { return remainingTicks_; }
+      set {
+        remainingTicks_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "leader_entity_id" field.</summary>
+    public const int LeaderEntityIdFieldNumber = 9;
+    private uint leaderEntityId_;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public uint LeaderEntityId {
+      get { return leaderEntityId_; }
+      set {
+        leaderEntityId_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "pickups" field.</summary>
+    public const int PickupsFieldNumber = 10;
+    private static readonly pb::FieldCodec<global::AiNative.Protocol.V1.PickupState> _repeated_pickups_codec
+        = pb::FieldCodec.ForMessage(82, global::AiNative.Protocol.V1.PickupState.Parser);
+    private readonly pbc::RepeatedField<global::AiNative.Protocol.V1.PickupState> pickups_ = new pbc::RepeatedField<global::AiNative.Protocol.V1.PickupState>();
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public pbc::RepeatedField<global::AiNative.Protocol.V1.PickupState> Pickups {
+      get { return pickups_; }
+    }
+
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override bool Equals(object other) {
@@ -2169,6 +3122,10 @@ namespace AiNative.Protocol.V1 {
       if(!players_.Equals(other.players_)) return false;
       if (StateHash != other.StateHash) return false;
       if (LastProcessedInputSequence != other.LastProcessedInputSequence) return false;
+      if (MatchPhase != other.MatchPhase) return false;
+      if (RemainingTicks != other.RemainingTicks) return false;
+      if (LeaderEntityId != other.LeaderEntityId) return false;
+      if(!pickups_.Equals(other.pickups_)) return false;
       return Equals(_unknownFields, other._unknownFields);
     }
 
@@ -2182,6 +3139,10 @@ namespace AiNative.Protocol.V1 {
       hash ^= players_.GetHashCode();
       if (StateHash != 0UL) hash ^= StateHash.GetHashCode();
       if (LastProcessedInputSequence != 0) hash ^= LastProcessedInputSequence.GetHashCode();
+      if (MatchPhase != global::AiNative.Protocol.V1.ArenaMatchPhase.ArenaMatchWaiting) hash ^= MatchPhase.GetHashCode();
+      if (RemainingTicks != 0) hash ^= RemainingTicks.GetHashCode();
+      if (LeaderEntityId != 0) hash ^= LeaderEntityId.GetHashCode();
+      hash ^= pickups_.GetHashCode();
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
       }
@@ -2221,6 +3182,19 @@ namespace AiNative.Protocol.V1 {
         output.WriteRawTag(48);
         output.WriteUInt32(LastProcessedInputSequence);
       }
+      if (MatchPhase != global::AiNative.Protocol.V1.ArenaMatchPhase.ArenaMatchWaiting) {
+        output.WriteRawTag(56);
+        output.WriteEnum((int) MatchPhase);
+      }
+      if (RemainingTicks != 0) {
+        output.WriteRawTag(64);
+        output.WriteUInt32(RemainingTicks);
+      }
+      if (LeaderEntityId != 0) {
+        output.WriteRawTag(72);
+        output.WriteUInt32(LeaderEntityId);
+      }
+      pickups_.WriteTo(output, _repeated_pickups_codec);
       if (_unknownFields != null) {
         _unknownFields.WriteTo(output);
       }
@@ -2252,6 +3226,19 @@ namespace AiNative.Protocol.V1 {
         output.WriteRawTag(48);
         output.WriteUInt32(LastProcessedInputSequence);
       }
+      if (MatchPhase != global::AiNative.Protocol.V1.ArenaMatchPhase.ArenaMatchWaiting) {
+        output.WriteRawTag(56);
+        output.WriteEnum((int) MatchPhase);
+      }
+      if (RemainingTicks != 0) {
+        output.WriteRawTag(64);
+        output.WriteUInt32(RemainingTicks);
+      }
+      if (LeaderEntityId != 0) {
+        output.WriteRawTag(72);
+        output.WriteUInt32(LeaderEntityId);
+      }
+      pickups_.WriteTo(ref output, _repeated_pickups_codec);
       if (_unknownFields != null) {
         _unknownFields.WriteTo(ref output);
       }
@@ -2278,6 +3265,16 @@ namespace AiNative.Protocol.V1 {
       if (LastProcessedInputSequence != 0) {
         size += 1 + pb::CodedOutputStream.ComputeUInt32Size(LastProcessedInputSequence);
       }
+      if (MatchPhase != global::AiNative.Protocol.V1.ArenaMatchPhase.ArenaMatchWaiting) {
+        size += 1 + pb::CodedOutputStream.ComputeEnumSize((int) MatchPhase);
+      }
+      if (RemainingTicks != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeUInt32Size(RemainingTicks);
+      }
+      if (LeaderEntityId != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeUInt32Size(LeaderEntityId);
+      }
+      size += pickups_.CalculateSize(_repeated_pickups_codec);
       if (_unknownFields != null) {
         size += _unknownFields.CalculateSize();
       }
@@ -2306,6 +3303,16 @@ namespace AiNative.Protocol.V1 {
       if (other.LastProcessedInputSequence != 0) {
         LastProcessedInputSequence = other.LastProcessedInputSequence;
       }
+      if (other.MatchPhase != global::AiNative.Protocol.V1.ArenaMatchPhase.ArenaMatchWaiting) {
+        MatchPhase = other.MatchPhase;
+      }
+      if (other.RemainingTicks != 0) {
+        RemainingTicks = other.RemainingTicks;
+      }
+      if (other.LeaderEntityId != 0) {
+        LeaderEntityId = other.LeaderEntityId;
+      }
+      pickups_.Add(other.pickups_);
       _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
     }
 
@@ -2347,6 +3354,22 @@ namespace AiNative.Protocol.V1 {
           }
           case 48: {
             LastProcessedInputSequence = input.ReadUInt32();
+            break;
+          }
+          case 56: {
+            MatchPhase = (global::AiNative.Protocol.V1.ArenaMatchPhase) input.ReadEnum();
+            break;
+          }
+          case 64: {
+            RemainingTicks = input.ReadUInt32();
+            break;
+          }
+          case 72: {
+            LeaderEntityId = input.ReadUInt32();
+            break;
+          }
+          case 82: {
+            pickups_.AddEntriesFrom(input, _repeated_pickups_codec);
             break;
           }
         }
@@ -2392,6 +3415,516 @@ namespace AiNative.Protocol.V1 {
             LastProcessedInputSequence = input.ReadUInt32();
             break;
           }
+          case 56: {
+            MatchPhase = (global::AiNative.Protocol.V1.ArenaMatchPhase) input.ReadEnum();
+            break;
+          }
+          case 64: {
+            RemainingTicks = input.ReadUInt32();
+            break;
+          }
+          case 72: {
+            LeaderEntityId = input.ReadUInt32();
+            break;
+          }
+          case 82: {
+            pickups_.AddEntriesFrom(ref input, _repeated_pickups_codec);
+            break;
+          }
+        }
+      }
+    }
+    #endif
+
+  }
+
+  [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
+  public sealed partial class ArenaCombatEvent : pb::IMessage<ArenaCombatEvent>
+  #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      , pb::IBufferMessage
+  #endif
+  {
+    private static readonly pb::MessageParser<ArenaCombatEvent> _parser = new pb::MessageParser<ArenaCombatEvent>(() => new ArenaCombatEvent());
+    private pb::UnknownFieldSet _unknownFields;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pb::MessageParser<ArenaCombatEvent> Parser { get { return _parser; } }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pbr::MessageDescriptor Descriptor {
+      get { return global::AiNative.Protocol.V1.GameplayReflection.Descriptor.MessageTypes[9]; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    pbr::MessageDescriptor pb::IMessage.Descriptor {
+      get { return Descriptor; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public ArenaCombatEvent() {
+      OnConstruction();
+    }
+
+    partial void OnConstruction();
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public ArenaCombatEvent(ArenaCombatEvent other) : this() {
+      eventType_ = other.eventType_;
+      eventTick_ = other.eventTick_;
+      sourceEntityId_ = other.sourceEntityId_;
+      targetEntityId_ = other.targetEntityId_;
+      weaponId_ = other.weaponId_;
+      damage_ = other.damage_;
+      positionXMilli_ = other.positionXMilli_;
+      positionYMilli_ = other.positionYMilli_;
+      positionZMilli_ = other.positionZMilli_;
+      _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public ArenaCombatEvent Clone() {
+      return new ArenaCombatEvent(this);
+    }
+
+    /// <summary>Field number for the "event_type" field.</summary>
+    public const int EventTypeFieldNumber = 1;
+    private global::AiNative.Protocol.V1.ArenaCombatEventType eventType_ = global::AiNative.Protocol.V1.ArenaCombatEventType.ArenaEventFire;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::AiNative.Protocol.V1.ArenaCombatEventType EventType {
+      get { return eventType_; }
+      set {
+        eventType_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "event_tick" field.</summary>
+    public const int EventTickFieldNumber = 2;
+    private ulong eventTick_;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public ulong EventTick {
+      get { return eventTick_; }
+      set {
+        eventTick_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "source_entity_id" field.</summary>
+    public const int SourceEntityIdFieldNumber = 3;
+    private uint sourceEntityId_;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public uint SourceEntityId {
+      get { return sourceEntityId_; }
+      set {
+        sourceEntityId_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "target_entity_id" field.</summary>
+    public const int TargetEntityIdFieldNumber = 4;
+    private uint targetEntityId_;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public uint TargetEntityId {
+      get { return targetEntityId_; }
+      set {
+        targetEntityId_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "weapon_id" field.</summary>
+    public const int WeaponIdFieldNumber = 5;
+    private global::AiNative.Protocol.V1.ArenaWeaponId weaponId_ = global::AiNative.Protocol.V1.ArenaWeaponId.ArenaWeaponNone;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::AiNative.Protocol.V1.ArenaWeaponId WeaponId {
+      get { return weaponId_; }
+      set {
+        weaponId_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "damage" field.</summary>
+    public const int DamageFieldNumber = 6;
+    private uint damage_;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public uint Damage {
+      get { return damage_; }
+      set {
+        damage_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "position_x_milli" field.</summary>
+    public const int PositionXMilliFieldNumber = 7;
+    private int positionXMilli_;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public int PositionXMilli {
+      get { return positionXMilli_; }
+      set {
+        positionXMilli_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "position_y_milli" field.</summary>
+    public const int PositionYMilliFieldNumber = 8;
+    private int positionYMilli_;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public int PositionYMilli {
+      get { return positionYMilli_; }
+      set {
+        positionYMilli_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "position_z_milli" field.</summary>
+    public const int PositionZMilliFieldNumber = 9;
+    private int positionZMilli_;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public int PositionZMilli {
+      get { return positionZMilli_; }
+      set {
+        positionZMilli_ = value;
+      }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override bool Equals(object other) {
+      return Equals(other as ArenaCombatEvent);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool Equals(ArenaCombatEvent other) {
+      if (ReferenceEquals(other, null)) {
+        return false;
+      }
+      if (ReferenceEquals(other, this)) {
+        return true;
+      }
+      if (EventType != other.EventType) return false;
+      if (EventTick != other.EventTick) return false;
+      if (SourceEntityId != other.SourceEntityId) return false;
+      if (TargetEntityId != other.TargetEntityId) return false;
+      if (WeaponId != other.WeaponId) return false;
+      if (Damage != other.Damage) return false;
+      if (PositionXMilli != other.PositionXMilli) return false;
+      if (PositionYMilli != other.PositionYMilli) return false;
+      if (PositionZMilli != other.PositionZMilli) return false;
+      return Equals(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override int GetHashCode() {
+      int hash = 1;
+      if (EventType != global::AiNative.Protocol.V1.ArenaCombatEventType.ArenaEventFire) hash ^= EventType.GetHashCode();
+      if (EventTick != 0UL) hash ^= EventTick.GetHashCode();
+      if (SourceEntityId != 0) hash ^= SourceEntityId.GetHashCode();
+      if (TargetEntityId != 0) hash ^= TargetEntityId.GetHashCode();
+      if (WeaponId != global::AiNative.Protocol.V1.ArenaWeaponId.ArenaWeaponNone) hash ^= WeaponId.GetHashCode();
+      if (Damage != 0) hash ^= Damage.GetHashCode();
+      if (PositionXMilli != 0) hash ^= PositionXMilli.GetHashCode();
+      if (PositionYMilli != 0) hash ^= PositionYMilli.GetHashCode();
+      if (PositionZMilli != 0) hash ^= PositionZMilli.GetHashCode();
+      if (_unknownFields != null) {
+        hash ^= _unknownFields.GetHashCode();
+      }
+      return hash;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override string ToString() {
+      return pb::JsonFormatter.ToDiagnosticString(this);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void WriteTo(pb::CodedOutputStream output) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      output.WriteRawMessage(this);
+    #else
+      if (EventType != global::AiNative.Protocol.V1.ArenaCombatEventType.ArenaEventFire) {
+        output.WriteRawTag(8);
+        output.WriteEnum((int) EventType);
+      }
+      if (EventTick != 0UL) {
+        output.WriteRawTag(17);
+        output.WriteFixed64(EventTick);
+      }
+      if (SourceEntityId != 0) {
+        output.WriteRawTag(24);
+        output.WriteUInt32(SourceEntityId);
+      }
+      if (TargetEntityId != 0) {
+        output.WriteRawTag(32);
+        output.WriteUInt32(TargetEntityId);
+      }
+      if (WeaponId != global::AiNative.Protocol.V1.ArenaWeaponId.ArenaWeaponNone) {
+        output.WriteRawTag(40);
+        output.WriteEnum((int) WeaponId);
+      }
+      if (Damage != 0) {
+        output.WriteRawTag(48);
+        output.WriteUInt32(Damage);
+      }
+      if (PositionXMilli != 0) {
+        output.WriteRawTag(56);
+        output.WriteSInt32(PositionXMilli);
+      }
+      if (PositionYMilli != 0) {
+        output.WriteRawTag(64);
+        output.WriteSInt32(PositionYMilli);
+      }
+      if (PositionZMilli != 0) {
+        output.WriteRawTag(72);
+        output.WriteSInt32(PositionZMilli);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(output);
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
+      if (EventType != global::AiNative.Protocol.V1.ArenaCombatEventType.ArenaEventFire) {
+        output.WriteRawTag(8);
+        output.WriteEnum((int) EventType);
+      }
+      if (EventTick != 0UL) {
+        output.WriteRawTag(17);
+        output.WriteFixed64(EventTick);
+      }
+      if (SourceEntityId != 0) {
+        output.WriteRawTag(24);
+        output.WriteUInt32(SourceEntityId);
+      }
+      if (TargetEntityId != 0) {
+        output.WriteRawTag(32);
+        output.WriteUInt32(TargetEntityId);
+      }
+      if (WeaponId != global::AiNative.Protocol.V1.ArenaWeaponId.ArenaWeaponNone) {
+        output.WriteRawTag(40);
+        output.WriteEnum((int) WeaponId);
+      }
+      if (Damage != 0) {
+        output.WriteRawTag(48);
+        output.WriteUInt32(Damage);
+      }
+      if (PositionXMilli != 0) {
+        output.WriteRawTag(56);
+        output.WriteSInt32(PositionXMilli);
+      }
+      if (PositionYMilli != 0) {
+        output.WriteRawTag(64);
+        output.WriteSInt32(PositionYMilli);
+      }
+      if (PositionZMilli != 0) {
+        output.WriteRawTag(72);
+        output.WriteSInt32(PositionZMilli);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(ref output);
+      }
+    }
+    #endif
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public int CalculateSize() {
+      int size = 0;
+      if (EventType != global::AiNative.Protocol.V1.ArenaCombatEventType.ArenaEventFire) {
+        size += 1 + pb::CodedOutputStream.ComputeEnumSize((int) EventType);
+      }
+      if (EventTick != 0UL) {
+        size += 1 + 8;
+      }
+      if (SourceEntityId != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeUInt32Size(SourceEntityId);
+      }
+      if (TargetEntityId != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeUInt32Size(TargetEntityId);
+      }
+      if (WeaponId != global::AiNative.Protocol.V1.ArenaWeaponId.ArenaWeaponNone) {
+        size += 1 + pb::CodedOutputStream.ComputeEnumSize((int) WeaponId);
+      }
+      if (Damage != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeUInt32Size(Damage);
+      }
+      if (PositionXMilli != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeSInt32Size(PositionXMilli);
+      }
+      if (PositionYMilli != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeSInt32Size(PositionYMilli);
+      }
+      if (PositionZMilli != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeSInt32Size(PositionZMilli);
+      }
+      if (_unknownFields != null) {
+        size += _unknownFields.CalculateSize();
+      }
+      return size;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(ArenaCombatEvent other) {
+      if (other == null) {
+        return;
+      }
+      if (other.EventType != global::AiNative.Protocol.V1.ArenaCombatEventType.ArenaEventFire) {
+        EventType = other.EventType;
+      }
+      if (other.EventTick != 0UL) {
+        EventTick = other.EventTick;
+      }
+      if (other.SourceEntityId != 0) {
+        SourceEntityId = other.SourceEntityId;
+      }
+      if (other.TargetEntityId != 0) {
+        TargetEntityId = other.TargetEntityId;
+      }
+      if (other.WeaponId != global::AiNative.Protocol.V1.ArenaWeaponId.ArenaWeaponNone) {
+        WeaponId = other.WeaponId;
+      }
+      if (other.Damage != 0) {
+        Damage = other.Damage;
+      }
+      if (other.PositionXMilli != 0) {
+        PositionXMilli = other.PositionXMilli;
+      }
+      if (other.PositionYMilli != 0) {
+        PositionYMilli = other.PositionYMilli;
+      }
+      if (other.PositionZMilli != 0) {
+        PositionZMilli = other.PositionZMilli;
+      }
+      _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(pb::CodedInputStream input) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      input.ReadRawMessage(this);
+    #else
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+      if ((tag & 7) == 4) {
+        // Abort on any end group tag.
+        return;
+      }
+      switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, input);
+            break;
+          case 8: {
+            EventType = (global::AiNative.Protocol.V1.ArenaCombatEventType) input.ReadEnum();
+            break;
+          }
+          case 17: {
+            EventTick = input.ReadFixed64();
+            break;
+          }
+          case 24: {
+            SourceEntityId = input.ReadUInt32();
+            break;
+          }
+          case 32: {
+            TargetEntityId = input.ReadUInt32();
+            break;
+          }
+          case 40: {
+            WeaponId = (global::AiNative.Protocol.V1.ArenaWeaponId) input.ReadEnum();
+            break;
+          }
+          case 48: {
+            Damage = input.ReadUInt32();
+            break;
+          }
+          case 56: {
+            PositionXMilli = input.ReadSInt32();
+            break;
+          }
+          case 64: {
+            PositionYMilli = input.ReadSInt32();
+            break;
+          }
+          case 72: {
+            PositionZMilli = input.ReadSInt32();
+            break;
+          }
+        }
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalMergeFrom(ref pb::ParseContext input) {
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+      if ((tag & 7) == 4) {
+        // Abort on any end group tag.
+        return;
+      }
+      switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, ref input);
+            break;
+          case 8: {
+            EventType = (global::AiNative.Protocol.V1.ArenaCombatEventType) input.ReadEnum();
+            break;
+          }
+          case 17: {
+            EventTick = input.ReadFixed64();
+            break;
+          }
+          case 24: {
+            SourceEntityId = input.ReadUInt32();
+            break;
+          }
+          case 32: {
+            TargetEntityId = input.ReadUInt32();
+            break;
+          }
+          case 40: {
+            WeaponId = (global::AiNative.Protocol.V1.ArenaWeaponId) input.ReadEnum();
+            break;
+          }
+          case 48: {
+            Damage = input.ReadUInt32();
+            break;
+          }
+          case 56: {
+            PositionXMilli = input.ReadSInt32();
+            break;
+          }
+          case 64: {
+            PositionYMilli = input.ReadSInt32();
+            break;
+          }
+          case 72: {
+            PositionZMilli = input.ReadSInt32();
+            break;
+          }
         }
       }
     }
@@ -2414,7 +3947,7 @@ namespace AiNative.Protocol.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::AiNative.Protocol.V1.GameplayReflection.Descriptor.MessageTypes[8]; }
+      get { return global::AiNative.Protocol.V1.GameplayReflection.Descriptor.MessageTypes[10]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -2438,6 +3971,7 @@ namespace AiNative.Protocol.V1 {
       sequence_ = other.sequence_;
       eventType_ = other.eventType_;
       payload_ = other.payload_;
+      combatEvent_ = other.combatEvent_ != null ? other.combatEvent_.Clone() : null;
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
     }
 
@@ -2495,6 +4029,18 @@ namespace AiNative.Protocol.V1 {
       }
     }
 
+    /// <summary>Field number for the "combat_event" field.</summary>
+    public const int CombatEventFieldNumber = 5;
+    private global::AiNative.Protocol.V1.ArenaCombatEvent combatEvent_;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::AiNative.Protocol.V1.ArenaCombatEvent CombatEvent {
+      get { return combatEvent_; }
+      set {
+        combatEvent_ = value;
+      }
+    }
+
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override bool Equals(object other) {
@@ -2514,6 +4060,7 @@ namespace AiNative.Protocol.V1 {
       if (Sequence != other.Sequence) return false;
       if (EventType != other.EventType) return false;
       if (Payload != other.Payload) return false;
+      if (!object.Equals(CombatEvent, other.CombatEvent)) return false;
       return Equals(_unknownFields, other._unknownFields);
     }
 
@@ -2525,6 +4072,7 @@ namespace AiNative.Protocol.V1 {
       if (Sequence != 0) hash ^= Sequence.GetHashCode();
       if (EventType != 0) hash ^= EventType.GetHashCode();
       if (Payload.Length != 0) hash ^= Payload.GetHashCode();
+      if (combatEvent_ != null) hash ^= CombatEvent.GetHashCode();
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
       }
@@ -2559,6 +4107,10 @@ namespace AiNative.Protocol.V1 {
         output.WriteRawTag(34);
         output.WriteBytes(Payload);
       }
+      if (combatEvent_ != null) {
+        output.WriteRawTag(42);
+        output.WriteMessage(CombatEvent);
+      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(output);
       }
@@ -2585,6 +4137,10 @@ namespace AiNative.Protocol.V1 {
         output.WriteRawTag(34);
         output.WriteBytes(Payload);
       }
+      if (combatEvent_ != null) {
+        output.WriteRawTag(42);
+        output.WriteMessage(CombatEvent);
+      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(ref output);
       }
@@ -2606,6 +4162,9 @@ namespace AiNative.Protocol.V1 {
       }
       if (Payload.Length != 0) {
         size += 1 + pb::CodedOutputStream.ComputeBytesSize(Payload);
+      }
+      if (combatEvent_ != null) {
+        size += 1 + pb::CodedOutputStream.ComputeMessageSize(CombatEvent);
       }
       if (_unknownFields != null) {
         size += _unknownFields.CalculateSize();
@@ -2630,6 +4189,12 @@ namespace AiNative.Protocol.V1 {
       }
       if (other.Payload.Length != 0) {
         Payload = other.Payload;
+      }
+      if (other.combatEvent_ != null) {
+        if (combatEvent_ == null) {
+          CombatEvent = new global::AiNative.Protocol.V1.ArenaCombatEvent();
+        }
+        CombatEvent.MergeFrom(other.CombatEvent);
       }
       _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
     }
@@ -2664,6 +4229,13 @@ namespace AiNative.Protocol.V1 {
           }
           case 34: {
             Payload = input.ReadBytes();
+            break;
+          }
+          case 42: {
+            if (combatEvent_ == null) {
+              CombatEvent = new global::AiNative.Protocol.V1.ArenaCombatEvent();
+            }
+            input.ReadMessage(CombatEvent);
             break;
           }
         }
@@ -2701,6 +4273,13 @@ namespace AiNative.Protocol.V1 {
             Payload = input.ReadBytes();
             break;
           }
+          case 42: {
+            if (combatEvent_ == null) {
+              CombatEvent = new global::AiNative.Protocol.V1.ArenaCombatEvent();
+            }
+            input.ReadMessage(CombatEvent);
+            break;
+          }
         }
       }
     }
@@ -2723,7 +4302,7 @@ namespace AiNative.Protocol.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::AiNative.Protocol.V1.GameplayReflection.Descriptor.MessageTypes[9]; }
+      get { return global::AiNative.Protocol.V1.GameplayReflection.Descriptor.MessageTypes[11]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -2995,7 +4574,7 @@ namespace AiNative.Protocol.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::AiNative.Protocol.V1.GameplayReflection.Descriptor.MessageTypes[10]; }
+      get { return global::AiNative.Protocol.V1.GameplayReflection.Descriptor.MessageTypes[12]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]

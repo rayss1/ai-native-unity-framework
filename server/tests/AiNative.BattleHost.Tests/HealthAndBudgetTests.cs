@@ -193,6 +193,29 @@ public sealed class HealthAndBudgetTests
         Assert.That(reassigned, Is.Zero);
     }
 
+    [TestCase(null, 1, 64)]
+    [TestCase(null, 2, 128)]
+    [TestCase("acceptance", 2, 128)]
+    [TestCase("arena", 1, 8)]
+    [TestCase("arena", 2, 8)]
+    public void GameModePreservesConfiguredAcceptanceCapacityAndBoundsArena(
+        string? mode, int roomCount, int expectedConnections)
+    {
+        IConfiguration configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["AINATIVE_GAME_MODE"] = mode,
+                ["AINATIVE_ENABLE_EVALUATION_ENDPOINTS"] = "true",
+                ["AINATIVE_EVALUATION_ROOM_COUNT"] = roomCount.ToString(),
+            })
+            .Build();
+
+        BattleGameModeSettings gameMode = BattleGameModeSettings.Create(configuration);
+        BattleHostCapacitySettings capacity = BattleHostCapacitySettings.Create(configuration);
+
+        Assert.That(gameMode.GetConnectionCapacity(capacity), Is.EqualTo(expectedConnections));
+    }
+
     [Test]
     public void SyntheticRoomUsesTheSharedFixedIntegerMovementRule()
     {

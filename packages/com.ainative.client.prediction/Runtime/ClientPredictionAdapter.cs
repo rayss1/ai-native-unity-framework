@@ -284,6 +284,10 @@ namespace AiNative.Client.Prediction
             return true;
         }
 
+        /// <summary>Sequence number assigned to the most recently prepared input.</summary>
+        public uint LastPreparedInputSequence =>
+            _nextInputSequence == 0 ? uint.MaxValue : _nextInputSequence - 1;
+
         public PredictionPrepareResult PrepareInput(
             ulong roomTick,
             int moveXMilli,

@@ -17,6 +17,43 @@ enum MessageId {
   MESSAGE_ID_RECONNECT_RESPONSE = 1201;
 }
 
+enum ArenaButton {
+  ARENA_BUTTON_NONE = 0;
+  ARENA_BUTTON_FIRE = 1;
+  ARENA_BUTTON_JUMP = 2;
+  ARENA_BUTTON_RELOAD = 4;
+  ARENA_BUTTON_NEXT_WEAPON = 8;
+  ARENA_BUTTON_PREVIOUS_WEAPON = 16;
+}
+
+enum ArenaWeaponId {
+  ARENA_WEAPON_NONE = 0;
+  ARENA_WEAPON_MACHINEGUN = 1;
+  ARENA_WEAPON_SHOTGUN = 2;
+  ARENA_WEAPON_ROCKET = 3;
+}
+
+enum ArenaMatchPhase {
+  ARENA_MATCH_WAITING = 0;
+  ARENA_MATCH_ACTIVE = 1;
+  ARENA_MATCH_FINISHED = 2;
+}
+
+enum ArenaPickupType {
+  ARENA_PICKUP_UNKNOWN = 0;
+  ARENA_PICKUP_HEALTH = 1;
+  ARENA_PICKUP_ARMOR = 2;
+}
+
+enum ArenaCombatEventType {
+  ARENA_EVENT_FIRE = 0;
+  ARENA_EVENT_HIT = 1;
+  ARENA_EVENT_KILL = 2;
+  ARENA_EVENT_RESPAWN = 3;
+  ARENA_EVENT_PICKUP = 4;
+  ARENA_EVENT_WEAPON_SWITCH = 5;
+}
+
 message LoginRequest {
   uint32 protocol_major = 1;
   string client_build = 2;
@@ -49,6 +86,9 @@ message InputCommand {
   sint32 move_y_milli = 4;
   sint32 yaw_millidegrees = 5;
   uint32 buttons = 6;
+  uint32 weapon_id = 7;
+  sint32 look_yaw_milli = 8;
+  sint32 look_pitch_milli = 9;
   reserved 100 to 199;
 }
 
@@ -64,6 +104,25 @@ message PlayerState {
   sint32 position_z_milli = 4;
   sint32 yaw_millidegrees = 5;
   uint32 health = 6;
+  sint32 velocity_x_milli_per_second = 7;
+  sint32 velocity_y_milli_per_second = 8;
+  sint32 velocity_z_milli_per_second = 9;
+  uint32 weapon_id = 10;
+  uint32 armor = 11;
+  bool alive = 12;
+  uint32 kills = 13;
+  sint32 pitch_millidegrees = 14;
+  reserved 100 to 199;
+}
+
+message PickupState {
+  uint32 pickup_id = 1;
+  ArenaPickupType pickup_type = 2;
+  sint32 position_x_milli = 3;
+  sint32 position_y_milli = 4;
+  sint32 position_z_milli = 5;
+  bool active = 6;
+  fixed64 respawn_tick = 7;
   reserved 100 to 199;
 }
 
@@ -74,6 +133,23 @@ message Snapshot {
   repeated PlayerState players = 4;
   fixed64 state_hash = 5;
   uint32 last_processed_input_sequence = 6;
+  ArenaMatchPhase match_phase = 7;
+  uint32 remaining_ticks = 8;
+  uint32 leader_entity_id = 9;
+  repeated PickupState pickups = 10;
+  reserved 100 to 199;
+}
+
+message ArenaCombatEvent {
+  ArenaCombatEventType event_type = 1;
+  fixed64 event_tick = 2;
+  uint32 source_entity_id = 3;
+  uint32 target_entity_id = 4;
+  ArenaWeaponId weapon_id = 5;
+  uint32 damage = 6;
+  sint32 position_x_milli = 7;
+  sint32 position_y_milli = 8;
+  sint32 position_z_milli = 9;
   reserved 100 to 199;
 }
 
@@ -82,6 +158,7 @@ message ReliableEvent {
   uint32 sequence = 2;
   uint32 event_type = 3;
   bytes payload = 4;
+  ArenaCombatEvent combat_event = 5;
   reserved 100 to 199;
 }
 

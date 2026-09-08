@@ -9,11 +9,19 @@ internal sealed class AcceptanceRoomService(
     BattleMetrics metrics,
     RoomProtocolService protocol,
     BattleRoomSet rooms,
+    ArenaRoom arenaRoom,
+    BattleGameModeSettings gameMode,
     BattleReplayCapture replayCapture,
     ILogger<AcceptanceRoomService> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        if (gameMode.IsArena)
+        {
+            await ExecuteArenaAsync(stoppingToken);
+            return;
+        }
+
         MonotonicFixedRatePacer pacer = new(60);
         readiness.MarkRoomReady();
         logger.LogInformation(
@@ -56,6 +64,46 @@ internal sealed class AcceptanceRoomService(
                 "Acceptance room set drained at tick {Tick} with {RoomCount} room(s)",
                 readiness.Tick,
                 rooms.RoomCount);
+        }
+    }
+
+    private async Task ExecuteArenaAsync(CancellationToken stoppingToken)
+    {
+        MonotonicFixedRatePacer pacer = new(60);
+        readiness.MarkRoomReady();
+        logger.LogInformation(
+            "Arena room ready with capacity {Capacity} at 60 Hz",
+            ArenaRoom.MaxPlayers);
+
+        try
+        {
+            while (true)
+            {
+                await pacer.WaitForNextTickAsync(stoppingToken);
+                long started = Stopwatch.GetTimestamp();
+                protocol.PumpInbound(checked((ulong)readiness.Tick));
+                long gameplayStarted = Stopwatch.GetTimestamp();
+                long allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+                arenaRoom.TickOnce();
+                long gameplayAllocated = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+                metrics.RecordGameplayTick(
+                    Stopwatch.GetElapsedTime(gameplayStarted).TotalMilliseconds,
+                    gameplayAllocated);
+                readiness.AdvanceTick();
+                protocol.PublishSnapshots(checked((ulong)readiness.Tick));
+                metrics.RecordTick(Stopwatch.GetElapsedTime(started).TotalMilliseconds);
+            }
+        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+        }
+        finally
+        {
+            readiness.BeginDrain();
+            logger.LogInformation(
+                "Arena room drained at tick {Tick} with {ConnectedCount} connected players",
+                readiness.Tick,
+                arenaRoom.ConnectedCount);
         }
     }
 }
