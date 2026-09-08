@@ -5,7 +5,8 @@
     "AiNative.Client.Fantasy",
     "AiNative.Client.Prediction",
     "AiNative.Gameplay",
-    "AiNative.Realtime"
+    "AiNative.Realtime",
+    "UnityEngine.UI"
   ],
   "autoReferenced": true
 }

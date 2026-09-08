@@ -5,7 +5,7 @@ using AiNative.Realtime;
 
 namespace AiNative.Client.Prediction
 {
-    internal readonly struct DecodedArenaSnapshot
+    public readonly struct DecodedArenaSnapshot
     {
         public DecodedArenaSnapshot(
             ArenaPlayerState state,
@@ -28,7 +28,7 @@ namespace AiNative.Client.Prediction
         public uint Acknowledgement { get; }
     }
 
-    internal static class ArenaClientProtocolV1
+    public static class ArenaClientProtocolV1
     {
         public const int HeaderBytes = sizeof(ushort);
         public const int MaxDatagramBytes = 1200;
