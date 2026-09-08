@@ -33,7 +33,7 @@ builder.Services.AddSingleton(telemetryHealth);
 builder.Services.AddSingleton<BattleMetrics>();
 builder.Services.AddSingleton<BattleReplayCapture>();
 builder.Services.AddSingleton(new FantasyKcpGateway(
-    maxConnections: capacitySettings.TotalBotCapacity,
+    maxConnections: gameMode.GetConnectionCapacity(capacitySettings),
     outerKcpMtu: outerKcpMtu));
 builder.Services.AddSingleton<RoomProtocolService>();
 if (fantasyEnabled)

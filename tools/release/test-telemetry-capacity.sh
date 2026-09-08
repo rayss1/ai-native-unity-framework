@@ -104,6 +104,21 @@ jq -e '.gates.passed == true and .exporterOutage.tickP99IncrementMilliseconds ==
 
 jq '.tickP99Milliseconds = 1.25' "$fixture_dir/outage.json" > "$fixture_dir/delta-at-limit.json"
 expect_failure delta-at-limit "$fixture_dir/delta-at-limit.json"
+grep -E 'Telemetry Tick P99 increment failed: baseline=1(\.0+)? ms, outage=1\.25 ms, increment=0\.25 ms; required < 0\.25 ms\.' \
+  "$fixture_dir/delta-at-limit.log" >/dev/null
+
+# Preserve the strict gate for the measured PR #27 failure, including its diagnostic.
+write_host "$fixture_dir/baseline.json" false 0.3957 0 0 0 0
+write_host "$fixture_dir/pr27-outage.json" true 0.8143 332 332 0 0
+expect_failure pr27-outage "$fixture_dir/pr27-outage.json"
+grep -F 'Telemetry Tick P99 increment failed: baseline=0.3957 ms, outage=0.8143 ms' \
+  "$fixture_dir/pr27-outage.log" >/dev/null
+write_host "$fixture_dir/baseline.json" false 1.00 0 0 0 0
+
+jq '.sourceCommit = "4444444444444444444444444444444444444444"' \
+  "$fixture_dir/outage.json" > "$fixture_dir/source-drift.json"
+expect_failure source-drift "$fixture_dir/source-drift.json"
+grep -F 'source/Fantasy/protocol identities differ' "$fixture_dir/source-drift.log" >/dev/null
 
 jq '.telemetryMetricExportFailures = 0' "$fixture_dir/outage.json" > "$fixture_dir/no-export-failure.json"
 expect_failure no-export-failure "$fixture_dir/no-export-failure.json"

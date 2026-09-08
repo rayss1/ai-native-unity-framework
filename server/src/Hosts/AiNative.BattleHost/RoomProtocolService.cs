@@ -101,7 +101,7 @@ internal sealed class RoomProtocolService(
     {
         while (gateway.TryAccept(out FantasyKcpConnection? accepted) && accepted is not null)
         {
-            if (_connections.Count >= gameMode.ConnectionCapacity)
+            if (_connections.Count >= gameMode.GetConnectionCapacity(rooms.Settings))
             {
                 accepted.DisposeAsync().AsTask().GetAwaiter().GetResult();
                 metrics.RecordDroppedDiagnostic();

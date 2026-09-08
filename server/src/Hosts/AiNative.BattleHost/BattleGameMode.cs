@@ -10,7 +10,8 @@ internal sealed record BattleGameModeSettings(BattleGameModeKind Kind)
 {
     public bool IsArena => Kind == BattleGameModeKind.Arena;
 
-    public int ConnectionCapacity => IsArena ? ArenaRoom.MaxPlayers : BattleHostCapacitySettings.BotsPerRoom;
+    public int GetConnectionCapacity(BattleHostCapacitySettings capacitySettings)
+        => IsArena ? ArenaRoom.MaxPlayers : capacitySettings.TotalBotCapacity;
 
     public static BattleGameModeSettings Create(IConfiguration configuration)
     {
