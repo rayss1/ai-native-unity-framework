@@ -26,6 +26,7 @@ namespace AiNative.Client.Application
         private bool _finished;
         private GameObject _playerVisual;
         private Camera _playerCamera;
+        private Light _arenaLight;
         private GUIStyle _hudStyle;
 
         public BattleClientSession Session => _session;
@@ -63,6 +64,12 @@ namespace AiNative.Client.Application
             floor.name = "ArenaGreyboxFloor";
             floor.transform.localScale = Vector3.one * 4f;
             floor.GetComponent<Renderer>().material.color = new Color(0.08f, 0.1f, 0.14f);
+            GameObject lightObject = new GameObject("ArenaGreyboxLight");
+            _arenaLight = lightObject.AddComponent<Light>();
+            _arenaLight.type = LightType.Directional;
+            _arenaLight.intensity = 1.2f;
+            _arenaLight.color = new Color(0.8f, 0.9f, 1f);
+            lightObject.transform.rotation = Quaternion.Euler(45f, -30f, 0f);
         }
 
         private void OnGUI()
@@ -75,12 +82,24 @@ namespace AiNative.Client.Application
             };
             GUI.Label(new Rect(16, 16, 700, 28),
                 $"BattleClient  {_session.State}  epoch={_session.ConnectionEpoch} tick={_session.LastReceivedTick} ack={_session.LastAcknowledgedSequence} dropped={_session.DroppedInputFrames}", _hudStyle);
+
+            if (_session.TryGetArenaState(out ArenaPlayerState arenaState))
+            {
+                GUI.Label(new Rect(16, 44, 700, 28),
+                    $"Arena  {_session.ArenaPhase}  HP={arenaState.Health}  AR={arenaState.Armor}  " +
+                    $"Weapon={arenaState.Weapon}  Kills={arenaState.Kills}  Leader={_session.ArenaLeaderEntityId}",
+                    _hudStyle);
+                GUI.Label(new Rect(16, 72, 900, 28),
+                    "WASD move  |  hold left mouse to fire  |  movement is predicted and server-corrected",
+                    _hudStyle);
+            }
         }
 
         private void OnDisable()
         {
             if (_playerVisual is not null) Destroy(_playerVisual);
             if (_playerCamera is not null) Destroy(_playerCamera.gameObject);
+            if (_arenaLight is not null) Destroy(_arenaLight.gameObject);
         }
 
         private void Update()
@@ -169,6 +188,12 @@ namespace AiNative.Client.Application
                     (float)(position.XMillimetres / 1000d),
                     current.y,
                     (float)(position.ZMillimetres / 1000d));
+            }
+
+            if (_playerVisual is not null && _session.TryGetArenaState(out ArenaPlayerState arenaState))
+            {
+                _playerVisual.transform.localRotation =
+                    Quaternion.Euler(0f, arenaState.YawMillidegrees / 1000f, 0f);
             }
         }
 
