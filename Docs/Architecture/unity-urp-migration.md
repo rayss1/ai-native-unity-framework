@@ -3,7 +3,7 @@
 Baseline: Unity `6000.3.23f1` (`09d2ecc7fb28`), Universal RP `17.3.0`.
 Authority: [ADR-0016](../ADR/0016-unity-6000-3-23-and-urp.md).
 
-`client/UnityProject/Assets/AiNative.BattleClient/Rendering` contains the Universal Renderer and pipeline assets. Graphics and all six quality levels select that pipeline. The previously selected quality index 2 is preserved.
+`client/UnityProject/Assets/AiNative.BattleClient/Rendering` contains the Universal Renderer and pipeline assets. Graphics and all six quality levels select that pipeline. Migration preserved quality index 2. Before merge, the Editor saved its latest quality index 0, Very Low anti-aliasing 4, and reflection-probe atlas disabled; these settings are retained.
 
 `Resources/BattleClient/Player.mat` and `Floor.mat` retain URP/Lit shaders and provide the greybox colors. The runtime uses shared material references without allocating material instances. The Built-in Standard always-included workaround is removed.
 
