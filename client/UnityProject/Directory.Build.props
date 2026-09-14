@@ -1,0 +1,9 @@
+<Project>
+  <!-- Unity owns the generated IDE projects' language, references and output paths.
+       Stop MSBuild's upward search here: the repository defaults target .NET tools
+       and servers, and enabling implicit usings generates C# 10 syntax for Unity's
+       C# 9 projects. Do not import the repository-level Directory.Build.props. -->
+  <PropertyGroup>
+    <ImplicitUsings>disable</ImplicitUsings>
+  </PropertyGroup>
+</Project>
