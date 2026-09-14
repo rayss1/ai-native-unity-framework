@@ -32,6 +32,34 @@ The following configuration limits fail at startup when out of range:
 
 The workflow retains the summary and raw Host/load/health/log inputs in the `runtime-telemetry-capacity` artifact. A future Battle Host publication must present that unexpired artifact from the same exact successful `main` qualification run as its provenance and 60-minute soak.
 
+## 2026-09-14 outage retry correction (qualification pending)
+
+PR #29 exposed a pre-existing lack of headroom in this comparison. Run
+`34822736470` measured baseline/outage Tick P99 of `0.2118/0.6251 ms`
+(`0.4133 ms` increment), and the preceding PR head also failed (`0.5307 ms`).
+The earlier successful main run `34812069678` was already close to the limit
+at `0.2474 ms`. The Unity change did not alter the server or its protocol.
+
+The metric exporter previously retried the unavailable collector on every
+reader interval (once per second in this profile). Consecutive actual export
+failures now use a monotonic `1, 2, 4, 8, 16, 30` second backoff, capped at
+30 seconds and reset by success. The reader still collects metrics and checks
+cardinality during backoff; skipped network attempts return failure and are
+counted separately as `metricExportBackoffs` in health and
+`telemetryMetricExportBackoffs` in Host evidence. Actual attempt/failure counts
+are not inflated by skipped attempts. Export remains on the reader thread;
+no retry or wait is added to the room Tick. Cumulative metric collection and
+the existing bounded trace queue remain in place.
+
+Deterministic clock tests cover failed/throwing exporters, the retry cap,
+successful recovery, and tag/cardinality observation during backoff. This is
+a candidate mitigation for repeated outage work, not yet proof of the entire
+latency cause. The Linux comparison must still pass the unchanged 300-second,
+64-client workload and strict `< 0.25 ms` increment gate. Desktop Windows
+diagnostics are not qualification evidence. Rollback reverts the exporter
+retry policy and its additive diagnostic counter without changing protocol,
+room behavior, dependencies, or acceptance thresholds.
+
 ## Qualified exact-main evidence
 
 [Battle Host production validation run 32883119254](https://github.com/rayss1/ai-native-unity-framework/actions/runs/32883119254) completed successfully on 2026-08-25. The repository-owned `tools/release/verify-battle-host-qualification.sh` independently accepted the downloaded `runtime-acceptance-provenance`, `runtime-acceptance-soak`, and `runtime-telemetry-capacity` artifacts against an exact checkout of the source commit. The run reported no failed job or gate; `runtime-acceptance-evidence` also retained the qualified impairment, replay, and backpressure inputs.
