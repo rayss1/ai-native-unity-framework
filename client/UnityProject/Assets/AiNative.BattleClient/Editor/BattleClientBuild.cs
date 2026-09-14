@@ -18,6 +18,7 @@ namespace AiNative.Client.Editor
 
         public static void BuildWindowsSmoke()
         {
+            BattleClientRendering.ValidateUrpConfiguration();
             string output = ReadRequiredAbsolutePath(
                 Environment.GetCommandLineArgs(),
                 "--ainative-build-output");
@@ -55,6 +56,7 @@ namespace AiNative.Client.Editor
 
         public static void BuildMacOsArm64Smoke()
         {
+            BattleClientRendering.ValidateUrpConfiguration();
             string output = ReadRequiredAbsolutePath(
                 Environment.GetCommandLineArgs(),
                 "--ainative-build-output");

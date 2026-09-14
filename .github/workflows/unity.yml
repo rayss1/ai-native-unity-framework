@@ -14,7 +14,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Run Unity 6000.3.9f1 EditMode vectors
+      - name: Run Unity 6000.3.23f1 EditMode vectors
         uses: game-ci/unity-test-runner@v4
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
@@ -22,7 +22,7 @@ jobs:
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
         with:
           projectPath: client/UnityProject
-          unityVersion: 6000.3.9f1
+          unityVersion: 6000.3.23f1
           testMode: EditMode
           artifactsPath: artifacts/unity-test-results
           githubToken: ${{ secrets.GITHUB_TOKEN }}

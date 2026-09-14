@@ -2,7 +2,7 @@
 param(
     [string] $UnityEditorPath = $(
         if ($env:UNITY_EDITOR_PATH) { $env:UNITY_EDITOR_PATH }
-        else { 'C:\Program Files\Unity\Hub\Editor\6000.3.9f1\Editor\Unity.exe' }
+        else { 'C:\Program Files\Unity\Hub\Editor\6000.3.23f1\Editor\Unity.exe' }
     ),
     [string] $EvidenceDirectory,
     [string] $HostAddress = '127.0.0.1',
@@ -158,14 +158,14 @@ if ($fantasyCommit -ne 'f8bed0d464924f159d46498f1311206ea0694be8') {
 
 $projectVersionPath = Join-Path $repositoryRoot 'client/UnityProject/ProjectSettings/ProjectVersion.txt'
 $projectVersion = Get-Content -LiteralPath $projectVersionPath -Raw
-if ($projectVersion -notmatch '(?m)^m_EditorVersion: 6000\.3\.9f1\s*$' -or
-    $projectVersion -notmatch '(?m)^m_EditorVersionWithRevision: 6000\.3\.9f1 \(7a9955a4f2fa\)\s*$') {
-    throw 'The Unity project is not pinned to 6000.3.9f1 revision 7a9955a4f2fa.'
+if ($projectVersion -notmatch '(?m)^m_EditorVersion: 6000\.3\.23f1\s*$' -or
+    $projectVersion -notmatch '(?m)^m_EditorVersionWithRevision: 6000\.3\.23f1 \(09d2ecc7fb28\)\s*$') {
+    throw 'The Unity project is not pinned to 6000.3.23f1 revision 09d2ecc7fb28.'
 }
 
 $editorVersionOutput = Get-UnityVersionOutput
-if ($editorVersionOutput -notmatch '6000\.3\.9f1') {
-    throw "Expected Unity Editor 6000.3.9f1, found: $editorVersionOutput"
+if ($editorVersionOutput -notmatch '6000\.3\.23f1') {
+    throw "Expected Unity Editor 6000.3.23f1, found: $editorVersionOutput"
 }
 
 if (-not $EvidenceDirectory) {
@@ -202,7 +202,7 @@ if ($dotnetSdk -ne '10.0.202') {
 }
 $metadata.Add("dotnet_sdk=$dotnetSdk")
 $metadata.Add("editor_version_output=$editorVersionOutput")
-$metadata.Add('editor_revision=7a9955a4f2fa')
+$metadata.Add('editor_revision=09d2ecc7fb28')
 $metadata.Add("editor_executable_sha256=$(Get-Sha256 $UnityEditorPath)")
 $metadata.Add("manifest_sha256=$(Get-Sha256 $manifestPath)")
 $metadata.Add("packages_lock_sha256=$(Get-Sha256 $lockPath)")
@@ -304,7 +304,7 @@ try {
         '-testResults', $editModeXml,
         '-logFile', $editModeLog
     )
-    $editMode = Assert-NUnitResult -Path $editModeXml -ExpectedPassed 44 -Label 'EditMode'
+    $editMode = Assert-NUnitResult -Path $editModeXml -ExpectedPassed 51 -Label 'EditMode'
 
     Invoke-Unity -Description 'Unity PlayMode validation' -ArgumentList @(
         '-batchmode', '-nographics',

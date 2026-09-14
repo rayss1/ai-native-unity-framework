@@ -103,6 +103,7 @@ app.MapGet("/health/telemetry", () =>
         snapshot.ExporterConfigured,
         snapshot.MetricExportAttempts,
         snapshot.MetricExportFailures,
+        snapshot.MetricExportBackoffs,
         snapshot.TraceExportAttempts,
         snapshot.TraceExportFailures,
         snapshot.TraceRecordsDropped,

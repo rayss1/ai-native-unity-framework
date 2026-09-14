@@ -204,6 +204,7 @@ internal readonly record struct TelemetryExportSnapshot(
     bool ExporterConfigured,
     long MetricExportAttempts,
     long MetricExportFailures,
+    long MetricExportBackoffs,
     long TraceExportAttempts,
     long TraceExportFailures,
     long TraceRecordsDropped,
@@ -218,6 +219,7 @@ internal sealed class TelemetryExportHealth(bool exporterConfigured)
     private readonly HashSet<string> _projectMetricSeries = new(StringComparer.Ordinal);
     private long _metricExportAttempts;
     private long _metricExportFailures;
+    private long _metricExportBackoffs;
     private long _traceExportAttempts;
     private long _traceExportFailures;
     private long _projectMetricTagViolations;
@@ -236,6 +238,7 @@ internal sealed class TelemetryExportHealth(bool exporterConfigured)
             exporterConfigured,
             Interlocked.Read(ref _metricExportAttempts),
             Interlocked.Read(ref _metricExportFailures),
+            Interlocked.Read(ref _metricExportBackoffs),
             Interlocked.Read(ref _traceExportAttempts),
             Interlocked.Read(ref _traceExportFailures),
             Interlocked.Read(ref _traceRecordsDropped),
@@ -261,6 +264,8 @@ internal sealed class TelemetryExportHealth(bool exporterConfigured)
             Interlocked.Increment(ref _traceExportFailures);
         }
     }
+
+    public void RecordMetricExportBackoff() => Interlocked.Increment(ref _metricExportBackoffs);
 
     public void RecordTraceDropped(int count = 1) =>
         Interlocked.Add(ref _traceRecordsDropped, count);
@@ -311,12 +316,26 @@ internal sealed class TelemetryExportHealth(bool exporterConfigured)
 
 internal sealed class TrackingMetricExporter(
     BaseExporter<Metric> inner,
-    TelemetryExportHealth health) : BaseExporter<Metric>
+    TelemetryExportHealth health,
+    TimeProvider? timeProvider = null) : BaseExporter<Metric>
 {
+    private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
+    private long _lastFailureTimestamp;
+    private int _retryDelaySeconds;
+
     public override ExportResult Export(in Batch<Metric> batch)
     {
         Batch<Metric> observed = batch;
         health.ObserveMetricBatch(ref observed);
+        // The periodic reader serializes exports. Keep observing cardinality during an
+        // outage, but bound repeated connection failures on its background thread.
+        if (_retryDelaySeconds > 0 &&
+            _timeProvider.GetElapsedTime(_lastFailureTimestamp).TotalSeconds < _retryDelaySeconds)
+        {
+            health.RecordMetricExportBackoff();
+            return ExportResult.Failure;
+        }
+
         ExportResult result;
         try
         {
@@ -328,6 +347,16 @@ internal sealed class TrackingMetricExporter(
         }
 
         health.RecordMetricExport(result);
+        if (result == ExportResult.Failure)
+        {
+            _lastFailureTimestamp = _timeProvider.GetTimestamp();
+            _retryDelaySeconds = _retryDelaySeconds == 0 ? 1 : Math.Min(30, _retryDelaySeconds * 2);
+        }
+        else
+        {
+            _retryDelaySeconds = 0;
+        }
+
         return result;
     }
 
