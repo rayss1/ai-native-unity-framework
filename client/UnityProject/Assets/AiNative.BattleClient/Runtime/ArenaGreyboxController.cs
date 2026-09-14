@@ -39,11 +39,15 @@ namespace AiNative.Client.Application
                 move = Vector2.ClampMagnitude(move, 1f);
             }
             Vector2 look = _look;
-            if (enableGyro && SystemInfo.supportsGyroscope) look += Input.gyro.rotationRateUnbiased * 0.15f;
+            if (enableGyro && SystemInfo.supportsGyroscope)
+            {
+                Vector3 gyro = Input.gyro.rotationRateUnbiased;
+                look += new Vector2(gyro.x, gyro.y) * 0.15f;
+            }
             _state.YawMillidegrees += Mathf.RoundToInt(look.x * lookSensitivity * 1000f);
             _state.PitchMillidegrees = Mathf.Clamp(
                 _state.PitchMillidegrees - Mathf.RoundToInt(look.y * lookSensitivity * 1000f),
-                -ArenaMovement.MaxPitchMillidegrees, ArenaMovement.MaxPitchMillidegrees);
+                -ArenaMovement.MaximumPitchMillidegrees, ArenaMovement.MaximumPitchMillidegrees);
             _look = Vector2.zero;
             _state.Weapon = (ArenaWeaponId)_weapon;
             _state = ArenaMovement.Step(_state, new ArenaInput(1, (ulong)(Time.frameCount),

@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using AiNative.Gameplay;
 using AiNative.Client.Prediction;
 using UnityEngine;
 
@@ -23,6 +24,10 @@ namespace AiNative.Client.Application
         private float _regionalMeasurementElapsed;
         private bool _regionalMeasurementStarted;
         private bool _finished;
+        private GameObject _playerVisual;
+        private Camera _playerCamera;
+        private Light _arenaLight;
+        private GUIStyle _hudStyle;
 
         public BattleClientSession Session => _session;
 
@@ -39,6 +44,63 @@ namespace AiNative.Client.Application
         }
 
         private void Start() => _session.Start();
+
+        private void OnEnable()
+        {
+            // Runtime-only greybox presentation keeps the scene usable without authored assets.
+            _playerVisual = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+            _playerVisual.name = "LocalPlayerGreybox";
+            _playerVisual.transform.SetParent(transform, false);
+            _playerVisual.transform.localPosition = Vector3.up;
+            Renderer renderer = _playerVisual.GetComponent<Renderer>();
+            renderer.material.color = new Color(0.15f, 0.65f, 1f);
+            GameObject cameraObject = new GameObject("LocalPlayerCamera");
+            cameraObject.transform.SetParent(_playerVisual.transform, false);
+            cameraObject.transform.localPosition = new Vector3(0f, 0.65f, -4f);
+            cameraObject.transform.localRotation = Quaternion.Euler(8f, 0f, 0f);
+            _playerCamera = cameraObject.AddComponent<Camera>();
+            _playerCamera.tag = "MainCamera";
+            GameObject floor = GameObject.CreatePrimitive(PrimitiveType.Plane);
+            floor.name = "ArenaGreyboxFloor";
+            floor.transform.localScale = Vector3.one * 4f;
+            floor.GetComponent<Renderer>().material.color = new Color(0.08f, 0.1f, 0.14f);
+            GameObject lightObject = new GameObject("ArenaGreyboxLight");
+            _arenaLight = lightObject.AddComponent<Light>();
+            _arenaLight.type = LightType.Directional;
+            _arenaLight.intensity = 1.2f;
+            _arenaLight.color = new Color(0.8f, 0.9f, 1f);
+            lightObject.transform.rotation = Quaternion.Euler(45f, -30f, 0f);
+        }
+
+        private void OnGUI()
+        {
+            if (_session is null) return;
+            _hudStyle ??= new GUIStyle(GUI.skin.label)
+            {
+                fontSize = 16,
+                normal = { textColor = Color.white }
+            };
+            GUI.Label(new Rect(16, 16, 700, 28),
+                $"BattleClient  {_session.State}  epoch={_session.ConnectionEpoch} tick={_session.LastReceivedTick} ack={_session.LastAcknowledgedSequence} dropped={_session.DroppedInputFrames}", _hudStyle);
+
+            if (_session.TryGetArenaState(out ArenaPlayerState arenaState))
+            {
+                GUI.Label(new Rect(16, 44, 700, 28),
+                    $"Arena  {_session.ArenaPhase}  HP={arenaState.Health}  AR={arenaState.Armor}  " +
+                    $"Weapon={arenaState.Weapon}  Kills={arenaState.Kills}  Leader={_session.ArenaLeaderEntityId}",
+                    _hudStyle);
+                GUI.Label(new Rect(16, 72, 900, 28),
+                    "WASD move  |  hold left mouse to fire  |  movement is predicted and server-corrected",
+                    _hudStyle);
+            }
+        }
+
+        private void OnDisable()
+        {
+            if (_playerVisual is not null) Destroy(_playerVisual);
+            if (_playerCamera is not null) Destroy(_playerCamera.gameObject);
+            if (_arenaLight is not null) Destroy(_arenaLight.gameObject);
+        }
 
         private void Update()
         {
@@ -104,7 +166,15 @@ namespace AiNative.Client.Application
                         (Input.GetKey(KeyCode.S) ? MoveScaleMilli : 0);
             }
 
-            _session.PredictAndQueueInput(_roomTick, moveX, moveZ);
+            ArenaButtons buttons = Input.GetMouseButton(0) ? ArenaButtons.Fire : ArenaButtons.None;
+            _session.PredictAndQueueArenaInput(
+                _roomTick,
+                moveX,
+                moveZ,
+                0,
+                0,
+                buttons,
+                ArenaWeaponId.Machinegun);
         }
 
         private void LateUpdate()
@@ -113,11 +183,17 @@ namespace AiNative.Client.Application
                     Time.unscaledDeltaTime,
                     out PresentationPosition position))
             {
-                Vector3 current = transform.localPosition;
-                transform.localPosition = new Vector3(
+                Vector3 current = transform.position;
+                transform.position = new Vector3(
                     (float)(position.XMillimetres / 1000d),
                     current.y,
                     (float)(position.ZMillimetres / 1000d));
+            }
+
+            if (_playerVisual is not null && _session.TryGetArenaState(out ArenaPlayerState arenaState))
+            {
+                _playerVisual.transform.localRotation =
+                    Quaternion.Euler(0f, arenaState.YawMillidegrees / 1000f, 0f);
             }
         }
 
