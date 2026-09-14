@@ -3,7 +3,9 @@
   "rootNamespace": "AiNative.Client.Editor",
   "references": [
     "AiNative.Client.Application",
-    "AiNative.Client.Fantasy"
+    "AiNative.Client.Fantasy",
+    "Unity.RenderPipelines.Core.Runtime",
+    "Unity.RenderPipelines.Universal.Runtime"
   ],
   "includePlatforms": [
     "Editor"

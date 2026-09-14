@@ -1,14 +1,14 @@
 # Unity macOS Validation
 
 Status: Required temporary validation path under ADR-0014
-Editor: Unity `6000.3.9f1` revision `7a9955a4f2fa`
+Editor: Unity `6000.3.23f1` revision `09d2ecc7fb28`; URP `17.3.0` (ADR-0016)
 Primary desktop gate: macOS Apple Silicon ARM64 + Mono
 
 ## Scope and pass criteria
 
-Run the exact same source from `shared/gameplay`, `shared/realtime`, the client prediction and Fantasy transport packages, and the Battle Client application through Unity. A valid run uses a clean checkout of the exact commit under review, Unity `6000.3.9f1` revision `7a9955a4f2fa`, and the repository-pinned Fantasy and .NET image identities.
+Run the exact same source from `shared/gameplay`, `shared/realtime`, the client prediction and Fantasy transport packages, and the Battle Client application through Unity. A valid run uses a clean checkout of the exact commit under review, Unity `6000.3.23f1` revision `09d2ecc7fb28`, and the repository-pinned Fantasy and .NET image identities.
 
-EditMode must report exactly 44 passed, zero failed, and zero skipped. The original contract, prediction, Fantasy transport, and application protocol/state tests remain mandatory. The WS-27 histogram tests and six WS-28 presentation-smoothing/composition tests freeze bounded correction measurement, render continuity, snap/reset behavior, authority separation, and zero allocation.
+EditMode must report exactly 51 passed, zero failed, and zero skipped. The original contract, prediction, Fantasy transport, and application protocol/state tests remain mandatory. The WS-27 histogram tests and six WS-28 presentation-smoothing/composition tests freeze bounded correction measurement, render continuity, snap/reset behavior, authority separation, and zero allocation.
 
 PlayMode must report exactly 2 passed, zero failed, and zero skipped against the real Fantasy KCP Battle Host: one covers login/join/first Snapshot/deterministic Input acknowledgement, and one forces reconnect and proves a newer epoch plus continued prediction.
 
@@ -38,7 +38,7 @@ The script:
 1. verifies macOS ARM64, Unity, source, submodule, UPM, license, and tool identities;
 2. builds the exact-source Battle Host with the fixed .NET `10.0.202` SDK and `10.0.4` runtime image digests under Linux x64 emulation;
 3. starts only that container, keeps readiness available at `127.0.0.1:22080`, discovers and proves a macOS-reachable Colima address, and uses that address for KCP `22000/udp`;
-4. executes the exact 44/2 EditMode/PlayMode totals;
+4. executes the exact 51/2 EditMode/PlayMode totals;
 5. builds an ARM64-only macOS Mono `.app`, verifies its notices, and runs the deterministic reconnect smoke;
 6. applies the symmetric Regional qdiscs only to the Colima-to-container path, runs the 10+60-second real-client correction measurement, records qdisc statistics, and restores the original interface classes;
 7. stops the Host normally and rejects any tracked worktree drift.
@@ -81,7 +81,7 @@ The Windows x64 Mono path remains available for future cross-platform evidence a
 tools/run-unity-windows-validation.ps1
 ```
 
-It retains the current exact 44 EditMode, 2 real-KCP PlayMode, and Windows Player smoke contract. A macOS pass does not claim that Windows has passed, and a future Windows result must be recorded separately.
+It retains the current exact 51 EditMode, 2 real-KCP PlayMode, and Windows Player smoke contract. A macOS pass does not claim that Windows has passed, and a future Windows result must be recorded separately.
 
 ## Unity Editor UI alternative
 

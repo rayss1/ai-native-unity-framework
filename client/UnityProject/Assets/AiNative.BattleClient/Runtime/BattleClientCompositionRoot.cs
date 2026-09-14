@@ -25,6 +25,7 @@ namespace AiNative.Client.Application
         private bool _regionalMeasurementStarted;
         private bool _finished;
         private GameObject _playerVisual;
+        private GameObject _floorVisual;
         private Camera _playerCamera;
         private Light _arenaLight;
         private GUIStyle _hudStyle;
@@ -47,23 +48,23 @@ namespace AiNative.Client.Application
 
         private void OnEnable()
         {
-            // Runtime-only greybox presentation keeps the scene usable without authored assets.
+            // Resource material references retain the URP shaders in standalone builds.
             _playerVisual = GameObject.CreatePrimitive(PrimitiveType.Capsule);
             _playerVisual.name = "LocalPlayerGreybox";
             _playerVisual.transform.SetParent(transform, false);
             _playerVisual.transform.localPosition = Vector3.up;
             Renderer renderer = _playerVisual.GetComponent<Renderer>();
-            renderer.material.color = new Color(0.15f, 0.65f, 1f);
+            renderer.sharedMaterial = LoadGreyboxMaterial("Player");
             GameObject cameraObject = new GameObject("LocalPlayerCamera");
             cameraObject.transform.SetParent(_playerVisual.transform, false);
             cameraObject.transform.localPosition = new Vector3(0f, 0.65f, -4f);
             cameraObject.transform.localRotation = Quaternion.Euler(8f, 0f, 0f);
             _playerCamera = cameraObject.AddComponent<Camera>();
             _playerCamera.tag = "MainCamera";
-            GameObject floor = GameObject.CreatePrimitive(PrimitiveType.Plane);
-            floor.name = "ArenaGreyboxFloor";
-            floor.transform.localScale = Vector3.one * 4f;
-            floor.GetComponent<Renderer>().material.color = new Color(0.08f, 0.1f, 0.14f);
+            _floorVisual = GameObject.CreatePrimitive(PrimitiveType.Plane);
+            _floorVisual.name = "ArenaGreyboxFloor";
+            _floorVisual.transform.localScale = Vector3.one * 4f;
+            _floorVisual.GetComponent<Renderer>().sharedMaterial = LoadGreyboxMaterial("Floor");
             GameObject lightObject = new GameObject("ArenaGreyboxLight");
             _arenaLight = lightObject.AddComponent<Light>();
             _arenaLight.type = LightType.Directional;
@@ -97,9 +98,22 @@ namespace AiNative.Client.Application
 
         private void OnDisable()
         {
-            if (_playerVisual is not null) Destroy(_playerVisual);
-            if (_playerCamera is not null) Destroy(_playerCamera.gameObject);
-            if (_arenaLight is not null) Destroy(_arenaLight.gameObject);
+            // Unity may have already destroyed native objects during Player shutdown.
+            // The camera is a child of the player and is destroyed with it.
+            if (_playerVisual != null) Destroy(_playerVisual);
+            if (_floorVisual != null) Destroy(_floorVisual);
+            if (_arenaLight != null) Destroy(_arenaLight.gameObject);
+            _playerVisual = null;
+            _floorVisual = null;
+            _playerCamera = null;
+            _arenaLight = null;
+        }
+
+        private static Material LoadGreyboxMaterial(string name)
+        {
+            Material material = Resources.Load<Material>("BattleClient/" + name);
+            if (material == null) throw new InvalidOperationException("Missing greybox material: " + name);
+            return material;
         }
 
         private void Update()

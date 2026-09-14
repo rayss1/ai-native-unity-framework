@@ -106,8 +106,8 @@ samples/                          # Minimal vertical slices and plugin examples
 
 ### 5.1 Runtime and presentation
 
-- Unity 6.3 LTS with a mobile-first configuration.
-- URP is the default rendering baseline unless a product profile requires another pipeline.
+- Unity 6.3 LTS, pinned to `6000.3.23f1` (`09d2ecc7fb28`) by [ADR-0016](../ADR/0016-unity-6000-3-23-and-urp.md).
+- URP `17.3.0` is the default rendering baseline unless a product profile requires another pipeline; mobile-specific quality and IL2CPP qualification remain separate gates.
 - Android and iOS release builds use IL2CPP. PC uses the same gameplay and package baseline.
 - Quality profiles own platform-specific frame-rate, memory, texture, shader variant, and rendering budgets.
 - GameObject/MonoBehaviour is the default gameplay presentation model.

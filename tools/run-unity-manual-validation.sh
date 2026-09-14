@@ -2,12 +2,12 @@
 set -euo pipefail
 
 repo_root="$(git rev-parse --show-toplevel)"
-editor_path="${UNITY_EDITOR_PATH:-/Applications/Unity/Hub/Editor/6000.3.9f1/Unity.app/Contents/MacOS/Unity}"
+editor_path="${UNITY_EDITOR_PATH:-/Applications/Unity/Hub/Editor/6000.3.23f1/Unity.app/Contents/MacOS/Unity}"
 sdk_image='mcr.microsoft.com/dotnet/sdk:10.0.202-noble@sha256:adc02be8b87957d07208a4a3e51775935b33bad3317de8c45b1e67357b4c073b'
 runtime_image='mcr.microsoft.com/dotnet/aspnet:10.0.4-noble@sha256:8b75cdf59a5068d9adfd8a6d202cc7671b2dc8f5f46c51e3b88a0a632e8fad1f'
 expected_fantasy='f8bed0d464924f159d46498f1311206ea0694be8'
-expected_unity_version='6000.3.9f1'
-expected_unity_revision='7a9955a4f2fa'
+expected_unity_version='6000.3.23f1'
+expected_unity_revision='09d2ecc7fb28'
 expected_fantasy_url='https://github.com/rayss1/Fantasy.git?path=/Fantasy.Packages/Fantasy.Unity#f8bed0d464924f159d46498f1311206ea0694be8'
 kcp_port=22000
 health_port=22080
@@ -142,8 +142,8 @@ if [[ "$editor_revision" != "$expected_unity_revision" ]]; then
 fi
 
 project_version="$repo_root/client/UnityProject/ProjectSettings/ProjectVersion.txt"
-grep -Eq '^m_EditorVersion: 6000\.3\.9f1$' "$project_version" || fail 'The Unity project version is not pinned to 6000.3.9f1.'
-grep -Eq '^m_EditorVersionWithRevision: 6000\.3\.9f1 \(7a9955a4f2fa\)$' "$project_version" || fail 'The Unity project revision is not pinned to 7a9955a4f2fa.'
+grep -Eq '^m_EditorVersion: 6000\.3\.23f1$' "$project_version" || fail 'The Unity project version is not pinned to 6000.3.23f1.'
+grep -Eq '^m_EditorVersionWithRevision: 6000\.3\.23f1 \(09d2ecc7fb28\)$' "$project_version" || fail 'The Unity project revision is not pinned to 09d2ecc7fb28.'
 
 manifest="$repo_root/client/UnityProject/Packages/manifest.json"
 lock_file="$repo_root/client/UnityProject/Packages/packages-lock.json"
@@ -323,7 +323,7 @@ fi
   echo "kcp_endpoint=$kcp_host:$kcp_port"
 } >>"$metadata"
 
-echo 'Running 44 exact-commit Unity EditMode tests...'
+echo 'Running 51 exact-commit Unity EditMode tests...'
 "$editor_path" \
   -batchmode \
   -nographics \
@@ -332,7 +332,7 @@ echo 'Running 44 exact-commit Unity EditMode tests...'
   -testPlatform EditMode \
   -testResults "$editmode_xml" \
   -logFile "$editmode_log"
-assert_nunit_result "$editmode_xml" 44 'EditMode'
+assert_nunit_result "$editmode_xml" 51 'EditMode'
 
 echo 'Running 2 real Fantasy KCP Unity PlayMode tests...'
 AINATIVE_WS26_RUN_PLAYMODE=1 \
@@ -531,7 +531,7 @@ container_id=''
 
 {
   echo 'result=Passed'
-  echo 'editmode_passed=44'
+  echo 'editmode_passed=51'
   echo 'editmode_failed=0'
   echo 'editmode_skipped=0'
   echo 'playmode_passed=2'
