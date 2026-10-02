@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../AiNative.Server.Rooms/AiNative.Server.Rooms.csproj" />
+    <ProjectReference Include="../AiNative.Server.Backend/AiNative.Server.Backend.csproj" />
+    <ProjectReference Include="../AiNative.Server.Fantasy/AiNative.Server.Fantasy.csproj" />
+    <ProjectReference Include="../AiNative.Server.Protocol/AiNative.Server.Protocol.csproj" />
+    <ProjectReference Include="../../../../shared/gameplay/Gameplay.Shared.csproj" />
+    <ProjectReference Include="../../../../shared/realtime/Realtime.Shared.csproj" />
+  </ItemGroup>
+</Project>

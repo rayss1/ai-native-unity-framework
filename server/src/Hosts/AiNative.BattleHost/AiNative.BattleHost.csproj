@@ -9,9 +9,13 @@
     <RestoreAdditionalProjectSources>$(RestoreAdditionalProjectSources);$(MSBuildThisFileDirectory)../../../vendor/Fantasy/nupkg</RestoreAdditionalProjectSources>
     <!-- The composition root owns Fantasy.config and enables its compile-time scene registry. -->
     <IsDirectFantasyNetReference>false</IsDirectFantasyNetReference>
-    <FantasyConfigAutoDiscoveryEnabled>true</FantasyConfigAutoDiscoveryEnabled>
+    <FantasyConfigAutoDiscoveryEnabled>false</FantasyConfigAutoDiscoveryEnabled>
   </PropertyGroup>
   <ItemGroup>
+    <!-- Compile all topology scene names while retaining the legacy runtime config as the default. -->
+    <AdditionalFiles Include="../../../../infrastructure/topology/Fantasy.config" SourceItemGroup="FantasyConfig" />
+    <ProjectReference Include="../../Modules/AiNative.Server.Battle/AiNative.Server.Battle.csproj" />
+    <ProjectReference Include="../../Modules/AiNative.Server.Hosting/AiNative.Server.Hosting.csproj" />
     <ProjectReference Include="../../Modules/AiNative.Server.Fantasy/AiNative.Server.Fantasy.csproj" />
     <ProjectReference Include="../../Modules/AiNative.Server.Protocol/AiNative.Server.Protocol.csproj" />
     <ProjectReference Include="../../../../shared/gameplay/Gameplay.Shared.csproj" />

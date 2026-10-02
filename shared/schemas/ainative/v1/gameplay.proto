@@ -57,12 +57,17 @@ enum ArenaCombatEventType {
 message LoginRequest {
   uint32 protocol_major = 1;
   string client_build = 2;
+  string entry_ticket = 3;
+  string global_room_id = 4;
   reserved 100 to 199;
 }
 
 message LoginResponse {
   fixed64 session_id = 1;
   uint32 connection_epoch = 2;
+  string global_room_id = 3;
+  string boot_epoch = 4;
+  fixed64 room_tick = 5;
   reserved 100 to 199;
 }
 

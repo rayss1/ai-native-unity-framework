@@ -32,6 +32,8 @@ Changing an accepted contract requires a superseding ADR that records compatibil
 | [0015](0015-room-aware-replay-format.md) | Accepted | Room-aware replay format | New captures use v2 room identity; the reader retains v1 one-room compatibility and fails closed | Exact-main replay-enabled evidence passed; environment canary/rollback remains |
 | [0016](0016-unity-6000-3-23-and-urp.md) | Accepted | Unity 6000.3.23f1 and URP | Owner-requested editor patch and client rendering baseline | URP 17.3.0; fresh Windows development validation, separate platform/release gates |
 
+| [0017](0017-single-region-service-topology.md) | Accepted | Six independent single-region services and fixed Battle Workers | Hosts remain independent composition roots; durable allocation, signed entry and idempotent settlement | Cross-process Fantasy routing, recovery/fault tests and representative capacity evidence |
+
 ## Open decision gates
 
 These are deliberately not final product choices. Each owner must record the resulting evidence in a new or superseding ADR before crossing the named gate.

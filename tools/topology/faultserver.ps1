@@ -1,0 +1,55 @@
+param([ValidateSet('backend-restarts','player-outage','battle-crash','capacity','bots','expired-ticket','party-notifications')][string]$Mode, [string]$SdkPath, [string]$RunDirectory='artifacts/topology-local', [switch]$SkipBuild, [switch]$SkipAudit, [int]$MatchTicks=1200)
+. "$PSScriptRoot/common.ps1" -SdkPath $SdkPath -RunDirectory $RunDirectory
+if(-not $env:AINATIVE_TEST_POSTGRES){throw 'Isolated AINATIVE_TEST_POSTGRES required'}
+if($Mode -in @('capacity','bots') -and $MatchTicks -eq 1200){$MatchTicks=6000}
+if($Mode -eq 'backend-restarts' -and $MatchTicks -eq 1200){$MatchTicks=2400}
+if($Mode -eq 'expired-ticket' -and $MatchTicks -eq 1200){$MatchTicks=9000}
+if(-not $SkipBuild){& "$PSScriptRoot/build.ps1" -SdkPath $SdkPath -RunDirectory $RunDirectory -SkipAudit:$SkipAudit}
+& "$PSScriptRoot/initialize.ps1" -SdkPath $SdkPath -RunDirectory $RunDirectory
+$signalDirectory=Join-Path $Run ('fault-signals-'+[guid]::NewGuid().ToString('N'));New-Item -ItemType Directory $signalDirectory | Out-Null
+$launch=@('-NoProfile','-File',('"'+(Join-Path $PSScriptRoot 'start.ps1')+'"'),'-SdkPath',('"'+$SdkPath+'"'),'-RunDirectory',('"'+$RunDirectory+'"'),'-MatchTicks',[string]$MatchTicks)
+$supervisor=Start-Process (Get-Command pwsh).Source -ArgumentList $launch -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $Run 'supervisor.stdout.log') -RedirectStandardError (Join-Path $Run 'supervisor.stderr.log')
+$supervisorTicks=$supervisor.StartTime.ToUniversalTime().Ticks
+$runStartUtc=[datetime]::UtcNow
+@{Pid=$supervisor.Id;StartUtc=$supervisor.StartTime.ToUniversalTime().ToString('O');Executable=$supervisor.Path;Script=(Join-Path $PSScriptRoot 'start.ps1')} | ConvertTo-Json | Set-Content (Join-Path $Run 'supervisor.pid.json')
+$replacements=@();$actions=@();$handled=@{};$code=1
+function Wait-Ready($service,[int]$Seconds=30){
+ $end=[datetime]::UtcNow.AddSeconds($Seconds)
+ while([datetime]::UtcNow -lt $end){try{$r=Invoke-WebRequest ('http://127.0.0.1:'+$service.Health+'/health/ready') -TimeoutSec 1;if($r.StatusCode -eq 200){return}}catch{};Start-Sleep -Milliseconds 100}
+ throw ('Readiness timeout: '+$service.Id)
+}
+try{
+ foreach($service in @($Services | Where-Object Role -ne Client)){Wait-Ready $service}
+ $client=Start-OwnedChild ($Services | Where-Object Id -eq acceptance) @{AINATIVE_ACCEPTANCE_MODE=$Mode;AINATIVE_FAULT_SIGNALS=$signalDirectory;AINATIVE_ACCEPTANCE_RUN_DIRECTORY=$Run;AINATIVE_ACCEPTANCE_REPORT=(Join-Path $Run ($Mode+'.json'));AINATIVE_MATCH_LENGTH_TICKS=[string]$MatchTicks}
+ while(-not $client.Process.HasExited){
+  foreach($request in Get-ChildItem $signalDirectory -Filter '*.request.json'){
+   if($handled.ContainsKey($request.Name)){continue}
+   try{$command=Get-Content $request.FullName -Raw | ConvertFrom-Json}catch{continue}
+   if($command.action -notin @('stop','start','restart')){throw 'Invalid fault action'}
+   foreach($id in $command.services){
+    $service=$Services | Where-Object Id -eq $id
+    if(-not $service -or $id -eq 'acceptance'){throw 'Fault target outside owned service list'}
+    if($command.action -in @('stop','restart')){& "$PSScriptRoot/stop.ps1" -SdkPath $SdkPath -RunDirectory $RunDirectory -ServiceId $id;Start-Sleep -Milliseconds 200}
+    if($command.action -in @('start','restart')){
+     $record=Get-Content (Join-Path $Run ($id+'.pid.json')) -Raw | ConvertFrom-Json
+     $existing=Get-Process -Id $record.Pid -ErrorAction SilentlyContinue
+     if($existing -and $existing.Path -eq $record.Executable -and $existing.StartTime.ToUniversalTime().Ticks -eq ([datetime]$record.StartUtc).ToUniversalTime().Ticks){throw 'Refusing duplicate owned process launch'}
+     $child=Start-OwnedChild $service @{AINATIVE_MATCH_LENGTH_TICKS=[string]$MatchTicks};$replacements+=$child;Wait-Ready $service
+    }
+    $actions+=@{Action=$command.action;Service=$id;Utc=[datetime]::UtcNow.ToString('O')}
+   }
+   $handled[$request.Name]=$true
+   @{status='done'} | ConvertTo-Json | Set-Content (Join-Path $signalDirectory ($request.Name.Replace('.request.json','.done.json')))
+  }
+  Start-Sleep -Milliseconds 50
+ }
+ $code=Wait-Child $client
+ Get-Content (Join-Path $Run ($Mode+'.json'))
+ if($code -eq 0 -and $Mode -notin @('capacity','party-notifications')) { & "$PSScriptRoot/verify-replay.ps1" -SdkPath $SdkPath -RunDirectory $RunDirectory -SinceUtc $runStartUtc -ReportName ($Mode+'-replay.json') }
+}finally{
+ $actions | ConvertTo-Json -Depth 5 | Set-Content (Join-Path $Run ($Mode+'-actions.json'))
+ & "$PSScriptRoot/stop.ps1" -SdkPath $SdkPath -RunDirectory $RunDirectory
+ foreach($child in $replacements){[void](Wait-Child $child)}
+ if(-not $supervisor.WaitForExit(5000)){$current=Get-Process -Id $supervisor.Id -ErrorAction SilentlyContinue;if($current -and $current.Path -eq $supervisor.Path -and $current.StartTime.ToUniversalTime().Ticks -eq $supervisorTicks){Stop-Process -Id $supervisor.Id}}
+}
+exit $code

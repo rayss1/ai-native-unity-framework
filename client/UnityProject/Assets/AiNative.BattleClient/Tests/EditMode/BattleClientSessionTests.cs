@@ -13,6 +13,47 @@ namespace AiNative.Client.Application.Tests
     public sealed class BattleClientSessionTests
     {
         [Test]
+        public void ArenaPredictionUsesAuthorityTickAndRejectsWrongEpochBeforeHudMutation()
+        {
+            var transport = new FakeTransport();
+            var session = CreateActiveSession(transport, out _);
+            byte[] snapshot = ArenaSnapshot(100);
+            transport.Enqueue(snapshot, BattleClientProtocolV1.SnapshotChannel, 1);
+            session.Pump(0);
+            Assert.That(session.PredictAndQueueArenaInput(1, 1000, 0, 0, 0, ArenaButtons.Jump, ArenaWeaponId.Machinegun), Is.EqualTo(PredictionPrepareStatus.Prepared));
+            Assert.That(session.TryGetArenaState(out var predicted), Is.True);
+            Assert.That(predicted.PositionXMillimetres, Is.EqualTo(16));
+            Assert.That(predicted.PositionYMillimetres, Is.EqualTo(91));
+            Assert.That(predicted.Tick, Is.EqualTo(101));
+            transport.Enqueue(ArenaSnapshot(200), BattleClientProtocolV1.SnapshotChannel, 2);
+            session.Pump(0);
+            session.TryGetArenaState(out var unchanged);
+            Assert.That(unchanged, Is.EqualTo(predicted));
+            Assert.That(session.LastReceivedTick, Is.EqualTo(100));
+        }
+
+        [Test]
+        public void ArenaReconnectUsesFullStateAndRetainsArenaSimulation()
+        {
+            var initial = new FakeTransport(); var replacement = new FakeTransport();
+            var connector = new FakeConnector(initial, replacement);
+            var session = CreateActiveSession(initial, out _, connector);
+            initial.Enqueue(ArenaSnapshot(100), BattleClientProtocolV1.SnapshotChannel, 1); session.Pump(0);
+            session.RequestReconnect(); session.Pump(0.3f); session.Pump(0);
+            byte[] snapshot = ArenaSnapshot(110);
+            replacement.Enqueue(TestFrames.Reconnect(2, 110, snapshot.AsSpan(2).ToArray()), BattleClientProtocolV1.ControlChannel, 2);
+            session.Pump(0);
+            Assert.That(session.State, Is.EqualTo(BattleClientState.Active));
+            Assert.That(session.PredictAndQueueArenaInput(1, 1000, 0, 0, 0, ArenaButtons.Jump, ArenaWeaponId.Machinegun), Is.EqualTo(PredictionPrepareStatus.Prepared));
+            session.TryGetArenaState(out var state);
+            Assert.That(state.Tick, Is.EqualTo(111));
+            Assert.That(state.PositionYMillimetres, Is.EqualTo(91));
+        }
+
+        private static byte[] ArenaSnapshot(byte tick)
+            => new byte[] { 0x4d, 0x04, 0x08, 1, 0x11, tick, 0, 0, 0, 0, 0, 0, 0, 0x22, 8, 0x08, 7, 0x30, 100, 0x50, 1, 0x60, 1 };
+
+        [Test]
         public void ProtocolV1ControlRequestsMatchFrozenWireShape()
         {
             byte[] frame = new byte[64];

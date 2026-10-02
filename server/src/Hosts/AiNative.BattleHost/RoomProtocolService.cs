@@ -23,6 +23,9 @@ internal sealed class RoomProtocolService(
     private readonly List<ConnectionState> _connections = new(rooms.Settings.TotalBotCapacity);
     private readonly Dictionary<ulong, LogicalSession> _sessions = new(rooms.Settings.TotalBotCapacity);
     private ulong _nextSessionId;
+    private uint _arenaEventSequence;
+    private readonly ArenaCombatEventRecord[] _arenaEvents = new ArenaCombatEventRecord[ArenaRoom.MaximumEvents];
+    private long _observedArenaEventDrops;
 
     public int ConnectedCount => _connections.Count;
 
@@ -69,6 +72,7 @@ internal sealed class RoomProtocolService(
 
     public void PublishSnapshots(ulong roomTick)
     {
+        if (gameMode.IsArena) PublishArenaEvents();
         if (roomTick == 0 || roomTick % 3 != 0)
         {
             return;
@@ -86,7 +90,7 @@ internal sealed class RoomProtocolService(
                             rooms[session.RoomIndex].CreateSnapshot(roomTick);
                     // Send encodes synchronously before returning, so the room snapshot can carry
                     // one recipient-specific acknowledgement without cloning its 64-player state.
-                    snapshot.LastProcessedInputSequence = session.LastInputSequence;
+                    if (!gameMode.IsArena) snapshot.LastProcessedInputSequence = session.LastInputSequence;
                     Send(connection, MessageId.Snapshot, snapshot);
                 }
             }
@@ -94,6 +98,31 @@ internal sealed class RoomProtocolService(
         finally
         {
             Array.Clear(_snapshotCache);
+        }
+    }
+
+    private void PublishArenaEvents()
+    {
+        long dropped = arenaRoom.DroppedEventCount;
+        if (dropped > _observedArenaEventDrops) metrics.RecordDroppedDiagnostic();
+        _observedArenaEventDrops = dropped;
+        int count = arenaRoom.DrainEvents(_arenaEvents);
+        for (int i = 0; i < count; i++)
+        {
+            ArenaCombatEventRecord e = _arenaEvents[i];
+            var message = new ReliableEvent
+            {
+                RoomTick = e.Tick, Sequence = ++_arenaEventSequence, EventType = (uint)e.Kind,
+                CombatEvent = new ArenaCombatEvent
+                {
+                    EventType = (ArenaCombatEventType)(int)e.Kind, EventTick = e.Tick,
+                    SourceEntityId = e.SourceEntityId, TargetEntityId = e.TargetEntityId,
+                    WeaponId = (AiNative.Protocol.V1.ArenaWeaponId)(int)e.Weapon, Damage = (uint)Math.Max(0, e.Damage),
+                    PositionXMilli = e.PositionXMillimetres, PositionYMilli = e.PositionYMillimetres, PositionZMilli = e.PositionZMillimetres
+                }
+            };
+            foreach (ConnectionState connection in _connections)
+                if (connection.Session is { Joined: true }) Send(connection, MessageId.ReliableEvent, message);
         }
     }
 
@@ -331,7 +360,7 @@ internal sealed class RoomProtocolService(
         Snapshot resumeSnapshot = gameMode.IsArena
             ? CreateArenaSnapshot(session, roomTick)
             : rooms[session.RoomIndex].CreateSnapshot(roomTick);
-        resumeSnapshot.LastProcessedInputSequence = session.LastInputSequence;
+        if (!gameMode.IsArena) resumeSnapshot.LastProcessedInputSequence = session.LastInputSequence;
         Send(connection, MessageId.ReconnectResponse, new ReconnectResponse
         {
             ConnectionEpoch = connection.Connection.ConnectionEpoch,
@@ -462,7 +491,7 @@ internal sealed class RoomProtocolService(
             RoomTick = roomTick,
             BaselineTick = roomTick > 3 ? roomTick - 3 : 0,
             StateHash = arenaRoom.ComputeStateHash(),
-            LastProcessedInputSequence = session.LastInputSequence,
+            LastProcessedInputSequence = arenaRoom.TryGetPlayer((uint)session.EntityIndex + 1, out ArenaPlayerState acknowledged) ? acknowledged.LastProcessedInputSequence : 0,
             MatchPhase = (AiNative.Protocol.V1.ArenaMatchPhase)(int)arenaRoom.Phase,
             RemainingTicks = checked((uint)Math.Min(uint.MaxValue, arenaRoom.RemainingTicks)),
             LeaderEntityId = arenaRoom.LeaderEntityId,

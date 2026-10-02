@@ -12,15 +12,18 @@ namespace AiNative.Client.Prediction
             ArenaMatchPhase phase,
             uint remainingTicks,
             uint leaderEntityId,
-            uint acknowledgement)
+            uint acknowledgement,
+            bool hasArenaData = true)
         {
             State = state;
             Phase = phase;
             RemainingTicks = remainingTicks;
             LeaderEntityId = leaderEntityId;
             Acknowledgement = acknowledgement;
+            HasArenaData = hasArenaData;
         }
 
+        public bool HasArenaData { get; }
         public ArenaPlayerState State { get; }
         public ArenaMatchPhase Phase { get; }
         public uint RemainingTicks { get; }
@@ -106,6 +109,7 @@ namespace AiNative.Client.Prediction
             ArenaMatchPhase phase = ArenaMatchPhase.Waiting;
             bool hasTick = false;
             bool found = false;
+            bool hasArenaData = false;
             ArenaPlayerState player = default;
 
             while (offset < payload.Length)
@@ -122,7 +126,7 @@ namespace AiNative.Client.Prediction
                         break;
                     case 4 when wire == 2:
                         if (!TryReadLength(payload, ref offset, out ReadOnlySpan<byte> playerPayload) ||
-                            !TryReadPlayer(playerPayload, entityId, ref found, ref player)) return false;
+                            !TryReadPlayer(playerPayload, entityId, ref found, ref player, ref hasArenaData)) return false;
                         break;
                     case 6 when wire == 0:
                         if (!TryReadUInt32(payload, ref offset, out acknowledgement)) return false;
@@ -150,24 +154,48 @@ namespace AiNative.Client.Prediction
 
             player.Tick = checked((long)roomTick);
             player.LastProcessedInputSequence = acknowledgement;
-            decoded = new DecodedArenaSnapshot(player, phase, remainingTicks, leaderEntityId, acknowledgement);
+            decoded = new DecodedArenaSnapshot(player, phase, remainingTicks, leaderEntityId, acknowledgement, hasArenaData);
             return true;
+        }
+
+        public static bool TryExtractReconnectSnapshot(ReadOnlySpan<byte> frame, Span<byte> destination, out int writtenBytes)
+        {
+            writtenBytes = 0;
+            if (frame.Length < HeaderBytes || BinaryPrimitives.ReadUInt16LittleEndian(frame) != 1201) return false;
+            int offset = HeaderBytes;
+            while (offset < frame.Length)
+            {
+                if (!TryReadKey(frame, ref offset, out int field, out int wire)) return false;
+                if (field == 3 && wire == 2)
+                {
+                    if (!TryReadLength(frame, ref offset, out ReadOnlySpan<byte> payload) || payload.Length + HeaderBytes > destination.Length) return false;
+                    BinaryPrimitives.WriteUInt16LittleEndian(destination, SnapshotMessageId);
+                    payload.CopyTo(destination.Slice(HeaderBytes));
+                    writtenBytes = payload.Length + HeaderBytes;
+                    return true;
+                }
+                if (!TrySkip(frame, ref offset, wire)) return false;
+            }
+            return false;
         }
 
         private static bool TryReadPlayer(
             ReadOnlySpan<byte> payload,
             uint expectedEntityId,
             ref bool found,
-            ref ArenaPlayerState player)
+            ref ArenaPlayerState player,
+            ref bool hasArenaData)
         {
             int offset = 0;
             uint entityId = 0;
             int x = 0, y = 0, z = 0, vx = 0, vy = 0, vz = 0, yaw = 0, pitch = 0;
             uint health = 0, armor = 0, weapon = 0, kills = 0;
-            bool alive = true;
+            bool alive = false;
+            bool arenaFields = false;
             while (offset < payload.Length)
             {
                 if (!TryReadKey(payload, ref offset, out int field, out int wire)) return false;
+                if (field >= 6) arenaFields = true;
                 switch (field)
                 {
                     case 1 when wire == 0: if (!TryReadUInt32(payload, ref offset, out entityId)) return false; break;
@@ -189,6 +217,7 @@ namespace AiNative.Client.Prediction
             }
 
             if (entityId != expectedEntityId) return true;
+            hasArenaData = arenaFields;
             if (found) return false;
             player = new ArenaPlayerState(0, x, y, z)
             {

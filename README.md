@@ -3,9 +3,11 @@ An AI-native full-stack Unity game development framework for autonomous AI agent
 
 The repository contains the first production vertical-slice foundation: one Shared Gameplay source set compiled by Unity and .NET, a Unity-ready bounded client prediction/protocol adapter with presentation-only correction smoothing, a dedicated Fantasy KCP client transport and Battle Client composition candidate, project-owned realtime/protocol contracts, a .NET 10 Fantasy-backed Battle Host, cross-runtime vectors, deterministic replay/load evidence, a production container contract, and a manifest-derived architecture validator.
 
+The new [single-region server topology](Docs/ADR/0017-single-region-service-topology.md) adds independent Gate, Player, Lobby, Match and Room Coordinator processes, plus multiple Battle processes with fixed Worker groups. It includes PostgreSQL ownership/settlement storage, signed admission, bounded durable results, Arena replay and actual local multi-process acceptance. See [operations and launch commands](Docs/Architecture/server-topology-operations.md) and the [implementation/qualification ledger](Docs/Architecture/server-topology-plan.md). Local evidence does not qualify production room density, Linux/TLS deployment or Unity/IL2CPP clients.
+
 ## Requirements
 
-- .NET SDK 10.0.202. The repository `global.json` pins the exact SDK servicing version.
+- .NET SDK 10.0.202 baseline. `global.json` prefers the 10.0.2xx feature band and allows a newer stable 10.0 SDK (for example, 10.0.401) when that band is unavailable. Release images and qualification scripts retain their explicitly pinned SDK.
 - Unity 6000.3.23f1 revision `09d2ecc7fb28`, with Universal RP `17.3.0`. Install the build support for the target platform (Mac Build Support (Mono) for the Apple Silicon ARM64 gate). See the [URP migration](Docs/Architecture/unity-urp-migration.md).
 - Colima/Docker with Linux x64 emulation and a macOS-reachable VM address for the fixed-image Battle Host used by the macOS Unity gate. Start the Apple Silicon profile with `--vz-rosetta --network-address`; TCP-only SSH port forwarding cannot carry the real KCP/UDP gate.
 
@@ -32,6 +34,8 @@ git add server/vendor/Fantasy
 ```
 
 ## Validate
+
+For local Unity CLI setup, project defaults and EditMode/real-KCP PlayMode commands, see [Unity CLI validation](Docs/Architecture/unity-cli-validation.md). The CLI development path accepts the current worktree; exact-commit qualification remains separate.
 
 ```powershell
 dotnet restore AiNative.sln

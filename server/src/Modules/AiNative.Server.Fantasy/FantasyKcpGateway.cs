@@ -12,6 +12,12 @@ namespace AiNative.Server.Fantasy;
 
 internal sealed class FantasyKcpConnection : IAsyncDisposable
 {
+    internal FantasyKcpConnection(long connectionId, uint connectionEpoch, IRealtimeTransport transport)
+    {
+        ArgumentNullException.ThrowIfNull(transport);
+        if (connectionEpoch == 0) throw new ArgumentOutOfRangeException(nameof(connectionEpoch));
+        ConnectionId = connectionId; ConnectionEpoch = connectionEpoch; Transport = transport;
+    }
     internal FantasyKcpConnection(long connectionId, uint connectionEpoch, Session session, int maxInboundBytes)
     {
         ConnectionId = connectionId;
@@ -79,6 +85,12 @@ internal sealed class FantasyKcpGateway : IAsyncDisposable
     public int ConnectionCount => _connections.Count;
 
     public int OuterKcpMtu { get; }
+
+    // Topology mode uses exactly one Entry lifecycle for inner routing and outer KCP.
+    public void AttachToServiceRuntime()
+    { FantasyKcpGatewayBridge.Activate(this); Volatile.Write(ref _accepting, 1); }
+    public void DetachFromServiceRuntime()
+    { BeginDrain(); FantasyKcpGatewayBridge.Deactivate(this); }
 
     public async Task RunAsync(CancellationToken cancellationToken)
     {

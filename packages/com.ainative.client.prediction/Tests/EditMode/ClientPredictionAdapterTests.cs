@@ -18,6 +18,26 @@ namespace AiNative.Client.Prediction.Tests
             TransportOrdering.Ordered);
 
         [Test]
+        public void ArenaOmittedFalseAliveRemainsDead()
+        {
+            byte[] frame = { 0x4d, 0x04, 0x08, 1, 0x11, 100, 0, 0, 0, 0, 0, 0, 0, 0x22, 4, 0x08, 1, 0x50, 1 };
+            Assert.That(ArenaClientProtocolV1.TryDecodeSnapshot(frame, 1, out var decoded), Is.True);
+            Assert.That(decoded.State.Alive, Is.False);
+        }
+
+        [Test]
+        public void ArenaInitializationContinuesAcknowledgedSequenceAndAlignsClientTick()
+        {
+            var adapter = new ArenaClientPredictionAdapter(new FakeRealtimeTransport(), 1);
+            var state = new ArenaPlayerState(100, 0, 0, 0) { LastProcessedInputSequence = 20 };
+            adapter.Initialize(state);
+            var result = adapter.PrepareInput(1, 1000, 0, 0, 0, ArenaButtons.None, ArenaWeaponId.Machinegun, new byte[64]);
+            Assert.That(result.PredictedState.LastProcessedInputSequence, Is.EqualTo(21));
+            Assert.That(result.PredictedState.Tick, Is.EqualTo(101));
+            Assert.That(result.PredictedState.PositionXMillimetres, Is.EqualTo(16));
+        }
+
+        [Test]
         public void InputSendUsesProtocolV1BytesAndInputChannel()
         {
             FakeRealtimeTransport transport = new FakeRealtimeTransport();

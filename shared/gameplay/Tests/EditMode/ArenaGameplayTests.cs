@@ -6,6 +6,16 @@ namespace AiNative.Gameplay.Tests
     public sealed class ArenaGameplayTests
     {
         [Test]
+        public void ExtremeLookDeltasUseSafeSignedArithmetic()
+        {
+            var state = new ArenaPlayerState(0, 0, 0, 0) { YawMillidegrees = 1, PitchMillidegrees = 1 };
+            var input = new ArenaInput(1, 1, 0, 0, int.MaxValue, int.MaxValue, ArenaButtons.None, ArenaWeaponId.None);
+            var next = ArenaMovement.Step(state, input);
+            Assert.That(next.YawMillidegrees, Is.EqualTo((int)(((long)int.MaxValue + 1) % 360000)));
+            Assert.That(next.PitchMillidegrees, Is.EqualTo(ArenaMovement.MaximumPitchMillidegrees));
+        }
+
+        [Test]
         public void GroundAccelerationAndFrictionAreDeterministic()
         {
             ArenaPlayerState state = new ArenaPlayerState(0, 0, 0, 0);

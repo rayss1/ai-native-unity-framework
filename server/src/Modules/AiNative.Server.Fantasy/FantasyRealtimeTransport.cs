@@ -25,9 +25,11 @@ internal interface IFantasyOutboundDispatcher
 
 internal sealed class FantasyOutboundDispatcher(Session session) : IFantasyOutboundDispatcher
 {
+    private readonly global::Fantasy.Scene _ownerScene = session.Scene;
     public bool IsClosed => session.IsDisposed;
 
-    public void Post(Action action) => session.Scene.ThreadSynchronizationContext.Post(action);
+    public void Post(Action action)
+    { if (!_ownerScene.IsDisposed) _ownerScene.ThreadSynchronizationContext.Post(() => { if (!session.IsDisposed) action(); }); }
 
     public void Send(FantasyRealtimeEnvelope envelope) => session.Send(envelope);
 
@@ -284,6 +286,7 @@ internal sealed class FantasyRealtimeTransport : IRealtimeTransport
     private int _inboundBytes;
     private int _inboundPackets;
     private int _state = (int)TransportState.Connected;
+    private int _disposed;
 
     public FantasyRealtimeTransport(
         IFantasySessionSender sender,
@@ -298,7 +301,14 @@ internal sealed class FantasyRealtimeTransport : IRealtimeTransport
         _maxInboundPackets = maxInboundPackets;
     }
 
-    public TransportState State => (TransportState)Volatile.Read(ref _state);
+    public TransportState State
+    {
+        get
+        {
+            if (_sender.IsClosed) Volatile.Write(ref _state, (int)TransportState.Closed);
+            return (TransportState)Volatile.Read(ref _state);
+        }
+    }
 
     public ValueTask<SendResult> SendAsync(
         TransportChannel channel,
@@ -423,11 +433,12 @@ internal sealed class FantasyRealtimeTransport : IRealtimeTransport
 
     public ValueTask DisposeAsync()
     {
-        if ((TransportState)Interlocked.Exchange(ref _state, (int)TransportState.Draining) == TransportState.Closed)
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
         {
             return ValueTask.CompletedTask;
         }
 
+        Volatile.Write(ref _state, (int)TransportState.Draining);
         DrainInbound();
         _sender.Dispose();
         Volatile.Write(ref _state, (int)TransportState.Closed);

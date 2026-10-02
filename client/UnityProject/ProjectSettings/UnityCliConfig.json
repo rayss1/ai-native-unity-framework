@@ -1,0 +1,10 @@
+{
+  "test": {
+    "mode": "EditMode",
+    "reportFormat": "nunit,junit",
+    "timeout": 600
+  },
+  "build": {
+    "timeout": 600
+  }
+}

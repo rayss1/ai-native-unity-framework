@@ -53,21 +53,30 @@ internal sealed class ArenaRoom
     };
 
     private readonly ArenaPlayerState[] _players = new ArenaPlayerState[MaxPlayers];
-    private readonly ArenaInput[] _pendingInputs = new ArenaInput[MaxPlayers];
+    public const int InputQueueCapacity = 32;
+    public const int MaximumEvents = 256;
+    private readonly ArenaInput[,] _pendingInputs = new ArenaInput[MaxPlayers, InputQueueCapacity];
+    private readonly int[] _inputHeads = new int[MaxPlayers];
+    private readonly int[] _inputCounts = new int[MaxPlayers];
+    private readonly bool[] _occupied = new bool[MaxPlayers];
+    private ulong _matchStartTick;
+    public long DroppedEventCount { get; private set; }
     private readonly uint[] _lastInputSequences = new uint[MaxPlayers];
     private readonly ulong[] _deathTicks = new ulong[MaxPlayers];
     private readonly ulong[] _protectedUntilTicks = new ulong[MaxPlayers];
     private readonly ulong[] _lastFireTicks = new ulong[MaxPlayers];
     private readonly int[,] _ammo = new int[MaxPlayers, 3];
     private readonly ArenaPickupRuntime[] _pickups = new ArenaPickupRuntime[PickupSpawns.Length];
-    private readonly List<ArenaProjectile> _projectiles = new();
-    private readonly List<ArenaCombatEventRecord> _events = new();
+    private readonly List<ArenaProjectile> _projectiles = new(64);
+    private readonly List<ArenaCombatEventRecord> _events = new(MaximumEvents);
     private static readonly XxHash64StateHasher StateHasher = new();
     private int _connectedCount;
+    private readonly int _matchLengthTicks;
 
-    public ArenaRoom()
+    public ArenaRoom(int matchLengthTicks = MatchLengthTicks)
     {
-        Array.Fill(_lastInputSequences, uint.MaxValue);
+        if (matchLengthTicks < 1) throw new ArgumentOutOfRangeException(nameof(matchLengthTicks));
+        _matchLengthTicks = matchLengthTicks;
         for (int index = 0; index < _pickups.Length; index++)
         {
             (ArenaPickupType type, int x, int y, int z) = PickupSpawns[index];
@@ -85,9 +94,13 @@ internal sealed class ArenaRoom
 
     public ulong ComputeStateHash()
     {
-        Span<byte> canonical = stackalloc byte[8 + (MaxPlayers * 48)];
+        Span<byte> canonical = stackalloc byte[32768];
         BinaryPrimitives.WriteUInt64LittleEndian(canonical, Tick);
         int offset = 8;
+        WriteHashValue(canonical, ref offset, (long)Phase);
+        WriteHashValue(canonical, ref offset, (long)_matchStartTick);
+        WriteHashValue(canonical, ref offset, _matchLengthTicks);
+        WriteHashValue(canonical, ref offset, LeaderEntityId);
         for (int index = 0; index < MaxPlayers; index++)
         {
             ArenaPlayerState state = _players[index];
@@ -103,29 +116,67 @@ internal sealed class ArenaRoom
             BinaryPrimitives.WriteInt32LittleEndian(canonical[(offset + 36)..], state.PitchMillidegrees);
             BinaryPrimitives.WriteUInt32LittleEndian(canonical[(offset + 40)..], state.Kills);
             BinaryPrimitives.WriteUInt32LittleEndian(canonical[(offset + 44)..],
-                _lastInputSequences[index] == uint.MaxValue ? 0U : 1U);
+                !_occupied[index] ? 0U : 1U);
             offset += 48;
+            WriteHashValue(canonical, ref offset, state.Tick);
+            WriteHashValue(canonical, ref offset, (long)state.Weapon);
+            WriteHashValue(canonical, ref offset, state.Alive ? 1 : 0);
+            WriteHashValue(canonical, ref offset, state.Grounded ? 1 : 0);
+            WriteHashValue(canonical, ref offset, state.LastProcessedInputSequence);
+            WriteHashValue(canonical, ref offset, _lastInputSequences[index]);
+            WriteHashValue(canonical, ref offset, (long)_deathTicks[index]);
+            WriteHashValue(canonical, ref offset, (long)_protectedUntilTicks[index]);
+            WriteHashValue(canonical, ref offset, (long)_lastFireTicks[index]);
+            for (int weapon = 0; weapon < 3; weapon++) WriteHashValue(canonical, ref offset, _ammo[index, weapon]);
+            WriteHashValue(canonical, ref offset, _inputCounts[index]);
+            for (int pending = 0; pending < _inputCounts[index]; pending++)
+            {
+                var input = _pendingInputs[index, (_inputHeads[index] + pending) % InputQueueCapacity];
+                WriteHashValue(canonical, ref offset, input.Sequence); WriteHashValue(canonical, ref offset, (long)input.ClientTick);
+                WriteHashValue(canonical, ref offset, input.MoveXMilli); WriteHashValue(canonical, ref offset, input.MoveZMilli);
+                WriteHashValue(canonical, ref offset, input.LookYawMilli); WriteHashValue(canonical, ref offset, input.LookPitchMilli);
+                WriteHashValue(canonical, ref offset, (long)input.Buttons); WriteHashValue(canonical, ref offset, (long)input.Weapon);
+            }
         }
 
-        return StateHasher.ComputeHash(canonical);
+        foreach (var pickup in _pickups)
+        {
+            WriteHashValue(canonical, ref offset, pickup.Active ? 1 : 0);
+            WriteHashValue(canonical, ref offset, (long)pickup.RespawnTick);
+        }
+        WriteHashValue(canonical, ref offset, _projectiles.Count);
+        foreach (var projectile in _projectiles)
+        {
+            WriteHashValue(canonical, ref offset, projectile.SourceEntityId);
+            WriteHashValue(canonical, ref offset, projectile.X); WriteHashValue(canonical, ref offset, projectile.Y); WriteHashValue(canonical, ref offset, projectile.Z);
+            WriteHashValue(canonical, ref offset, projectile.VelocityX); WriteHashValue(canonical, ref offset, projectile.VelocityY); WriteHashValue(canonical, ref offset, projectile.VelocityZ);
+            WriteHashValue(canonical, ref offset, projectile.RemainingTicks);
+        }
+        return StateHasher.ComputeHash(canonical[..offset]);
     }
 
+    private static void WriteHashValue(Span<byte> bytes, ref int offset, long value)
+    { BinaryPrimitives.WriteInt64LittleEndian(bytes[offset..], value); offset += 8; }
+
     public int RemainingTicks => Phase == ArenaMatchPhase.Active
-        ? Math.Max(0, MatchLengthTicks - checked((int)Math.Min(Tick, (ulong)MatchLengthTicks)))
-        : Phase == ArenaMatchPhase.Waiting ? MatchLengthTicks : 0;
+        ? Math.Max(0, _matchLengthTicks - checked((int)Math.Min(Tick - _matchStartTick, (ulong)_matchLengthTicks)))
+        : Phase == ArenaMatchPhase.Waiting ? _matchLengthTicks : 0;
 
     public bool TryJoin(out uint entityId)
     {
+        if (Phase == ArenaMatchPhase.Finished) { entityId = 0; return false; }
         for (int index = 0; index < MaxPlayers; index++)
         {
-            if (_lastInputSequences[index] != uint.MaxValue)
+            if (_occupied[index])
             {
                 continue;
             }
 
             (int x, int y, int z) = SpawnPoints[index];
             _players[index] = new ArenaPlayerState(checked((long)Tick), x, y, z);
-            _pendingInputs[index] = default;
+            _inputHeads[index] = 0;
+            _inputCounts[index] = 0;
+            _occupied[index] = true;
             _lastInputSequences[index] = 0;
             _deathTicks[index] = 0;
             _protectedUntilTicks[index] = checked(Tick + RespawnProtectionTicks);
@@ -138,6 +189,7 @@ internal sealed class ArenaRoom
             if (Phase == ArenaMatchPhase.Waiting && _connectedCount >= 2)
             {
                 Phase = ArenaMatchPhase.Active;
+                _matchStartTick = Tick;
             }
 
             return true;
@@ -149,32 +201,43 @@ internal sealed class ArenaRoom
 
     public bool Leave(uint entityId)
     {
-        if (!TryGetIndex(entityId, out int index) || _lastInputSequences[index] == uint.MaxValue)
+        if (!TryGetIndex(entityId, out int index) || !_occupied[index])
         {
             return false;
         }
 
-        _lastInputSequences[index] = uint.MaxValue;
+        _occupied[index] = false;
+        _inputCounts[index] = 0;
         _connectedCount--;
-        if (_connectedCount < 2 && Phase == ArenaMatchPhase.Active)
-        {
-            Phase = ArenaMatchPhase.Waiting;
-        }
 
         return true;
     }
 
+    public void ClearPendingInputs(uint entityId)
+    {
+        if (TryGetIndex(entityId, out int index))
+        {
+            _inputCounts[index] = 0;
+            _lastInputSequences[index] = _players[index].LastProcessedInputSequence;
+        }
+    }
+
     public bool SubmitInput(uint entityId, in ArenaInput input)
     {
-        if (!TryGetIndex(entityId, out int index) || _lastInputSequences[index] == uint.MaxValue ||
+        if (!TryGetIndex(entityId, out int index) || !_occupied[index] ||
             input.Sequence <= _lastInputSequences[index] ||
+            _inputCounts[index] == InputQueueCapacity ||
             input.ClientTick > Tick + 1 ||
-            Tick > input.ClientTick + 12)
+            (Tick > input.ClientTick && Tick - input.ClientTick > 12) ||
+            input.MoveXMilli is < -1000 or > 1000 || input.MoveZMilli is < -1000 or > 1000 ||
+            input.LookYawMilli is < -360000 or > 360000 || input.LookPitchMilli is < -180000 or > 180000 ||
+            (uint)input.Weapon > 3 || ((uint)input.Buttons & ~31u) != 0)
         {
             return false;
         }
 
-        _pendingInputs[index] = input;
+        _pendingInputs[index, (_inputHeads[index] + _inputCounts[index]) % InputQueueCapacity] = input;
+        _inputCounts[index]++;
         _lastInputSequences[index] = input.Sequence;
         return true;
     }
@@ -189,7 +252,7 @@ internal sealed class ArenaRoom
 
         for (int index = 0; index < MaxPlayers; index++)
         {
-            if (_lastInputSequences[index] == uint.MaxValue)
+            if (!_occupied[index])
             {
                 continue;
             }
@@ -204,21 +267,11 @@ internal sealed class ArenaRoom
                 continue;
             }
 
-            ArenaInput input = _pendingInputs[index];
-            if (input.Sequence == 0)
-            {
-                input = new ArenaInput(
-                    checked(_players[index].LastProcessedInputSequence + 1),
-                    Tick,
-                    0,
-                    0,
-                    0,
-                    0,
-                    ArenaButtons.None,
-                    _players[index].Weapon);
-            }
-
+            ArenaInput input = _inputCounts[index] > 0 ? _pendingInputs[index, _inputHeads[index]] : default;
+            uint previousAcknowledgement = _players[index].LastProcessedInputSequence;
             _players[index] = ArenaMovement.Step(_players[index], input);
+            _players[index].Tick = checked((long)Tick);
+            if (_inputCounts[index] == 0) _players[index].LastProcessedInputSequence = previousAcknowledgement;
             if (input.Weapon != ArenaWeaponId.None && input.Weapon != _players[index].Weapon)
             {
                 SwitchWeapon(index, input.Weapon);
@@ -230,12 +283,16 @@ internal sealed class ArenaRoom
             }
 
             CollectPickups(index);
-            _pendingInputs[index] = default;
+            if (_inputCounts[index] > 0)
+            {
+                _inputHeads[index] = (_inputHeads[index] + 1) % InputQueueCapacity;
+                _inputCounts[index]--;
+            }
         }
 
         TickProjectiles();
         UpdateLeader();
-        if (Tick >= MatchLengthTicks || LeaderScore() >= ScoreLimit)
+        if (Phase == ArenaMatchPhase.Active && (Tick - _matchStartTick >= (ulong)_matchLengthTicks || LeaderScore() >= ScoreLimit))
         {
             Phase = ArenaMatchPhase.Finished;
         }
@@ -243,7 +300,7 @@ internal sealed class ArenaRoom
 
     public bool TryGetPlayer(uint entityId, out ArenaPlayerState state)
     {
-        if (TryGetIndex(entityId, out int index) && _lastInputSequences[index] != uint.MaxValue)
+        if (TryGetIndex(entityId, out int index) && _occupied[index])
         {
             state = _players[index];
             return true;
@@ -258,7 +315,7 @@ internal sealed class ArenaRoom
         int written = 0;
         for (int index = 0; index < MaxPlayers && written < destination.Length; index++)
         {
-            if (_lastInputSequences[index] == uint.MaxValue)
+            if (!_occupied[index])
             {
                 continue;
             }
@@ -300,6 +357,12 @@ internal sealed class ArenaRoom
         return count;
     }
 
+    private void AddEvent(ArenaCombatEventRecord record)
+    {
+        if (_events.Count == MaximumEvents) { DroppedEventCount++; return; }
+        _events.Add(record);
+    }
+
     private void Fire(int shooterIndex, in ArenaInput input)
     {
         ArenaWeaponId weapon = _players[shooterIndex].Weapon;
@@ -320,7 +383,7 @@ internal sealed class ArenaRoom
         _ammo[shooterIndex, weaponIndex]--;
         ArenaPlayerState shooter = _players[shooterIndex];
         uint sourceId = checked((uint)shooterIndex + 1);
-        _events.Add(new ArenaCombatEventRecord(
+        AddEvent(new ArenaCombatEventRecord(
             ArenaCombatEventKind.Fire,
             Tick,
             sourceId,
@@ -336,11 +399,11 @@ internal sealed class ArenaRoom
             _projectiles.Add(new ArenaProjectile(
                 sourceId,
                 shooter.PositionXMillimetres,
-                shooter.PositionYMillimetres,
+                shooter.PositionYMillimetres + 600,
                 shooter.PositionZMillimetres,
-                ForwardX(shooter.YawMillidegrees, shooter.PitchMillidegrees),
-                ForwardY(shooter.PitchMillidegrees),
-                ForwardZ(shooter.YawMillidegrees, shooter.PitchMillidegrees),
+                (int)((long)ForwardX(shooter.YawMillidegrees, shooter.PitchMillidegrees) * RocketSpeedMillimetresPerSecond / 1000000),
+                (int)((long)ForwardY(shooter.PitchMillidegrees) * RocketSpeedMillimetresPerSecond / 1000000),
+                (int)((long)ForwardZ(shooter.YawMillidegrees, shooter.PitchMillidegrees) * RocketSpeedMillimetresPerSecond / 1000000),
                 RocketLifetimeTicks));
             return;
         }
@@ -382,7 +445,7 @@ internal sealed class ArenaRoom
         int sourceIndex = checked((int)sourceEntityId - 1);
         for (int targetIndex = 0; targetIndex < MaxPlayers; targetIndex++)
         {
-            if (_lastInputSequences[targetIndex] == uint.MaxValue || !_players[targetIndex].Alive)
+            if (!_occupied[targetIndex] || !_players[targetIndex].Alive)
             {
                 continue;
             }
@@ -404,13 +467,13 @@ internal sealed class ArenaRoom
     {
         for (int targetIndex = 0; targetIndex < MaxPlayers; targetIndex++)
         {
-            if (targetIndex == sourceIndex || _lastInputSequences[targetIndex] == uint.MaxValue || !_players[targetIndex].Alive)
+            if (targetIndex == sourceIndex || !_occupied[targetIndex] || !_players[targetIndex].Alive)
             {
                 continue;
             }
 
             int distance = DistanceMillimetres(_players[targetIndex].PositionXMillimetres - x,
-                _players[targetIndex].PositionYMillimetres - y,
+                _players[targetIndex].PositionYMillimetres + 600 - y,
                 _players[targetIndex].PositionZMillimetres - z);
             if (distance <= RocketCollisionRadiusMillimetres)
             {
@@ -441,7 +504,7 @@ internal sealed class ArenaRoom
 
         for (int candidate = 0; candidate < MaxPlayers; candidate++)
         {
-            if (candidate == shooterIndex || _lastInputSequences[candidate] == uint.MaxValue ||
+            if (candidate == shooterIndex || !_occupied[candidate] ||
                 !_players[candidate].Alive || Tick < _protectedUntilTicks[candidate])
             {
                 continue;
@@ -479,7 +542,7 @@ internal sealed class ArenaRoom
         _players[targetIndex] = target;
         uint sourceId = checked((uint)sourceIndex + 1);
         uint targetId = checked((uint)targetIndex + 1);
-        _events.Add(new ArenaCombatEventRecord(
+        AddEvent(new ArenaCombatEventRecord(
             ArenaCombatEventKind.Hit,
             Tick,
             sourceId,
@@ -494,7 +557,7 @@ internal sealed class ArenaRoom
         {
             _deathTicks[targetIndex] = Tick;
             _players[sourceIndex].Kills++;
-            _events.Add(new ArenaCombatEventRecord(
+            AddEvent(new ArenaCombatEventRecord(
                 ArenaCombatEventKind.Kill,
                 Tick,
                 sourceId,
@@ -517,7 +580,7 @@ internal sealed class ArenaRoom
         _ammo[index, 0] = ArenaWeaponRules.Machinegun.MagazineSize;
         _ammo[index, 1] = ArenaWeaponRules.Shotgun.MagazineSize;
         _ammo[index, 2] = ArenaWeaponRules.Rocket.MagazineSize;
-        _events.Add(new ArenaCombatEventRecord(
+        AddEvent(new ArenaCombatEventRecord(
             ArenaCombatEventKind.Respawn,
             Tick,
             checked((uint)index + 1),
@@ -539,7 +602,7 @@ internal sealed class ArenaRoom
             double nearest = double.MaxValue;
             for (int candidate = 0; candidate < MaxPlayers; candidate++)
             {
-                if (candidate == playerIndex || _lastInputSequences[candidate] == uint.MaxValue || !_players[candidate].Alive)
+                if (candidate == playerIndex || !_occupied[candidate] || !_players[candidate].Alive)
                 {
                     continue;
                 }
@@ -604,7 +667,7 @@ internal sealed class ArenaRoom
             pickup.Active = false;
             pickup.RespawnTick = checked(Tick + PickupRespawnTicks);
             _players[playerIndex] = player;
-            _events.Add(new ArenaCombatEventRecord(
+            AddEvent(new ArenaCombatEventRecord(
                 ArenaCombatEventKind.Pickup,
                 Tick,
                 checked((uint)playerIndex + 1),
@@ -626,7 +689,7 @@ internal sealed class ArenaRoom
         }
 
         _players[playerIndex].Weapon = weapon;
-        _events.Add(new ArenaCombatEventRecord(
+        AddEvent(new ArenaCombatEventRecord(
             ArenaCombatEventKind.WeaponSwitch,
             Tick,
             checked((uint)playerIndex + 1),
@@ -644,7 +707,7 @@ internal sealed class ArenaRoom
         uint bestScore = 0;
         for (int index = 0; index < MaxPlayers; index++)
         {
-            if (_lastInputSequences[index] == uint.MaxValue || _players[index].Kills < bestScore)
+            if (!_occupied[index] || _players[index].Kills < bestScore)
             {
                 continue;
             }
@@ -678,8 +741,10 @@ internal sealed class ArenaRoom
 
     private static bool TryGetIndex(uint entityId, out int index)
     {
-        index = checked((int)entityId - 1);
-        return entityId is >= 1 and <= MaxPlayers;
+        index = -1;
+        if (entityId is < 1 or > MaxPlayers) return false;
+        index = (int)entityId - 1;
+        return true;
     }
 
     private sealed class ArenaPickupRuntime

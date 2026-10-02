@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup>
+  <ItemGroup><FrameworkReference Include="Microsoft.AspNetCore.App" /></ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.17.0" />
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.17.0" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.17.0" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.17.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../AiNative.Server.Control/AiNative.Server.Control.csproj" />
+    <ProjectReference Include="../AiNative.Server.Fantasy/AiNative.Server.Fantasy.csproj" />
+    <ProjectReference Include="../AiNative.Server.Backend/AiNative.Server.Backend.csproj" />
+    <ProjectReference Include="../AiNative.Server.Rooms/AiNative.Server.Rooms.csproj" />
+  </ItemGroup>
+</Project>

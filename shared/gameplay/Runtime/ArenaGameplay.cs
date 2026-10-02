@@ -199,9 +199,9 @@ namespace AiNative.Gameplay
             ArenaPlayerState next = state;
             next.Tick = checked(state.Tick + 1);
             next.LastProcessedInputSequence = input.Sequence;
-            next.YawMillidegrees = WrapYaw(checked(state.YawMillidegrees + input.LookYawMilli));
+            next.YawMillidegrees = WrapYaw((long)state.YawMillidegrees + input.LookYawMilli);
             next.PitchMillidegrees = Clamp(
-                checked(state.PitchMillidegrees + input.LookPitchMilli),
+                (int)Math.Max(-MaximumPitchMillidegrees, Math.Min(MaximumPitchMillidegrees, (long)state.PitchMillidegrees + input.LookPitchMilli)),
                 -MaximumPitchMillidegrees,
                 MaximumPitchMillidegrees);
 
@@ -290,9 +290,9 @@ namespace AiNative.Gameplay
             return 0;
         }
 
-        private static int WrapYaw(int yaw)
+        private static int WrapYaw(long yaw)
         {
-            int wrapped = yaw % 360000;
+            int wrapped = (int)(yaw % 360000);
             return wrapped < 0 ? wrapped + 360000 : wrapped;
         }
 

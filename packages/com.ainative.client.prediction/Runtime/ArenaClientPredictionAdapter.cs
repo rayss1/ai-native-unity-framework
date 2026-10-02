@@ -107,6 +107,7 @@ namespace AiNative.Client.Prediction
             if (_disposed) return;
             _history.Initialize(state);
             _initialized = true;
+            EnsureSequenceAfter(state.LastProcessedInputSequence);
         }
 
         public ArenaPredictionPrepareResult PrepareInput(
@@ -125,6 +126,7 @@ namespace AiNative.Client.Prediction
             if (_nextSequence == 0) return new ArenaPredictionPrepareResult(ArenaPredictionPrepareStatus.SequenceExhausted, 0, default, false);
 
             uint sequence = _nextSequence;
+            clientTick = Math.Max(clientTick, checked((ulong)_history.Current.Tick + 1));
             ArenaInput input = new(sequence, clientTick, moveXMilli, moveZMilli, lookYawMilli, lookPitchMilli, buttons, weapon);
             ArenaPlayerState predicted = _history.Predict(input, out bool droppedOldest);
             _nextSequence = sequence == uint.MaxValue ? 0 : sequence + 1;

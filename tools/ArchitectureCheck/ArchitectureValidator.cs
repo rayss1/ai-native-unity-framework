@@ -20,6 +20,7 @@ public sealed class ArchitectureValidator
     private const string SolutionDriftCode = "ARC006";
     private const string UnityPackageGeneratedOutputCode = "ARC007";
     private const string FantasyBoundaryCode = "ARC008";
+    private const string HostDependencyCode = "ARC009";
 
     public ArchitectureValidationResult Validate(string repositoryRoot, string? rulesPath = null)
     {
@@ -262,6 +263,16 @@ public sealed class ArchitectureValidator
                     edge.Target.Id));
             }
 
+            if (edge.Source.Kind == NodeKind.Project && edge.Target.Kind == NodeKind.Project
+                && edge.Source.Path.StartsWith("server/src/Hosts/", StringComparison.OrdinalIgnoreCase)
+                && edge.Target.Path.StartsWith("server/src/Hosts/", StringComparison.OrdinalIgnoreCase))
+            {
+                diagnostics.Add(new ArchitectureDiagnostic(
+                    HostDependencyCode, edge.DeclaredIn,
+                    "A Server Host composition root may not reference another Host.",
+                    edge.Source.Id, edge.Target.Id));
+            }
+
             if (edge.Source.Kind == NodeKind.Assembly
                 && IsRuntimePath(edge.Source.Path)
                 && IsEditorPath(edge.Target.Path))
@@ -484,7 +495,7 @@ public sealed class ArchitectureValidator
                 diagnostics.Add(new ArchitectureDiagnostic(
                     FantasyBoundaryCode,
                     relativePath,
-                    "Fantasy-Net may be referenced only by the dedicated Server adapter or Battle Host composition root."));
+                    "Fantasy-Net may be referenced only by the dedicated Server adapter, approved topology Hosts or the exact topology acceptance executable for compile-time startup metadata."));
             }
         }
     }
@@ -654,7 +665,10 @@ public sealed class ArchitectureValidator
                     directories.Push(child);
                 }
 
-                files.AddRange(Directory.EnumerateFiles(directory));
+                files.AddRange(Directory.EnumerateFiles(directory).Where(path =>
+                    !Relative(root, directory).Equals("client/UnityProject", StringComparison.OrdinalIgnoreCase)
+                    || !(path.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase)
+                        || path.EndsWith(".sln", StringComparison.OrdinalIgnoreCase))));
             }
 
             return new RepositoryFiles(
