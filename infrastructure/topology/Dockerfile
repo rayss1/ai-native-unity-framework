@@ -4,6 +4,7 @@ FROM mcr.microsoft.com/dotnet/sdk:${SDK_VERSION} AS build
 ARG HOST=GateHost
 WORKDIR /source
 COPY global.json Directory.Build.props ./
+COPY server/Directory.Build.props ./server/
 COPY server/src ./server/src
 COPY server/vendor/Fantasy/nupkg ./server/vendor/Fantasy/nupkg
 COPY shared ./shared

@@ -5,14 +5,15 @@ ARG RUNTIME_IMAGE=mcr.microsoft.com/dotnet/aspnet:10.0.4-noble
 FROM ${SDK_IMAGE} AS build
 WORKDIR /tmp
 COPY Directory.Build.props /source/
+COPY server/Directory.Build.props /source/server/
 COPY shared/gameplay/ /source/shared/gameplay/
 COPY shared/generated/ /source/shared/generated/
 COPY shared/protocol/ /source/shared/protocol/
 COPY shared/realtime/ /source/shared/realtime/
 COPY server/vendor/Fantasy/nupkg/ /source/server/vendor/Fantasy/nupkg/
-COPY server/src/Modules/AiNative.Server.Fantasy/ /source/server/src/Modules/AiNative.Server.Fantasy/
-COPY server/src/Modules/AiNative.Server.Protocol/ /source/server/src/Modules/AiNative.Server.Protocol/
+COPY server/src/Modules/ /source/server/src/Modules/
 COPY server/src/Hosts/AiNative.BattleHost/ /source/server/src/Hosts/AiNative.BattleHost/
+COPY infrastructure/topology/Fantasy.config /source/infrastructure/topology/Fantasy.config
 RUN dotnet restore /source/server/src/Hosts/AiNative.BattleHost/AiNative.BattleHost.csproj \
     && dotnet publish /source/server/src/Hosts/AiNative.BattleHost/AiNative.BattleHost.csproj \
         --configuration Release \
