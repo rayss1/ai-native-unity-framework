@@ -27,6 +27,31 @@ public sealed class PostgresAllocationStoreTests
         await using NpgsqlCommand drop = new($"DROP DATABASE {_database} WITH (FORCE)", admin); await drop.ExecuteNonQueryAsync();
     }
     [Test]
+    public async Task MigratedSchemaInitializesWithOnlyRuntimeDmlPrivileges()
+    {
+        await using (PostgresAllocationStore migration = new(_connection)) await migration.InitializeAsync();
+        string role = "coordinator_runtime_" + Guid.NewGuid().ToString("N");
+        await using NpgsqlConnection admin = new(_connection); await admin.OpenAsync();
+        await using (NpgsqlCommand grant = new($"CREATE ROLE {role} NOLOGIN; GRANT USAGE ON SCHEMA coordinator TO {role}; GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA coordinator TO {role}", admin))
+            await grant.ExecuteNonQueryAsync();
+        try
+        {
+            string restricted = new NpgsqlConnectionStringBuilder(_connection) { Options = "-c role=" + role, Pooling = false }.ConnectionString;
+            await using PostgresAllocationStore runtime = new(restricted);
+            await runtime.InitializeAsync();
+            Assert.That(await runtime.CheckOwnershipAsync(), Is.True);
+            string id = Guid.NewGuid().ToString("N");
+            RoomAllocation room = new() { RoomId = id, MatchId = id, NodeId = "b1", BootEpoch = "e1", AllocationId = id, State = "Reserved", PlayerIds = { "p1" } };
+            await runtime.SaveAsync(room);
+            Assert.That(await runtime.LoadAsync(), Does.Contain(room));
+        }
+        finally
+        {
+            await using NpgsqlCommand cleanup = new($"DROP OWNED BY {role}; DROP ROLE {role}", admin);
+            await cleanup.ExecuteNonQueryAsync();
+        }
+    }
+    [Test]
     public async Task TerminatedOwnershipConnectionCannotContinueAllocating()
     {
         string application = "coord_owned_" + Guid.NewGuid().ToString("N");
