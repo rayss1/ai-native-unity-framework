@@ -92,11 +92,13 @@ public sealed class PlayerService : IServiceHandler
                 }
                 case ServiceMethods.SettlementStatus:
                 {
-                    if (context.Caller != ServiceRole.Battle) return ServiceReply.Reject("forbidden");
+                    if (context.Caller is not (ServiceRole.Battle or ServiceRole.Gate) ||
+                        (context.Caller == ServiceRole.Gate && context.PlayerId.Length == 0)) return ServiceReply.Reject("forbidden");
                     var query = SettlementQuery.Parser.ParseFrom(payload.Span);
                     if (!Identifiers.Valid(query.MatchId)) return ServiceReply.Reject("invalid_request");
                     var authoritative = await GetRoomAsync("", query.MatchId, cancellationToken);
-                    if (authoritative.MatchId != query.MatchId || authoritative.NodeId != context.PeerId || !Identifiers.Valid(authoritative.RoomId, authoritative.NodeId, authoritative.BootEpoch)) return ServiceReply.Reject("forbidden");
+                    if (authoritative.MatchId != query.MatchId || !Identifiers.Valid(authoritative.RoomId, authoritative.NodeId, authoritative.BootEpoch) ||
+                        (context.Caller == ServiceRole.Battle ? authoritative.NodeId != context.PeerId : !authoritative.PlayerIds.Contains(context.PlayerId))) return ServiceReply.Reject("forbidden");
                     var receipt = await store.SettlementAsync(query.MatchId, cancellationToken);
                     return ServiceReply.From(receipt ?? new SettlementReceipt { MatchId = query.MatchId });
                 }

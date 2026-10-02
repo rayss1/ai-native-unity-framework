@@ -8,6 +8,28 @@ using AiNative.Realtime;
 
 namespace AiNative.Client.Application
 {
+    /// <summary>Immutable credentials issued by Gate for one Battle allocation. The ticket is never logged.</summary>
+    public sealed class BattleAdmissionInfo
+    {
+        public BattleAdmissionInfo(string roomId, string bootEpoch, string entryTicket, string nodeId = "", string playerId = "")
+        {
+            if (string.IsNullOrWhiteSpace(roomId)) throw new ArgumentException("Global room is required.", nameof(roomId));
+            if (string.IsNullOrWhiteSpace(bootEpoch)) throw new ArgumentException("Boot epoch is required.", nameof(bootEpoch));
+            if (string.IsNullOrWhiteSpace(entryTicket)) throw new ArgumentException("Entry ticket is required.", nameof(entryTicket));
+            RoomId = roomId;
+            BootEpoch = bootEpoch;
+            EntryTicket = entryTicket;
+            NodeId = nodeId ?? string.Empty;
+            PlayerId = playerId ?? string.Empty;
+        }
+
+        public string RoomId { get; }
+        public string BootEpoch { get; }
+        public string EntryTicket { get; }
+        public string NodeId { get; }
+        public string PlayerId { get; }
+    }
+
     public enum BattleClientState : byte
     {
         Connecting = 0,
@@ -85,6 +107,9 @@ namespace AiNative.Client.Application
         private readonly int _port;
         private readonly string _clientBuild;
         private readonly IBattleTransportConnector _connector;
+        private BattleAdmissionInfo _admission;
+        private bool _topologyReconnecting;
+        private uint _localRoomId;
         private readonly ReplaceableRealtimeTransportSlot _transportSlot = new ReplaceableRealtimeTransportSlot();
         private readonly InputFrameRing _inputRing;
         private readonly PresentationCorrectionSmoother _presentation =
@@ -95,7 +120,6 @@ namespace AiNative.Client.Application
         private Task<BattleTransportConnection> _connectTask;
         private ClientPredictionAdapter _prediction;
         private ArenaClientPredictionAdapter _arenaPrediction;
-        private ulong _nextInputTick;
         private float _phaseElapsedSeconds;
         private float _retryDelayRemainingSeconds;
         private int _reconnectAttempts;
@@ -124,16 +148,29 @@ namespace AiNative.Client.Application
         {
         }
 
+        public BattleClientSession(
+            string host,
+            int port,
+            BattleAdmissionInfo admission,
+            string clientBuild = "topology",
+            int inputRingCapacity = DefaultInputRingCapacity)
+            : this(host, port, clientBuild, inputRingCapacity, new FantasyBattleTransportConnector(),
+                admission ?? throw new ArgumentNullException(nameof(admission)))
+        {
+        }
+
         internal BattleClientSession(
             string host,
             int port,
             string clientBuild,
             int inputRingCapacity,
-            IBattleTransportConnector connector)
+            IBattleTransportConnector connector,
+            BattleAdmissionInfo admission = null)
         {
             if (string.IsNullOrWhiteSpace(host)) throw new ArgumentException("Host is required.", nameof(host));
             if (port is < 1 or > 65535) throw new ArgumentOutOfRangeException(nameof(port));
             _connector = connector ?? throw new ArgumentNullException(nameof(connector));
+            _admission = admission;
             _host = host;
             _port = port;
             _clientBuild = clientBuild ?? string.Empty;
@@ -153,6 +190,24 @@ namespace AiNative.Client.Application
 
         public uint InitialConnectionEpoch => _initialConnectionEpoch;
 
+        public uint LocalRoomId => _localRoomId;
+
+        public bool UsesTopologyAdmission => _admission is not null;
+
+        /// <summary>Refreshes short-lived credentials without changing the allocation. Call on the Pump thread.</summary>
+        public void UpdateAdmission(BattleAdmissionInfo admission)
+        {
+            if (_disposed) throw new ObjectDisposedException(nameof(BattleClientSession));
+            if (admission is null) throw new ArgumentNullException(nameof(admission));
+            if (_admission is null ||
+                !string.Equals(_admission.RoomId, admission.RoomId, StringComparison.Ordinal) ||
+                !string.Equals(_admission.BootEpoch, admission.BootEpoch, StringComparison.Ordinal) ||
+                !string.Equals(_admission.NodeId, admission.NodeId, StringComparison.Ordinal) ||
+                !string.Equals(_admission.PlayerId, admission.PlayerId, StringComparison.Ordinal))
+                throw new ArgumentException("Admission refresh must retain the same room, boot, node and player.", nameof(admission));
+            _admission = admission;
+        }
+
         public ulong LastReceivedTick => _lastReceivedTick;
 
         public uint LastAcknowledgedSequence => _lastAcknowledgedSequence;
@@ -162,6 +217,8 @@ namespace AiNative.Client.Application
         public ArenaMatchPhase ArenaPhase => _arenaPhase;
         public uint ArenaRemainingTicks => _arenaRemainingTicks;
         public uint ArenaLeaderEntityId => _arenaLeaderEntityId;
+
+        private bool IsArenaFinished => _hasArenaState && _arenaPhase == ArenaMatchPhase.Finished;
 
         public bool TryGetArenaState(out ArenaPlayerState state)
         {
@@ -256,7 +313,7 @@ namespace AiNative.Client.Application
             }
 
             PumpReceive();
-            if (State == BattleClientState.Active)
+            if (State == BattleClientState.Active && !IsArenaFinished)
             {
                 FlushInputRing();
             }
@@ -267,7 +324,7 @@ namespace AiNative.Client.Application
                 _phaseElapsedSeconds += unscaledDeltaSeconds;
                 if (_phaseElapsedSeconds >= PhaseTimeoutMilliseconds / 1000f)
                 {
-                    if (State == BattleClientState.Reconnecting)
+                    if (State == BattleClientState.Reconnecting || _topologyReconnecting)
                     {
                         ScheduleReconnectRetry("Reconnect response timed out.");
                     }
@@ -322,7 +379,7 @@ namespace AiNative.Client.Application
             ArenaWeaponId weapon)
         {
             if (_disposed) return PredictionPrepareStatus.Disposed;
-            if (State != BattleClientState.Active || !IsPredictionInitialized)
+            if (State != BattleClientState.Active || !IsPredictionInitialized || IsArenaFinished)
             {
                 return PredictionPrepareStatus.NotInitialized;
             }
@@ -334,12 +391,11 @@ namespace AiNative.Client.Application
             }
 
             if (_arenaPrediction?.IsInitialized != true) return PredictionPrepareStatus.NotInitialized;
-            ulong stampedTick = Math.Max(_nextInputTick, checked((ulong)_arenaPrediction.Current.Tick + 1));
+            ulong stampedTick = checked(_lastReceivedTick + 1);
             ArenaPredictionPrepareResult predicted = _arenaPrediction.PrepareInput(
                 stampedTick, moveXMilli, moveZMilli, lookYawMilli, lookPitchMilli, buttons, weapon, buffer);
             if (predicted.Status == ArenaPredictionPrepareStatus.Prepared)
             {
-                _nextInputTick = stampedTick + 1;
                 _arenaState = predicted.PredictedState;
                 _inputRing.CommitWrite(predicted.WrittenBytes);
             }
@@ -441,7 +497,7 @@ namespace AiNative.Client.Application
             }
 
             _transportSlot.Replace(connection.Transport, connection.TryAdvanceConnectionEpoch);
-            if (State == BattleClientState.Reconnecting)
+            if (State == BattleClientState.Reconnecting && _admission is null)
             {
                 _awaitingReconnectResponse = true;
                 _phaseElapsedSeconds = 0;
@@ -463,11 +519,13 @@ namespace AiNative.Client.Application
             _phaseElapsedSeconds = 0;
             if (!BattleClientProtocolV1.TryEncodeLogin(
                     _clientBuild,
+                    _admission,
                     _controlBuffer,
                     out int loginBytes) ||
                 !TrySendControl(loginBytes))
             {
-                Fail("Login request was not accepted.");
+                if (_topologyReconnecting) ScheduleReconnectRetry("Login request was not accepted.");
+                else Fail("Login request was not accepted.");
             }
         }
 
@@ -507,6 +565,7 @@ namespace AiNative.Client.Application
                     HandleLogin(frame);
                 }
                 else if (State == BattleClientState.JoiningRoom &&
+                         packet.ConnectionEpoch == _connectionEpoch &&
                          packet.Channel.Equals(BattleClientProtocolV1.ControlChannel) &&
                          messageId == BattleClientProtocolV1.JoinRoomResponseMessageId)
                 {
@@ -531,7 +590,13 @@ namespace AiNative.Client.Application
             if (!BattleClientProtocolV1.TryDecodeLoginResponse(
                     frame,
                     out ulong sessionId,
-                    out uint epoch) ||
+                    out uint epoch,
+                    out string globalRoomId,
+                    out string bootEpoch,
+                    out ulong roomTick) ||
+                (_admission is not null &&
+                 (!string.Equals(globalRoomId, _admission.RoomId, StringComparison.Ordinal) ||
+                  !string.Equals(bootEpoch, _admission.BootEpoch, StringComparison.Ordinal))) ||
                 !_transportSlot.TryAdvanceConnectionEpoch(epoch))
             {
                 Fail("Malformed login response or invalid connection epoch.");
@@ -540,7 +605,8 @@ namespace AiNative.Client.Application
 
             _sessionId = sessionId;
             _connectionEpoch = epoch;
-            _initialConnectionEpoch = epoch;
+            if (_initialConnectionEpoch == 0) _initialConnectionEpoch = epoch;
+            if (_admission is not null) _lastReceivedTick = roomTick;
             State = BattleClientState.JoiningRoom;
             _phaseElapsedSeconds = 0;
             if (!BattleClientProtocolV1.TryEncodeJoin(
@@ -550,7 +616,8 @@ namespace AiNative.Client.Application
                     out int joinBytes) ||
                 !TrySendControl(joinBytes))
             {
-                Fail("Join-room request was not accepted.");
+                if (_topologyReconnecting) ScheduleReconnectRetry("Join-room request was not accepted.");
+                else Fail("Join-room request was not accepted.");
             }
         }
 
@@ -561,14 +628,17 @@ namespace AiNative.Client.Application
                     out uint roomId,
                     out uint entityId,
                     out uint tickRate) ||
-                roomId != RoomId || tickRate != TickRate)
+                (_admission is null && roomId != RoomId) || tickRate != TickRate)
             {
                 Fail("Malformed or incompatible join-room response.");
                 return;
             }
 
             _entityId = entityId;
+            _localRoomId = roomId;
             _prediction = new ClientPredictionAdapter(_transportSlot, entityId);
+            _topologyReconnecting = false;
+            _reconnectAttempts = 0;
             State = BattleClientState.Active;
             _phaseElapsedSeconds = 0;
         }
@@ -628,22 +698,32 @@ namespace AiNative.Client.Application
 
         private void ApplySnapshot(ReadOnlySpan<byte> frame, in ReceivedPacket packet)
         {
+            if (IsArenaFinished) return;
             if (packet.ConnectionEpoch != _connectionEpoch || !packet.Channel.Equals(BattleClientProtocolV1.SnapshotChannel)) return;
+            if (_admission is not null &&
+                (!BattleClientProtocolV1.TryReadSnapshotMetadata(frame, out ulong admittedTick, out uint admittedAcknowledgement) ||
+                 admittedTick < _lastReceivedTick || admittedAcknowledgement < _lastAcknowledgedSequence)) return;
             if (ArenaClientProtocolV1.TryDecodeSnapshot(frame, _entityId, out DecodedArenaSnapshot arena) && arena.HasArenaData)
             {
                 if ((ulong)arena.State.Tick < _lastReceivedTick || arena.Acknowledgement < _lastAcknowledgedSequence) return;
                 _arenaPrediction ??= new ArenaClientPredictionAdapter(_transportSlot, _entityId);
                 ArenaSnapshotApplyResult result = _arenaPrediction.ApplySnapshot(frame, packet);
                 if (result.Status is not (ArenaSnapshotApplyStatus.Initialized or ArenaSnapshotApplyStatus.Reconciled)) return;
-                _arenaState = result.State;
+                bool finished = arena.Phase == ArenaMatchPhase.Finished;
+                if (finished)
+                {
+                    // The terminal authority state supersedes every unacknowledged local command.
+                    _arenaPrediction.Initialize(arena.State);
+                    _inputRing.Clear();
+                }
+                _arenaState = finished ? arena.State : result.State;
                 _arenaPhase = arena.Phase;
                 _arenaRemainingTicks = arena.RemainingTicks;
                 _arenaLeaderEntityId = arena.LeaderEntityId;
                 _hasArenaState = true;
                 _lastReceivedTick = (ulong)arena.State.Tick;
                 _lastAcknowledgedSequence = arena.Acknowledgement;
-                _nextInputTick = Math.Max(_nextInputTick, _lastReceivedTick + 1);
-                if (result.Status == ArenaSnapshotApplyStatus.Initialized) _presentation.Initialize(ToKinematic(result.State));
+                if (finished || result.Status == ArenaSnapshotApplyStatus.Initialized) _presentation.Initialize(ToKinematic(_arenaState));
                 else _presentation.ApplyReconciliation(result.Reconciliation);
                 return;
             }
@@ -700,6 +780,7 @@ namespace AiNative.Client.Application
 
         private void BeginReconnect()
         {
+            if (IsArenaFinished) return;
             if (_sessionId == 0 || _prediction is null)
             {
                 Fail("Connection closed before a resumable session was established.");
@@ -708,6 +789,26 @@ namespace AiNative.Client.Application
 
             State = BattleClientState.Reconnecting;
             _presentation.ResetState();
+            if (_admission is not null)
+            {
+                _topologyReconnecting = true;
+                // A new authenticated owner starts from authority; unsent commands must not cross connections.
+                _inputRing.Clear();
+                _ = _prediction.DisposeAsync();
+                if (_arenaPrediction is not null) _ = _arenaPrediction.DisposeAsync();
+                _prediction = null;
+                _arenaPrediction = null;
+                _hasArenaState = false;
+                _arenaState = default;
+                _arenaPhase = default;
+                _arenaRemainingTicks = 0;
+                _arenaLeaderEntityId = 0;
+                _lastAcknowledgedSequence = 0;
+                _lastReceivedTick = 0;
+                _sessionId = 0;
+                _entityId = 0;
+                _localRoomId = 0;
+            }
             _awaitingReconnectResponse = false;
             _reconnectAttempts = 1;
             _retryDelayRemainingSeconds = ReconnectDelaySeconds[0];
@@ -825,6 +926,8 @@ namespace AiNative.Client.Application
             }
 
             internal int Count => _count;
+
+            internal void Clear() { _head = 0; _count = 0; }
 
             internal bool TryGetWriteBuffer(out byte[] buffer)
             {

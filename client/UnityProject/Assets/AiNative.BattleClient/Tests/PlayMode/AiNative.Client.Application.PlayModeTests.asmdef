@@ -3,7 +3,9 @@
   "rootNamespace": "AiNative.Client.Application.PlayModeTests",
   "references": [
     "AiNative.Client.Application",
-    "AiNative.Client.Prediction"
+    "AiNative.Client.Prediction",
+    "AiNative.Gameplay",
+    "AiNative.Client.Fantasy"
   ],
   "optionalUnityReferences": [
     "TestAssemblies"

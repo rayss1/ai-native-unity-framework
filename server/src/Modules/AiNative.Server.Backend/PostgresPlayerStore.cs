@@ -16,6 +16,20 @@ public sealed class PostgresPlayerStore : IPlayerStore, IAsyncDisposable
     public async ValueTask InitializeAsync(CancellationToken cancellationToken = default)
     {
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        // Production migrations run with their owner before DML-only runtime accounts start.
+        await using (var version = new NpgsqlCommand("SELECT max(version) FROM player.schema_version", connection))
+        {
+            try
+            {
+                if (await version.ExecuteScalarAsync(cancellationToken) is not int schemaVersion || schemaVersion != 1)
+                    throw new InvalidDataException("player-schema-version-not-supported");
+                return;
+            }
+            catch (PostgresException exception) when (exception.SqlState == "42P01")
+            {
+                // Preserve bootstrap for an uninitialized database owned by the caller.
+            }
+        }
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
         await using var command = new NpgsqlCommand("""
             SELECT pg_advisory_xact_lock(91817001);

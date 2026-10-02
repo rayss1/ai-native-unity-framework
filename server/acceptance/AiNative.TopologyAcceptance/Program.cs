@@ -8,10 +8,14 @@ using AiNative.Server.Fantasy;
 using AiNative.Server.Hosting;
 using AiNative.Server.Protocol;
 using Google.Protobuf;
+using System.Diagnostics;
+using System.Globalization;
+using System.Threading.Channels;
 
 List<object> evidence = [];
 string output = Environment.GetEnvironmentVariable("AINATIVE_ACCEPTANCE_REPORT") ?? "acceptance.json";
-using CancellationTokenSource deadline = new(TimeSpan.FromSeconds(240));
+AcceptanceOptions options = AcceptanceOptions.Load(Environment.GetEnvironmentVariable);
+using CancellationTokenSource deadline = new(options.Deadline);
 CancellationToken ct = deadline.Token;
 ServiceRole role = Enum.Parse<ServiceRole>(Environment.GetEnvironmentVariable("AINATIVE_ACCEPTANCE_ROLE") ?? "Client");
 HostSettings settings = HostSettings.Load(role, args);
@@ -43,8 +47,8 @@ try
     }
     else
     {
-    await using FantasyBackendProbe gateA = await runtime.ConnectGateProbeAsync("127.0.0.1:23001", ct);
-    await using FantasyBackendProbe gateB = await runtime.ConnectGateProbeAsync("127.0.0.1:23001", ct);
+    await using FantasyBackendProbe gateA = await runtime.ConnectGateProbeAsync(options.GateAddress, ct);
+    await using FantasyBackendProbe gateB = await runtime.ConnectGateProbeAsync(options.GateAddress, ct);
     var a = await Queue(gateA); var b = await Queue(gateB);
     evidence.Add(new { scenario = "tcp-register-login-party-ready-queue", passed = true, players = 2 });
     ServiceReply privateCall = await gateA.CallAsync(ServiceMethods.Settle, new MatchResult().ToByteArray(), a.login.SessionToken, ct);
@@ -63,9 +67,10 @@ try
         await using var battleA = await runtime.ConnectBattleProbeAsync(readyA.Status.Allocation.Address, ct);
         await using var battleB = await runtime.ConnectBattleProbeAsync(readyB.Status.Allocation.Address, ct);
         var first = await Join(battleA.Transport, readyA); var second = await Join(battleB.Transport, readyB);
-        Snapshot snapshot = await Receive<Snapshot>(battleA.Transport, MessageId.Snapshot, TimeSpan.FromSeconds(10));
-        await Send(battleA.Transport, MessageId.InputCommand, new InputCommand { RoomTick = snapshot.RoomTick + 2, Sequence = 1, MoveXMilli = 1000 });
-        do { snapshot = await Receive<Snapshot>(battleA.Transport, MessageId.Snapshot, TimeSpan.FromSeconds(10)); } while (snapshot.LastProcessedInputSequence < 1);
+        await using SnapshotInputLoop inputA = new(battleA.Transport, ct);
+        await using SnapshotInputLoop inputB = new(battleB.Transport, ct);
+        Snapshot snapshot;
+        do { snapshot = await inputA.ReadAsync(TimeSpan.FromSeconds(10)); } while (snapshot.LastProcessedInputSequence < 1);
         evidence.Add(new { scenario = "kcp-input-ack", passed = true, snapshot.RoomTick, snapshot.LastProcessedInputSequence });
         string? restartSignal = Environment.GetEnvironmentVariable("AINATIVE_GATE_RESTART_SIGNAL");
         if (restartSignal is not null)
@@ -73,12 +78,19 @@ try
             File.WriteAllText(restartSignal, "active");
             DateTime restartDeadline = DateTime.UtcNow.AddSeconds(15);
             while (!File.Exists(restartSignal + ".done")) { if (DateTime.UtcNow > restartDeadline) throw new TimeoutException("gate-restart-harness"); await Task.Delay(100, ct); }
-            Snapshot continued = await Receive<Snapshot>(battleA.Transport, MessageId.Snapshot, TimeSpan.FromSeconds(5));
+            Snapshot continued = await inputA.ReadAsync(TimeSpan.FromSeconds(5));
             Check(continued.RoomTick > snapshot.RoomTick, "battle-continues-during-gate-restart");
             evidence.Add(new { scenario = "gate-restart-battle-continues", passed = true, continued.RoomTick });
+            await using FantasyBackendProbe reconnectedGate = await runtime.ConnectGateProbeAsync(options.GateAddress, ct);
+            PlayerProfile restoredProfile = (await reconnectedGate.CallAsync(ServiceMethods.Profile, new ProfileRequest { PlayerId = a.login.PlayerId }.ToByteArray(), a.login.SessionToken, ct)).Read(PlayerProfile.Parser);
+            MatchReady restoredMatch = (await reconnectedGate.CallAsync(ServiceMethods.MatchStatus, new MatchQuery { RequestId = a.request }.ToByteArray(), a.login.SessionToken, ct)).Read(MatchReady.Parser);
+            Check(restoredProfile.PlayerId == a.login.PlayerId && restoredMatch.Status.Allocation?.RoomId == readyA.Status.Allocation.RoomId, "gate-reconnect-public-profile-match-restored");
+            evidence.Add(new { scenario = "gate-reconnect-public-profile-match-restored", passed = true, restoredProfile.PlayerId, room = restoredMatch.Status.Allocation!.RoomId });
         }
+        await inputA.DisposeAsync();
         await using var replacement = await runtime.ConnectBattleProbeAsync(readyA.Status.Allocation.Address, ct);
         var resumed = await Join(replacement.Transport, readyA);
+        await using SnapshotInputLoop replacementInput = new(replacement.Transport, ct);
         Check(resumed.EntityId == first.EntityId, "reconnect-same-entity");
         evidence.Add(new { scenario = "reconnect", passed = true, resumed.EntityId });
         await using var invalid = await runtime.ConnectBattleProbeAsync(readyA.Status.Allocation.Address, ct);
@@ -87,10 +99,54 @@ try
         try { await Receive<LoginResponse>(invalid.Transport, MessageId.LoginResponse, TimeSpan.FromSeconds(2)); } catch (TimeoutException) { rejected = true; }
         Check(rejected, "wrong-room-ticket-no-response");
         evidence.Add(new { scenario = "wrong-room-ticket", passed = true });
-        do { snapshot = await Receive<Snapshot>(replacement.Transport, MessageId.Snapshot, TimeSpan.FromSeconds(30)); } while (snapshot.MatchPhase != ArenaMatchPhase.ArenaMatchFinished);
-        await using FantasyBackendProbe profileGate = await runtime.ConnectGateProbeAsync("127.0.0.1:23001", ct);
-        PlayerProfile profile;
-        do { await Task.Delay(300, ct); profile = (await profileGate.CallAsync(ServiceMethods.Profile, new ProfileRequest { PlayerId = a.login.PlayerId }.ToByteArray(), a.login.SessionToken, ct)).Read(PlayerProfile.Parser); } while (profile.Played != 1);
+        string? activeSignal = Environment.GetEnvironmentVariable("AINATIVE_ACCEPTANCE_ACTIVE_SIGNAL");
+        if (activeSignal is not null)
+        {
+            RoomAllocation active = readyA.Status.Allocation;
+            // Write metadata atomically; never include session tokens or tickets.
+            File.WriteAllText(activeSignal + ".tmp", JsonSerializer.Serialize(new { active.RoomId, active.MatchId, active.NodeId, active.BootEpoch, playerIds = active.PlayerIds.ToArray() }));
+            File.Move(activeSignal + ".tmp", activeSignal, true);
+        }
+        string? battleRestartSignal = Environment.GetEnvironmentVariable("AINATIVE_ACCEPTANCE_BATTLE_RESTART_SIGNAL");
+        if (battleRestartSignal is not null)
+        {
+            while (!File.Exists(battleRestartSignal)) await Task.Delay(100, ct);
+            await using var stale = await runtime.ConnectBattleProbeAsync(readyA.Status.Allocation.Address, ct);
+            await Send(stale.Transport, MessageId.LoginRequest, new LoginRequest { ProtocolMajor = 1, ClientBuild = "acceptance", EntryTicket = readyA.EntryTicket, GlobalRoomId = readyA.Status.Allocation.RoomId });
+            bool fenced = false;
+            try { await Receive<LoginResponse>(stale.Transport, MessageId.LoginResponse, TimeSpan.FromSeconds(2)); } catch (TimeoutException) { fenced = true; }
+            Check(fenced, "old-boot-ticket-no-login");
+            evidence.Add(new { scenario = "battle-restart-old-ticket-fenced", passed = true, readyA.Status.Allocation.RoomId, readyA.Status.Allocation.BootEpoch });
+            await replacementInput.StopAfterVerifiedPeerLossAsync();
+            await inputB.StopAfterVerifiedPeerLossAsync();
+            // The old battle cannot finish. The harness must require this exact expected
+            // termination plus a fresh match; a generic failed client is never a pass.
+            throw new InvalidOperationException("expected-room-lost-after-battle-restart");
+        }
+        if (Environment.GetEnvironmentVariable("AINATIVE_ACCEPTANCE_EXPIRED_TICKET") == "true")
+        {
+            using var claims = JsonDocument.Parse(Convert.FromBase64String(readyA.EntryTicket.Split('.')[0]));
+            long expiry = claims.RootElement.GetProperty("Expiry").GetInt64();
+            while (DateTimeOffset.UtcNow.ToUnixTimeSeconds() <= expiry) await Task.Delay(500, ct);
+            Snapshot active = await replacementInput.ReadAsync(TimeSpan.FromSeconds(10));
+            Check(active.MatchPhase == ArenaMatchPhase.ArenaMatchActive, "expiry-tested-in-live-room");
+            await using var expired = await runtime.ConnectBattleProbeAsync(readyA.Status.Allocation.Address, ct);
+            await Send(expired.Transport, MessageId.LoginRequest, new LoginRequest { ProtocolMajor = 1, ClientBuild = "acceptance", EntryTicket = readyA.EntryTicket, GlobalRoomId = readyA.Status.Allocation.RoomId });
+            bool expiryRejected = false;
+            try { await Receive<LoginResponse>(expired.Transport, MessageId.LoginResponse, TimeSpan.FromSeconds(2)); } catch (TimeoutException) { expiryRejected = true; }
+            Check(expiryRejected, "expired-ticket-no-response");
+            evidence.Add(new { scenario = "expired-player-issued-ticket-live-room", passed = true, expiryUnixSeconds = expiry, active.RoomTick });
+        }
+        do { snapshot = await replacementInput.ReadAsync(TimeSpan.FromSeconds(30)); } while (snapshot.MatchPhase != ArenaMatchPhase.ArenaMatchFinished);
+        await inputB.Completion.WaitAsync(TimeSpan.FromSeconds(10), ct);
+        Check(inputB.SentInputs > 0 && replacementInput.SentInputs > 0 && inputB.LastSnapshot?.MatchPhase == ArenaMatchPhase.ArenaMatchFinished && inputB.LastSnapshot.LastProcessedInputSequence > 0 && snapshot.LastProcessedInputSequence > 0, "both-players-continuous-input-through-finish");
+        evidence.Add(new { scenario = "snapshot-driven-continuous-input", passed = true, firstConnectionInputs = inputA.SentInputs, secondPlayerInputs = inputB.SentInputs, secondPlayerFinishedTick = inputB.LastSnapshot!.RoomTick, secondPlayerAcknowledgedSequence = inputB.LastSnapshot.LastProcessedInputSequence, replacementInputs = replacementInput.SentInputs, replacementAcknowledgedSequence = snapshot.LastProcessedInputSequence, finishedRoomTick = snapshot.RoomTick, inputHz = 10, deadlineSeconds = options.Deadline.TotalSeconds });
+        await using FantasyBackendProbe profileGate = await runtime.ConnectGateProbeAsync(options.GateAddress, ct);
+        await AcceptanceSettlementPolling.WaitAsync(async token =>
+        {
+            ServiceReply reply = await profileGate.CallAsync(ServiceMethods.Profile, new ProfileRequest { PlayerId = a.login.PlayerId }.ToByteArray(), a.login.SessionToken, token);
+            return reply.Success ? reply.Read(PlayerProfile.Parser) : null;
+        }, ct);
         await Task.Delay(1500, ct);
         PlayerProfile stable = (await profileGate.CallAsync(ServiceMethods.Profile, new ProfileRequest { PlayerId = a.login.PlayerId }.ToByteArray(), a.login.SessionToken, ct)).Read(PlayerProfile.Parser);
         Check(stable.Played == 1, "settlement-remains-once");
@@ -124,7 +180,7 @@ async Task<(LoginResult login, string request)> Queue(FantasyBackendProbe gate)
 {
     var account = new AccountRequest { Username = "accept_" + Guid.NewGuid().ToString("N")[..16], Password = Guid.NewGuid().ToString("N") };
     LoginResult login = (await gate.CallAsync(ServiceMethods.RegisterAccount, account.ToByteArray(), ct: ct)).Read(LoginResult.Parser);
-    await using FantasyBackendProbe loginConnection = await runtime.ConnectGateProbeAsync("127.0.0.1:23001", ct);
+    await using FantasyBackendProbe loginConnection = await runtime.ConnectGateProbeAsync(options.GateAddress, ct);
     login = (await loginConnection.CallAsync(ServiceMethods.Login, account.ToByteArray(), ct: ct)).Read(LoginResult.Parser);
     PartyState party = (await gate.CallAsync(ServiceMethods.PartyCreate, new Empty().ToByteArray(), login.SessionToken, ct)).Read(PartyState.Parser);
     party = (await gate.CallAsync(ServiceMethods.PartyReady, new PartyCommand { PartyId = party.PartyId, ExpectedVersion = party.Version, Ready = true }.ToByteArray(), login.SessionToken, ct)).Read(PartyState.Parser);
@@ -173,4 +229,113 @@ void Check(bool condition, string label) { if (!condition) throw new InvalidOper
 sealed class RejectHandler : IServiceHandler
 {
     public ValueTask<ServiceReply> HandleAsync(ServiceCallContext context, string method, ReadOnlyMemory<byte> payload, CancellationToken cancellationToken = default) => ValueTask.FromResult(ServiceReply.Reject("forbidden"));
+}
+
+public sealed record AcceptanceOptions(string GateAddress, TimeSpan Deadline)
+{
+    public static AcceptanceOptions Load(Func<string, string?> environment)
+    {
+        string address = environment("AINATIVE_ACCEPTANCE_GATE_ADDRESS") ?? "127.0.0.1:23001";
+        string raw = environment("AINATIVE_ACCEPTANCE_DEADLINE_SECONDS") ?? "240";
+        if (!int.TryParse(raw, NumberStyles.None, CultureInfo.InvariantCulture, out int seconds) || seconds < 1 || seconds > 86400)
+            throw new ArgumentException("AINATIVE_ACCEPTANCE_DEADLINE_SECONDS must be an integer from 1 to 86400.");
+        if (string.IsNullOrWhiteSpace(address)) throw new ArgumentException("AINATIVE_ACCEPTANCE_GATE_ADDRESS cannot be blank.");
+        return new(address, TimeSpan.FromSeconds(seconds));
+    }
+}
+
+public static class AcceptanceSettlementPolling
+{
+    public static async Task<PlayerProfile> WaitAsync(Func<CancellationToken, Task<PlayerProfile?>> probe, CancellationToken cancellationToken)
+    {
+        while (true)
+        {
+            await Task.Delay(300, cancellationToken);
+            PlayerProfile? profile = await probe(cancellationToken);
+            if (profile?.Played == 1) return profile;
+            if (profile?.Played > 1) throw new InvalidOperationException("settlement-count-exceeds-one");
+        }
+    }
+}
+
+/// <summary>One reader per transport; keeps the newest snapshot in a bounded mailbox.</summary>
+public sealed class SnapshotInputLoop : IAsyncDisposable
+{
+    readonly IRealtimeTransport transport;
+    readonly CancellationTokenSource stop;
+    readonly Channel<Snapshot> snapshots = Channel.CreateBounded<Snapshot>(new BoundedChannelOptions(1) { FullMode = BoundedChannelFullMode.DropOldest, SingleWriter = true, SingleReader = true });
+    int disposed;
+    long sentInputs;
+    Snapshot? lastObservedSnapshot;
+    public long SentInputs => Interlocked.Read(ref sentInputs);
+    public Snapshot? LastSnapshot => Volatile.Read(ref lastObservedSnapshot);
+    public Task Completion { get; }
+    public SnapshotInputLoop(IRealtimeTransport transport, CancellationToken cancellationToken)
+    {
+        this.transport = transport;
+        stop = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        Completion = PumpAsync();
+    }
+    async Task PumpAsync()
+    {
+        byte[] receive = new byte[1200], send = new byte[1200];
+        Snapshot? latest = null;
+        uint sequence = 0;
+        long lastSnapshot = 0, nextSend = 0;
+        Exception? failure = null;
+        try
+        {
+            while (!stop.IsCancellationRequested)
+            {
+                // A busy peer cannot starve cancellation or input sends.
+                for (int budget = 0; budget < 64 && !stop.IsCancellationRequested && transport.TryReceive(receive, out var packet); budget++)
+                {
+                    if (!packet.IsComplete || RealtimeProtocolCodec.TryDecode(receive.AsSpan(0, packet.WrittenBytes), out var decoded) != ProtocolDecodeStatus.Accepted || decoded.Message is not Snapshot snapshot) continue;
+                    if (latest is not null && snapshot.RoomTick < latest.RoomTick) continue;
+                    latest = snapshot; Volatile.Write(ref lastObservedSnapshot, snapshot); sequence = Math.Max(sequence, snapshot.LastProcessedInputSequence);
+                    lastSnapshot = Stopwatch.GetTimestamp(); snapshots.Writer.TryWrite(snapshot);
+                    if (snapshot.MatchPhase == ArenaMatchPhase.ArenaMatchFinished) return;
+                }
+                long now = Stopwatch.GetTimestamp();
+                if (latest is not null && now >= nextSend && Stopwatch.GetElapsedTime(lastSnapshot).TotalSeconds < 1)
+                {
+                    InputCommand input = new() { RoomTick = checked(latest.RoomTick + 2), Sequence = checked(++sequence), MoveXMilli = 1000 };
+                    if (!RealtimeProtocolCodec.TryEncode(MessageId.InputCommand, input, send, out var channel, out int length))
+                        throw new InvalidOperationException("continuous-input-send");
+                    SendResult result = await transport.SendAsync(channel, send.AsMemory(0, length), stop.Token);
+                    if (result.Status is SendStatus.Closed or SendStatus.Faulted) throw new PeerLossSendException();
+                    if (result.Status != SendStatus.Accepted) throw new InvalidOperationException("continuous-input-send");
+                    Interlocked.Increment(ref sentInputs); nextSend = now + Stopwatch.Frequency / 10;
+                }
+                await Task.Delay(10, stop.Token);
+            }
+        }
+        catch (OperationCanceledException) when (stop.IsCancellationRequested) { }
+        catch (Exception ex) { failure = ex; throw; }
+        finally { snapshots.Writer.TryComplete(failure); }
+    }
+    public async Task<Snapshot> ReadAsync(TimeSpan timeout)
+    {
+        using var wait = CancellationTokenSource.CreateLinkedTokenSource(stop.Token);
+        wait.CancelAfter(timeout);
+        try { return await snapshots.Reader.ReadAsync(wait.Token); }
+        catch (OperationCanceledException) when (!stop.IsCancellationRequested) { throw new TimeoutException("receive-Snapshot"); }
+    }
+    public async ValueTask DisposeAsync()
+    {
+        if (Interlocked.Exchange(ref disposed, 1) != 0) return;
+        stop.Cancel();
+        try { await Completion; } finally { stop.Dispose(); }
+    }
+
+    internal async ValueTask StopAfterVerifiedPeerLossAsync()
+    {
+        try { await DisposeAsync(); }
+        catch (PeerLossSendException) { }
+    }
+
+    sealed class PeerLossSendException : InvalidOperationException
+    {
+        public PeerLossSendException() : base("continuous-input-send") { }
+    }
 }

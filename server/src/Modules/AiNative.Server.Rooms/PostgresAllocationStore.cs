@@ -27,7 +27,21 @@ public sealed class PostgresAllocationStore(string connectionString) : IAllocati
         _ownership = await _source.OpenConnectionAsync(ct);
         await using NpgsqlCommand own = new("SELECT pg_try_advisory_lock(91817002)", _ownership);
         if (await own.ExecuteScalarAsync(ct) is not true) throw new InvalidOperationException("coordinator-already-active");
-        _locked = true;
+        // A pre-migrated schema must work without database CREATE or schema ownership.
+        await using (NpgsqlCommand version = new("SELECT max(version) FROM coordinator.schema_version", _ownership))
+        {
+            try
+            {
+                if (await version.ExecuteScalarAsync(ct) is not int schemaVersion || schemaVersion != 1)
+                    throw new InvalidDataException("coordinator-schema-version-not-supported");
+                _locked = true;
+                return;
+            }
+            catch (PostgresException exception) when (exception.SqlState == "42P01")
+            {
+                // Development bootstrap still requires the caller's migration privileges.
+            }
+        }
         await using NpgsqlCommand migrate = new("""
             CREATE SCHEMA IF NOT EXISTS coordinator;
             CREATE TABLE IF NOT EXISTS coordinator.schema_version(version integer PRIMARY KEY);
@@ -39,6 +53,7 @@ public sealed class PostgresAllocationStore(string connectionString) : IAllocati
             INSERT INTO coordinator.schema_version(version) VALUES(1) ON CONFLICT DO NOTHING;
             """, _ownership);
         await migrate.ExecuteNonQueryAsync(ct);
+        _locked = true;
     }
     public async ValueTask<IReadOnlyList<RoomAllocation>> LoadAsync(CancellationToken cancellationToken = default)
     {

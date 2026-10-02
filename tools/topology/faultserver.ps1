@@ -1,4 +1,4 @@
-param([ValidateSet('backend-restarts','player-outage','battle-crash','capacity','bots','expired-ticket','party-notifications')][string]$Mode, [string]$SdkPath, [string]$RunDirectory='artifacts/topology-local', [switch]$SkipBuild, [switch]$SkipAudit, [int]$MatchTicks=1200)
+param([ValidateSet('backend-restarts','player-outage','battle-crash','capacity','bots','expired-ticket','party-notifications')][string]$Mode, [string]$SdkPath, [string]$RunDirectory='artifacts/topology-local', [switch]$SkipBuild, [switch]$SkipAudit, [int]$MatchTicks=1200, [ValidateRange(1,86400)][int]$DeadlineSeconds=240)
 . "$PSScriptRoot/common.ps1" -SdkPath $SdkPath -RunDirectory $RunDirectory
 if(-not $env:AINATIVE_TEST_POSTGRES){throw 'Isolated AINATIVE_TEST_POSTGRES required'}
 if($Mode -in @('capacity','bots') -and $MatchTicks -eq 1200){$MatchTicks=6000}
@@ -20,7 +20,7 @@ function Wait-Ready($service,[int]$Seconds=30){
 }
 try{
  foreach($service in @($Services | Where-Object Role -ne Client)){Wait-Ready $service}
- $client=Start-OwnedChild ($Services | Where-Object Id -eq acceptance) @{AINATIVE_ACCEPTANCE_MODE=$Mode;AINATIVE_FAULT_SIGNALS=$signalDirectory;AINATIVE_ACCEPTANCE_RUN_DIRECTORY=$Run;AINATIVE_ACCEPTANCE_REPORT=(Join-Path $Run ($Mode+'.json'));AINATIVE_MATCH_LENGTH_TICKS=[string]$MatchTicks}
+ $client=Start-OwnedChild ($Services | Where-Object Id -eq acceptance) @{AINATIVE_ACCEPTANCE_MODE=$Mode;AINATIVE_FAULT_SIGNALS=$signalDirectory;AINATIVE_ACCEPTANCE_RUN_DIRECTORY=$Run;AINATIVE_ACCEPTANCE_REPORT=(Join-Path $Run ($Mode+'.json'));AINATIVE_MATCH_LENGTH_TICKS=[string]$MatchTicks;AINATIVE_ACCEPTANCE_DEADLINE_SECONDS=[string]$DeadlineSeconds}
  while(-not $client.Process.HasExited){
   foreach($request in Get-ChildItem $signalDirectory -Filter '*.request.json'){
    if($handled.ContainsKey($request.Name)){continue}

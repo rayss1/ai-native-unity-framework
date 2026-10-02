@@ -72,7 +72,7 @@ public sealed class GateService(IServiceRpc rpc, IClientNotifier notifier, TimeP
         }
         if (player.Length == 0) return ServiceReply.Reject("invalid-session");
         ServiceTarget target;
-        if (method == ServiceMethods.Profile) target = new(ServiceRole.Player);
+        if (method is ServiceMethods.Profile or ServiceMethods.SettlementStatus) target = new(ServiceRole.Player);
         else if (method is ServiceMethods.PartyCreate or ServiceMethods.PartyInvite or ServiceMethods.PartyAccept or ServiceMethods.PartyLeave or
             ServiceMethods.PartyReady or ServiceMethods.PartyGet or ServiceMethods.PartyQueue or ServiceMethods.QueueCancel or ServiceMethods.MatchStatus or ServiceMethods.PartyInvites)
             target = new(ServiceRole.Lobby);
