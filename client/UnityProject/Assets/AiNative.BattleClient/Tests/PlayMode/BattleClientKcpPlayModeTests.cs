@@ -8,6 +8,22 @@ namespace AiNative.Client.Application.PlayModeTests
 {
     public sealed class BattleClientKcpPlayModeTests
     {
+        private System.Threading.Tasks.Task _idleDisposalTask;
+
+        [UnityTearDown]
+        public IEnumerator AwaitIdleSessionDisposal()
+        {
+            System.Threading.Tasks.Task task = _idleDisposalTask;
+            _idleDisposalTask = null;
+            if (task == null) yield break;
+
+            while (!task.IsCompleted) yield return null;
+            // Native Scene disposal is posted to its Unity thread context.
+            // Give that queue a frame even when the test aborted on an assertion.
+            yield return null;
+            task.GetAwaiter().GetResult();
+        }
+
         [UnityTest]
         public IEnumerator LocalBattleHostCompletesLoginJoinSnapshotAndAcknowledgement()
         {
@@ -91,6 +107,60 @@ namespace AiNative.Client.Application.PlayModeTests
             Assert.That(session.LastAcknowledgedSequence, Is.GreaterThan(acknowledgementBeforeReconnect));
             Assert.That(session.IsPredictionInitialized, Is.True);
             yield return Dispose(session);
+        }
+
+        [UnityTest]
+        public IEnumerator IdleClientRetainsIdentityAndReceivesSnapshotsBeyondServerIdleTimeout()
+        {
+            BattleClientSession session = CreateLiveSessionOrIgnore();
+            try
+            {
+                session.Start();
+                DateTime handshakeDeadline = DateTime.UtcNow.AddSeconds(15);
+                while (DateTime.UtcNow < handshakeDeadline && !session.IsPredictionInitialized)
+                {
+                    session.Pump(Time.unscaledDeltaTime);
+                    Assert.That(session.State, Is.Not.EqualTo(BattleClientState.Faulted), session.FaultReason);
+                    yield return null;
+                }
+
+                Assert.That(session.State, Is.EqualTo(BattleClientState.Active));
+                Assert.That(session.IsPredictionInitialized, Is.True);
+                ulong sessionId = session.SessionId;
+                uint entityId = session.EntityId;
+                uint epoch = session.ConnectionEpoch;
+                ulong initialTick = session.LastReceivedTick;
+                ulong progressTick = initialTick;
+                double nextProgressCheckSeconds = 5;
+                // Pinned legacy Fantasy.config: idleTimeout=30000ms, idleInterval=5000ms.
+                // 45 seconds crosses the timeout and its next two inspection intervals.
+                var idleClock = System.Diagnostics.Stopwatch.StartNew();
+                while (idleClock.Elapsed.TotalSeconds < 45)
+                {
+                    session.Pump(Time.unscaledDeltaTime);
+                    Assert.That(session.State, Is.EqualTo(BattleClientState.Active), session.FaultReason);
+                    Assert.That(session.SessionId, Is.EqualTo(sessionId));
+                    Assert.That(session.EntityId, Is.EqualTo(entityId));
+                    Assert.That(session.ConnectionEpoch, Is.EqualTo(epoch));
+                    Assert.That(session.LastAcknowledgedSequence, Is.Zero);
+                    Assert.That(session.QueuedInputFrames, Is.Zero);
+                    if (idleClock.Elapsed.TotalSeconds >= nextProgressCheckSeconds)
+                    {
+                        Assert.That(session.LastReceivedTick, Is.GreaterThan(progressTick), "Idle snapshots must keep advancing.");
+                        progressTick = session.LastReceivedTick;
+                        nextProgressCheckSeconds += 5;
+                    }
+                    yield return null;
+                }
+
+                Assert.That(session.LastReceivedTick, Is.GreaterThan(initialTick));
+                Debug.Log($"Idle keepalive verified: seconds={idleClock.Elapsed.TotalSeconds:F3}, initialTick={initialTick}, finalTick={session.LastReceivedTick}, epoch={epoch}, acknowledgement={session.LastAcknowledgedSequence}");
+            }
+            finally
+            {
+                // Start cleanup even when a live assertion aborts this iterator.
+                _idleDisposalTask = session.DisposeAsync().AsTask();
+            }
         }
 
         private static BattleClientSession CreateLiveSessionOrIgnore()

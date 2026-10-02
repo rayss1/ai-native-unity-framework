@@ -187,10 +187,28 @@ namespace AiNative.Client.Fantasy
                     return;
                 }
 
-                var adapter = new FantasyClientSession(_scene, _session);
-                if (!_completion.TrySetResult(adapter))
+                try
                 {
-                    adapter.Dispose();
+                    // Scene.Connect bypasses FantasyRuntime's automatic heartbeat setup.
+                    // Both connection callbacks and Scene.Create's continuation run on the
+                    // owning Scene thread. Attach to this Session so its disposal also
+                    // removes the heartbeat timers; use FantasyRuntime's pinned defaults.
+                    if (_session.GetComponent<SessionHeartbeatComponent>() == null)
+                    {
+                        _session.AddComponent<SessionHeartbeatComponent>().Start(
+                            interval: 2000, timeOut: 30000, timeOutInterval: 5000);
+                    }
+
+                    var adapter = new FantasyClientSession(_scene, _session);
+                    if (!_completion.TrySetResult(adapter))
+                    {
+                        adapter.Dispose();
+                    }
+                }
+                catch (Exception exception)
+                {
+                    DisposeScene();
+                    _completion.TrySetException(exception);
                 }
             }
 
