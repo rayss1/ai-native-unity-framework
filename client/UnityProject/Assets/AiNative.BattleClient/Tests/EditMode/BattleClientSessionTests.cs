@@ -13,6 +13,265 @@ namespace AiNative.Client.Application.Tests
     public sealed class BattleClientSessionTests
     {
         [Test]
+        public void TopologyLoginSendsTicketAndGlobalRoomUsingExistingV1Fields()
+        {
+            var transport = new FakeTransport();
+            var session = CreateTopologySession(new FakeConnector(transport));
+            session.Start(); session.Pump(0);
+            Assert.That(transport.SentFrames[0], Is.EqualTo(new byte[]
+            {
+                0xe8, 0x03, 0x08, 1, 0x12, 1, (byte)'x',
+                0x1a, 1, (byte)'t', 0x22, 1, (byte)'r',
+            }));
+        }
+
+        [TestCase("", "e")]
+        [TestCase("other-room", "e")]
+        [TestCase("r", "")]
+        [TestCase("r", "other-boot")]
+        public void TopologyLoginRejectsMissingOrMismatchedRoomAndBoot(string room, string boot)
+        {
+            var transport = new FakeTransport();
+            var session = CreateTopologySession(new FakeConnector(transport));
+            session.Start(); session.Pump(0);
+            transport.Enqueue(TestFrames.Login(42, 1, room, boot), BattleClientProtocolV1.ControlChannel, 1);
+            session.Pump(0);
+            Assert.That(session.State, Is.EqualTo(BattleClientState.Faulted));
+            Assert.That(transport.SentFrames.Count, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void TopologyJoinAcceptsServerLocalRoomAndEntityAndRejectsWrongPacketEpoch()
+        {
+            var transport = new FakeTransport();
+            var session = CreateTopologySession(new FakeConnector(transport));
+            session.Start(); session.Pump(0);
+            transport.Enqueue(TestFrames.Login(42, 2, "r", "e"), BattleClientProtocolV1.ControlChannel, 1);
+            session.Pump(0);
+            transport.Enqueue(TestFrames.Join(19, 3, 60), BattleClientProtocolV1.ControlChannel, 1);
+            session.Pump(0);
+            Assert.That(session.State, Is.EqualTo(BattleClientState.JoiningRoom));
+            transport.Enqueue(TestFrames.Join(19, 3, 60), BattleClientProtocolV1.ControlChannel, 2);
+            transport.Enqueue(TestFrames.Snapshot(3, 110, 0), BattleClientProtocolV1.SnapshotChannel, 2);
+            session.Pump(0);
+            Assert.That(session.State, Is.EqualTo(BattleClientState.Active));
+            Assert.That(session.EntityId, Is.EqualTo(3));
+            Assert.That(session.IsPredictionInitialized, Is.True);
+        }
+
+        [Test]
+        public void TopologyReconnectReloginsWithFreshTicketAndClearsOldPredictionAndInputs()
+        {
+            var initial = new FakeTransport(); var replacement = new FakeTransport();
+            var session = CreateTopologySession(new FakeConnector(initial, replacement));
+            session.Start(); session.Pump(0);
+            initial.Enqueue(TestFrames.Login(42, 1, "r", "e"), BattleClientProtocolV1.ControlChannel, 1);
+            initial.Enqueue(TestFrames.Join(19, 7, 60), BattleClientProtocolV1.ControlChannel, 1);
+            initial.Enqueue(ArenaSnapshot(100), BattleClientProtocolV1.SnapshotChannel, 1);
+            session.Pump(0);
+            session.PredictAndQueueArenaInput(101, 1000, 0, 0, 0, ArenaButtons.Jump, ArenaWeaponId.Machinegun);
+            Assert.That(session.QueuedInputFrames, Is.EqualTo(1));
+            UpdateTopologyAdmission(session, "r", "e", "fresh");
+            session.RequestReconnect();
+            Assert.That(session.QueuedInputFrames, Is.Zero);
+            Assert.That(session.IsPredictionInitialized, Is.False);
+            Assert.That(session.TryGetArenaState(out _), Is.False);
+            Assert.That(session.TryAdvancePresentation(0, out _), Is.False);
+            session.Pump(0.3f); session.Pump(0);
+            Assert.That(BattleClientProtocolV1.ReadMessageId(replacement.SentFrames[0]), Is.EqualTo(1000));
+            Assert.That(System.Text.Encoding.UTF8.GetString(replacement.SentFrames[0]), Does.Contain("fresh"));
+            replacement.Enqueue(TestFrames.Login(42, 1, "r", "e"), BattleClientProtocolV1.ControlChannel, 1);
+            replacement.Enqueue(TestFrames.Join(19, 7, 60), BattleClientProtocolV1.ControlChannel, 1);
+            replacement.Enqueue(ArenaSnapshot(110), BattleClientProtocolV1.SnapshotChannel, 1);
+            session.Pump(0);
+            Assert.That(session.State, Is.EqualTo(BattleClientState.Active));
+            Assert.That(session.SessionId, Is.EqualTo(42));
+            Assert.That(session.EntityId, Is.EqualTo(7));
+            Assert.That(session.PredictAndQueueArenaInput(1, 0, 0, 0, 0, ArenaButtons.None, ArenaWeaponId.Machinegun), Is.EqualTo(PredictionPrepareStatus.Prepared));
+            session.TryGetArenaState(out var state);
+            Assert.That(state.Tick, Is.EqualTo(111));
+            Assert.That(state.PositionXMillimetres, Is.Zero);
+        }
+
+        [Test]
+        public void TopologyLoginRoomTickRejectsEarlierInitialSnapshot()
+        {
+            var transport = new FakeTransport();
+            var session = CreateTopologySession(new FakeConnector(transport));
+            session.Start(); session.Pump(0);
+            transport.Enqueue(TestFrames.Login(42, 1, "r", "e", 100), BattleClientProtocolV1.ControlChannel, 1);
+            transport.Enqueue(TestFrames.Join(19, 3, 60), BattleClientProtocolV1.ControlChannel, 1);
+            transport.Enqueue(TestFrames.Snapshot(3, 99, 0), BattleClientProtocolV1.SnapshotChannel, 1);
+            session.Pump(0);
+            Assert.That(session.LastReceivedTick, Is.EqualTo(100));
+            Assert.That(session.IsPredictionInitialized, Is.False);
+            transport.Enqueue(TestFrames.Snapshot(3, 101, 9), BattleClientProtocolV1.SnapshotChannel, 1);
+            session.Pump(0);
+            Assert.That(session.IsPredictionInitialized, Is.True);
+            Assert.That(session.LastAcknowledgedSequence, Is.EqualTo(9));
+        }
+
+        [TestCase("", "e", "t")]
+        [TestCase("r", "", "t")]
+        [TestCase("r", "e", " ")]
+        public void TopologyAdmissionRequiresRoomBootAndTicket(string room, string boot, string ticket)
+            => Assert.Throws<ArgumentException>(() => new BattleAdmissionInfo(room, boot, ticket));
+
+        [TestCase("other", "e")]
+        [TestCase("r", "other")]
+        public void TopologyAdmissionRefreshRejectsAllocationChanges(string room, string boot)
+        {
+            var transport = new FakeTransport();
+            var session = CreateTopologySession(new FakeConnector(transport));
+            Assert.Throws<ArgumentException>(() => session.UpdateAdmission(new BattleAdmissionInfo(room, boot, "fresh")));
+            session.Start(); session.Pump(0);
+            Assert.That(transport.SentFrames[0], Is.EqualTo(new byte[]
+            {
+                0xe8, 0x03, 0x08, 1, 0x12, 1, (byte)'x',
+                0x1a, 1, (byte)'t', 0x22, 1, (byte)'r',
+            }));
+        }
+
+        [Test]
+        public void TopologyLoginRejectsOversizedTicketWithoutSendingPartialFrame()
+        {
+            var transport = new FakeTransport();
+            var session = new BattleClientSession("localhost", 22000, "x", 4, new FakeConnector(transport),
+                new BattleAdmissionInfo("r", "e", new string('t', 1200)));
+            session.Start(); session.Pump(0);
+            Assert.That(session.State, Is.EqualTo(BattleClientState.Faulted));
+            Assert.That(transport.SentFrames, Is.Empty);
+        }
+
+        [Test]
+        public void TopologyReconnectRetriesTimedOutReloginWithRefreshedTicket()
+        {
+            var initial = new FakeTransport(); var timedOut = new FakeTransport(); var replacement = new FakeTransport();
+            var session = CreateTopologySession(new FakeConnector(initial, timedOut, replacement));
+            session.Start(); session.Pump(0);
+            initial.Enqueue(TestFrames.Login(42, 1, "r", "e"), BattleClientProtocolV1.ControlChannel, 1);
+            initial.Enqueue(TestFrames.Join(19, 7, 60), BattleClientProtocolV1.ControlChannel, 1);
+            session.Pump(0); session.RequestReconnect(); session.Pump(0.3f); session.Pump(0);
+            session.Pump(5.1f);
+            Assert.That(session.State, Is.EqualTo(BattleClientState.Reconnecting));
+            session.UpdateAdmission(new BattleAdmissionInfo("r", "e", "fresh"));
+            session.Pump(0.6f); session.Pump(0);
+            Assert.That(BattleClientProtocolV1.ReadMessageId(replacement.SentFrames[0]), Is.EqualTo(1000));
+            Assert.That(System.Text.Encoding.UTF8.GetString(replacement.SentFrames[0]), Does.Contain("fresh"));
+        }
+
+        [Test]
+        public void FinishedArenaRetainsFinalStateAfterConnectionClosesAndManualReconnect()
+        {
+            var transport = new FakeTransport();
+            var connector = new FakeConnector(transport, new FakeTransport());
+            var session = CreateActiveTopologySession(transport, connector);
+            transport.Enqueue(FinishedArenaSnapshot(110), BattleClientProtocolV1.SnapshotChannel, 1);
+            session.Pump(0);
+            Assert.That(session.ArenaPhase, Is.EqualTo(ArenaMatchPhase.Finished));
+            transport.Close();
+            session.Pump(0);
+            session.RequestReconnect();
+            session.Pump(1);
+            AssertFinalArenaState(session);
+            Assert.That(connector.CallCount, Is.EqualTo(1));
+        }
+
+        [TestCase(SendStatus.Closed)]
+        [TestCase(SendStatus.Faulted)]
+        public void FinishedArenaDiscardsQueuedInputsBeforeSendFailureCanTriggerReconnect(SendStatus sendStatus)
+        {
+            var transport = new FakeTransport();
+            var connector = new FakeConnector(transport, new FakeTransport());
+            var session = CreateActiveTopologySession(transport, connector);
+            transport.Enqueue(ArenaSnapshot(100), BattleClientProtocolV1.SnapshotChannel, 1);
+            session.Pump(0);
+            session.PredictAndQueueArenaInput(101, 1000, 0, 0, 0, ArenaButtons.Jump, ArenaWeaponId.Machinegun);
+            Assert.That(session.QueuedInputFrames, Is.EqualTo(1));
+            int sentBeforeFinal = transport.SentFrames.Count;
+            transport.NextSendStatus = sendStatus;
+            transport.Enqueue(FinishedArenaSnapshot(110), BattleClientProtocolV1.SnapshotChannel, 1);
+            session.Pump(0);
+            session.Pump(1);
+            AssertFinalArenaState(session);
+            Assert.That(session.QueuedInputFrames, Is.Zero);
+            Assert.That(transport.SentFrames.Count, Is.EqualTo(sentBeforeFinal));
+            Assert.That(connector.CallCount, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void FinishedArenaRejectsFurtherPredictionAndInput()
+        {
+            var transport = new FakeTransport();
+            var session = CreateActiveTopologySession(transport, new FakeConnector(transport));
+            transport.Enqueue(FinishedArenaSnapshot(110), BattleClientProtocolV1.SnapshotChannel, 1);
+            session.Pump(0);
+            Assert.That(session.PredictAndQueueArenaInput(111, 1000, 0, 0, 0, ArenaButtons.Fire, ArenaWeaponId.Machinegun),
+                Is.EqualTo(PredictionPrepareStatus.NotInitialized));
+            Assert.That(session.PredictAndQueueInput(111, 1000, 0), Is.EqualTo(PredictionPrepareStatus.NotInitialized));
+            Assert.That(session.QueuedInputFrames, Is.Zero);
+            AssertFinalArenaState(session);
+        }
+
+        [Test]
+        public void FinishedArenaUsesAuthorityStateWithoutReplayingUnacknowledgedInputs()
+        {
+            var transport = new FakeTransport();
+            var session = CreateActiveTopologySession(transport, new FakeConnector(transport));
+            transport.Enqueue(ArenaSnapshot(100), BattleClientProtocolV1.SnapshotChannel, 1);
+            session.Pump(0);
+            session.PredictAndQueueArenaInput(101, 1000, 0, 0, 0, ArenaButtons.Jump, ArenaWeaponId.Machinegun);
+            transport.Enqueue(FinishedArenaSnapshot(110, 0), BattleClientProtocolV1.SnapshotChannel, 1);
+            session.Pump(0);
+            Assert.That(session.TryGetArenaState(out var state), Is.True);
+            Assert.That(state.Tick, Is.EqualTo(110));
+            Assert.That(state.LastProcessedInputSequence, Is.Zero);
+            Assert.That(state.PositionXMillimetres, Is.Zero);
+            Assert.That(state.PositionYMillimetres, Is.Zero);
+            Assert.That(session.QueuedInputFrames, Is.Zero);
+        }
+
+        private static byte[] FinishedArenaSnapshot(byte tick, byte acknowledgement = 42)
+        {
+            var frame = new List<byte>(ArenaSnapshot(tick));
+            frame.AddRange(new byte[] { 0x30, acknowledgement, 0x38, 2 });
+            return frame.ToArray();
+        }
+
+        private static void AssertFinalArenaState(BattleClientSession session)
+        {
+            Assert.That(session.ArenaPhase, Is.EqualTo(ArenaMatchPhase.Finished));
+            Assert.That(session.LastReceivedTick, Is.EqualTo(110));
+            Assert.That(session.LastAcknowledgedSequence, Is.EqualTo(42));
+            Assert.That(session.TryGetArenaState(out var state), Is.True);
+            Assert.That(state.Tick, Is.EqualTo(110));
+            Assert.That(state.LastProcessedInputSequence, Is.EqualTo(42));
+        }
+
+        private static BattleAdmissionInfo CreateTopologyAdmission(string room, string boot, string ticket)
+            => new BattleAdmissionInfo(room, boot, ticket);
+
+        private static BattleClientSession CreateTopologySession(FakeConnector connector)
+        {
+            return new BattleClientSession("127.0.0.1", 22000, "x", 4, connector,
+                CreateTopologyAdmission("r", "e", "t"));
+        }
+
+        private static BattleClientSession CreateActiveTopologySession(FakeTransport transport, FakeConnector connector)
+        {
+            var session = CreateTopologySession(connector);
+            session.Start(); session.Pump(0);
+            transport.Enqueue(TestFrames.Login(42, 1, "r", "e"), BattleClientProtocolV1.ControlChannel, 1);
+            transport.Enqueue(TestFrames.Join(19, 7, 60), BattleClientProtocolV1.ControlChannel, 1);
+            session.Pump(0);
+            Assert.That(session.State, Is.EqualTo(BattleClientState.Active));
+            return session;
+        }
+
+        private static void UpdateTopologyAdmission(BattleClientSession session, string room, string boot, string ticket)
+            => session.UpdateAdmission(CreateTopologyAdmission(room, boot, ticket));
+
+        [Test]
         public void ArenaPredictionUsesAuthorityTickAndRejectsWrongEpochBeforeHudMutation()
         {
             var transport = new FakeTransport();
@@ -30,6 +289,32 @@ namespace AiNative.Client.Application.Tests
             session.TryGetArenaState(out var unchanged);
             Assert.That(unchanged, Is.EqualTo(predicted));
             Assert.That(session.LastReceivedTick, Is.EqualTo(100));
+        }
+
+        [TestCase(1UL)]
+        [TestCase(ulong.MaxValue)]
+        public void ArenaSessionWireTickRemainsAtLatestAuthorityDespiteUnacknowledgedPrediction(ulong callerTick)
+        {
+            var transport = new FakeTransport();
+            var session = CreateActiveTopologySession(transport, new FakeConnector(transport));
+            transport.Enqueue(ArenaSnapshot(100), BattleClientProtocolV1.SnapshotChannel, 1);
+            session.Pump(0);
+            for (int index = 0; index < 3; index++)
+                Assert.That(session.PredictAndQueueArenaInput(callerTick, 1000, 0, 0, 0, ArenaButtons.None, ArenaWeaponId.Machinegun),
+                    Is.EqualTo(PredictionPrepareStatus.Prepared));
+            session.Pump(0);
+            for (int index = 2; index < transport.SentFrames.Count; index++)
+                Assert.That(BinaryPrimitives.ReadUInt64LittleEndian(transport.SentFrames[index].AsSpan(3)), Is.EqualTo(101));
+
+            transport.Enqueue(ArenaSnapshot(103), BattleClientProtocolV1.SnapshotChannel, 1);
+            session.Pump(0);
+            Assert.That(session.PredictAndQueueArenaInput(callerTick, 1000, 0, 0, 0, ArenaButtons.None, ArenaWeaponId.Machinegun),
+                Is.EqualTo(PredictionPrepareStatus.Prepared));
+            session.Pump(0);
+            Assert.That(BinaryPrimitives.ReadUInt64LittleEndian(transport.SentFrames[transport.SentFrames.Count - 1].AsSpan(3)), Is.EqualTo(104));
+            Assert.That(session.TryGetArenaState(out var predicted), Is.True);
+            Assert.That(predicted.Tick, Is.EqualTo(107));
+            Assert.That(session.LastAcknowledgedSequence, Is.Zero);
         }
 
         [Test]
@@ -280,6 +565,8 @@ namespace AiNative.Client.Application.Tests
         internal void Enqueue(byte[] frame, TransportChannel channel, uint epoch) =>
             _received.Enqueue(new QueuedPacket(frame, channel, epoch));
 
+        internal void Close() => State = TransportState.Closed;
+
         public ValueTask<SendResult> SendAsync(
             TransportChannel channel,
             ReadOnlyMemory<byte> payload,
@@ -340,14 +627,23 @@ namespace AiNative.Client.Application.Tests
 
     internal static class TestFrames
     {
-        internal static byte[] Login(ulong sessionId, uint epoch)
+        internal static byte[] Login(ulong sessionId, uint epoch, string room = "", string boot = "", ulong roomTick = 0)
         {
             List<byte> payload = Header(BattleClientProtocolV1.LoginResponseMessageId);
             payload.Add(0x09);
             AddFixed64(payload, sessionId);
             payload.Add(0x10);
             AddVarint(payload, epoch);
+            if (room.Length != 0) AddString(payload, 0x1a, room);
+            if (boot.Length != 0) AddString(payload, 0x22, boot);
+            if (roomTick != 0) { payload.Add(0x29); AddFixed64(payload, roomTick); }
             return payload.ToArray();
+        }
+
+        private static void AddString(List<byte> payload, byte key, string value)
+        {
+            byte[] bytes = System.Text.Encoding.UTF8.GetBytes(value);
+            payload.Add(key); AddVarint(payload, (ulong)bytes.Length); payload.AddRange(bytes);
         }
 
         internal static byte[] Join(uint roomId, uint entityId, uint tickRate)

@@ -1,11 +1,11 @@
-param([string]$SdkPath, [string]$RunDirectory='artifacts/topology-local', [switch]$SkipBuild, [switch]$GateRestart, [switch]$DuplicateSettlement, [switch]$SkipAudit, [switch]$BackendOnly)
+param([string]$SdkPath, [string]$RunDirectory='artifacts/topology-local', [switch]$SkipBuild, [switch]$GateRestart, [switch]$DuplicateSettlement, [switch]$SkipAudit, [switch]$BackendOnly, [ValidateRange(120,360000)][int]$MatchTicks=1200, [ValidateRange(1,86400)][int]$DeadlineSeconds=240, [string]$GateAddress='127.0.0.1:23001')
 . "$PSScriptRoot/common.ps1" -SdkPath $SdkPath -RunDirectory $RunDirectory
 if (-not $env:AINATIVE_TEST_POSTGRES) { throw 'AINATIVE_TEST_POSTGRES must name an isolated test database' }
 New-Item -ItemType Directory -Force $Run | Out-Null
 if (-not $SkipBuild) { & "$PSScriptRoot/build.ps1" -SdkPath $SdkPath -RunDirectory $RunDirectory -SkipAudit:$SkipAudit }
 & "$PSScriptRoot/initialize.ps1" -SdkPath $SdkPath -RunDirectory $RunDirectory
 # All arguments are trusted local absolute paths, quoted for PowerShell's command-line parser.
-$launchArgs=@('-NoProfile','-File',('"'+(Join-Path $PSScriptRoot 'start.ps1')+'"'),'-SdkPath',('"'+$SdkPath+'"'),'-RunDirectory',('"'+$RunDirectory+'"'))
+$launchArgs=@('-NoProfile','-File',('"'+(Join-Path $PSScriptRoot 'start.ps1')+'"'),'-SdkPath',('"'+$SdkPath+'"'),'-RunDirectory',('"'+$RunDirectory+'"'),'-MatchTicks',[string]$MatchTicks)
 $supervisor=Start-Process (Get-Command pwsh).Source -ArgumentList $launchArgs -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $Run 'supervisor.stdout.log') -RedirectStandardError (Join-Path $Run 'supervisor.stderr.log')
 $supervisorStart=$supervisor.StartTime.ToUniversalTime().Ticks
 @{Pid=$supervisor.Id; StartUtc=$supervisor.StartTime.ToUniversalTime().ToString('O'); Executable=$supervisor.Path; Script=(Join-Path $PSScriptRoot 'start.ps1')} | ConvertTo-Json | Set-Content (Join-Path $Run 'supervisor.pid.json')
@@ -23,7 +23,7 @@ try {
   if(-not $live) { throw ('Health unavailable: '+$service.Id) }
  }
   Start-Sleep -Seconds 6 # Initial Battle heartbeat can precede scene readiness; allow next 5-second inventory report.
- $extra=@{}; $restartedGate=$null; $admin=$null; $restoredBattle=$null
+ $extra=@{AINATIVE_ACCEPTANCE_GATE_ADDRESS=$GateAddress;AINATIVE_ACCEPTANCE_DEADLINE_SECONDS=[string]$DeadlineSeconds}; $restartedGate=$null; $admin=$null; $restoredBattle=$null
  if($BackendOnly){$extra.AINATIVE_ACCEPTANCE_BACKEND_ONLY='true'}
  if($DuplicateSettlement) { $resultFile=Join-Path $Run ([guid]::NewGuid().ToString("N")+".result.pb"); $extra.AINATIVE_ACCEPTANCE_RESULT_FILE=$resultFile }
  if($GateRestart) {
@@ -59,7 +59,7 @@ try {
   $admin=Start-OwnedChild $target @{AINATIVE_ACCEPTANCE_ROLE='Battle';AINATIVE_ACCEPTANCE_RESULT_FILE=$resultFile;AINATIVE_ACCEPTANCE_REPORT=(Join-Path $Run 'duplicate-settlement.json')}
   $code=Wait-Child $admin
   Get-Content (Join-Path $Run 'duplicate-settlement.json')
-  $restoredBattle=Start-OwnedChild ($Services | Where-Object Id -eq $node)
+  $restoredBattle=Start-OwnedChild ($Services | Where-Object Id -eq $node) @{AINATIVE_MATCH_LENGTH_TICKS=[string]$MatchTicks}
   $restoreDeadline=[datetime]::UtcNow.AddSeconds(15)
   $restored=$false
   while([datetime]::UtcNow -lt $restoreDeadline) {

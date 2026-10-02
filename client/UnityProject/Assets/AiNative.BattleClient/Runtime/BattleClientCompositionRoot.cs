@@ -15,6 +15,7 @@ namespace AiNative.Client.Application
         private const float RegionalMeasurementSeconds = 60f;
         private const long RegionalMinimumReconciliationSamples = 1000;
         private BattleClientSession _session;
+        private TopologyClientFlow _topology;
         private BattleClientLaunchOptions _launch;
         private ulong _roomTick;
         private float _smokeElapsed;
@@ -30,21 +31,27 @@ namespace AiNative.Client.Application
         private Light _arenaLight;
         private GUIStyle _hudStyle;
 
-        public BattleClientSession Session => _session;
+        public BattleClientSession Session => _topology != null ? _topology.Battle : _session;
 
         private void Awake()
         {
             global::UnityEngine.Application.runInBackground = true;
             QualitySettings.vSyncCount = 0;
             global::UnityEngine.Application.targetFrameRate = 60;
-            _launch = BattleClientLaunchOptions.Parse(Environment.GetCommandLineArgs());
+            string[] arguments = Environment.GetCommandLineArgs();
+            if (Array.IndexOf(arguments, "--ainative-topology") >= 0 || Array.IndexOf(arguments, "--ainative-topology-smoke") >= 0)
+            {
+                _topology = gameObject.AddComponent<TopologyClientFlow>();
+                return;
+            }
+            _launch = BattleClientLaunchOptions.Parse(arguments);
             _session = new BattleClientSession(
                 _launch.Host,
                 _launch.Port,
                 global::UnityEngine.Application.version);
         }
 
-        private void Start() => _session.Start();
+        private void Start() => _session?.Start();
 
         private void OnEnable()
         {
@@ -75,25 +82,35 @@ namespace AiNative.Client.Application
 
         private void OnGUI()
         {
-            if (_session is null) return;
+            if (_topology == null && !_launch.Smoke && !_launch.RegionalCorrection && GUI.Button(new Rect(740, 16, 180, 32), "登录大厅与匹配")) SwitchToTopology();
+            BattleClientSession session = Session;
+            if (session is null) return;
             _hudStyle ??= new GUIStyle(GUI.skin.label)
             {
                 fontSize = 16,
                 normal = { textColor = Color.white }
             };
             GUI.Label(new Rect(16, 16, 700, 28),
-                $"BattleClient  {_session.State}  epoch={_session.ConnectionEpoch} tick={_session.LastReceivedTick} ack={_session.LastAcknowledgedSequence} dropped={_session.DroppedInputFrames}", _hudStyle);
+                $"BattleClient  {session.State}  epoch={session.ConnectionEpoch} tick={session.LastReceivedTick} ack={session.LastAcknowledgedSequence} dropped={session.DroppedInputFrames}", _hudStyle);
 
-            if (_session.TryGetArenaState(out ArenaPlayerState arenaState))
+            if (session.TryGetArenaState(out ArenaPlayerState arenaState))
             {
                 GUI.Label(new Rect(16, 44, 700, 28),
-                    $"Arena  {_session.ArenaPhase}  HP={arenaState.Health}  AR={arenaState.Armor}  " +
-                    $"Weapon={arenaState.Weapon}  Kills={arenaState.Kills}  Leader={_session.ArenaLeaderEntityId}",
+                    $"Arena  {session.ArenaPhase}  HP={arenaState.Health}  AR={arenaState.Armor}  " +
+                    $"Weapon={arenaState.Weapon}  Kills={arenaState.Kills}  Leader={session.ArenaLeaderEntityId}",
                     _hudStyle);
                 GUI.Label(new Rect(16, 72, 900, 28),
                     "WASD move  |  hold left mouse to fire  |  movement is predicted and server-corrected",
                     _hudStyle);
             }
+        }
+
+        private async void SwitchToTopology()
+        {
+            BattleClientSession previous = _session;
+            _session = null;
+            _topology = gameObject.AddComponent<TopologyClientFlow>();
+            if (previous != null) await previous.DisposeAsync();
         }
 
         private void OnDisable()
@@ -118,6 +135,7 @@ namespace AiNative.Client.Application
 
         private void Update()
         {
+            if (_topology != null || _session == null) return;
             _session.Pump(Time.unscaledDeltaTime);
             if (_finished) return;
 
@@ -162,6 +180,7 @@ namespace AiNative.Client.Application
 
         private void FixedUpdate()
         {
+            if (_topology != null || _session == null) return;
             if (!_session.IsPredictionInitialized || _session.State != BattleClientState.Active) return;
             _roomTick = Math.Max(_roomTick + 1, _session.LastReceivedTick + 1);
             int moveX;
@@ -200,7 +219,9 @@ namespace AiNative.Client.Application
 
         private void LateUpdate()
         {
-            if (_session.TryAdvancePresentation(
+            BattleClientSession session = Session;
+            if (session is null) return;
+            if (session.TryAdvancePresentation(
                     Time.unscaledDeltaTime,
                     out PresentationPosition position))
             {
@@ -211,7 +232,7 @@ namespace AiNative.Client.Application
                     (float)(position.ZMillimetres / 1000d));
             }
 
-            if (_playerVisual is not null && _session.TryGetArenaState(out ArenaPlayerState arenaState))
+            if (_playerVisual is not null && session.TryGetArenaState(out ArenaPlayerState arenaState))
             {
                 Vector3 current = transform.position;
                 transform.position = new Vector3(current.x, arenaState.PositionYMillimetres / 1000f, current.z);

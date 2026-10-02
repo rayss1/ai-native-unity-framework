@@ -18,10 +18,17 @@ namespace AiNative.Client.Editor
 
         public static void BuildWindowsSmoke()
         {
-            BattleClientRendering.ValidateUrpConfiguration();
             string output = ReadRequiredAbsolutePath(
                 Environment.GetCommandLineArgs(),
                 "--ainative-build-output");
+            BuildWindowsAtPath(output);
+        }
+
+        public static void BuildWindowsAtPath(string output)
+        {
+            if (!Path.IsPathRooted(output)) throw new ArgumentException("Player output must be an absolute path.");
+            output = Path.GetFullPath(output);
+            BattleClientRendering.ValidateUrpConfiguration();
             if (!output.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
             {
                 throw new ArgumentException("--ainative-build-output must name an .exe file.");

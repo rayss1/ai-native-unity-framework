@@ -75,6 +75,7 @@ namespace AiNative.Client.Prediction
         private readonly byte[] _sendBuffer = new byte[RequiredInputBufferBytes];
         private readonly bool _ownsTransport;
         private readonly uint _entityId;
+        private ulong _authoritativeTick;
         private uint _nextSequence = 1;
         private bool _initialized;
         private bool _disposed;
@@ -106,10 +107,13 @@ namespace AiNative.Client.Prediction
         {
             if (_disposed) return;
             _history.Initialize(state);
+            _authoritativeTick = checked((ulong)state.Tick);
             _initialized = true;
             EnsureSequenceAfter(state.LastProcessedInputSequence);
         }
 
+        /// <summary>Predicts locally while stamping admission time from the latest authority snapshot.
+        /// The clientTick argument is retained for source compatibility; it does not control the wire clock.</summary>
         public ArenaPredictionPrepareResult PrepareInput(
             ulong clientTick,
             int moveXMilli,
@@ -126,7 +130,7 @@ namespace AiNative.Client.Prediction
             if (_nextSequence == 0) return new ArenaPredictionPrepareResult(ArenaPredictionPrepareStatus.SequenceExhausted, 0, default, false);
 
             uint sequence = _nextSequence;
-            clientTick = Math.Max(clientTick, checked((ulong)_history.Current.Tick + 1));
+            clientTick = checked(_authoritativeTick + 1);
             ArenaInput input = new(sequence, clientTick, moveXMilli, moveZMilli, lookYawMilli, lookPitchMilli, buttons, weapon);
             ArenaPlayerState predicted = _history.Predict(input, out bool droppedOldest);
             _nextSequence = sequence == uint.MaxValue ? 0 : sequence + 1;
@@ -183,6 +187,7 @@ namespace AiNative.Client.Prediction
             }
 
             _acceptedSnapshots++;
+            _authoritativeTick = Math.Max(_authoritativeTick, checked((ulong)decoded.State.Tick));
             if (!_initialized)
             {
                 _history.Initialize(decoded.State);

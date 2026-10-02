@@ -37,6 +37,32 @@ namespace AiNative.Client.Prediction.Tests
             Assert.That(result.PredictedState.PositionXMillimetres, Is.EqualTo(16));
         }
 
+        [TestCase(1UL)]
+        [TestCase(ulong.MaxValue)]
+        public void ArenaWireTickUsesAuthorityWhileUnacknowledgedPredictionKeepsAdvancing(ulong callerTick)
+        {
+            var adapter = new ArenaClientPredictionAdapter(new FakeRealtimeTransport(), 1);
+            adapter.Initialize(new ArenaPlayerState(100, 0, 0, 0));
+            byte[] frame = new byte[ArenaClientProtocolV1.MaxInputFrameBytes];
+            for (int index = 0; index < 5; index++)
+            {
+                var prepared = adapter.PrepareInput(callerTick, 1000, 0, 0, 0,
+                    ArenaButtons.None, ArenaWeaponId.Machinegun, frame);
+                Assert.That(prepared.Status, Is.EqualTo(ArenaPredictionPrepareStatus.Prepared));
+                Assert.That(System.Buffers.Binary.BinaryPrimitives.ReadUInt64LittleEndian(frame.AsSpan(3)),
+                    Is.EqualTo(101), "Unacknowledged prediction must not advance the wire admission clock.");
+                Assert.That(prepared.PredictedState.Tick, Is.EqualTo(101 + index));
+            }
+
+            byte[] snapshot = ProtocolFrameFixtures.Snapshot(1, 103, 0, 0, 0);
+            adapter.ApplySnapshot(snapshot, ProtocolFrameFixtures.Packet(snapshot, SnapshotChannel, 1));
+            Assert.That(adapter.Current.Tick, Is.EqualTo(108), "Local prediction still replays unacknowledged commands.");
+            var next = adapter.PrepareInput(callerTick, 1000, 0, 0, 0,
+                ArenaButtons.None, ArenaWeaponId.Machinegun, frame);
+            Assert.That(System.Buffers.Binary.BinaryPrimitives.ReadUInt64LittleEndian(frame.AsSpan(3)), Is.EqualTo(104));
+            Assert.That(next.PredictedState.Tick, Is.EqualTo(109));
+        }
+
         [Test]
         public void InputSendUsesProtocolV1BytesAndInputChannel()
         {

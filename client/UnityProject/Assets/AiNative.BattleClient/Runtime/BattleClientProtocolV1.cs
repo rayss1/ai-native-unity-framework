@@ -35,6 +35,13 @@ namespace AiNative.Client.Application
             string clientBuild,
             Span<byte> destination,
             out int writtenBytes)
+            => TryEncodeLogin(clientBuild, null, destination, out writtenBytes);
+
+        internal static bool TryEncodeLogin(
+            string clientBuild,
+            BattleAdmissionInfo admission,
+            Span<byte> destination,
+            out int writtenBytes)
         {
             writtenBytes = 0;
             clientBuild ??= string.Empty;
@@ -61,6 +68,11 @@ namespace AiNative.Client.Application
                 offset += Encoding.UTF8.GetBytes(clientBuild, destination.Slice(offset, buildBytes));
             }
 
+            if (admission is not null &&
+                (!TryWriteString(destination, ref offset, 0x1a, admission.EntryTicket) ||
+                 !TryWriteString(destination, ref offset, 0x22, admission.RoomId))) return false;
+            if (offset > MaxFrameBytes) return false;
+
             writtenBytes = offset;
             return true;
         }
@@ -69,9 +81,21 @@ namespace AiNative.Client.Application
             ReadOnlySpan<byte> frame,
             out ulong sessionId,
             out uint connectionEpoch)
+            => TryDecodeLoginResponse(frame, out sessionId, out connectionEpoch, out _, out _, out _);
+
+        internal static bool TryDecodeLoginResponse(
+            ReadOnlySpan<byte> frame,
+            out ulong sessionId,
+            out uint connectionEpoch,
+            out string globalRoomId,
+            out string bootEpoch,
+            out ulong roomTick)
         {
             sessionId = 0;
             connectionEpoch = 0;
+            globalRoomId = string.Empty;
+            bootEpoch = string.Empty;
+            roomTick = 0;
             if (!TryBegin(frame, LoginResponseMessageId, out int offset))
             {
                 return false;
@@ -97,6 +121,19 @@ namespace AiNative.Client.Application
                     {
                         return false;
                     }
+                }
+                else if (field is 3 or 4 && wire == 2)
+                {
+                    if (!TryReadLength(frame, ref offset, out ReadOnlySpan<byte> value)) return false;
+                    string decoded;
+                    try { decoded = StrictUtf8.GetString(value); }
+                    catch (DecoderFallbackException) { return false; }
+                    if (field == 3) globalRoomId = decoded;
+                    else bootEpoch = decoded;
+                }
+                else if (field == 5 && wire == 1)
+                {
+                    if (!TryReadFixed64(frame, ref offset, out roomTick)) return false;
                 }
                 else if (!TrySkip(frame, ref offset, wire))
                 {
@@ -381,6 +418,18 @@ namespace AiNative.Client.Application
         {
             if ((uint)offset >= (uint)destination.Length) return false;
             destination[offset++] = value;
+            return true;
+        }
+
+        private static readonly Encoding StrictUtf8 = new UTF8Encoding(false, true);
+
+        private static bool TryWriteString(Span<byte> destination, ref int offset, byte key, string value)
+        {
+            int length = Encoding.UTF8.GetByteCount(value);
+            if (!TryWriteByte(destination, ref offset, key) ||
+                !TryWriteVarint(destination, ref offset, (ulong)length) ||
+                destination.Length - offset < length) return false;
+            offset += Encoding.UTF8.GetBytes(value, destination.Slice(offset, length));
             return true;
         }
 

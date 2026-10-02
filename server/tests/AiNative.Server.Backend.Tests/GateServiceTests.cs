@@ -10,6 +10,42 @@ namespace AiNative.Server.Backend.Tests;
 public sealed class GateServiceTests
 {
     [Test]
+    public async Task Settlement_query_routes_to_player_with_the_authenticated_identity()
+    {
+        using var fixture = new GateFixture();
+        var login = await fixture.RegisterAsync();
+        await fixture.QueueAsync(login);
+        await fixture.Match.PumpAsync(default);
+        var room = fixture.Router.Room!;
+        var query = new SettlementQuery { MatchId = room.MatchId };
+        var pending = (await fixture.CallAsync(ServiceMethods.SettlementStatus, query, login.SessionToken,
+            delegated: "victim", contextPlayer: "victim")).Read(SettlementReceipt.Parser);
+        Assert.That((pending.MatchId, pending.Confirmed, pending.PayloadHash), Is.EqualTo((room.MatchId, false, "")));
+
+        var result = new MatchResult { MatchId = room.MatchId, RoomId = room.RoomId, NodeId = room.NodeId, BootEpoch = room.BootEpoch, Completion = "completed" };
+        result.Players.Add(new PlayerResult { PlayerId = login.PlayerId, Won = true, Kills = 2 });
+        var committed = (await fixture.Router.Player.HandleAsync(new(ServiceRole.Battle, room.NodeId), ServiceMethods.Settle,
+            result.ToByteArray())).Read(SettlementReceipt.Parser);
+        var confirmed = (await fixture.CallAsync(ServiceMethods.SettlementStatus, query, login.SessionToken)).Read(SettlementReceipt.Parser);
+        Assert.That(confirmed, Is.EqualTo(committed));
+        Assert.That(confirmed.Confirmed, Is.True);
+    }
+
+    [Test]
+    public async Task Settlement_query_rejects_anonymous_and_client_identity_spoofing()
+    {
+        using var fixture = new GateFixture();
+        var login = await fixture.RegisterAsync();
+        fixture.Router.Room = new RoomAllocation { MatchId = "victim-match", RoomId = "room", NodeId = "battle", BootEpoch = "epoch", State = "Released" };
+        fixture.Router.Room.PlayerIds.Add("victim");
+        var query = new SettlementQuery { MatchId = "victim-match" };
+        Assert.That((await fixture.CallAsync(ServiceMethods.SettlementStatus, query)).Error, Is.EqualTo("invalid-session"));
+        Assert.That((await fixture.CallAsync(ServiceMethods.SettlementStatus, query, "forged-token")).Error, Is.EqualTo("invalid_session"));
+        Assert.That((await fixture.CallAsync(ServiceMethods.SettlementStatus, query, login.SessionToken,
+            delegated: "victim", contextPlayer: "victim")).Error, Is.EqualTo("forbidden"));
+    }
+
+    [Test]
     public async Task Concurrent_credentials_cannot_replace_an_inflight_requests_authenticated_player()
     {
         using var fixture = new GateFixture();
