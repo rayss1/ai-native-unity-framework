@@ -117,6 +117,8 @@ try
             try { await Receive<LoginResponse>(stale.Transport, MessageId.LoginResponse, TimeSpan.FromSeconds(2)); } catch (TimeoutException) { fenced = true; }
             Check(fenced, "old-boot-ticket-no-login");
             evidence.Add(new { scenario = "battle-restart-old-ticket-fenced", passed = true, readyA.Status.Allocation.RoomId, readyA.Status.Allocation.BootEpoch });
+            await replacementInput.StopAfterVerifiedPeerLossAsync();
+            await inputB.StopAfterVerifiedPeerLossAsync();
             // The old battle cannot finish. The harness must require this exact expected
             // termination plus a fresh match; a generic failed client is never a pass.
             throw new InvalidOperationException("expected-room-lost-after-battle-restart");
@@ -298,8 +300,11 @@ public sealed class SnapshotInputLoop : IAsyncDisposable
                 if (latest is not null && now >= nextSend && Stopwatch.GetElapsedTime(lastSnapshot).TotalSeconds < 1)
                 {
                     InputCommand input = new() { RoomTick = checked(latest.RoomTick + 2), Sequence = checked(++sequence), MoveXMilli = 1000 };
-                    if (!RealtimeProtocolCodec.TryEncode(MessageId.InputCommand, input, send, out var channel, out int length) || (await transport.SendAsync(channel, send.AsMemory(0, length), stop.Token)).Status != SendStatus.Accepted)
+                    if (!RealtimeProtocolCodec.TryEncode(MessageId.InputCommand, input, send, out var channel, out int length))
                         throw new InvalidOperationException("continuous-input-send");
+                    SendResult result = await transport.SendAsync(channel, send.AsMemory(0, length), stop.Token);
+                    if (result.Status is SendStatus.Closed or SendStatus.Faulted) throw new PeerLossSendException();
+                    if (result.Status != SendStatus.Accepted) throw new InvalidOperationException("continuous-input-send");
                     Interlocked.Increment(ref sentInputs); nextSend = now + Stopwatch.Frequency / 10;
                 }
                 await Task.Delay(10, stop.Token);
@@ -321,5 +326,16 @@ public sealed class SnapshotInputLoop : IAsyncDisposable
         if (Interlocked.Exchange(ref disposed, 1) != 0) return;
         stop.Cancel();
         try { await Completion; } finally { stop.Dispose(); }
+    }
+
+    internal async ValueTask StopAfterVerifiedPeerLossAsync()
+    {
+        try { await DisposeAsync(); }
+        catch (PeerLossSendException) { }
+    }
+
+    sealed class PeerLossSendException : InvalidOperationException
+    {
+        public PeerLossSendException() : base("continuous-input-send") { }
     }
 }

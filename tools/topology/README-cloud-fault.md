@@ -13,7 +13,9 @@ python3 tools/topology/cloud-fault-acceptance.py \
   --mode long-match --deadline-seconds 780
 ```
 
-`long-match` requires at least 36000 authoritative finished ticks. A successful short run cannot qualify it. The script does not change match duration: configure the Battle deployment separately under the deployment workflow. Ordinary Windows functional runs remain at 1200 ticks and a 240-second deadline. A local long run can use `testserver.ps1 -MatchTicks 36000 -DeadlineSeconds 780`; this is still local evidence.
+`long-match` requires both players to reach at least 36000 authoritative finished ticks, send at least 80% of the expected continuous 10 Hz traffic over that duration, and reach a final acknowledgement sequence of at least 80% of their send count. A successful short run or one old acknowledgement cannot qualify it. A maximum sequence does not prove how many inputs were accepted: separately audit each entity's actual accepted input count, largest gap and final input tick in the complete replay, and verify its Tick hashes. The script does not change match duration: configure the Battle deployment separately under the deployment workflow. Ordinary Windows functional runs remain at 1200 ticks and a 240-second deadline. A local long run can use `testserver.ps1 -MatchTicks 36000 -DeadlineSeconds 780`; this is still local evidence.
+
+The reports bind directory must be writable by both the host-side harness and the acceptance container's UID/GID 1654. In the isolated Ubuntu deployment its directory owner is `ubuntu:1654`, mode `2770`; the set-group bit preserves shared group ownership for new reports. Limit this permission change to the exact reports directory. Do not recursively change deployment secrets, Compose files or persistent database/outbox ownership.
 
 Use the same cloud command with these `--mode` values:
 

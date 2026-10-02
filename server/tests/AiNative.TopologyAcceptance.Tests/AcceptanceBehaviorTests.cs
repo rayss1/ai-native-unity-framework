@@ -93,6 +93,70 @@ public class AcceptanceBehaviorTests
         await (ValueTask)loop.DisposeAsync();
     }
 
+    [TestCase(SendStatus.Closed)]
+    [TestCase(SendStatus.Faulted)]
+    public async Task OrdinaryDisposeStillPropagatesPeerLossSendFailure(SendStatus status)
+    {
+        dynamic loop = await FailedLoop(new FakeTransport { SendOutcome = status });
+        var failure = Assert.CatchAsync<InvalidOperationException>(async () => await (ValueTask)loop.DisposeAsync());
+        Assert.That(failure!.Message, Is.EqualTo("continuous-input-send"));
+    }
+
+    [TestCase(SendStatus.Closed)]
+    [TestCase(SendStatus.Faulted)]
+    public async Task VerifiedPeerLossCleanupPreservesExpectedRoomLostTermination(SendStatus status)
+    {
+        dynamic loop = await FailedLoop(new FakeTransport { SendOutcome = status });
+        var failure = Assert.ThrowsAsync<InvalidOperationException>(async () =>
+        {
+            await using var resource = (IAsyncDisposable)loop;
+            await StopAfterVerifiedPeerLoss(loop);
+            throw new InvalidOperationException("expected-room-lost-after-battle-restart");
+        });
+        Assert.That(failure!.Message, Is.EqualTo("expected-room-lost-after-battle-restart"),
+            "A verified peer-loss send failure must not replace the explicit expected termination during await-using cleanup.");
+        Assert.That(((Task)loop.Completion).IsFaulted, Is.True, "Cleanup must still observe the original pump failure.");
+    }
+
+    [TestCase(SendStatus.WouldBlock)]
+    [TestCase(SendStatus.PayloadTooLarge)]
+    [TestCase(SendStatus.DroppedByPolicy)]
+    public async Task VerifiedPeerLossCleanupDoesNotSuppressOtherSendRejections(SendStatus status)
+    {
+        dynamic loop = await FailedLoop(new FakeTransport { SendOutcome = status });
+        var failure = Assert.ThrowsAsync<InvalidOperationException>(async () => await StopAfterVerifiedPeerLoss(loop));
+        Assert.That(failure!.Message, Is.EqualTo("continuous-input-send"));
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task VerifiedPeerLossCleanupDoesNotSuppressOtherExceptionsEvenWithMatchingMessage(bool matchingMessage)
+    {
+        Exception expected = matchingMessage ? new InvalidOperationException("continuous-input-send") : new IOException("transport-bug");
+        dynamic loop = await FailedLoop(new FakeTransport { SendFailure = expected });
+        Exception? observed = null;
+        try { await StopAfterVerifiedPeerLoss(loop); }
+        catch (Exception error) { observed = error; }
+        Assert.That(observed, Is.SameAs(expected));
+    }
+
+    static async Task<object> FailedLoop(FakeTransport transport)
+    {
+        transport.Enqueue(new Snapshot { RoomTick = 100 });
+        dynamic loop = Start(transport);
+        await Until(() => ((Task)loop.Completion).IsCompleted);
+        Assert.That(((Task)loop.Completion).IsFaulted, Is.True);
+        return loop;
+    }
+
+    static async Task StopAfterVerifiedPeerLoss(object loop)
+    {
+        MethodInfo? cleanup = loop.GetType().GetMethod("StopAfterVerifiedPeerLossAsync", BindingFlags.Instance | BindingFlags.NonPublic);
+        // Exercise the original strict cleanup when the dedicated verified-loss path is absent.
+        // This keeps the regression observable as the original exception-masking behavior.
+        await (ValueTask)(cleanup?.Invoke(loop, null) ?? ((IAsyncDisposable)loop).DisposeAsync());
+    }
+
     [Test]
     public async Task SettlementPollingSurvivesUnavailablePlayerThenRequiresExactlyOne()
     {
@@ -115,6 +179,8 @@ public class AcceptanceBehaviorTests
         readonly ConcurrentQueue<byte[]> packets = new();
         public ConcurrentQueue<InputCommand> Inputs { get; } = new();
         public bool AlwaysReadable;
+        public SendStatus SendOutcome = SendStatus.Accepted;
+        public Exception? SendFailure;
         public TransportState State => TransportState.Connected;
         public void Enqueue(Snapshot snapshot)
         {
@@ -134,8 +200,9 @@ public class AcceptanceBehaviorTests
         public ValueTask<SendResult> SendAsync(TransportChannel channel, ReadOnlyMemory<byte> payload, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (SendFailure is not null) throw SendFailure;
             if (BinaryPrimitives.ReadUInt16LittleEndian(payload.Span) == (ushort)MessageId.InputCommand) Inputs.Enqueue(InputCommand.Parser.ParseFrom(payload.Span[2..]));
-            return ValueTask.FromResult(new SendResult(SendStatus.Accepted, payload.Length));
+            return ValueTask.FromResult(new SendResult(SendOutcome, SendOutcome == SendStatus.Accepted ? payload.Length : 0));
         }
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }

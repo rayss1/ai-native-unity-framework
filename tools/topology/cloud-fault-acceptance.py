@@ -186,6 +186,16 @@ def acceptance_report(process, report, end, minimum_tick):
     inputs = next((e for e in data["evidence"] if e.get("scenario") == "snapshot-driven-continuous-input"), None)
     if not inputs or not inputs.get("passed") or inputs["finishedRoomTick"] < minimum_tick or inputs.get("secondPlayerFinishedTick", -1) < minimum_tick or inputs.get("secondPlayerAcknowledgedSequence", 0) < 1 or inputs.get("replacementAcknowledgedSequence", 0) < 1:
         raise RuntimeError("finished-tick-or-continuous-input-not-qualified")
+    # A final snapshot and one old acknowledgement do not establish continuous
+    # traffic. Both ongoing players must send throughout the requested duration
+    # and have most of those inputs acknowledged by the authoritative server.
+    if inputs.get("inputHz") != 10:
+        raise RuntimeError("continuous-input-rate-not-qualified")
+    minimum_inputs = max(1, minimum_tick / 60 * inputs["inputHz"] * .8)
+    for sent_field, ack_field in (("secondPlayerInputs", "secondPlayerAcknowledgedSequence"), ("replacementInputs", "replacementAcknowledgedSequence")):
+        sent = inputs.get(sent_field, 0)
+        if sent < minimum_inputs or inputs[ack_field] < sent * .8:
+            raise RuntimeError("continuous-input-count-or-acknowledgements-not-qualified")
     return data
 
 

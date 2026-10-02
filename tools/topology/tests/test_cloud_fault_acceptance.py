@@ -130,13 +130,43 @@ class CloudHarnessTests(unittest.TestCase):
         import time
         with tempfile.TemporaryDirectory() as directory:
             report = Path(directory) / "acceptance.json"
-            report.write_text(json.dumps({"exit": 0, "evidence": [{"scenario": "snapshot-driven-continuous-input", "passed": True, "finishedRoomTick": 36040, "secondPlayerFinishedTick": 36040, "secondPlayerAcknowledgedSequence": 5900, "replacementAcknowledgedSequence": 5870}]}))
+            report.write_text(json.dumps({"exit": 0, "evidence": [{"scenario": "snapshot-driven-continuous-input", "passed": True, "finishedRoomTick": 36040, "secondPlayerFinishedTick": 36040, "secondPlayerInputs": 5950, "replacementInputs": 5930, "inputHz": 10, "secondPlayerAcknowledgedSequence": 5900, "replacementAcknowledgedSequence": 5870}]}))
             class Completed:
                 returncode = 0
                 def poll(self):
                     return 0
             qualified = self.module.acceptance_report(Completed(), report, time.monotonic() + 1, 36000)
             self.assertEqual(qualified["exit"], 0)
+
+    def test_finished_match_with_stalled_acknowledgements_cannot_qualify(self):
+        import tempfile
+        import time
+        class Completed:
+            returncode = 0
+            def poll(self):
+                return 0
+        with tempfile.TemporaryDirectory() as directory:
+            report = Path(directory) / "acceptance.json"
+            baseline = {"scenario": "snapshot-driven-continuous-input", "passed": True, "finishedRoomTick": 36040, "secondPlayerFinishedTick": 36040, "secondPlayerInputs": 6000, "replacementInputs": 6000, "inputHz": 10, "secondPlayerAcknowledgedSequence": 5990, "replacementAcknowledgedSequence": 5990}
+            for field in ("secondPlayerAcknowledgedSequence", "replacementAcknowledgedSequence"):
+                with self.subTest(stalled=field):
+                    inputs = dict(baseline, **{field: 1})
+                    report.write_text(json.dumps({"exit": 0, "evidence": [inputs]}))
+                    with self.assertRaisesRegex(RuntimeError, "not-qualified"):
+                        self.module.acceptance_report(Completed(), report, time.monotonic() + 1, 36000)
+
+    def test_long_match_with_only_brief_input_burst_cannot_qualify(self):
+        import tempfile
+        import time
+        class Completed:
+            returncode = 0
+            def poll(self):
+                return 0
+        with tempfile.TemporaryDirectory() as directory:
+            report = Path(directory) / "acceptance.json"
+            report.write_text(json.dumps({"exit": 0, "evidence": [{"scenario": "snapshot-driven-continuous-input", "passed": True, "finishedRoomTick": 36040, "secondPlayerFinishedTick": 36040, "secondPlayerInputs": 20, "replacementInputs": 20, "inputHz": 10, "secondPlayerAcknowledgedSequence": 20, "replacementAcknowledgedSequence": 20}]}))
+            with self.assertRaisesRegex(RuntimeError, "not-qualified"):
+                self.module.acceptance_report(Completed(), report, time.monotonic() + 1, 36000)
 
     def test_continuous_loop_disconnected_failure_cannot_qualify_passed_report(self):
         self.assertIsNotNone(self.module)
