@@ -1,0 +1,55 @@
+syntax = "proto3";
+package ainative.backend.v1;
+option csharp_namespace = "AiNative.Protocol.Backend.V1";
+message ControlRequest { string correlation_id = 1; string method = 2; bytes body = 3; string credential = 4; string delegated_player_id = 5; string trace_parent = 6; string trace_state = 7; }
+message ControlResponse { string correlation_id = 1; bytes body = 2; string error = 3; }
+message ControlNotification { string method = 1; bytes body = 2; }
+message PresenceUpdate { bool online = 1; }
+message PresenceState { string player_id = 1; bool online = 2; }
+message Empty {}
+message AccountRequest { string username = 1; string password = 2; }
+message LoginResult { string player_id = 1; string session_token = 2; int64 expires_unix_seconds = 3; }
+message SessionRequest { string session_token = 1; }
+message PlayerIdentity { string player_id = 1; int64 expires_unix_seconds = 2; }
+message PlayerProfile { string player_id = 1; string display_name = 2; int64 played = 3; int64 won = 4; int64 kills = 5; }
+message ProfileRequest { string player_id = 1; }
+message PartyCommand { string party_id = 1; string target_player_id = 2; bool ready = 3; uint64 expected_version = 4; }
+message PartyMember { string player_id = 1; bool ready = 2; }
+message PartyState { string party_id = 1; string leader_id = 2; uint64 version = 3; repeated PartyMember members = 4; string queue_request_id = 5; }
+message ServiceEpoch { string epoch = 1; }
+message PartyInvitations { repeated PartyState parties = 1; }
+message PartyQueueRequest { string party_id = 1; uint64 expected_version = 2; string request_id = 3; }
+message QueueEntry { string request_id = 1; string party_id = 2; uint64 party_version = 3; repeated string player_ids = 4; string expected_match_epoch = 5; int64 admission_expires_unix_seconds = 6; }
+message MatchQuery { string request_id = 1; }
+message MatchStatus { string request_id = 1; string state = 2; string match_id = 3; RoomAllocation allocation = 4; string failure = 5; }
+message AllocationRequest { string match_id = 1; repeated string player_ids = 2; }
+message RoomQuery { string room_id = 1; string match_id = 2; uint32 page_size = 3; string after_room_id = 4; }
+message RoomAllocation {
+  string allocation_id = 1; string match_id = 2; string room_id = 3;
+  string node_id = 4; string boot_epoch = 5; string address = 6;
+  string state = 7; repeated string player_ids = 8; int64 created_unix_seconds = 9;
+  string coordinator_epoch = 10;
+  bool authority_fenced = 11;
+}
+message WorkerCapacity { int32 worker_id = 1; int32 available_rooms = 2; int32 mailbox_available = 3; int64 last_tick_micros = 4; }
+message BattleNodeReport {
+  string node_id = 1; string boot_epoch = 2; string address = 3; bool draining = 4;
+  bool outbox_healthy = 5; repeated WorkerCapacity workers = 6; repeated RoomAllocation rooms = 7;
+}
+message RoomReservation { RoomAllocation allocation = 1; }
+message RoomCreation { string allocation_id = 1; string room_id = 2; string boot_epoch = 3; string coordinator_epoch = 4; }
+message RoomRelease { string allocation_id = 1; string room_id = 2; string boot_epoch = 3; string reason = 4; string coordinator_epoch = 5; }
+message RoomList { repeated RoomAllocation rooms = 1; bool allocating = 2; string next_room_id = 3; }
+message DrainRequest { string boot_epoch = 1; string coordinator_epoch = 2; }
+message CoordinatorFence { string coordinator_epoch = 1; string boot_epoch = 2; }
+message TicketRequest { string player_id = 1; RoomAllocation allocation = 2; }
+message EntryTicket { string ticket = 1; int64 expires_unix_seconds = 2; }
+message BattleAdmission { string entry_ticket = 1; string room_id = 2; }
+message MatchReady { MatchStatus status = 1; string entry_ticket = 2; }
+message PlayerResult { string player_id = 1; bool won = 2; int32 kills = 3; }
+message MatchResult {
+  string match_id = 1; string room_id = 2; string node_id = 3; string boot_epoch = 4;
+  repeated PlayerResult players = 5; string completion = 6;
+}
+message SettlementQuery { string match_id = 1; }
+message SettlementReceipt { string match_id = 1; string payload_hash = 2; bool confirmed = 3; }

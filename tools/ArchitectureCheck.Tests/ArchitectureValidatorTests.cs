@@ -249,6 +249,63 @@ public sealed class ArchitectureValidatorTests
         Assert.That(result.Diagnostics, Is.Empty);
     }
 
+    [Test]
+    public void UnityRootGeneratedProjectsAndSolutionsDoNotShadowRealModules()
+    {
+        Write("packages/core/Core.csproj", Project("AiNative.Core"));
+        WriteSolution("packages/core/Core.csproj");
+        Write("client/UnityProject/AiNative.Core.csproj", Project("AiNative.Core", "missing.csproj"));
+        Write("client/UnityProject/Unity.sln", File.ReadAllText(Path.Combine(_fixtureRoot, "AiNative.sln")).Replace("packages\\core\\Core.csproj", "missing.csproj"));
+        Assert.That(Validate().Diagnostics, Is.Empty);
+    }
+
+    [Test]
+    public void UnityAssetsProjectsAndAsmdefsRemainChecked()
+    {
+        Write("client/UnityProject/Assets/Real.csproj", Project("AiNative.Real"));
+        Write("client/UnityProject/Assets/Runtime/Real.asmdef", Asmdef("AiNative.Real", "AiNative.Missing"));
+        Assert.That(Validate().Diagnostics.Select(item => item.Code), Is.EquivalentTo(new[] { "ARC005", "ARC006" }));
+    }
+
+    [Test]
+    public void ServerHostCannotReferenceAnotherHost()
+    {
+        Write("server/src/Hosts/AiNative.GateHost/Gate.csproj", Project("AiNative.GateHost", "../AiNative.PlayerHost/Player.csproj"));
+        Write("server/src/Hosts/AiNative.PlayerHost/Player.csproj", Project("AiNative.PlayerHost"));
+        WriteSolution("server/src/Hosts/AiNative.GateHost/Gate.csproj", "server/src/Hosts/AiNative.PlayerHost/Player.csproj");
+        ArchitectureDiagnostic diagnostic = Validate().Diagnostics.Single();
+        Assert.That(diagnostic.Code, Is.EqualTo("ARC009"));
+        Assert.That(diagnostic.Source, Is.EqualTo("AiNative.GateHost"));
+        Assert.That(diagnostic.Target, Is.EqualTo("AiNative.PlayerHost"));
+    }
+
+    [TestCase("GateHost")]
+    [TestCase("PlayerHost")]
+    [TestCase("LobbyHost")]
+    [TestCase("MatchHost")]
+    [TestCase("RoomCoordinatorHost")]
+    [TestCase("BattleHost")]
+    public void TopologyHostAllowsFantasyPackageButRejectsHandwrittenRuntimeNamespace(string host)
+    {
+        string prefix = $"server/src/Hosts/AiNative.{host}";
+        Write($"{prefix}/Host.csproj", "<Project><ItemGroup><PackageReference Include=\"Fantasy-Net\" Version=\"1.0.0\" /></ItemGroup></Project>");
+        WriteSolution($"{prefix}/Host.csproj");
+        Assert.That(Validate().Diagnostics, Is.Empty);
+        Write($"{prefix}/Bad.cs", "using Fantasy.Network; class Bad { }");
+        Assert.That(Validate().Diagnostics.Single().Code, Is.EqualTo("ARC008"));
+    }
+
+    [Test]
+    public void OnlyExactTopologyAcceptanceProjectCanGenerateFantasyStartupMetadata()
+    {
+        const string prefix = "server/acceptance/AiNative.TopologyAcceptance";
+        const string project = prefix + "/AiNative.TopologyAcceptance.csproj";
+        Write(project, "<Project><ItemGroup><PackageReference Include=\"Fantasy-Net\" Version=\"2026.1.1003\" /></ItemGroup></Project>");
+        WriteSolution(project); Assert.That(Validate().Diagnostics, Is.Empty);
+        Write(prefix + "/Bad.cs", "using Fantasy.Network; class Bad { }");
+        Assert.That(Validate().Diagnostics.Single().Code, Is.EqualTo("ARC008"));
+    }
+
     private ArchitectureValidationResult Validate()
     {
         string rules = Path.Combine(AppContext.BaseDirectory, "architecture-rules.json");

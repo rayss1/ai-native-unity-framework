@@ -162,7 +162,8 @@ namespace AiNative.Client.Application
 
         private void FixedUpdate()
         {
-            _roomTick++;
+            if (!_session.IsPredictionInitialized || _session.State != BattleClientState.Active) return;
+            _roomTick = Math.Max(_roomTick + 1, _session.LastReceivedTick + 1);
             int moveX;
             int moveZ;
             if (_launch.Smoke || _launch.RegionalCorrection)
@@ -178,6 +179,12 @@ namespace AiNative.Client.Application
                         (Input.GetKey(KeyCode.A) ? MoveScaleMilli : 0);
                 moveZ = (Input.GetKey(KeyCode.W) ? MoveScaleMilli : 0) -
                         (Input.GetKey(KeyCode.S) ? MoveScaleMilli : 0);
+            }
+
+            if (!_session.TryGetArenaState(out _))
+            {
+                _session.PredictAndQueueInput(_roomTick, moveX, moveZ);
+                return;
             }
 
             ArenaButtons buttons = Input.GetMouseButton(0) ? ArenaButtons.Fire : ArenaButtons.None;
@@ -206,6 +213,8 @@ namespace AiNative.Client.Application
 
             if (_playerVisual is not null && _session.TryGetArenaState(out ArenaPlayerState arenaState))
             {
+                Vector3 current = transform.position;
+                transform.position = new Vector3(current.x, arenaState.PositionYMillimetres / 1000f, current.z);
                 _playerVisual.transform.localRotation =
                     Quaternion.Euler(0f, arenaState.YawMillidegrees / 1000f, 0f);
             }

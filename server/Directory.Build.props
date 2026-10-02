@@ -1,0 +1,7 @@
+<Project>
+  <Import Project="../Directory.Build.props" />
+  <PropertyGroup>
+    <!-- Package sources are not inherited through ProjectReference, so every Server consumer needs this feed. -->
+    <RestoreAdditionalProjectSources>$(RestoreAdditionalProjectSources);$(MSBuildThisFileDirectory)vendor/Fantasy/nupkg</RestoreAdditionalProjectSources>
+  </PropertyGroup>
+</Project>

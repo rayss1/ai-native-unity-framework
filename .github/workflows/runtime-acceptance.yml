@@ -8,6 +8,8 @@ on:
       - .dockerignore
       - AiNative.sln
       - Directory.Build.props
+      - server/Directory.Build.props
+      - infrastructure/topology/Fantasy.config
       - global.json
       - Docs/ADR/0012-server-runtime-successor.md
       - Docs/Architecture/runtime-acceptance-candidate-2026-08-19.md
@@ -31,6 +33,8 @@ on:
       - .dockerignore
       - AiNative.sln
       - Directory.Build.props
+      - server/Directory.Build.props
+      - infrastructure/topology/Fantasy.config
       - global.json
       - infrastructure/battle-host/**
       - server/RuntimeAcceptance.sln

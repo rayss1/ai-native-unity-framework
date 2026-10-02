@@ -12,6 +12,7 @@
     <FantasyConfigAutoDiscoveryEnabled>false</FantasyConfigAutoDiscoveryEnabled>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="../AiNative.Server.Control/AiNative.Server.Control.csproj" />
     <ProjectReference Include="../../../../shared/realtime/Realtime.Shared.csproj" />
   </ItemGroup>
   <ItemGroup>

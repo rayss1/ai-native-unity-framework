@@ -24,83 +24,86 @@ namespace AiNative.Protocol.V1 {
     static GameplayReflection() {
       byte[] descriptorData = global::System.Convert.FromBase64String(
           string.Concat(
-            "ChphaW5hdGl2ZS92MS9nYW1lcGxheS5wcm90bxILYWluYXRpdmUudjEiQwoM",
+            "ChphaW5hdGl2ZS92MS9nYW1lcGxheS5wcm90bxILYWluYXRpdmUudjEicQoM",
             "TG9naW5SZXF1ZXN0EhYKDnByb3RvY29sX21ham9yGAEgASgNEhQKDGNsaWVu",
-            "dF9idWlsZBgCIAEoCUoFCGQQyAEiRAoNTG9naW5SZXNwb25zZRISCgpzZXNz",
-            "aW9uX2lkGAEgASgGEhgKEGNvbm5lY3Rpb25fZXBvY2gYAiABKA1KBQhkEMgB",
-            "IkQKD0pvaW5Sb29tUmVxdWVzdBISCgpzZXNzaW9uX2lkGAEgASgGEhYKDnJl",
-            "cXVlc3RlZF9yb29tGAIgASgNSgUIZBDIASJQChBKb2luUm9vbVJlc3BvbnNl",
-            "Eg8KB3Jvb21faWQYASABKA0SEQoJZW50aXR5X2lkGAIgASgNEhEKCXRpY2tf",
-            "cmF0ZRgDIAEoDUoFCGQQyAEi1gEKDElucHV0Q29tbWFuZBIRCglyb29tX3Rp",
-            "Y2sYASABKAYSEAoIc2VxdWVuY2UYAiABKA0SFAoMbW92ZV94X21pbGxpGAMg",
-            "ASgREhQKDG1vdmVfeV9taWxsaRgEIAEoERIYChB5YXdfbWlsbGlkZWdyZWVz",
-            "GAUgASgREg8KB2J1dHRvbnMYBiABKA0SEQoJd2VhcG9uX2lkGAcgASgNEhYK",
-            "Dmxvb2tfeWF3X21pbGxpGAggASgREhgKEGxvb2tfcGl0Y2hfbWlsbGkYCSAB",
-            "KBFKBQhkEMgBIkAKCklucHV0QmF0Y2gSKwoIY29tbWFuZHMYASADKAsyGS5h",
-            "aW5hdGl2ZS52MS5JbnB1dENvbW1hbmRKBQhkEMgBIuoCCgtQbGF5ZXJTdGF0",
-            "ZRIRCgllbnRpdHlfaWQYASABKA0SGAoQcG9zaXRpb25feF9taWxsaRgCIAEo",
-            "ERIYChBwb3NpdGlvbl95X21pbGxpGAMgASgREhgKEHBvc2l0aW9uX3pfbWls",
-            "bGkYBCABKBESGAoQeWF3X21pbGxpZGVncmVlcxgFIAEoERIOCgZoZWFsdGgY",
-            "BiABKA0SIwobdmVsb2NpdHlfeF9taWxsaV9wZXJfc2Vjb25kGAcgASgREiMK",
-            "G3ZlbG9jaXR5X3lfbWlsbGlfcGVyX3NlY29uZBgIIAEoERIjCht2ZWxvY2l0",
-            "eV96X21pbGxpX3Blcl9zZWNvbmQYCSABKBESEQoJd2VhcG9uX2lkGAogASgN",
-            "Eg0KBWFybW9yGAsgASgNEg0KBWFsaXZlGAwgASgIEg0KBWtpbGxzGA0gASgN",
-            "EhoKEnBpdGNoX21pbGxpZGVncmVlcxgOIAEoEUoFCGQQyAEizgEKC1BpY2t1",
-            "cFN0YXRlEhEKCXBpY2t1cF9pZBgBIAEoDRIxCgtwaWNrdXBfdHlwZRgCIAEo",
-            "DjIcLmFpbmF0aXZlLnYxLkFyZW5hUGlja3VwVHlwZRIYChBwb3NpdGlvbl94",
-            "X21pbGxpGAMgASgREhgKEHBvc2l0aW9uX3lfbWlsbGkYBCABKBESGAoQcG9z",
-            "aXRpb25fel9taWxsaRgFIAEoERIOCgZhY3RpdmUYBiABKAgSFAoMcmVzcGF3",
-            "bl90aWNrGAcgASgGSgUIZBDIASLKAgoIU25hcHNob3QSFgoOcHJvdG9jb2xf",
-            "bWFqb3IYASABKA0SEQoJcm9vbV90aWNrGAIgASgGEhUKDWJhc2VsaW5lX3Rp",
-            "Y2sYAyABKAYSKQoHcGxheWVycxgEIAMoCzIYLmFpbmF0aXZlLnYxLlBsYXll",
-            "clN0YXRlEhIKCnN0YXRlX2hhc2gYBSABKAYSJQodbGFzdF9wcm9jZXNzZWRf",
-            "aW5wdXRfc2VxdWVuY2UYBiABKA0SMQoLbWF0Y2hfcGhhc2UYByABKA4yHC5h",
-            "aW5hdGl2ZS52MS5BcmVuYU1hdGNoUGhhc2USFwoPcmVtYWluaW5nX3RpY2tz",
-            "GAggASgNEhgKEGxlYWRlcl9lbnRpdHlfaWQYCSABKA0SKQoHcGlja3VwcxgK",
-            "IAMoCzIYLmFpbmF0aXZlLnYxLlBpY2t1cFN0YXRlSgUIZBDIASKlAgoQQXJl",
-            "bmFDb21iYXRFdmVudBI1CgpldmVudF90eXBlGAEgASgOMiEuYWluYXRpdmUu",
-            "djEuQXJlbmFDb21iYXRFdmVudFR5cGUSEgoKZXZlbnRfdGljaxgCIAEoBhIY",
-            "ChBzb3VyY2VfZW50aXR5X2lkGAMgASgNEhgKEHRhcmdldF9lbnRpdHlfaWQY",
-            "BCABKA0SLQoJd2VhcG9uX2lkGAUgASgOMhouYWluYXRpdmUudjEuQXJlbmFX",
-            "ZWFwb25JZBIOCgZkYW1hZ2UYBiABKA0SGAoQcG9zaXRpb25feF9taWxsaRgH",
-            "IAEoERIYChBwb3NpdGlvbl95X21pbGxpGAggASgREhgKEHBvc2l0aW9uX3pf",
-            "bWlsbGkYCSABKBFKBQhkEMgBIpUBCg1SZWxpYWJsZUV2ZW50EhEKCXJvb21f",
-            "dGljaxgBIAEoBhIQCghzZXF1ZW5jZRgCIAEoDRISCgpldmVudF90eXBlGAMg",
-            "ASgNEg8KB3BheWxvYWQYBCABKAwSMwoMY29tYmF0X2V2ZW50GAUgASgLMh0u",
-            "YWluYXRpdmUudjEuQXJlbmFDb21iYXRFdmVudEoFCGQQyAEiYwoQUmVjb25u",
-            "ZWN0UmVxdWVzdBISCgpzZXNzaW9uX2lkGAEgASgGEhgKEGNvbm5lY3Rpb25f",
-            "ZXBvY2gYAiABKA0SGgoSbGFzdF9yZWNlaXZlZF90aWNrGAMgASgGSgUIZBDI",
-            "ASJyChFSZWNvbm5lY3RSZXNwb25zZRIYChBjb25uZWN0aW9uX2Vwb2NoGAEg",
-            "ASgNEhMKC3Jlc3VtZV90aWNrGAIgASgGEicKCHNuYXBzaG90GAMgASgLMhUu",
-            "YWluYXRpdmUudjEuU25hcHNob3RKBQhkEMgBKuoCCglNZXNzYWdlSWQSGgoW",
-            "TUVTU0FHRV9JRF9VTlNQRUNJRklFRBAAEh0KGE1FU1NBR0VfSURfTE9HSU5f",
-            "UkVRVUVTVBDoBxIeChlNRVNTQUdFX0lEX0xPR0lOX1JFU1BPTlNFEOkHEiEK",
-            "HE1FU1NBR0VfSURfSk9JTl9ST09NX1JFUVVFU1QQ8gcSIgodTUVTU0FHRV9J",
-            "RF9KT0lOX1JPT01fUkVTUE9OU0UQ8wcSHQoYTUVTU0FHRV9JRF9JTlBVVF9D",
-            "T01NQU5EEMwIEhgKE01FU1NBR0VfSURfU05BUFNIT1QQzQgSHgoZTUVTU0FH",
-            "RV9JRF9SRUxJQUJMRV9FVkVOVBDOCBIbChZNRVNTQUdFX0lEX0lOUFVUX0JB",
-            "VENIEM8IEiEKHE1FU1NBR0VfSURfUkVDT05ORUNUX1JFUVVFU1QQsAkSIgod",
-            "TUVTU0FHRV9JRF9SRUNPTk5FQ1RfUkVTUE9OU0UQsQkqqwEKC0FyZW5hQnV0",
-            "dG9uEhUKEUFSRU5BX0JVVFRPTl9OT05FEAASFQoRQVJFTkFfQlVUVE9OX0ZJ",
-            "UkUQARIVChFBUkVOQV9CVVRUT05fSlVNUBACEhcKE0FSRU5BX0JVVFRPTl9S",
-            "RUxPQUQQBBIcChhBUkVOQV9CVVRUT05fTkVYVF9XRUFQT04QCBIgChxBUkVO",
-            "QV9CVVRUT05fUFJFVklPVVNfV0VBUE9OEBAqdgoNQXJlbmFXZWFwb25JZBIV",
-            "ChFBUkVOQV9XRUFQT05fTk9ORRAAEhsKF0FSRU5BX1dFQVBPTl9NQUNISU5F",
-            "R1VOEAESGAoUQVJFTkFfV0VBUE9OX1NIT1RHVU4QAhIXChNBUkVOQV9XRUFQ",
-            "T05fUk9DS0VUEAMqXAoPQXJlbmFNYXRjaFBoYXNlEhcKE0FSRU5BX01BVENI",
-            "X1dBSVRJTkcQABIWChJBUkVOQV9NQVRDSF9BQ1RJVkUQARIYChRBUkVOQV9N",
-            "QVRDSF9GSU5JU0hFRBACKlwKD0FyZW5hUGlja3VwVHlwZRIYChRBUkVOQV9Q",
-            "SUNLVVBfVU5LTk9XThAAEhcKE0FSRU5BX1BJQ0tVUF9IRUFMVEgQARIWChJB",
-            "UkVOQV9QSUNLVVBfQVJNT1IQAiqnAQoUQXJlbmFDb21iYXRFdmVudFR5cGUS",
-            "FAoQQVJFTkFfRVZFTlRfRklSRRAAEhMKD0FSRU5BX0VWRU5UX0hJVBABEhQK",
-            "EEFSRU5BX0VWRU5UX0tJTEwQAhIXChNBUkVOQV9FVkVOVF9SRVNQQVdOEAMS",
-            "FgoSQVJFTkFfRVZFTlRfUElDS1VQEAQSHQoZQVJFTkFfRVZFTlRfV0VBUE9O",
-            "X1NXSVRDSBAFQheqAhRBaU5hdGl2ZS5Qcm90b2NvbC5WMWIGcHJvdG8z"));
+            "dF9idWlsZBgCIAEoCRIUCgxlbnRyeV90aWNrZXQYAyABKAkSFgoOZ2xvYmFs",
+            "X3Jvb21faWQYBCABKAlKBQhkEMgBIoMBCg1Mb2dpblJlc3BvbnNlEhIKCnNl",
+            "c3Npb25faWQYASABKAYSGAoQY29ubmVjdGlvbl9lcG9jaBgCIAEoDRIWCg5n",
+            "bG9iYWxfcm9vbV9pZBgDIAEoCRISCgpib290X2Vwb2NoGAQgASgJEhEKCXJv",
+            "b21fdGljaxgFIAEoBkoFCGQQyAEiRAoPSm9pblJvb21SZXF1ZXN0EhIKCnNl",
+            "c3Npb25faWQYASABKAYSFgoOcmVxdWVzdGVkX3Jvb20YAiABKA1KBQhkEMgB",
+            "IlAKEEpvaW5Sb29tUmVzcG9uc2USDwoHcm9vbV9pZBgBIAEoDRIRCgllbnRp",
+            "dHlfaWQYAiABKA0SEQoJdGlja19yYXRlGAMgASgNSgUIZBDIASLWAQoMSW5w",
+            "dXRDb21tYW5kEhEKCXJvb21fdGljaxgBIAEoBhIQCghzZXF1ZW5jZRgCIAEo",
+            "DRIUCgxtb3ZlX3hfbWlsbGkYAyABKBESFAoMbW92ZV95X21pbGxpGAQgASgR",
+            "EhgKEHlhd19taWxsaWRlZ3JlZXMYBSABKBESDwoHYnV0dG9ucxgGIAEoDRIR",
+            "Cgl3ZWFwb25faWQYByABKA0SFgoObG9va195YXdfbWlsbGkYCCABKBESGAoQ",
+            "bG9va19waXRjaF9taWxsaRgJIAEoEUoFCGQQyAEiQAoKSW5wdXRCYXRjaBIr",
+            "Cghjb21tYW5kcxgBIAMoCzIZLmFpbmF0aXZlLnYxLklucHV0Q29tbWFuZEoF",
+            "CGQQyAEi6gIKC1BsYXllclN0YXRlEhEKCWVudGl0eV9pZBgBIAEoDRIYChBw",
+            "b3NpdGlvbl94X21pbGxpGAIgASgREhgKEHBvc2l0aW9uX3lfbWlsbGkYAyAB",
+            "KBESGAoQcG9zaXRpb25fel9taWxsaRgEIAEoERIYChB5YXdfbWlsbGlkZWdy",
+            "ZWVzGAUgASgREg4KBmhlYWx0aBgGIAEoDRIjCht2ZWxvY2l0eV94X21pbGxp",
+            "X3Blcl9zZWNvbmQYByABKBESIwobdmVsb2NpdHlfeV9taWxsaV9wZXJfc2Vj",
+            "b25kGAggASgREiMKG3ZlbG9jaXR5X3pfbWlsbGlfcGVyX3NlY29uZBgJIAEo",
+            "ERIRCgl3ZWFwb25faWQYCiABKA0SDQoFYXJtb3IYCyABKA0SDQoFYWxpdmUY",
+            "DCABKAgSDQoFa2lsbHMYDSABKA0SGgoScGl0Y2hfbWlsbGlkZWdyZWVzGA4g",
+            "ASgRSgUIZBDIASLOAQoLUGlja3VwU3RhdGUSEQoJcGlja3VwX2lkGAEgASgN",
+            "EjEKC3BpY2t1cF90eXBlGAIgASgOMhwuYWluYXRpdmUudjEuQXJlbmFQaWNr",
+            "dXBUeXBlEhgKEHBvc2l0aW9uX3hfbWlsbGkYAyABKBESGAoQcG9zaXRpb25f",
+            "eV9taWxsaRgEIAEoERIYChBwb3NpdGlvbl96X21pbGxpGAUgASgREg4KBmFj",
+            "dGl2ZRgGIAEoCBIUCgxyZXNwYXduX3RpY2sYByABKAZKBQhkEMgBIsoCCghT",
+            "bmFwc2hvdBIWCg5wcm90b2NvbF9tYWpvchgBIAEoDRIRCglyb29tX3RpY2sY",
+            "AiABKAYSFQoNYmFzZWxpbmVfdGljaxgDIAEoBhIpCgdwbGF5ZXJzGAQgAygL",
+            "MhguYWluYXRpdmUudjEuUGxheWVyU3RhdGUSEgoKc3RhdGVfaGFzaBgFIAEo",
+            "BhIlCh1sYXN0X3Byb2Nlc3NlZF9pbnB1dF9zZXF1ZW5jZRgGIAEoDRIxCgtt",
+            "YXRjaF9waGFzZRgHIAEoDjIcLmFpbmF0aXZlLnYxLkFyZW5hTWF0Y2hQaGFz",
+            "ZRIXCg9yZW1haW5pbmdfdGlja3MYCCABKA0SGAoQbGVhZGVyX2VudGl0eV9p",
+            "ZBgJIAEoDRIpCgdwaWNrdXBzGAogAygLMhguYWluYXRpdmUudjEuUGlja3Vw",
+            "U3RhdGVKBQhkEMgBIqUCChBBcmVuYUNvbWJhdEV2ZW50EjUKCmV2ZW50X3R5",
+            "cGUYASABKA4yIS5haW5hdGl2ZS52MS5BcmVuYUNvbWJhdEV2ZW50VHlwZRIS",
+            "CgpldmVudF90aWNrGAIgASgGEhgKEHNvdXJjZV9lbnRpdHlfaWQYAyABKA0S",
+            "GAoQdGFyZ2V0X2VudGl0eV9pZBgEIAEoDRItCgl3ZWFwb25faWQYBSABKA4y",
+            "Gi5haW5hdGl2ZS52MS5BcmVuYVdlYXBvbklkEg4KBmRhbWFnZRgGIAEoDRIY",
+            "ChBwb3NpdGlvbl94X21pbGxpGAcgASgREhgKEHBvc2l0aW9uX3lfbWlsbGkY",
+            "CCABKBESGAoQcG9zaXRpb25fel9taWxsaRgJIAEoEUoFCGQQyAEilQEKDVJl",
+            "bGlhYmxlRXZlbnQSEQoJcm9vbV90aWNrGAEgASgGEhAKCHNlcXVlbmNlGAIg",
+            "ASgNEhIKCmV2ZW50X3R5cGUYAyABKA0SDwoHcGF5bG9hZBgEIAEoDBIzCgxj",
+            "b21iYXRfZXZlbnQYBSABKAsyHS5haW5hdGl2ZS52MS5BcmVuYUNvbWJhdEV2",
+            "ZW50SgUIZBDIASJjChBSZWNvbm5lY3RSZXF1ZXN0EhIKCnNlc3Npb25faWQY",
+            "ASABKAYSGAoQY29ubmVjdGlvbl9lcG9jaBgCIAEoDRIaChJsYXN0X3JlY2Vp",
+            "dmVkX3RpY2sYAyABKAZKBQhkEMgBInIKEVJlY29ubmVjdFJlc3BvbnNlEhgK",
+            "EGNvbm5lY3Rpb25fZXBvY2gYASABKA0SEwoLcmVzdW1lX3RpY2sYAiABKAYS",
+            "JwoIc25hcHNob3QYAyABKAsyFS5haW5hdGl2ZS52MS5TbmFwc2hvdEoFCGQQ",
+            "yAEq6gIKCU1lc3NhZ2VJZBIaChZNRVNTQUdFX0lEX1VOU1BFQ0lGSUVEEAAS",
+            "HQoYTUVTU0FHRV9JRF9MT0dJTl9SRVFVRVNUEOgHEh4KGU1FU1NBR0VfSURf",
+            "TE9HSU5fUkVTUE9OU0UQ6QcSIQocTUVTU0FHRV9JRF9KT0lOX1JPT01fUkVR",
+            "VUVTVBDyBxIiCh1NRVNTQUdFX0lEX0pPSU5fUk9PTV9SRVNQT05TRRDzBxId",
+            "ChhNRVNTQUdFX0lEX0lOUFVUX0NPTU1BTkQQzAgSGAoTTUVTU0FHRV9JRF9T",
+            "TkFQU0hPVBDNCBIeChlNRVNTQUdFX0lEX1JFTElBQkxFX0VWRU5UEM4IEhsK",
+            "Fk1FU1NBR0VfSURfSU5QVVRfQkFUQ0gQzwgSIQocTUVTU0FHRV9JRF9SRUNP",
+            "Tk5FQ1RfUkVRVUVTVBCwCRIiCh1NRVNTQUdFX0lEX1JFQ09OTkVDVF9SRVNQ",
+            "T05TRRCxCSqrAQoLQXJlbmFCdXR0b24SFQoRQVJFTkFfQlVUVE9OX05PTkUQ",
+            "ABIVChFBUkVOQV9CVVRUT05fRklSRRABEhUKEUFSRU5BX0JVVFRPTl9KVU1Q",
+            "EAISFwoTQVJFTkFfQlVUVE9OX1JFTE9BRBAEEhwKGEFSRU5BX0JVVFRPTl9O",
+            "RVhUX1dFQVBPThAIEiAKHEFSRU5BX0JVVFRPTl9QUkVWSU9VU19XRUFQT04Q",
+            "ECp2Cg1BcmVuYVdlYXBvbklkEhUKEUFSRU5BX1dFQVBPTl9OT05FEAASGwoX",
+            "QVJFTkFfV0VBUE9OX01BQ0hJTkVHVU4QARIYChRBUkVOQV9XRUFQT05fU0hP",
+            "VEdVThACEhcKE0FSRU5BX1dFQVBPTl9ST0NLRVQQAypcCg9BcmVuYU1hdGNo",
+            "UGhhc2USFwoTQVJFTkFfTUFUQ0hfV0FJVElORxAAEhYKEkFSRU5BX01BVENI",
+            "X0FDVElWRRABEhgKFEFSRU5BX01BVENIX0ZJTklTSEVEEAIqXAoPQXJlbmFQ",
+            "aWNrdXBUeXBlEhgKFEFSRU5BX1BJQ0tVUF9VTktOT1dOEAASFwoTQVJFTkFf",
+            "UElDS1VQX0hFQUxUSBABEhYKEkFSRU5BX1BJQ0tVUF9BUk1PUhACKqcBChRB",
+            "cmVuYUNvbWJhdEV2ZW50VHlwZRIUChBBUkVOQV9FVkVOVF9GSVJFEAASEwoP",
+            "QVJFTkFfRVZFTlRfSElUEAESFAoQQVJFTkFfRVZFTlRfS0lMTBACEhcKE0FS",
+            "RU5BX0VWRU5UX1JFU1BBV04QAxIWChJBUkVOQV9FVkVOVF9QSUNLVVAQBBId",
+            "ChlBUkVOQV9FVkVOVF9XRUFQT05fU1dJVENIEAVCF6oCFEFpTmF0aXZlLlBy",
+            "b3RvY29sLlYxYgZwcm90bzM="));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { },
           new pbr::GeneratedClrTypeInfo(new[] {typeof(global::AiNative.Protocol.V1.MessageId), typeof(global::AiNative.Protocol.V1.ArenaButton), typeof(global::AiNative.Protocol.V1.ArenaWeaponId), typeof(global::AiNative.Protocol.V1.ArenaMatchPhase), typeof(global::AiNative.Protocol.V1.ArenaPickupType), typeof(global::AiNative.Protocol.V1.ArenaCombatEventType), }, null, new pbr::GeneratedClrTypeInfo[] {
-            new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.V1.LoginRequest), global::AiNative.Protocol.V1.LoginRequest.Parser, new[]{ "ProtocolMajor", "ClientBuild" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.V1.LoginResponse), global::AiNative.Protocol.V1.LoginResponse.Parser, new[]{ "SessionId", "ConnectionEpoch" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.V1.LoginRequest), global::AiNative.Protocol.V1.LoginRequest.Parser, new[]{ "ProtocolMajor", "ClientBuild", "EntryTicket", "GlobalRoomId" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.V1.LoginResponse), global::AiNative.Protocol.V1.LoginResponse.Parser, new[]{ "SessionId", "ConnectionEpoch", "GlobalRoomId", "BootEpoch", "RoomTick" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.V1.JoinRoomRequest), global::AiNative.Protocol.V1.JoinRoomRequest.Parser, new[]{ "SessionId", "RequestedRoom" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.V1.JoinRoomResponse), global::AiNative.Protocol.V1.JoinRoomResponse.Parser, new[]{ "RoomId", "EntityId", "TickRate" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.V1.InputCommand), global::AiNative.Protocol.V1.InputCommand.Parser, new[]{ "RoomTick", "Sequence", "MoveXMilli", "MoveYMilli", "YawMillidegrees", "Buttons", "WeaponId", "LookYawMilli", "LookPitchMilli" }, null, null, null, null),
@@ -209,6 +212,8 @@ namespace AiNative.Protocol.V1 {
     public LoginRequest(LoginRequest other) : this() {
       protocolMajor_ = other.protocolMajor_;
       clientBuild_ = other.clientBuild_;
+      entryTicket_ = other.entryTicket_;
+      globalRoomId_ = other.globalRoomId_;
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
     }
 
@@ -242,6 +247,30 @@ namespace AiNative.Protocol.V1 {
       }
     }
 
+    /// <summary>Field number for the "entry_ticket" field.</summary>
+    public const int EntryTicketFieldNumber = 3;
+    private string entryTicket_ = "";
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public string EntryTicket {
+      get { return entryTicket_; }
+      set {
+        entryTicket_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+      }
+    }
+
+    /// <summary>Field number for the "global_room_id" field.</summary>
+    public const int GlobalRoomIdFieldNumber = 4;
+    private string globalRoomId_ = "";
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public string GlobalRoomId {
+      get { return globalRoomId_; }
+      set {
+        globalRoomId_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+      }
+    }
+
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override bool Equals(object other) {
@@ -259,6 +288,8 @@ namespace AiNative.Protocol.V1 {
       }
       if (ProtocolMajor != other.ProtocolMajor) return false;
       if (ClientBuild != other.ClientBuild) return false;
+      if (EntryTicket != other.EntryTicket) return false;
+      if (GlobalRoomId != other.GlobalRoomId) return false;
       return Equals(_unknownFields, other._unknownFields);
     }
 
@@ -268,6 +299,8 @@ namespace AiNative.Protocol.V1 {
       int hash = 1;
       if (ProtocolMajor != 0) hash ^= ProtocolMajor.GetHashCode();
       if (ClientBuild.Length != 0) hash ^= ClientBuild.GetHashCode();
+      if (EntryTicket.Length != 0) hash ^= EntryTicket.GetHashCode();
+      if (GlobalRoomId.Length != 0) hash ^= GlobalRoomId.GetHashCode();
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
       }
@@ -294,6 +327,14 @@ namespace AiNative.Protocol.V1 {
         output.WriteRawTag(18);
         output.WriteString(ClientBuild);
       }
+      if (EntryTicket.Length != 0) {
+        output.WriteRawTag(26);
+        output.WriteString(EntryTicket);
+      }
+      if (GlobalRoomId.Length != 0) {
+        output.WriteRawTag(34);
+        output.WriteString(GlobalRoomId);
+      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(output);
       }
@@ -312,6 +353,14 @@ namespace AiNative.Protocol.V1 {
         output.WriteRawTag(18);
         output.WriteString(ClientBuild);
       }
+      if (EntryTicket.Length != 0) {
+        output.WriteRawTag(26);
+        output.WriteString(EntryTicket);
+      }
+      if (GlobalRoomId.Length != 0) {
+        output.WriteRawTag(34);
+        output.WriteString(GlobalRoomId);
+      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(ref output);
       }
@@ -327,6 +376,12 @@ namespace AiNative.Protocol.V1 {
       }
       if (ClientBuild.Length != 0) {
         size += 1 + pb::CodedOutputStream.ComputeStringSize(ClientBuild);
+      }
+      if (EntryTicket.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(EntryTicket);
+      }
+      if (GlobalRoomId.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(GlobalRoomId);
       }
       if (_unknownFields != null) {
         size += _unknownFields.CalculateSize();
@@ -345,6 +400,12 @@ namespace AiNative.Protocol.V1 {
       }
       if (other.ClientBuild.Length != 0) {
         ClientBuild = other.ClientBuild;
+      }
+      if (other.EntryTicket.Length != 0) {
+        EntryTicket = other.EntryTicket;
+      }
+      if (other.GlobalRoomId.Length != 0) {
+        GlobalRoomId = other.GlobalRoomId;
       }
       _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
     }
@@ -373,6 +434,14 @@ namespace AiNative.Protocol.V1 {
             ClientBuild = input.ReadString();
             break;
           }
+          case 26: {
+            EntryTicket = input.ReadString();
+            break;
+          }
+          case 34: {
+            GlobalRoomId = input.ReadString();
+            break;
+          }
         }
       }
     #endif
@@ -398,6 +467,14 @@ namespace AiNative.Protocol.V1 {
           }
           case 18: {
             ClientBuild = input.ReadString();
+            break;
+          }
+          case 26: {
+            EntryTicket = input.ReadString();
+            break;
+          }
+          case 34: {
+            GlobalRoomId = input.ReadString();
             break;
           }
         }
@@ -444,6 +521,9 @@ namespace AiNative.Protocol.V1 {
     public LoginResponse(LoginResponse other) : this() {
       sessionId_ = other.sessionId_;
       connectionEpoch_ = other.connectionEpoch_;
+      globalRoomId_ = other.globalRoomId_;
+      bootEpoch_ = other.bootEpoch_;
+      roomTick_ = other.roomTick_;
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
     }
 
@@ -477,6 +557,42 @@ namespace AiNative.Protocol.V1 {
       }
     }
 
+    /// <summary>Field number for the "global_room_id" field.</summary>
+    public const int GlobalRoomIdFieldNumber = 3;
+    private string globalRoomId_ = "";
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public string GlobalRoomId {
+      get { return globalRoomId_; }
+      set {
+        globalRoomId_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+      }
+    }
+
+    /// <summary>Field number for the "boot_epoch" field.</summary>
+    public const int BootEpochFieldNumber = 4;
+    private string bootEpoch_ = "";
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public string BootEpoch {
+      get { return bootEpoch_; }
+      set {
+        bootEpoch_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+      }
+    }
+
+    /// <summary>Field number for the "room_tick" field.</summary>
+    public const int RoomTickFieldNumber = 5;
+    private ulong roomTick_;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public ulong RoomTick {
+      get { return roomTick_; }
+      set {
+        roomTick_ = value;
+      }
+    }
+
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override bool Equals(object other) {
@@ -494,6 +610,9 @@ namespace AiNative.Protocol.V1 {
       }
       if (SessionId != other.SessionId) return false;
       if (ConnectionEpoch != other.ConnectionEpoch) return false;
+      if (GlobalRoomId != other.GlobalRoomId) return false;
+      if (BootEpoch != other.BootEpoch) return false;
+      if (RoomTick != other.RoomTick) return false;
       return Equals(_unknownFields, other._unknownFields);
     }
 
@@ -503,6 +622,9 @@ namespace AiNative.Protocol.V1 {
       int hash = 1;
       if (SessionId != 0UL) hash ^= SessionId.GetHashCode();
       if (ConnectionEpoch != 0) hash ^= ConnectionEpoch.GetHashCode();
+      if (GlobalRoomId.Length != 0) hash ^= GlobalRoomId.GetHashCode();
+      if (BootEpoch.Length != 0) hash ^= BootEpoch.GetHashCode();
+      if (RoomTick != 0UL) hash ^= RoomTick.GetHashCode();
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
       }
@@ -529,6 +651,18 @@ namespace AiNative.Protocol.V1 {
         output.WriteRawTag(16);
         output.WriteUInt32(ConnectionEpoch);
       }
+      if (GlobalRoomId.Length != 0) {
+        output.WriteRawTag(26);
+        output.WriteString(GlobalRoomId);
+      }
+      if (BootEpoch.Length != 0) {
+        output.WriteRawTag(34);
+        output.WriteString(BootEpoch);
+      }
+      if (RoomTick != 0UL) {
+        output.WriteRawTag(41);
+        output.WriteFixed64(RoomTick);
+      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(output);
       }
@@ -547,6 +681,18 @@ namespace AiNative.Protocol.V1 {
         output.WriteRawTag(16);
         output.WriteUInt32(ConnectionEpoch);
       }
+      if (GlobalRoomId.Length != 0) {
+        output.WriteRawTag(26);
+        output.WriteString(GlobalRoomId);
+      }
+      if (BootEpoch.Length != 0) {
+        output.WriteRawTag(34);
+        output.WriteString(BootEpoch);
+      }
+      if (RoomTick != 0UL) {
+        output.WriteRawTag(41);
+        output.WriteFixed64(RoomTick);
+      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(ref output);
       }
@@ -562,6 +708,15 @@ namespace AiNative.Protocol.V1 {
       }
       if (ConnectionEpoch != 0) {
         size += 1 + pb::CodedOutputStream.ComputeUInt32Size(ConnectionEpoch);
+      }
+      if (GlobalRoomId.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(GlobalRoomId);
+      }
+      if (BootEpoch.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(BootEpoch);
+      }
+      if (RoomTick != 0UL) {
+        size += 1 + 8;
       }
       if (_unknownFields != null) {
         size += _unknownFields.CalculateSize();
@@ -580,6 +735,15 @@ namespace AiNative.Protocol.V1 {
       }
       if (other.ConnectionEpoch != 0) {
         ConnectionEpoch = other.ConnectionEpoch;
+      }
+      if (other.GlobalRoomId.Length != 0) {
+        GlobalRoomId = other.GlobalRoomId;
+      }
+      if (other.BootEpoch.Length != 0) {
+        BootEpoch = other.BootEpoch;
+      }
+      if (other.RoomTick != 0UL) {
+        RoomTick = other.RoomTick;
       }
       _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
     }
@@ -608,6 +772,18 @@ namespace AiNative.Protocol.V1 {
             ConnectionEpoch = input.ReadUInt32();
             break;
           }
+          case 26: {
+            GlobalRoomId = input.ReadString();
+            break;
+          }
+          case 34: {
+            BootEpoch = input.ReadString();
+            break;
+          }
+          case 41: {
+            RoomTick = input.ReadFixed64();
+            break;
+          }
         }
       }
     #endif
@@ -633,6 +809,18 @@ namespace AiNative.Protocol.V1 {
           }
           case 16: {
             ConnectionEpoch = input.ReadUInt32();
+            break;
+          }
+          case 26: {
+            GlobalRoomId = input.ReadString();
+            break;
+          }
+          case 34: {
+            BootEpoch = input.ReadString();
+            break;
+          }
+          case 41: {
+            RoomTick = input.ReadFixed64();
             break;
           }
         }

@@ -6,6 +6,21 @@ namespace AiNative.Server.Fantasy.Tests;
 
 public sealed class FantasyRealtimeTransportTests
 {
+    [Test]
+    public async Task UnderlyingDisconnectPropagatesWithoutAnyOutboundSend()
+    {
+        FakeSender sender = new(); await using FantasyRealtimeTransport transport = new(sender);
+        sender.Dispose(); Assert.That(transport.State, Is.EqualTo(TransportState.Closed));
+        Assert.That(sender.SendCount, Is.Zero);
+    }
+    [Test]
+    public async Task ClosedTransportDisposalStillReleasesItsBufferedPackets()
+    {
+        FakeSender sender = new(); FantasyRealtimeTransport transport = new(sender);
+        Assert.That(transport.TryEnqueueReceived(SnapshotChannel, new byte[] { 1, 2 }, 1, 1), Is.True);
+        sender.Dispose(); Assert.That(transport.State, Is.EqualTo(TransportState.Closed));
+        await transport.DisposeAsync(); Assert.That(transport.TryReceive(new byte[8], out _), Is.False);
+    }
     private static readonly TransportChannel SnapshotChannel = new(
         1,
         TransportDelivery.Unreliable,

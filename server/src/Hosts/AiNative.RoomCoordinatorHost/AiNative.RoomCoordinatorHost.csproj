@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsDirectFantasyNetReference>false</IsDirectFantasyNetReference>
+    <FantasyConfigAutoDiscoveryEnabled>true</FantasyConfigAutoDiscoveryEnabled>
+    <RestoreAdditionalProjectSources>$(RestoreAdditionalProjectSources);$(MSBuildThisFileDirectory)../../../vendor/Fantasy/nupkg</RestoreAdditionalProjectSources>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../Modules/AiNative.Server.Hosting/AiNative.Server.Hosting.csproj" />
+    <PackageReference Include="Fantasy-Net" Version="2026.1.1003" />
+    <None Include="Fantasy.config" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

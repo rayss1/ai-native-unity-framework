@@ -94,6 +94,8 @@ namespace AiNative.Client.Application
         private CancellationTokenSource _connectCancellation;
         private Task<BattleTransportConnection> _connectTask;
         private ClientPredictionAdapter _prediction;
+        private ArenaClientPredictionAdapter _arenaPrediction;
+        private ulong _nextInputTick;
         private float _phaseElapsedSeconds;
         private float _retryDelayRemainingSeconds;
         private int _reconnectAttempts;
@@ -135,7 +137,7 @@ namespace AiNative.Client.Application
             _host = host;
             _port = port;
             _clientBuild = clientBuild ?? string.Empty;
-            _inputRing = new InputFrameRing(inputRingCapacity, ClientPredictionAdapter.RequiredInputBufferBytes);
+            _inputRing = new InputFrameRing(inputRingCapacity, Math.Max(ClientPredictionAdapter.RequiredInputBufferBytes, ArenaClientPredictionAdapter.RequiredInputBufferBytes));
             State = BattleClientState.Connecting;
         }
 
@@ -169,7 +171,7 @@ namespace AiNative.Client.Application
 
         public int QueuedInputFrames => _inputRing.Count;
 
-        public bool IsPredictionInitialized => _prediction?.IsInitialized == true;
+        public bool IsPredictionInitialized => _arenaPrediction?.IsInitialized == true || _prediction?.IsInitialized == true;
 
         public PredictionDiagnostics PredictionDiagnostics => _prediction?.Diagnostics ?? default;
 
@@ -194,6 +196,12 @@ namespace AiNative.Client.Application
             float unscaledDeltaSeconds,
             out PresentationPosition position)
         {
+            if (!_disposed && _arenaPrediction?.IsInitialized == true)
+            {
+                ArenaPlayerState arena = _arenaPrediction.Current;
+                position = _presentation.Advance(ToKinematic(arena), unscaledDeltaSeconds);
+                return true;
+            }
             if (_disposed || _prediction is null ||
                 !_prediction.TryGetPredictedState(out KinematicState simulationState))
             {
@@ -276,6 +284,8 @@ namespace AiNative.Client.Application
             int moveXMilli,
             int moveZMilli)
         {
+            if (_arenaPrediction?.IsInitialized == true)
+                return PredictAndQueueArenaInput(roomTick, moveXMilli, moveZMilli, 0, 0, ArenaButtons.None, _arenaPrediction.Current.Weapon);
             if (_disposed) return PredictionPrepareStatus.Disposed;
             if (State != BattleClientState.Active || _prediction is null || !_prediction.IsInitialized)
             {
@@ -301,7 +311,7 @@ namespace AiNative.Client.Application
             return result.Status;
         }
 
-        /// <summary>Queues an arena command while advancing the existing prediction history.</summary>
+        /// <summary>Queues an arena command using the latest authority tick and shared arena prediction.</summary>
         public PredictionPrepareStatus PredictAndQueueArenaInput(
             ulong roomTick,
             int moveXMilli,
@@ -312,7 +322,7 @@ namespace AiNative.Client.Application
             ArenaWeaponId weapon)
         {
             if (_disposed) return PredictionPrepareStatus.Disposed;
-            if (State != BattleClientState.Active || _prediction is null || !_prediction.IsInitialized)
+            if (State != BattleClientState.Active || !IsPredictionInitialized)
             {
                 return PredictionPrepareStatus.NotInitialized;
             }
@@ -323,29 +333,17 @@ namespace AiNative.Client.Application
                 return PredictionPrepareStatus.BufferTooSmall;
             }
 
-            PredictionPrepareResult predicted = _prediction.PrepareInput(
-                roomTick, moveXMilli, moveZMilli, buffer);
-            if (predicted.Status != PredictionPrepareStatus.Prepared)
+            if (_arenaPrediction?.IsInitialized != true) return PredictionPrepareStatus.NotInitialized;
+            ulong stampedTick = Math.Max(_nextInputTick, checked((ulong)_arenaPrediction.Current.Tick + 1));
+            ArenaPredictionPrepareResult predicted = _arenaPrediction.PrepareInput(
+                stampedTick, moveXMilli, moveZMilli, lookYawMilli, lookPitchMilli, buttons, weapon, buffer);
+            if (predicted.Status == ArenaPredictionPrepareStatus.Prepared)
             {
-                return predicted.Status;
+                _nextInputTick = stampedTick + 1;
+                _arenaState = predicted.PredictedState;
+                _inputRing.CommitWrite(predicted.WrittenBytes);
             }
-
-            ArenaInput arenaInput = new(
-                _prediction.LastPreparedInputSequence,
-                roomTick,
-                moveXMilli,
-                moveZMilli,
-                lookYawMilli,
-                lookPitchMilli,
-                buttons,
-                weapon);
-            if (!ArenaClientProtocolV1.TryEncodeInput(arenaInput, buffer, out int writtenBytes))
-            {
-                return PredictionPrepareStatus.BufferTooSmall;
-            }
-
-            _inputRing.CommitWrite(writtenBytes);
-            return PredictionPrepareStatus.Prepared;
+            return (PredictionPrepareStatus)predicted.Status;
         }
 
         public void RequestReconnect()
@@ -388,6 +386,7 @@ namespace AiNative.Client.Application
                 await _prediction.DisposeAsync();
             }
 
+            if (_arenaPrediction is not null) await _arenaPrediction.DisposeAsync();
             await _transportSlot.DisposeAsync();
         }
 
@@ -587,6 +586,24 @@ namespace AiNative.Client.Application
                 return;
             }
 
+            if (_arenaPrediction is not null)
+            {
+                Span<byte> snapshot = stackalloc byte[ArenaClientProtocolV1.MaxDatagramBytes];
+                if (!ArenaClientProtocolV1.TryExtractReconnectSnapshot(frame, snapshot, out int length) ||
+                    !ArenaClientProtocolV1.TryDecodeSnapshot(snapshot.Slice(0, length), _entityId, out var arena) || !arena.HasArenaData || (ulong)arena.State.Tick < _lastReceivedTick || (ulong)arena.State.Tick != resumeTick)
+                {
+                    ScheduleReconnectRetry("Arena reconnect snapshot was rejected.");
+                    return;
+                }
+                ReceivedPacket arenaPacket = new ReceivedPacket(ArenaClientProtocolV1.SnapshotChannel, length, length, packet.Sequence, epoch);
+                _connectionEpoch = epoch;
+                ApplySnapshot(snapshot.Slice(0, length), arenaPacket);
+                _awaitingReconnectResponse = false;
+                _reconnectAttempts = 0;
+                State = BattleClientState.Active;
+                return;
+            }
+
             ReceivedPacket rebound = new ReceivedPacket(
                 packet.Channel,
                 packet.WrittenBytes,
@@ -611,14 +628,26 @@ namespace AiNative.Client.Application
 
         private void ApplySnapshot(ReadOnlySpan<byte> frame, in ReceivedPacket packet)
         {
-            if (ArenaClientProtocolV1.TryDecodeSnapshot(frame, _entityId, out DecodedArenaSnapshot arena))
+            if (packet.ConnectionEpoch != _connectionEpoch || !packet.Channel.Equals(BattleClientProtocolV1.SnapshotChannel)) return;
+            if (ArenaClientProtocolV1.TryDecodeSnapshot(frame, _entityId, out DecodedArenaSnapshot arena) && arena.HasArenaData)
             {
-                _arenaState = arena.State;
+                if ((ulong)arena.State.Tick < _lastReceivedTick || arena.Acknowledgement < _lastAcknowledgedSequence) return;
+                _arenaPrediction ??= new ArenaClientPredictionAdapter(_transportSlot, _entityId);
+                ArenaSnapshotApplyResult result = _arenaPrediction.ApplySnapshot(frame, packet);
+                if (result.Status is not (ArenaSnapshotApplyStatus.Initialized or ArenaSnapshotApplyStatus.Reconciled)) return;
+                _arenaState = result.State;
                 _arenaPhase = arena.Phase;
                 _arenaRemainingTicks = arena.RemainingTicks;
                 _arenaLeaderEntityId = arena.LeaderEntityId;
                 _hasArenaState = true;
+                _lastReceivedTick = (ulong)arena.State.Tick;
+                _lastAcknowledgedSequence = arena.Acknowledgement;
+                _nextInputTick = Math.Max(_nextInputTick, _lastReceivedTick + 1);
+                if (result.Status == ArenaSnapshotApplyStatus.Initialized) _presentation.Initialize(ToKinematic(result.State));
+                else _presentation.ApplyReconciliation(result.Reconciliation);
+                return;
             }
+            if (_arenaPrediction is not null) return;
             SnapshotApplyResult applied = _prediction.ApplyPacket(frame, packet);
             if (applied.Status is SnapshotApplyStatus.Initialized or SnapshotApplyStatus.Reconciled)
             {
@@ -708,6 +737,9 @@ namespace AiNative.Client.Application
             _connectCancellation?.Cancel();
             _presentation.ResetState();
         }
+
+        private static KinematicState ToKinematic(in ArenaPlayerState state)
+            => new KinematicState(state.Tick, state.LastProcessedInputSequence, state.PositionXMillimetres, state.PositionZMillimetres);
 
         private void ApplyPresentationReconciliation(in SnapshotApplyResult applied)
         {

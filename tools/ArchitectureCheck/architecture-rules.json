@@ -65,7 +65,13 @@
   ],
   "fantasyPackageReferenceAllowedPathPrefixes": [
     "server/src/Modules/AiNative.Server.Fantasy",
-    "server/src/Hosts/AiNative.BattleHost"
+    "server/src/Hosts/AiNative.GateHost",
+    "server/src/Hosts/AiNative.PlayerHost",
+    "server/src/Hosts/AiNative.LobbyHost",
+    "server/src/Hosts/AiNative.MatchHost",
+    "server/src/Hosts/AiNative.RoomCoordinatorHost",
+    "server/src/Hosts/AiNative.BattleHost",
+    "server/acceptance/AiNative.TopologyAcceptance/AiNative.TopologyAcceptance.csproj"
   ],
   "fantasyNamespaceAllowedPathPrefixes": [
     "server/src/Modules/AiNative.Server.Fantasy",

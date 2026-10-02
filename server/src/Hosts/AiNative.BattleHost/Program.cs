@@ -6,6 +6,12 @@ using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 
+if (string.Equals(Environment.GetEnvironmentVariable("AINATIVE_SERVER_TOPOLOGY"), "true", StringComparison.OrdinalIgnoreCase))
+{
+    await BattleTopologyComposition.RunAsync(args);
+    return;
+}
+
 if (args is ["--verify-replay", string replayPath])
 {
     ReplayVerificationResult verified = BattleReplayVerifier.Verify(replayPath);

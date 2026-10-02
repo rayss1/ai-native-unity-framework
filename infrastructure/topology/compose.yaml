@@ -1,0 +1,183 @@
+name: ainative-topology
+x-environment: &environment
+  AINATIVE_PEERS_FILE: /run/topology/public/peers.json
+  AINATIVE_FANTASY_CONFIG_FILE: /run/topology/public/Fantasy.config
+  AINATIVE_PLAYER_PUBLIC_KEY_FILE: /run/topology/public/player-ticket.public.pem
+  AINATIVE_SERVICE_PRIVATE_KEY_FILE: /run/secrets/service.private.pem
+  AINATIVE_SERVER_TOPOLOGY: "true"
+  ASPNETCORE_URLS: http://0.0.0.0:8080
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://otel:4317
+  AINATIVE_BATTLE_WORKERS: "2"
+  AINATIVE_ROOMS_PER_WORKER: "2"
+  AINATIVE_BATTLE_MAILBOX_CAPACITY: "256"
+  AINATIVE_OUTBOX_MAX_RESULTS: "128"
+  AINATIVE_OUTBOX_MAX_BYTES: "16777216"
+  AINATIVE_OUTBOX_PATH: /var/lib/ainative/outbox
+x-host: &host
+  restart: unless-stopped
+  depends_on:
+    postgres:
+      condition: service_healthy
+services:
+  postgres:
+    image: postgres:17.11
+    environment:
+      POSTGRES_DB: ainative_topology
+      POSTGRES_USER: topology_test_owner
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets: [postgres_password]
+    volumes: [postgres-data:/var/lib/postgresql/data]
+    networks:
+      private: {ipv4_address: 172.28.0.10}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U topology_test_owner -d ainative_topology"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+  otel:
+    image: otel/opentelemetry-collector:0.123.0
+    volumes: [./otel-collector.yaml:/etc/otelcol/config.yaml:ro]
+    networks:
+      private: {ipv4_address: 172.28.0.18}
+  gate:
+    <<: *host
+    build:
+      context: ../..
+      dockerfile: infrastructure/topology/Dockerfile
+      args: {HOST: GateHost}
+    environment:
+      <<: *environment
+      AINATIVE_SERVICE_ID: gate
+      AINATIVE_PROCESS_ID: "1"
+    volumes:
+      - ../../artifacts/topology-compose/public:/run/topology/public:ro
+      - ../../artifacts/topology-compose/private/gate/service.private.pem:/run/secrets/service.private.pem:ro
+    networks:
+      private: {ipv4_address: 172.28.0.11}
+  player:
+    <<: *host
+    build:
+      context: ../..
+      dockerfile: infrastructure/topology/Dockerfile
+      args: {HOST: PlayerHost}
+    environment:
+      <<: *environment
+      AINATIVE_SERVICE_ID: player
+      AINATIVE_PROCESS_ID: "2"
+      AINATIVE_POSTGRES_CONNECTION_STRING: ${AINATIVE_PLAYER_POSTGRES:?required}
+      AINATIVE_PLAYER_SIGNING_KEY_FILE: /run/secrets/player-ticket.private.pem
+    volumes:
+      - ../../artifacts/topology-compose/public:/run/topology/public:ro
+      - ../../artifacts/topology-compose/private/player/service.private.pem:/run/secrets/service.private.pem:ro
+      - ../../artifacts/topology-compose/private/player/player-ticket.private.pem:/run/secrets/player-ticket.private.pem:ro
+    networks:
+      private: {ipv4_address: 172.28.0.12}
+  lobby:
+    <<: *host
+    build:
+      context: ../..
+      dockerfile: infrastructure/topology/Dockerfile
+      args: {HOST: LobbyHost}
+    environment:
+      <<: *environment
+      AINATIVE_SERVICE_ID: lobby
+      AINATIVE_PROCESS_ID: "3"
+    volumes:
+      - ../../artifacts/topology-compose/public:/run/topology/public:ro
+      - ../../artifacts/topology-compose/private/lobby/service.private.pem:/run/secrets/service.private.pem:ro
+    networks:
+      private: {ipv4_address: 172.28.0.13}
+  match:
+    <<: *host
+    build:
+      context: ../..
+      dockerfile: infrastructure/topology/Dockerfile
+      args: {HOST: MatchHost}
+    environment:
+      <<: *environment
+      AINATIVE_SERVICE_ID: match
+      AINATIVE_PROCESS_ID: "4"
+    volumes:
+      - ../../artifacts/topology-compose/public:/run/topology/public:ro
+      - ../../artifacts/topology-compose/private/match/service.private.pem:/run/secrets/service.private.pem:ro
+    networks:
+      private: {ipv4_address: 172.28.0.14}
+  coordinator:
+    <<: *host
+    build:
+      context: ../..
+      dockerfile: infrastructure/topology/Dockerfile
+      args: {HOST: RoomCoordinatorHost}
+    environment:
+      <<: *environment
+      AINATIVE_SERVICE_ID: coordinator
+      AINATIVE_PROCESS_ID: "5"
+      AINATIVE_POSTGRES_CONNECTION_STRING: ${AINATIVE_COORDINATOR_POSTGRES:?required}
+    volumes:
+      - ../../artifacts/topology-compose/public:/run/topology/public:ro
+      - ../../artifacts/topology-compose/private/coordinator/service.private.pem:/run/secrets/service.private.pem:ro
+    networks:
+      private: {ipv4_address: 172.28.0.15}
+  battle-1:
+    <<: *host
+    build:
+      context: ../..
+      dockerfile: infrastructure/topology/Dockerfile
+      args: {HOST: BattleHost}
+    environment:
+      <<: *environment
+      AINATIVE_SERVICE_ID: battle-1
+      AINATIVE_PROCESS_ID: "100"
+      AINATIVE_BATTLE_ADDRESS: ${AINATIVE_BATTLE_1_PUBLIC_ADDRESS:?required}
+      AINATIVE_ARENA_REPLAY_PATH: /var/lib/ainative/replay
+      AINATIVE_ARENA_REPLAY_CAPACITY: "4096"
+      AINATIVE_ARENA_REPLAY_MAX_FILES: "1024"
+      AINATIVE_ARENA_REPLAY_MAX_BYTES: "2147483648"
+      AINATIVE_SOURCE_COMMIT: ${AINATIVE_SOURCE_COMMIT:?required}
+      AINATIVE_FANTASY_COMMIT: ${AINATIVE_FANTASY_COMMIT:?required}
+      AINATIVE_PROTOCOL_IDENTITY: ${AINATIVE_PROTOCOL_IDENTITY:?required}
+      AINATIVE_CONFIGURATION_IDENTITY: ${AINATIVE_CONFIGURATION_IDENTITY:?required}
+    volumes:
+      - ../../artifacts/topology-compose/public:/run/topology/public:ro
+      - ../../artifacts/topology-compose/private/battle-1/service.private.pem:/run/secrets/service.private.pem:ro
+      - battle-1-outbox:/var/lib/ainative
+    ports: ["22000:22000/udp"]
+    networks:
+      private: {ipv4_address: 172.28.0.16}
+  battle-2:
+    <<: *host
+    build:
+      context: ../..
+      dockerfile: infrastructure/topology/Dockerfile
+      args: {HOST: BattleHost}
+    environment:
+      <<: *environment
+      AINATIVE_SERVICE_ID: battle-2
+      AINATIVE_PROCESS_ID: "101"
+      AINATIVE_BATTLE_ADDRESS: ${AINATIVE_BATTLE_2_PUBLIC_ADDRESS:?required}
+      AINATIVE_ARENA_REPLAY_PATH: /var/lib/ainative/replay
+      AINATIVE_ARENA_REPLAY_CAPACITY: "4096"
+      AINATIVE_ARENA_REPLAY_MAX_FILES: "1024"
+      AINATIVE_ARENA_REPLAY_MAX_BYTES: "2147483648"
+      AINATIVE_SOURCE_COMMIT: ${AINATIVE_SOURCE_COMMIT:?required}
+      AINATIVE_FANTASY_COMMIT: ${AINATIVE_FANTASY_COMMIT:?required}
+      AINATIVE_PROTOCOL_IDENTITY: ${AINATIVE_PROTOCOL_IDENTITY:?required}
+      AINATIVE_CONFIGURATION_IDENTITY: ${AINATIVE_CONFIGURATION_IDENTITY:?required}
+    volumes:
+      - ../../artifacts/topology-compose/public:/run/topology/public:ro
+      - ../../artifacts/topology-compose/private/battle-2/service.private.pem:/run/secrets/service.private.pem:ro
+      - battle-2-outbox:/var/lib/ainative
+    ports: ["22001:22001/udp"]
+    networks:
+      private: {ipv4_address: 172.28.0.17}
+networks:
+  private:
+    ipam:
+      config: [{subnet: 172.28.0.0/24}]
+volumes:
+  postgres-data:
+  battle-1-outbox:
+  battle-2-outbox:
+secrets:
+  postgres_password:
+    file: ../../artifacts/topology-compose/postgres-password

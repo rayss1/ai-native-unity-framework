@@ -195,6 +195,25 @@ The smoother consumes the project-owned `ReconciliationResult` after simulation 
 
 `Advance` receives caller-supplied delta time and the latest predicted state and returns millimetre presentation coordinates. It never writes prediction history, changes acknowledgements, delays authority, reads wall-clock time, or allocates after construction. Diagnostics expose smoothed/snap counts and the current residual without binding to Unity or a telemetry SDK. Remote-entity interpolation and game-specific physics presentation remain outside this contract.
 
+## Server topology control ports
+
+Owner: `AiNative.Server.Control`; consumers: Server backend/room modules and Host composition roots. Accepted by [ADR-0017](../ADR/0017-single-region-service-topology.md). Exact signatures live in [ServicePorts.cs](../../server/src/Modules/AiNative.Server.Control/ServicePorts.cs); versioned wire bodies live in [backend.proto](../../shared/schemas/ainative/v1/backend.proto).
+
+`IServiceRpc.CallAsync` accepts a `ServiceTarget`, stable method name, caller-owned serialized body, cancellation and optional delegated player identity. `IServiceHandler.HandleAsync` receives the adapter-authenticated `ServiceCallContext`. `IClientNotifier.NotifyAsync` sends bounded backend notifications; `IServiceConnectionObserver.DisconnectedAsync` releases connection-owned state. These are asynchronous control-plane ports outside fixed Tick. Fantasy types terminate at the transport adapter. Protobuf bodies belong to Shared Protocol, not Shared Gameplay.
+
+Contract:
+
+- Caller role and peer identity are established by signed adapter ingress. Request bodies cannot grant authority. Only Gate/Lobby can delegate an authenticated player; the Client role has no internal service privilege. Gate freezes a connection's player identity after authentication.
+- `ServiceReply.Success` distinguishes a serialized success body from a stable error code. Cancellation or a transport timeout stops caller interest, but does not prove that the remote mutation did not happen. Retry allocation/settlement with the same identity and immutable payload; never allocate a replacement for an uncertain match.
+- Fantasy control requests have a 64 KiB body limit, bounded outstanding calls/handlers/notifications and explicit unavailable/backpressure outcomes. Endpoint-specific limits can be stricter. Correlation and signed tracing metadata stay outside domain authority. See [operations](server-topology-operations.md) for configured budgets.
+- Player owns login sessions, profiles, offline-verifiable tickets and settlement transactions. Tickets bind player, global room, Battle node and boot epoch. A confirmed settlement means the exact canonical result was committed once; conflicting duplicates fail.
+- Lobby owns parties/readiness; Match owns queue entries/jobs. Queue admission is bound to the Match startup epoch and a short admission deadline. Cancellation of a request that may not have arrived installs a bounded tombstone, preventing a delayed join from restoring it. Match restart requires ready-state reconfirmation.
+- Coordinator owns durable allocation identity and node ownership. `Reserved` is durable before Battle reservation; `Ready` requires Worker installation. Global match/room identity is independent of local Worker slots. Reserve/create/release/drain are fenced by Coordinator and Battle startup epochs. Room lists are paged; inventories are bounded.
+- Battle owns live room state on one fixed Worker for the whole match. Result/replay persistence and retry run outside Tick. Result capacity is reserved before room admission; durable results are deleted only after exact Player confirmation. Replay quota rejection before creation is a definite failure and releases allocation; uncertain creation retains its reservation.
+- Backend services access other services' data through these ports. Player and Coordinator own separate PostgreSQL schemas/migrations. Additive wire fields preserve existing v1 message IDs and the explicitly selectable legacy evaluation chain.
+
+Behavior, failure recovery and local evidence are recorded in the [implementation ledger](server-topology-plan.md). Bounds are admission controls, not production capacity measurements.
+
 ## Supporting boundary contracts
 
 The first slice also requires, but does not yet freeze method shapes for:
