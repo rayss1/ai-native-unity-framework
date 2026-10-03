@@ -18,6 +18,8 @@ public sealed class BattleWorkerPool : IAsyncDisposable
     private readonly Func<RoomAllocation, IWorkerRoom> _factory;
     private readonly string _nodeId, _epoch;
     private bool _draining;
+    private bool _disposed;
+    private Task? _workerShutdown;
     private int _started;
     private string _coordinatorEpoch = "";
     private readonly HashSet<string> _retiredCoordinatorEpochs = new(StringComparer.Ordinal);
@@ -33,12 +35,16 @@ public sealed class BattleWorkerPool : IAsyncDisposable
         ArgumentOutOfRangeException.ThrowIfLessThan(roomsPerWorker, 1); ArgumentOutOfRangeException.ThrowIfGreaterThan(roomsPerWorker, 256);
         ArgumentOutOfRangeException.ThrowIfLessThan(mailboxCapacity, 1); ArgumentOutOfRangeException.ThrowIfGreaterThan(mailboxCapacity, 4096);
         _nodeId = nodeId; _epoch = epoch; _factory = factory;
-        _workers = Enumerable.Range(0, workerCount).Select(i => new Worker(i, roomsPerWorker, mailboxCapacity, stopped => _stoppedWorkers.Enqueue(stopped))).ToArray();
+        _workers = Enumerable.Range(0, workerCount).Select(i => new Worker(i, roomsPerWorker, mailboxCapacity, WorkerStopped)).ToArray();
     }
     public void Start()
     {
-        if (Interlocked.Exchange(ref _started, 1) != 0) throw new InvalidOperationException("already-started");
-        foreach (Worker worker in _workers) worker.Start();
+        lock (_sync)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            if (Interlocked.Exchange(ref _started, 1) != 0) throw new InvalidOperationException("already-started");
+            foreach (Worker worker in _workers) worker.Start();
+        }
     }
     public void BeginDrain() { lock (_sync) _draining = true; }
     public string BeginDrain(string coordinatorEpoch)
@@ -88,7 +94,7 @@ public sealed class BattleWorkerPool : IAsyncDisposable
                     previous.Allocation.PlayerIds.SequenceEqual(allocation.PlayerIds) ? "" : "allocation-conflict";
             if (_draining) return "draining";
             if (_rooms.Values.Any(x => x.Allocation.MatchId == allocation.MatchId)) return "allocation-conflict";
-            Worker? worker = _workers.Where(x => !x.Faulted && x.Reservations < x.Capacity && x.MailboxAvailable > 0)
+            Worker? worker = _workers.Where(x => !x.Unavailable && x.Reservations < x.Capacity && x.MailboxAvailable > 0)
                 .OrderBy(x => x.Reservations).ThenBy(x => x.LastTickMicros).ThenBy(x => x.Id).FirstOrDefault();
             if (worker is null) return "capacity-unavailable";
             if (_resultOutbox is not null && !_resultOutbox.TryReserve(allocation)) return "outbox-capacity-unavailable";
@@ -115,9 +121,9 @@ public sealed class BattleWorkerPool : IAsyncDisposable
                 if (slot.Allocation.State != "Ready" && slot.Installation is null) { _rooms.Remove(roomId); slot.Worker.Reservations--; _resultOutbox?.ReleaseReservation(slot.Allocation.MatchId); }
                 cancellationToken.ThrowIfCancellationRequested();
             }
+            if (slot.Worker.Unavailable) return "worker-unavailable";
             if (slot.ReleaseCompletion is not null) return "released";
             if (slot.Allocation.State == "Ready") return "";
-            if (slot.Worker.Faulted) return "worker-unavailable";
             if (slot.Installation is not null) completion = slot.Installation.Task;
             else
             {
@@ -136,24 +142,36 @@ public sealed class BattleWorkerPool : IAsyncDisposable
             try
             {
                 // Initialize off the owner thread and outside the pool lock.
-                IWorkerRoom room = _factory(slot.Allocation.Clone());
+                IWorkerRoom? pendingRoom = _factory(slot.Allocation.Clone());
+                void RejectInstallation(string reason)
+                {
+                    // Exactly one of installation or rejection takes ownership, even if Dispose throws.
+                    try { Interlocked.Exchange(ref pendingRoom, null)?.Dispose(); }
+                    finally { installation.TrySetResult(reason); }
+                }
+                string? rejection = null;
                 lock (_sync)
                 {
-                    if (slot.ReleaseCompletion is not null || !_rooms.TryGetValue(roomId, out Slot? current) || !ReferenceEquals(slot, current) || installationEpoch != _coordinatorEpoch)
-                    { room.Dispose(); installation.TrySetResult("released"); }
+                    if (slot.Worker.Unavailable) rejection = "worker-unavailable";
+                    else if (slot.ReleaseCompletion is not null || !_rooms.TryGetValue(roomId, out Slot? current) || !ReferenceEquals(slot, current) || installationEpoch != _coordinatorEpoch)
+                        rejection = "released";
                     else if (!slot.Worker.TryPost(() =>
                     {
                         lock (_sync)
                         {
-                            if (slot.ReleaseCompletion is not null || installationEpoch != _coordinatorEpoch || !_rooms.TryGetValue(roomId, out Slot? current) || !ReferenceEquals(current, slot) || !ReferenceEquals(slot.Installation, installation))
-                            { room.Dispose(); installation.TrySetResult("stale-coordinator"); return; }
-                            slot.Worker.Install(slot.Index, room);
-                            slot.Allocation.State = "Ready";
-                            installation.TrySetResult("");
+                            if (slot.ReleaseCompletion is null && installationEpoch == _coordinatorEpoch && _rooms.TryGetValue(roomId, out Slot? current) && ReferenceEquals(current, slot) && ReferenceEquals(slot.Installation, installation))
+                            {
+                                slot.Worker.Install(slot.Index, Interlocked.Exchange(ref pendingRoom, null)!);
+                                slot.Allocation.State = "Ready";
+                                installation.TrySetResult("");
+                                return;
+                            }
                         }
-                    }))
-                    { room.Dispose(); installation.TrySetResult("mailbox-full"); slot.Installation = null; }
+                        RejectInstallation("stale-coordinator");
+                    }, () => RejectInstallation("worker-unavailable")))
+                    { rejection = slot.Worker.Unavailable ? "worker-unavailable" : "mailbox-full"; slot.Installation = null; }
                 }
+                if (rejection is not null) RejectInstallation(rejection);
             }
             catch (Exception error) { installation.TrySetException(error); CancelUninstalled(slot, installation); }
         }
@@ -183,14 +201,16 @@ public sealed class BattleWorkerPool : IAsyncDisposable
             TaskCompletionSource<string> removed = new(TaskCreationOptions.RunContinuationsAsynchronously);
             if (!slot.Worker.TryPost(() =>
             {
+                bool remove = false;
                 lock (_sync)
                 {
                     if (coordinatorEpoch is not null && coordinatorEpoch != _coordinatorEpoch) { slot.ReleaseCompletion = null; removed.TrySetResult("stale-coordinator"); return; }
                     if (_rooms.TryGetValue(roomId, out Slot? current) && ReferenceEquals(slot, current))
-                    { slot.Worker.Remove(slot.Index); _rooms.Remove(roomId); slot.Worker.Reservations--; _releasedMatches.Enqueue(slot.Allocation.MatchId); }
+                    { remove = true; _rooms.Remove(roomId); slot.Worker.Reservations--; _releasedMatches.Enqueue(slot.Allocation.MatchId); }
                 }
-                removed.TrySetResult("");
-            })) return "mailbox-full";
+                try { if (remove) slot.Worker.Remove(slot.Index); }
+                finally { removed.TrySetResult(""); }
+            }, () => CompleteTerminatedRelease(slot, removed))) return slot.Worker.Unavailable ? "worker-unavailable" : "mailbox-full";
             slot.ReleaseCompletion = removed;
             completion = removed.Task;
             }
@@ -198,6 +218,36 @@ public sealed class BattleWorkerPool : IAsyncDisposable
         string result = await completion.WaitAsync(cancellationToken);
         lock (_sync) ReclaimStoppedReservations();
         return result;
+    }
+    private void CompleteTerminatedRelease(Slot slot, TaskCompletionSource<string> removed)
+    {
+        lock (_sync)
+        {
+            if (_rooms.TryGetValue(slot.Allocation.RoomId, out Slot? current) && ReferenceEquals(slot, current))
+            {
+                _rooms.Remove(slot.Allocation.RoomId); slot.Worker.Reservations--;
+                _releasedMatches.Enqueue(slot.Allocation.MatchId);
+            }
+            removed.TrySetResult("");
+        }
+    }
+    private void WorkerStopped(Worker worker)
+    {
+        lock (_sync)
+        {
+            // Factories can still be running outside this lock. Their eventual result must be rejected.
+            foreach (Slot slot in _rooms.Values.Where(slot => slot.Worker == worker).ToArray())
+            {
+                slot.Installation?.TrySetResult("worker-unavailable");
+                if (slot.ReleaseCompletion is not null)
+                {
+                    _rooms.Remove(slot.Allocation.RoomId); worker.Reservations--;
+                    _releasedMatches.Enqueue(slot.Allocation.MatchId);
+                    slot.ReleaseCompletion.TrySetResult("");
+                }
+            }
+            _stoppedWorkers.Enqueue(worker);
+        }
     }
     private void CancelUninstalled(Slot slot, TaskCompletionSource<string> installation)
     {
@@ -222,18 +272,27 @@ public sealed class BattleWorkerPool : IAsyncDisposable
             ReclaimStoppedReservations();
             BattleNodeReport report = new() { NodeId = _nodeId, BootEpoch = _epoch, Address = address, Draining = _draining, OutboxHealthy = outboxHealthy };
             foreach (Worker worker in _workers)
-                report.Workers.Add(new WorkerCapacity { WorkerId = worker.Id, AvailableRooms = worker.Faulted ? 0 : worker.Capacity - worker.Reservations,
+                report.Workers.Add(new WorkerCapacity { WorkerId = worker.Id, AvailableRooms = worker.Unavailable ? 0 : worker.Capacity - worker.Reservations,
                     MailboxAvailable = worker.MailboxAvailable, LastTickMicros = worker.LastTickMicros });
             report.Rooms.Add(_rooms.Values.Select(x =>
-            { RoomAllocation copy = x.Allocation.Clone(); if (x.Worker.Faulted) copy.State = "Lost"; return copy; }));
+            { RoomAllocation copy = x.Allocation.Clone(); if (x.Worker.Unavailable) copy.State = "Lost"; return copy; }));
             return report;
         }
     }
     public async ValueTask DisposeAsync()
     {
-        BeginDrain();
-        foreach (Worker worker in _workers) worker.Stop();
-        foreach (Worker worker in _workers) await Task.Run(worker.Join);
+        Task shutdown;
+        lock (_sync)
+        {
+            _disposed = true; _draining = true;
+            if (_workerShutdown is null)
+            {
+                foreach (Worker worker in _workers) worker.Stop();
+                _workerShutdown = Task.WhenAll(_workers.Select(worker => Task.Run(worker.Join)));
+            }
+            shutdown = _workerShutdown;
+        }
+        await shutdown;
         lock (_sync) { ReclaimStoppedReservations(); foreach (Slot slot in _rooms.Values) _resultOutbox?.ReleaseReservation(slot.Allocation.MatchId); }
     }
     private sealed class Slot(RoomAllocation allocation, Worker worker, int index)
@@ -246,11 +305,11 @@ public sealed class BattleWorkerPool : IAsyncDisposable
     }
     private sealed class Worker
     {
-        private readonly Channel<Action> _mailbox;
+        private readonly Channel<Command> _mailbox;
         private readonly IWorkerRoom?[] _slots;
         private readonly int _mailboxCapacity;
         private readonly Thread _thread;
-        private int _stopping, _faulted, _terminated;
+        private int _stopping, _faulted, _terminated, _cleanupStarted;
         private long _lastTickMicros;
         private readonly long[] _tickSamples = new long[4096], _sampleIds = new long[4096];
         private long _ticks, _overBudget, _allocated;
@@ -260,13 +319,14 @@ public sealed class BattleWorkerPool : IAsyncDisposable
             _stopped = stopped;
             Id = id; Capacity = capacity; _mailboxCapacity = mailboxCapacity;
             _slots = new IWorkerRoom[capacity];
-            _mailbox = Channel.CreateBounded<Action>(new BoundedChannelOptions(mailboxCapacity) { SingleReader = true, FullMode = BoundedChannelFullMode.Wait });
+            _mailbox = Channel.CreateBounded<Command>(new BoundedChannelOptions(mailboxCapacity) { SingleReader = true, FullMode = BoundedChannelFullMode.Wait });
             _thread = new Thread(Run) { IsBackground = true, Name = $"BattleWorker-{id}" };
         }
         public int Id { get; }
         public int Capacity { get; }
         public int Reservations { get; set; }
         public bool Faulted => Volatile.Read(ref _faulted) != 0;
+        public bool Unavailable => Faulted || Volatile.Read(ref _stopping) != 0 || Terminated;
         public bool Terminated => Volatile.Read(ref _terminated) != 0;
         public int MailboxAvailable => _mailboxCapacity - _mailbox.Reader.Count;
         public long LastTickMicros => Interlocked.Read(ref _lastTickMicros);
@@ -284,13 +344,13 @@ public sealed class BattleWorkerPool : IAsyncDisposable
             return new(Id, end, Interlocked.Read(ref _overBudget), Interlocked.Read(ref _allocated), LastTickMicros, first, samples.ToArray(), ids.ToArray());
         }
         public void Start() => _thread.Start();
-        public bool TryPost(Action action) => !Faulted && Volatile.Read(ref _stopping) == 0 && _mailbox.Writer.TryWrite(action);
+        public bool TryPost(Action action, Action? rejected = null) => !Unavailable && _mailbox.Writer.TryWrite(new(action, rejected));
         public void Install(int index, IWorkerRoom room) => _slots[index] = room;
-        public void Remove(int index) { _slots[index]?.Dispose(); _slots[index] = null; }
-        public void Stop() => Volatile.Write(ref _stopping, 1);
+        public void Remove(int index) { IWorkerRoom? room = _slots[index]; _slots[index] = null; room?.Dispose(); }
+        public void Stop() { Volatile.Write(ref _stopping, 1); _mailbox.Writer.TryComplete(); }
         public void Join()
         {
-            if ((_thread.ThreadState & System.Threading.ThreadState.Unstarted) != 0) return;
+            if ((_thread.ThreadState & System.Threading.ThreadState.Unstarted) != 0) { Cleanup(); return; }
             if (!_thread.Join(TimeSpan.FromSeconds(5))) throw new TimeoutException("battle-worker-stop-timeout");
         }
         private void Run()
@@ -303,7 +363,11 @@ public sealed class BattleWorkerPool : IAsyncDisposable
                 {
                     long started = Stopwatch.GetTimestamp();
                     long allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
-                    for (int n = 0; n < _mailboxCapacity && _mailbox.Reader.TryRead(out Action? command); n++) command();
+                    for (int n = 0; n < _mailboxCapacity && Volatile.Read(ref _stopping) == 0 && _mailbox.Reader.TryRead(out Command command); n++)
+                    {
+                        try { command.Execute(); }
+                        catch { try { command.Rejected?.Invoke(); } catch { } throw; }
+                    }
                     for (int i = 0; i < _slots.Length; i++) _slots[i]?.Tick();
                     long elapsed = Stopwatch.GetTimestamp() - started;
                     long micros = elapsed * 1_000_000 / Stopwatch.Frequency;
@@ -324,11 +388,20 @@ public sealed class BattleWorkerPool : IAsyncDisposable
                 }
             }
             catch { Volatile.Write(ref _faulted, 1); }
-            finally
+            finally { Cleanup(); }
+        }
+        private void Cleanup()
+        {
+            if (Interlocked.Exchange(ref _cleanupStarted, 1) != 0) return;
+            Stop();
+            try
             {
                 for (int i = 0; i < _slots.Length; i++) { try { Remove(i); } catch { Volatile.Write(ref _faulted, 1); } }
-                Volatile.Write(ref _terminated, 1); _stopped(this);
+                while (_mailbox.Reader.TryRead(out Command command))
+                { try { command.Rejected?.Invoke(); } catch { Volatile.Write(ref _faulted, 1); } }
             }
+            finally { Volatile.Write(ref _terminated, 1); _stopped(this); }
         }
+        private readonly record struct Command(Action Execute, Action? Rejected);
     }
 }

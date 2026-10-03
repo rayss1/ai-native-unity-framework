@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using AiNative.Realtime;
@@ -166,6 +167,136 @@ namespace AiNative.Client.Fantasy.Tests
         }
 
         [Test]
+        public async Task DisconnectThenDispose_ReleasesSessionAndRejectsLateCallbacks()
+        {
+            var session = new FakeFantasyClientSession { RunPostsImmediately = false };
+            var transport = new FantasyKcpRealtimeTransport(session);
+            await transport.SendAsync(ReliableOrdered(0), new byte[] { 1 });
+            transport.NotifyDisconnected();
+
+            await transport.DisposeAsync();
+            session.RunPostedActions();
+            transport.NotifyDisconnected();
+
+            Assert.That(session.DisposeCount, Is.EqualTo(1));
+            Assert.That(transport.State, Is.EqualTo(TransportState.Closed));
+            Assert.That(session.Sent, Is.Empty);
+            Assert.That(FantasyClientSessionRouter.Deliver(session.RuntimeId, 0, new byte[] { 2 }, 1), Is.False);
+        }
+
+        [Test]
+        public async Task RepeatedDispose_KeepsClosedAndReleasesSessionOnce()
+        {
+            var session = new FakeFantasyClientSession();
+            var transport = new FantasyKcpRealtimeTransport(session);
+            await transport.DisposeAsync();
+            await transport.DisposeAsync();
+            await transport.DisposeAsync();
+
+            Assert.That(session.DisposeCount, Is.EqualTo(1));
+            Assert.That(transport.State, Is.EqualTo(TransportState.Closed));
+        }
+
+        [Test]
+        public void ConcurrentDispose_ReleasesSessionOnce()
+        {
+            var session = new FakeFantasyClientSession();
+            var transport = new FantasyKcpRealtimeTransport(session);
+            Parallel.For(0, 32, _ => transport.DisposeAsync().GetAwaiter().GetResult());
+
+            Assert.That(session.DisposeCount, Is.EqualTo(1));
+            Assert.That(transport.State, Is.EqualTo(TransportState.Closed));
+        }
+
+        [Test]
+        public async Task RuntimeIdResetBeforeDisconnect_UnregistersOriginalRoutingIdentity()
+        {
+            var session = new FakeFantasyClientSession();
+            long registeredId = session.RuntimeId;
+            var transport = new FantasyKcpRealtimeTransport(session);
+            FantasyKcpRealtimeTransport replacement = null;
+            try
+            {
+                session.ResetRuntimeId(); // Fantasy Entity disposal clears RuntimeId before the disconnect callback.
+                transport.NotifyDisconnected();
+                await transport.DisposeAsync();
+
+                Assert.DoesNotThrow(() => replacement = new FantasyKcpRealtimeTransport(new FakeFantasyClientSession(registeredId)), "Disconnection must remove the original router key even after Fantasy clears its session ID.");
+                Assert.That(session.DisposeCount, Is.EqualTo(1));
+            }
+            finally
+            {
+                FantasyClientSessionRouter.Remove(registeredId, transport);
+                if (replacement != null) await replacement.DisposeAsync();
+            }
+        }
+
+        [Test]
+        public async Task SendPassingConnectivityCheckBeforeDispose_DoesNotAcceptPacketAfterDisposal()
+        {
+            var session = new FakeFantasyClientSession { RunPostsImmediately = false };
+            var transport = new FantasyKcpRealtimeTransport(session);
+            session.BeforeClosedCheck = () => { session.BeforeClosedCheck = null; transport.DisposeAsync().GetAwaiter().GetResult(); };
+
+            SendResult result = await transport.SendAsync(ReliableOrdered(0), new byte[] { 1 });
+
+            Assert.That(result.Status, Is.EqualTo(SendStatus.Closed));
+            session.RunPostedActions();
+            Assert.That(session.Sent, Is.Empty);
+            Assert.That(transport.State, Is.EqualTo(TransportState.Closed));
+        }
+
+        [Test]
+        public async Task PostFailureAfterDispose_DoesNotResurrectFaultedTransport()
+        {
+            var session = new FakeFantasyClientSession { ThrowWhenPosting = true };
+            var transport = new FantasyKcpRealtimeTransport(session);
+            session.BeforePost = () => transport.DisposeAsync().GetAwaiter().GetResult();
+
+            await transport.SendAsync(ReliableOrdered(0), new byte[] { 1 });
+
+            Assert.That(transport.State, Is.EqualTo(TransportState.Closed));
+            Assert.That(session.DisposeCount, Is.EqualTo(1));
+        }
+
+        [Test]
+        public async Task SendFailureAfterDispose_DoesNotResurrectFaultedTransport()
+        {
+            var session = new FakeFantasyClientSession { ThrowWhenSending = true };
+            var transport = new FantasyKcpRealtimeTransport(session);
+            session.BeforeSend = () => transport.DisposeAsync().GetAwaiter().GetResult();
+
+            await transport.SendAsync(ReliableOrdered(0), new byte[] { 1 });
+
+            Assert.That(transport.State, Is.EqualTo(TransportState.Closed));
+            Assert.That(session.DisposeCount, Is.EqualTo(1));
+            Assert.That(session.Sent, Is.Empty);
+        }
+
+        [Test]
+        public void InboundCallbackWaitingDuringDispose_CannotRetainPacketAfterDisposal()
+        {
+            var session = new FakeFantasyClientSession();
+            var transport = new FantasyKcpRealtimeTransport(session);
+            object sequenceGate = typeof(FantasyKcpRealtimeTransport).GetField("_sequenceGate", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(transport);
+            bool received = false;
+            var callback = new Thread(() => received = transport.TryEnqueueReceived(0, new byte[] { 1 }, 1));
+            Monitor.Enter(sequenceGate);
+            try
+            {
+                callback.Start();
+                Assert.That(SpinWait.SpinUntil(() => (callback.ThreadState & ThreadState.WaitSleepJoin) != 0, 2000), Is.True, "The callback must pass its initial state check and wait for sequence admission.");
+                transport.DisposeAsync().GetAwaiter().GetResult();
+            }
+            finally { Monitor.Exit(sequenceGate); }
+            Assert.That(callback.Join(2000), Is.True);
+
+            Assert.That(received, Is.False);
+            Assert.That(transport.TryReceive(new byte[1], out _), Is.False);
+            Assert.That(transport.State, Is.EqualTo(TransportState.Closed));
+        }
+
+        [Test]
         public async Task WarmedSendQueuePath_HasZeroManagedAllocation()
         {
             var session = new FakeFantasyClientSession { RunPostsImmediately = false };
@@ -196,25 +327,34 @@ namespace AiNative.Client.Fantasy.Tests
         private static long _nextRuntimeId;
         private readonly Action[] _posted = new Action[2048];
         private int _postedCount;
+        private bool _isClosed;
 
-        internal FakeFantasyClientSession()
+        internal FakeFantasyClientSession(long runtimeId = 0)
         {
-            RuntimeId = System.Threading.Interlocked.Increment(ref _nextRuntimeId);
+            RuntimeId = runtimeId == 0 ? System.Threading.Interlocked.Increment(ref _nextRuntimeId) : runtimeId;
         }
 
-        public long RuntimeId { get; }
+        public long RuntimeId { get; private set; }
+        internal void ResetRuntimeId() => RuntimeId = 0;
 
-        public bool IsClosed { get; private set; }
+        public bool IsClosed { get { bool closed = _isClosed; BeforeClosedCheck?.Invoke(); return closed; } }
 
         internal bool RunPostsImmediately { get; set; } = true;
 
         internal bool ThrowWhenPosting { get; set; }
+        internal bool ThrowWhenSending { get; set; }
+        internal Action BeforePost { get; set; }
+        internal Action BeforeSend { get; set; }
+        internal Action BeforeClosedCheck { get; set; }
+
+        internal int DisposeCount;
 
         internal List<FantasyRealtimeEnvelope> Sent { get; } =
             new List<FantasyRealtimeEnvelope>();
 
         public void Post(Action action)
         {
+            BeforePost?.Invoke();
             if (ThrowWhenPosting)
             {
                 throw new InvalidOperationException("Injected post failure.");
@@ -229,9 +369,14 @@ namespace AiNative.Client.Fantasy.Tests
             _posted[_postedCount++] = action;
         }
 
-        public void Send(FantasyRealtimeEnvelope envelope) => Sent.Add(envelope);
+        public void Send(FantasyRealtimeEnvelope envelope)
+        {
+            BeforeSend?.Invoke();
+            if (ThrowWhenSending) throw new InvalidOperationException("Injected send failure.");
+            Sent.Add(envelope);
+        }
 
-        public void Dispose() => IsClosed = true;
+        public void Dispose() { Interlocked.Increment(ref DisposeCount); _isClosed = true; }
 
         internal void RunPostedActions()
         {

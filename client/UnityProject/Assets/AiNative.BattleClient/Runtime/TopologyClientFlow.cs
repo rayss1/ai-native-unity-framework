@@ -45,6 +45,7 @@ namespace AiNative.Client.Application
         public float MaxAcknowledgementStallSeconds { get; private set; }
         public int BackendReconnectCount { get; private set; }
         public bool SettlementConfirmed { get; private set; }
+        public bool AuthenticationRequired => _backend == null || !_backend.IsAuthenticated;
 
         public void Initialize(GateConnectionOptions options, bool automated = false, float deadlineSeconds = 120, string resultPath = "")
         {
@@ -160,10 +161,10 @@ namespace AiNative.Client.Application
 
         private async Task PollAsync()
         {
-            if (!_backend.IsConnected)
+            if (!_backend.IsAuthenticated)
             {
                 if (_automated && Battle != null) await ConnectAccountAsync(register: false);
-                else { BackendStatus = "后台连接已断开，请重新登录；当前对局继续。"; return; }
+                else { BackendStatus = "后台连接或登录凭证已失效，请重新登录；当前对局继续。"; return; }
             }
             if (Battle != null)
             {
@@ -234,6 +235,12 @@ namespace AiNative.Client.Application
             {
                 if (_disposed) return;
                 string code = exception is GateCallException gate ? gate.Code : exception.GetType().Name;
+                if (_backend != null && (code == "session-expired" || code == "invalid_session" || code == "invalid-session" || code == "unauthorized"))
+                {
+                    BackendStatus = "登录凭证已失效，请重新登录；当前对局继续，结算会重试。";
+                    _nextPoll = Time.unscaledTime + 1;
+                    return;
+                }
                 if (Battle == null && code == "party_not_found")
                 {
                     _party = null; _requestId = ""; State = "Lobby"; BackendStatus = "大厅状态已重置，请重新建队和准备。"; return;
@@ -260,7 +267,7 @@ namespace AiNative.Client.Application
             if (Error.Length > 0) GUILayout.Label(Error);
             if (BackendStatus.Length > 0) GUILayout.Label(BackendStatus);
             GUI.enabled = !_busy && !Completed;
-            if (_backend == null || !_backend.IsConnected || _backend.PlayerId.Length == 0)
+            if (AuthenticationRequired)
             {
                 GUILayout.Label("接入地址"); _host = GUILayout.TextField(_host); _port = GUILayout.TextField(_port); _tls = GUILayout.Toggle(_tls, "使用 TLS");
                 if (_tls) { GUILayout.Label("测试证书 SHA256（正式证书可留空）"); _pin = GUILayout.TextField(_pin); }

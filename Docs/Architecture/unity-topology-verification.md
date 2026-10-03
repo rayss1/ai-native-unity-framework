@@ -10,6 +10,17 @@ Admission refresh is restricted to the original player, room, node and boot epoc
 
 Gate disruption does not halt an active Battle. The automated verifier reconnects the original account; the interactive application offers login recovery. Missing lobby/queue state returns the user to confirmation. A lost Battle connection queries the original allocation and settlement. A successful result requires that exact MatchId's confirmed receipt and one profile increment. The authenticated Player query checks the allocation roster; a client cannot query another player's match by supplying a player ID.
 
+The [2026-10-03 audit remediation](audit-remediation-2026-10-03.md) also covers
+credential expiry while TCP remains connected. `GateBackendSession.IsConnected`
+reports socket connectivity; `IsAuthenticated` additionally requires a nonempty
+credential whose expiry is strictly after the current UTC second. A server
+authentication rejection invalidates the credential while retaining PlayerId.
+The flow offers login or automatically reauthenticates the original account;
+the Battle instance, allocation and exact settlement remain bound to that
+player, and fixed updates continue during backend authentication. Unity's
+persisted fixed timestep is 1/60 second. These fixes have local worktree
+validation and do not extend the earlier cloud qualification to new binaries.
+
 ## Executed checks
 
 | Check | Observed result |
