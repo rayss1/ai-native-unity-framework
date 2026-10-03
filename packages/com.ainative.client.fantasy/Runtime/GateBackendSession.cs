@@ -14,6 +14,7 @@ namespace AiNative.Client.Fantasy
         public string PlayerId { get; private set; } = "";
         public long ExpiresUnixSeconds { get; private set; }
         public bool IsConnected => _client.IsConnected;
+        public bool IsAuthenticated => IsConnected && _credential.Length != 0 && ExpiresUnixSeconds > DateTimeOffset.UtcNow.ToUnixTimeSeconds();
         public GateBackendSession(FantasyGateClient client) => _client = client ?? throw new ArgumentNullException(nameof(client));
         public Task RegisterAsync(string username, string password, CancellationToken ct = default) => AuthenticateAsync("player.register", username, password, ct);
         public Task LoginAsync(string username, string password, CancellationToken ct = default) => AuthenticateAsync("player.login", username, password, ct);
@@ -56,11 +57,17 @@ namespace AiNative.Client.Fantasy
         }
         public async Task CancelQueueAsync(string requestId, CancellationToken ct = default) { await CallAsync("match.cancel", GateWire.Text(1, requestId), ct).ConfigureAwait(false); }
         public async Task<GateMatch> MatchAsync(string requestId, CancellationToken ct = default) => GateWire.Match(await CallAsync("match.status", GateWire.Text(1, requestId), ct).ConfigureAwait(false));
-        private Task<byte[]> CallAsync(string method, byte[] payload, CancellationToken ct)
+        private async Task<byte[]> CallAsync(string method, byte[] payload, CancellationToken ct)
         {
             if (_credential.Length == 0) throw new GateCallException("unauthorized");
             if (ExpiresUnixSeconds <= DateTimeOffset.UtcNow.ToUnixTimeSeconds()) throw new GateCallException("session-expired");
-            return _client.CallAsync(method, payload, _credential, ct);
+            try { return await _client.CallAsync(method, payload, _credential, ct).ConfigureAwait(false); }
+            catch (GateCallException error) when (error.Code == "invalid_session" || error.Code == "invalid-session" || error.Code == "session-expired" || error.Code == "unauthorized")
+            {
+                // Preserve the player binding so recovery cannot replace an active battle's identity.
+                _credential = "";
+                throw;
+            }
         }
         private static byte[] PartyCommand(GateParty party, string target, bool ready) => GateWire.Join(GateWire.Text(1, party.PartyId), GateWire.Text(2, target), GateWire.Number(3, ready ? 1UL : 0UL), GateWire.Number(4, party.Version));
         public void Dispose() { _credential = ""; _client.Dispose(); }

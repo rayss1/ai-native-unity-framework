@@ -14,10 +14,13 @@ namespace AiNative.Client.Fantasy
         public const int DefaultMaximumQueuedBytes = 256 * 1024;
 
         private readonly IFantasyClientSession _session;
+        private readonly long _sessionRuntimeId;
         private readonly BoundedPacketQueue _inbound;
         private readonly BoundedPacketQueue _outbound;
         private readonly Action _drainOutboundAction;
         private readonly object _sequenceGate = new object();
+        private readonly object _disposeGate = new object();
+        private bool _disposed;
         private readonly ulong[] _lastInboundSequences = new ulong[4];
         private int _connectionEpoch;
         private int _drainScheduled;
@@ -38,16 +41,17 @@ namespace AiNative.Client.Fantasy
             int maximumQueuedBytes = DefaultMaximumQueuedBytes)
         {
             _session = session ?? throw new ArgumentNullException(nameof(session));
+            _sessionRuntimeId = session.RuntimeId;
             _inbound = new BoundedPacketQueue(maximumQueuedPackets, maximumQueuedBytes);
             _outbound = new BoundedPacketQueue(maximumQueuedPackets, maximumQueuedBytes);
             _drainOutboundAction = DrainOutboundOnFantasyThread;
             _state = (int)TransportState.Connected;
 
-            if (!FantasyClientSessionRouter.Register(session.RuntimeId, this))
+            if (!FantasyClientSessionRouter.Register(_sessionRuntimeId, this))
             {
                 _state = (int)TransportState.Faulted;
                 throw new InvalidOperationException(
-                    $"A Fantasy client transport is already registered for session {session.RuntimeId}.");
+                    $"A Fantasy client transport is already registered for session {_sessionRuntimeId}.");
             }
         }
 
@@ -149,10 +153,16 @@ namespace AiNative.Client.Fantasy
             }
 
             ulong sequence = unchecked((ulong)Interlocked.Increment(ref _outboundSequence));
-            if (!_outbound.TryEnqueue(channel.Id, payload.Span, sequence))
+            lock (_sequenceGate)
             {
-                Interlocked.Increment(ref _sendBackpressure);
-                return Completed(new SendResult(SendStatus.WouldBlock));
+                TransportState current = State;
+                if (current != TransportState.Connected)
+                    return Completed(new SendResult(current == TransportState.Faulted ? SendStatus.Faulted : SendStatus.Closed));
+                if (!_outbound.TryEnqueue(channel.Id, payload.Span, sequence))
+                {
+                    Interlocked.Increment(ref _sendBackpressure);
+                    return Completed(new SendResult(SendStatus.WouldBlock));
+                }
             }
 
             Interlocked.Increment(ref _sendsAccepted);
@@ -182,20 +192,22 @@ namespace AiNative.Client.Fantasy
 
         public ValueTask DisposeAsync()
         {
-            TransportState previous = (TransportState)Interlocked.Exchange(
-                ref _state,
-                (int)TransportState.Draining);
-            if (previous == TransportState.Closed)
+            lock (_disposeGate)
             {
+                if (_disposed) return default;
+                // Closed describes connectivity, not ownership of the independent Fantasy Scene.
+                _disposed = true;
+                Volatile.Write(ref _state, (int)TransportState.Draining);
+                lock (_sequenceGate)
+                {
+                    FantasyClientSessionRouter.Remove(_sessionRuntimeId, this);
+                    _inbound.Drain();
+                    _outbound.Drain();
+                }
+                try { _session.Dispose(); }
+                finally { Volatile.Write(ref _state, (int)TransportState.Closed); }
                 return default;
             }
-
-            FantasyClientSessionRouter.Remove(_session.RuntimeId, this);
-            _inbound.Drain();
-            _outbound.Drain();
-            _session.Dispose();
-            Volatile.Write(ref _state, (int)TransportState.Closed);
-            return default;
         }
 
         internal static Task<FantasyKcpConnectResult> ConnectCoreAsync(
@@ -238,6 +250,11 @@ namespace AiNative.Client.Fantasy
 
             lock (_sequenceGate)
             {
+                if (State != TransportState.Connected)
+                {
+                    Interlocked.Increment(ref _inboundDropped);
+                    return false;
+                }
                 if (sequence <= _lastInboundSequences[channelId])
                 {
                     Interlocked.Increment(ref _staleSequences);
@@ -345,7 +362,7 @@ namespace AiNative.Client.Fantasy
             catch
             {
                 Interlocked.Increment(ref _connectionFaults);
-                Volatile.Write(ref _state, (int)TransportState.Faulted);
+                Interlocked.CompareExchange(ref _state, (int)TransportState.Faulted, (int)TransportState.Connected);
                 Volatile.Write(ref _drainScheduled, 0);
                 _outbound.Drain();
             }
@@ -383,7 +400,7 @@ namespace AiNative.Client.Fantasy
             catch
             {
                 Interlocked.Increment(ref _connectionFaults);
-                Volatile.Write(ref _state, (int)TransportState.Faulted);
+                Interlocked.CompareExchange(ref _state, (int)TransportState.Faulted, (int)TransportState.Connected);
                 _outbound.Drain();
             }
             finally
@@ -398,16 +415,19 @@ namespace AiNative.Client.Fantasy
 
         private void TransitionClosed()
         {
-            TransportState current = State;
-            if (current == TransportState.Closed || current == TransportState.Draining)
+            lock (_sequenceGate)
             {
-                return;
-            }
+                TransportState current = State;
+                if (current == TransportState.Closed || current == TransportState.Draining)
+                {
+                    return;
+                }
 
-            Volatile.Write(ref _state, (int)TransportState.Closed);
-            FantasyClientSessionRouter.Remove(_session.RuntimeId, this);
-            _inbound.Drain();
-            _outbound.Drain();
+                Volatile.Write(ref _state, (int)TransportState.Closed);
+                FantasyClientSessionRouter.Remove(_sessionRuntimeId, this);
+                _inbound.Drain();
+                _outbound.Drain();
+            }
         }
 
         private static bool IsSupportedChannel(TransportChannel channel)
