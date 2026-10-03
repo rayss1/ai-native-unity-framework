@@ -1,6 +1,6 @@
 # Unity topology verification
 
-This report records observed results on 2026-10-02 for the implementation in [the execution plan](unity-cloud-topology-plan.md). The topology follows [ADR-0017](../ADR/0017-single-region-service-topology.md). Private cloud ten-minute qualification passed; public Unity TLS/KCP qualification remains incomplete.
+This report records observed results on 2026-10-02 and 2026-10-03 for the implementation in [the execution plan](unity-cloud-topology-plan.md). The topology follows [ADR-0017](../ADR/0017-single-region-service-topology.md). Private cloud qualification, the public Unity TLS/KCP short match and two public ten-minute Unity matches passed.
 
 ## Implemented behavior
 
@@ -36,9 +36,9 @@ The pinned Fantasy `Scene.Connect` path bypassed automatic heartbeat setup. The 
 
 Two independent standalone clients also passed Match and Lobby restarts during their live match: both completed the same match, confirmed its receipt and recorded Played=1. Evidence: `backend-restarts-unity-a.json` and `backend-restarts-unity-b.json`.
 
-## Cloud preparation and remaining qualification
+## Cloud deployment and qualification
 
-The isolated `ainative-cloud-test` deployment keeps the previous host separate. Its dedicated native TLS terminator is running with an IP-SAN test certificate and explicit SHA256 pin. An actual loopback handshake against native stunnel verified the IP identity and expected DER fingerprint. Gate's backend remains on loopback; Battle public routes have not yet been applied. Source-limited TCP 443 and UDP 32000/32001 firewall changes await the owner's specific approval.
+The isolated `ainative-cloud-test` deployment keeps the previous host separate. Its dedicated native TLS terminator is running with an IP-SAN test certificate and explicit SHA256 pin. An actual loopback handshake against native stunnel verified the IP identity and expected DER fingerprint. Gate's backend remains on loopback; the applied public routes are TLS TCP 443 and Battle UDP 32000/32001. The owner specifically approved the three source-limited firewall rules and their source correction. All seven business roles were observed ready after deployment; internal RPC, PostgreSQL and health endpoints remain private.
 
 The cloud business/acceptance images were built from `f94d45a`, then upgraded to clean `e995e404c395338a4b858015d3da713adb3aa183` using fixed SDK 10.0.202 and the verified fixed Fantasy package, without changing ports, credentials or persistent volumes. Actual private-network cloud checks observed:
 
@@ -56,6 +56,23 @@ The first Player wrapper attempt could not write its final report because the re
 
 The ten-minute match was `c5dc2bb4d4374753b9a39b7f30ebeb87`, room `f4af5de81a644a37aaadf7d4d9cf54f4`, on battle-1 boot `4a2c847f830242ae8a3c18dac2ef85cb`. The complete 47396-record ANAR replay contained 5684 and 5678 accepted inputs for entities 1 and 2, with last accepted server ticks 36026 and 36023 (3 and 6 ticks before finish). Maximum inter-input gaps were 24 and 30 ticks. This exceeds the explicit 4800-input lower bound per player and ends within 180 ticks. Independent `AiNative.ArenaReplay` re-simulated every state hash, producing final hash `10568620101839048260` at tick 36029. Source, fixed Fantasy, protocol and configuration header identities were checked against the separately recorded deployment provenance. Input ACK maxima alone were not used as accepted-input evidence.
 
-Remote evidence remains in `/home/ubuntu/ainative-cloud-test/repository/artifacts/cloud-deploy/reports`: `fault-long-match-1790934116318547103.json`, `provenance-e995e40-36000.json`, `long-match-e995e40-accepted-input-audit.json`, `long-match-e995e40-independent-verifier.json` and `long-match-e995e40-final-proof.json`. These cloud clients are the .NET acceptance clients, not public Unity clients.
+Remote evidence remains in `/home/ubuntu/ainative-cloud-test/repository/artifacts/cloud-deploy/reports`: `fault-long-match-1790934116318547103.json`, `provenance-private-e995e40-36000.json` (preserved before changing public routes), `long-match-e995e40-accepted-input-audit.json`, `long-match-e995e40-independent-verifier.json` and `long-match-e995e40-final-proof.json`. These cloud clients are the .NET acceptance clients, not public Unity clients.
 
-Actual public correct/wrong-pin checks and two Unity clients over public TLS/KCP still require execution. Firewall changes await the owner's specific approval; the current test egress IP was observed as `210.57.99.221`. Cloud expiry, certificate renewal and source-IP changes are operational constraints; this milestone does not establish production CA trust, multiple physical machines, failover, mobile/IL2CPP or performance capacity.
+HTTP-based IP discovery initially returned a different source from direct TCP. The original source restriction therefore caused a timeout. A uniquely marked direct packet proved the actual client source, which the owner then approved. Only the three new rules were corrected; the existing rules were preserved. The earlier wrong-pin timeout is excluded from certificate rejection evidence.
+
+On 2026-10-03, a fresh direct TCP 443 connection succeeded. The final Windows Unity build rejected an incorrect SHA256 pin with `AuthenticationException`, before acquiring any player or allocation identity. With the correct pin, two independent Unity processes completed public match `5cd1e33031f44647bfd64b5bd3265e43`, room `0b9b14fa14034a2da585483be2cd1664`, boot `24bfe2ee5fce40d59e848a089ab021dd`. Both reached tick 1297, retained entity/session identity through reconnect, confirmed the exact settlement receipt and recorded Played=1. Input acknowledgements reached 958/955; maximum observed acknowledgement stalls were approximately 0.151 seconds. Evidence: `public-tcp-correct-source.json`, `public-wrong-pin-correct-source.json`, `public-client-a.json` and `public-client-b.json` under ignored `artifacts/unity-topology-goal`.
+
+Four final-build Unity processes then ran two concurrent matches on separate Battle processes with 36000 active match ticks. Actual server captures observed the approved client source entering both public UDP 32000 and 32001. Each pair reported matching room/boot/match identities, successful identity-preserving reconnect, the original receipt and Played=1. Process launch to successful evidence took 608.56–608.98 seconds. No backend recovery was required in these uninterrupted public runs.
+
+The independent audit counted accepted ANAR input records rather than inferring acceptance from ACK maxima. Each player had to exceed 24000 accepted inputs (80% of 50 Hz for 600 seconds) and finish within 180 ticks of its last input. A separate `AiNative.ArenaReplay` executable re-simulated every state hash with source/Fantasy/protocol/configuration identities checked against `provenance-public-e995e40-36000.json`. Read-only PostgreSQL checks found exactly one allocation and one settlement per match, with the expected node/boot and each player's Played=1.
+
+| Public Unity match | Battle node / UDP port | Final tick / complete records | Accepted inputs, entities 1 / 2 | Final input gaps / maximum inter-input gaps | Independently verified final hash |
+| --- | --- | --- | --- | --- | --- |
+| `2ce1a23f685e40ddbb280ec9087cfa7c` | battle-1 / 32000 | 36061 / 95947 | 29940 / 29940 | 1 / 1 ticks; 51 / 53 ticks maximum | `8128658296714165684` |
+| `4738ce685ada4f7faedaaf40c62b2d97` | battle-2 / 32001 | 36087 / 95991 | 29949 / 29949 | 1 / 1 ticks; 49 / 50 ticks maximum | `6245273737489585266` |
+
+Local evidence: `public-long-client-a.json` through `public-long-client-d.json`, `public-long-client-validation.json`, managed assembly SHA256 hashes and the two `public-long-battle*-proof.png` captures. Remote reports retain `public-unity-long-<MatchId>-input-audit.json` and `public-unity-long-<MatchId>-final-proof.json`, including independent verifier output and database observations. All owned standalone processes exited. After checking there were no active rooms, the two Battle services were restored to the 1200-tick short-test configuration; database volumes and replays were retained.
+
+The client runtime source is `a1ee08dbce7c1e2ad28853119290e743d0ad99da`; cloud server images use clean `e995e404c395338a4b858015d3da713adb3aa183`. The subsequent client heartbeat/test changes do not alter server runtime. Final-head PR31 validation passed in 1m51s and production validation in 27m1s; PR31 was merged by the owner or another actor before this report update.
+
+Cloud expiry, certificate renewal and source-IP changes are operational constraints; this milestone does not establish production CA trust, multiple physical machines, failover, mobile/IL2CPP or performance capacity.
