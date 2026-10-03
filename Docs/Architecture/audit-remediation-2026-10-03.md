@@ -94,6 +94,17 @@ require fresh qualification and are not inferred from correctness tests.
   under the same evidence directory. PlayMode/topology/replay evidence above
   comes from the implementation run; those checks were not repeated for PR
   creation. The temporary database was stopped after the repeated tests.
+- PR #33's initial production CI run 37103655259 failed in
+  `TripleFramesDoNotAliasWhileReaderIsDelayed`: the producer could complete
+  before the consumer loop started, making the test observe zero frames.
+  The other .NET workflow passed the same commit. A forced producer-first
+  test case reproduced the identical assertion locally (1 passed / 1 failed).
+  The consumer now drains published frames after observing producer completion,
+  retaining payload-consistency and nonzero-observation assertions and checking
+  all slots are released. Both scheduling cases and all 32 Battle tests passed.
+  Red/green TRX are in `ci-triple-frame-red` and `ci-triple-frame-green` under
+  the evidence directory. This correction changes tests only; production
+  triple-frame ownership and gameplay fingerprint are unchanged.
 
 ## Validation limits and next gates
 

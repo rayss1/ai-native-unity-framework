@@ -107,14 +107,25 @@ public class TopologyBattleEngineTests
         for (int i = 0; i < count; i++) { (int Sequence, int Check) value; while (!ring.TryRead(out value)) Thread.Yield(); Assert.That(value.Sequence, Is.EqualTo(i)); Assert.That(value.Check, Is.EqualTo(~i)); }
         producer.GetAwaiter().GetResult();
     }
-    [Test]
-    public void TripleFramesDoNotAliasWhileReaderIsDelayed()
+    [TestCase(false)]
+    [TestCase(true)]
+    public void TripleFramesDoNotAliasWhileReaderIsDelayed(bool writerCompletesBeforeRead)
     {
         var frames = new TopologyBattleEngine.Frame[] { new(), new(), new() }; int finished = 0;
         var writer = Task.Run(() => { for (int tick = 1; tick <= 100000; tick++) { var f = TopologyBattleEngine.ClaimWritable(frames); if (f == null) { Thread.Yield(); continue; } f.Tick = (ulong)tick; for (int p = 0; p < 8; p++) f.Players[p].PositionXMillimetres = tick; Volatile.Write(ref f.State, 2); } Volatile.Write(ref finished, 1); });
+        if (writerCompletesBeforeRead) writer.GetAwaiter().GetResult();
         int observed = 0;
-        while (Volatile.Read(ref finished) == 0) { var f = TopologyBattleEngine.ClaimLatest(frames); if (f == null) { Thread.Yield(); continue; } try { Thread.SpinWait(100); for (int p = 0; p < 8; p++) Assert.That(f.Players[p].PositionXMillimetres, Is.EqualTo((int)f.Tick)); observed++; } finally { Volatile.Write(ref f.State, 0); } }
+        while (true)
+        {
+            // Observe completion before claiming so the last publication is drained.
+            bool writerFinished = Volatile.Read(ref finished) != 0;
+            var f = TopologyBattleEngine.ClaimLatest(frames);
+            if (f == null) { if (writerFinished) break; Thread.Yield(); continue; }
+            try { Thread.SpinWait(100); for (int p = 0; p < 8; p++) Assert.That(f.Players[p].PositionXMillimetres, Is.EqualTo((int)f.Tick)); observed++; }
+            finally { Volatile.Write(ref f.State, 0); }
+        }
         writer.GetAwaiter().GetResult(); Assert.That(observed, Is.GreaterThan(0));
+        Assert.That(frames.All(f => f.State == 0), Is.True);
     }
     [Test]
     public async Task FullOutboxRetainsFinishedRoomUntilDurableAcceptance()
