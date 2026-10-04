@@ -169,6 +169,231 @@ namespace AiNative.Client.Application.Tests
             finally { gate.ReleaseLogin.TrySetResult(true); UnityEngine.Object.DestroyImmediate(owner); }
         }
 
+        [Test]
+        public async Task PauseResume_WaitingForAdmissionDoesNotPredictOrQueueStaleInputs()
+        {
+            using var gate = new GatePeer { SettlementConfirmed = false };
+            using var backend = new GateBackendSession(await FantasyGateClient.ConnectAsync(gate.Options));
+            await backend.LoginAsync("original-user", "original-password");
+            var owner = new GameObject("WaitingForResumeAdmission");
+            Task recovering = null;
+            try
+            {
+                var flow = CreateFlow(owner, gate.Options, backend, true);
+                var transport = new FakeTransport();
+                var battle = ActiveBattle(transport, new FakeConnector(transport, new FakeTransport()));
+                SetProperty(flow, "Battle", battle);
+                Pause(flow, true);
+                SetProperty(backend, "ExpiresUnixSeconds", DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+                gate.PauseLogin = true;
+                Pause(flow, false);
+                recovering = Poll(flow);
+                await Task.WhenAny(gate.LoginBlocked.Task, Task.Delay(2500));
+                Assert.That(gate.LoginBlocked.Task.IsCompleted, Is.True, "Resume authentication must be waiting for fresh admission.");
+                Assert.That(recovering.IsCompleted, Is.False);
+                Assert.That(battle.State, Is.EqualTo(BattleClientState.Active), "The old connection remains active until admission renews.");
+
+                MethodInfo fixedUpdate = typeof(TopologyClientFlow).GetMethod("FixedUpdate", BindingFlags.Instance | BindingFlags.NonPublic);
+                for (int step = 0; step < 8; step++) fixedUpdate.Invoke(flow, null);
+
+                Assert.That(flow.PreparedInputs, Is.Zero, "Resume must not predict commands against the suspended connection.");
+                Assert.That(battle.QueuedInputFrames, Is.Zero, "Admission waiting must not fill the old input queue.");
+                gate.ReleaseLogin.TrySetResult(true);
+                await recovering;
+                Assert.That(battle.State, Is.EqualTo(BattleClientState.Reconnecting));
+                Assert.That(flow.Battle, Is.SameAs(battle));
+                Assert.That(flow.ResumeCompletedCount, Is.EqualTo(1));
+            }
+            finally
+            {
+                gate.ReleaseLogin.TrySetResult(true);
+                if (recovering != null) await recovering;
+                UnityEngine.Object.DestroyImmediate(owner);
+            }
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public async Task PauseResume_RefreshesOriginalAdmissionAndRestartsBattleOnce(bool faulted)
+        {
+            using var gate = new GatePeer { SettlementConfirmed = false };
+            using var backend = new GateBackendSession(await FantasyGateClient.ConnectAsync(gate.Options));
+            await backend.LoginAsync("original-user", "original-password");
+            var owner = new GameObject("ResumingOriginalBattle");
+            try
+            {
+                var flow = CreateFlow(owner, gate.Options, backend, true);
+                var transport = new FakeTransport(); var replacement = new FakeTransport();
+                var connector = new FakeConnector(transport, faulted ? null : replacement, null, null, replacement);
+                var battle = ActiveBattle(transport, connector); SetProperty(flow, "Battle", battle);
+                Pause(flow, false); // Unity sends an initial false; it must not start recovery.
+                await Poll(flow); Assert.That(battle.State, Is.EqualTo(BattleClientState.Active));
+                Pause(flow, true);
+                if (faulted)
+                {
+                    transport.Close(); battle.Pump(0); battle.Pump(.3f); battle.Pump(0); battle.Pump(.6f); battle.Pump(0); battle.Pump(1.1f); battle.Pump(0);
+                    Assert.That(battle.State, Is.EqualTo(BattleClientState.Faulted), "The fixture must exhaust ordinary reconnect retries.");
+                }
+                SetProperty(backend, "ExpiresUnixSeconds", DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+                Pause(flow, false);
+                await Poll(flow);
+
+                Assert.That(battle.State, Is.EqualTo(BattleClientState.Reconnecting), "Resume must restart the original battle, including exhausted connections.");
+                Assert.That(flow.Battle, Is.SameAs(battle));
+                Assert.That((flow.PlayerId, flow.MatchId, flow.RoomId), Is.EqualTo(("original-player", "original-match", "original-room")));
+                Assert.That(flow.BackendReconnectCount, Is.EqualTo(1));
+                int before = connector.CallCount;
+                battle.Pump(.3f); battle.Pump(0);
+                Assert.That(connector.CallCount, Is.EqualTo(before + 1));
+                Assert.That(replacement.SentFrames.Count, Is.EqualTo(1), "The fresh transport must receive the renewed entry ticket login.");
+                Assert.That(Encoding.UTF8.GetString(replacement.SentFrames[0]), Does.Contain("renewed-ticket"));
+                Pause(flow, false); await Poll(flow);
+                Assert.That(connector.CallCount, Is.EqualTo(before + 1), "Duplicate resume must not create another connection.");
+                Assert.That(gate.LoginUsers.Count, Is.EqualTo(2));
+                Assert.That(gate.MatchRequests.ToArray(), Has.All.EqualTo("original-request"));
+                Assert.That(flow.Completed, Is.False);
+            }
+            finally { UnityEngine.Object.DestroyImmediate(owner); }
+        }
+
+        [TestCase("match")]
+        [TestCase("room")]
+        [TestCase("node")]
+        [TestCase("boot")]
+        [TestCase("player")]
+        public async Task PauseResume_RejectsChangedIdentityAndPreservesOriginalAllocation(string changed)
+        {
+            using var gate = new GatePeer { SettlementConfirmed = false, ChangedAllocation = changed };
+            using var backend = new GateBackendSession(await FantasyGateClient.ConnectAsync(gate.Options));
+            await backend.LoginAsync("original-user", "original-password");
+            var owner = new GameObject("RejectingResumeAllocation");
+            try
+            {
+                var flow = CreateFlow(owner, gate.Options, backend, true);
+                var transport = new FakeTransport(); var connector = new FakeConnector(transport, new FakeTransport());
+                var battle = ActiveBattle(transport, connector); SetProperty(flow, "Battle", battle);
+                if (changed == "player") { gate.LoginPlayer = "different-player"; SetProperty(backend, "ExpiresUnixSeconds", DateTimeOffset.UtcNow.ToUnixTimeSeconds()); }
+                Pause(flow, true); Pause(flow, false);
+                Exception rejection = null; try { await Poll(flow); } catch (Exception exception) { rejection = exception; }
+                Assert.That(rejection, Is.Not.Null, "Every component of the original allocation identity must be checked before reconnecting.");
+                Assert.That(battle.State, Is.EqualTo(BattleClientState.Active));
+                Assert.That(connector.CallCount, Is.EqualTo(1));
+                Assert.That(flow.Battle, Is.SameAs(battle));
+                Assert.That((flow.PlayerId, flow.MatchId, flow.RoomId), Is.EqualTo(("original-player", "original-match", "original-room")));
+                Assert.That(flow.SettlementConfirmed, Is.False);
+            }
+            finally { UnityEngine.Object.DestroyImmediate(owner); }
+        }
+
+        [Test]
+        public async Task BackgroundPause_SuspendsBattlePumpAndFocusLossDoesNotResume()
+        {
+            using var gate = new GatePeer { SettlementConfirmed = false };
+            using var backend = new GateBackendSession(await FantasyGateClient.ConnectAsync(gate.Options));
+            await backend.LoginAsync("original-user", "original-password");
+            var owner = new GameObject("PausedBattle");
+            try
+            {
+                var flow = CreateFlow(owner, gate.Options, backend, false);
+                var transport = new FakeTransport(); var connector = new FakeConnector(transport);
+                var battle = ActiveBattle(transport, connector); SetProperty(flow, "Battle", battle);
+                Pause(flow, true); transport.Close();
+                typeof(TopologyClientFlow).GetMethod("OnApplicationFocus", BindingFlags.Instance | BindingFlags.NonPublic)?.Invoke(flow, new object[] { false });
+                typeof(TopologyClientFlow).GetMethod("Update", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(flow, null);
+                Assert.That(battle.State, Is.EqualTo(BattleClientState.Active), "Background time must not consume reconnect attempts before fresh admission is available.");
+                Assert.That(gate.MatchRequests, Is.Empty);
+            }
+            finally { UnityEngine.Object.DestroyImmediate(owner); }
+        }
+
+        private static BattleClientSession ActiveBattle(FakeTransport transport, FakeConnector connector)
+        {
+            var battle = new BattleClientSession("127.0.0.1", 22000, "fixture", 4, connector, new BattleAdmissionInfo("original-room", "original-boot", "ticket", "original-node", "original-player"));
+            battle.Start(); battle.Pump(0);
+            transport.Enqueue(TestFrames.Login(42, 1, "original-room", "original-boot"), BattleClientProtocolV1.ControlChannel, 1);
+            transport.Enqueue(TestFrames.Join(19, 7, 60), BattleClientProtocolV1.ControlChannel, 1);
+            transport.Enqueue(TestFrames.Snapshot(7, 110, 0), BattleClientProtocolV1.SnapshotChannel, 1);
+            battle.Pump(0); Assert.That(battle.IsPredictionInitialized, Is.True); return battle;
+        }
+        [Test]
+        public async Task Pause_WritesPublicLifecycleCheckpointWithoutCredentials()
+        {
+            using var gate = new GatePeer();
+            using var backend = new GateBackendSession(await FantasyGateClient.ConnectAsync(gate.Options));
+            await backend.LoginAsync("original-user", "original-password");
+            string result = Path.Combine(Path.GetTempPath(), "ainative-checkpoint-" + Guid.NewGuid().ToString("N") + ".json");
+            var owner = new GameObject("CheckpointBattle");
+            try
+            {
+                var flow = CreateFlow(owner, gate.Options, backend, true); flow.Initialize(gate.Options, true, 120, result);
+                Pause(flow, true);
+                Assert.That(File.Exists(result), Is.True, "A real-device driver needs a persistent pause checkpoint before returning to the app.");
+                string json = File.ReadAllText(result);
+                Assert.That(json, Does.Contain("original-match").And.Contain("original-room").And.Contain("original-node").And.Contain("original-boot"));
+                Assert.That(json, Does.Not.Contain("original-user").And.Not.Contain("original-password").And.Not.Contain("renewed-credential").And.Not.Contain("ticket"));
+                Assert.That(json, Does.Contain("\"paused\": true").And.Contain("\"completed\": false"));
+            }
+            finally { UnityEngine.Object.DestroyImmediate(owner); if (File.Exists(result)) File.Delete(result); }
+        }
+
+        [TestCase(true)]
+        [TestCase(false)]
+        public async Task PauseResume_LostQueueKeepsOriginalSettlementWithoutStartingAnotherBattle(bool confirmed)
+        {
+            using var gate = new GatePeer { AllocationLost = true, SettlementConfirmed = confirmed };
+            using var backend = new GateBackendSession(await FantasyGateClient.ConnectAsync(gate.Options));
+            await backend.LoginAsync("original-user", "original-password");
+            var owner = new GameObject("LostQueueResume");
+            try
+            {
+                var flow = CreateFlow(owner, gate.Options, backend, true);
+                var transport = new FakeTransport(); var replacement = new FakeTransport(); var connector = new FakeConnector(transport, replacement);
+                var battle = ActiveBattle(transport, connector); SetProperty(flow, "Battle", battle); SetProperty(flow, "Reconnected", true);
+                Pause(flow, true); Pause(flow, false);
+                Exception rejection = null; try { await Poll(flow); } catch (Exception exception) { rejection = exception; }
+                Assert.That(rejection, Is.Null, "Losing the queue cannot prevent querying the original receipt.");
+                Assert.That(flow.Completed, Is.EqualTo(confirmed));
+                Assert.That(flow.SettlementConfirmed, Is.EqualTo(confirmed));
+                Assert.That(flow.Battle, Is.SameAs(battle));
+                Assert.That((flow.PlayerId, flow.MatchId, flow.RoomId), Is.EqualTo(("original-player", "original-match", "original-room")));
+                Assert.That(battle.State, Is.EqualTo(BattleClientState.Active));
+                Assert.That(connector.CallCount, Is.EqualTo(1));
+                Assert.That(gate.SettlementMatches.ToArray(), Is.EqualTo(new[] { "original-match" }));
+                Assert.That(gate.Methods.ToArray(), Does.Not.Contain("player.register").And.Not.Contain("match.queue"));
+                Assert.That(flow.Error, Is.Empty);
+                if (!confirmed) Assert.That(flow.BackendStatus, Is.Not.Empty);
+            }
+            finally { UnityEngine.Object.DestroyImmediate(owner); }
+        }
+
+        [Test]
+        public async Task PauseResume_RejectsReceiptForAnotherMatchAndWaitsForOriginalReceipt()
+        {
+            using var gate = new GatePeer { AllocationLost = true, SettlementConfirmed = true, ReceiptMatch = "another-match" };
+            using var backend = new GateBackendSession(await FantasyGateClient.ConnectAsync(gate.Options));
+            await backend.LoginAsync("original-user", "original-password");
+            var owner = new GameObject("MismatchedReceiptResume");
+            try
+            {
+                var flow = CreateFlow(owner, gate.Options, backend, true);
+                var transport = new FakeTransport(); var connector = new FakeConnector(transport, new FakeTransport());
+                var battle = ActiveBattle(transport, connector); SetProperty(flow, "Battle", battle); SetProperty(flow, "Reconnected", true);
+                Pause(flow, true); Pause(flow, false);
+                GateCallException rejection = null; try { await Poll(flow); } catch (GateCallException exception) { rejection = exception; }
+                Assert.That(rejection?.Code, Is.EqualTo("settlement-mismatch-active-battle"));
+                Assert.That(flow.Completed || flow.SettlementConfirmed, Is.False);
+                Assert.That(flow.Battle, Is.SameAs(battle)); Assert.That(flow.MatchId, Is.EqualTo("original-match"));
+                Assert.That(battle.State, Is.EqualTo(BattleClientState.Active)); Assert.That(connector.CallCount, Is.EqualTo(1));
+                gate.ReceiptMatch = "original-match";
+                await Poll(flow);
+                Assert.That(flow.Completed && flow.SettlementConfirmed, Is.True);
+                Assert.That(gate.SettlementMatches.ToArray(), Is.EqualTo(new[] { "original-match", "original-match" }));
+                Assert.That(gate.Methods.ToArray(), Does.Not.Contain("player.register").And.Not.Contain("match.queue"));
+                Assert.That(flow.Battle, Is.SameAs(battle)); Assert.That(connector.CallCount, Is.EqualTo(1));
+            }
+            finally { UnityEngine.Object.DestroyImmediate(owner); }
+        }
+        private static void Pause(TopologyClientFlow flow, bool paused) => typeof(TopologyClientFlow).GetMethod("OnApplicationPause", BindingFlags.Instance | BindingFlags.NonPublic)?.Invoke(flow, new object[] { paused });
         private static Task Poll(TopologyClientFlow flow) => (Task)typeof(TopologyClientFlow).GetMethod("PollAsync", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(flow, null);
         private static void SetField(object target, string field, object value) => target.GetType().GetField(field, BindingFlags.Instance | BindingFlags.NonPublic).SetValue(target, value);
         private static void SetProperty(object target, string property, object value) => target.GetType().GetProperty(property).GetSetMethod(true).Invoke(target, new[] { value });
@@ -182,6 +407,12 @@ namespace AiNative.Client.Application.Tests
             internal readonly ConcurrentQueue<string> LoginUsers = new ConcurrentQueue<string>();
             internal readonly ConcurrentQueue<string> LoginPasswords = new ConcurrentQueue<string>();
             internal readonly ConcurrentQueue<string> SettlementMatches = new ConcurrentQueue<string>();
+            internal readonly ConcurrentQueue<string> MatchRequests = new ConcurrentQueue<string>();
+            internal readonly ConcurrentQueue<string> Methods = new ConcurrentQueue<string>();
+            internal bool SettlementConfirmed = true;
+            internal bool AllocationLost;
+            internal string ReceiptMatch = "original-match";
+            internal string ChangedAllocation = "";
             internal bool RejectNextProfile;
             internal bool PauseLogin;
             internal string LoginPlayer = "original-player";
@@ -208,6 +439,7 @@ namespace AiNative.Client.Application.Tests
                         byte[] header = new byte[20]; await Read(stream, header, _stop.Token).ConfigureAwait(false);
                         byte[] outer = new byte[BinaryPrimitives.ReadInt32LittleEndian(header)]; await Read(stream, outer, _stop.Token).ConfigureAwait(false);
                         byte[] request = Data(outer, 1); string method = Text(request, 2), correlation = Text(request, 1), error = ""; byte[] body = Data(request, 3), reply;
+                        Methods.Enqueue(method);
                         if (method == "player.login")
                         {
                             LoginUsers.Enqueue(Text(body, 1));
@@ -216,7 +448,13 @@ namespace AiNative.Client.Application.Tests
                             reply = Join(Field(1, LoginPlayer), Field(2, "renewed-credential"), Number(3, (ulong)DateTimeOffset.UtcNow.AddMinutes(10).ToUnixTimeSeconds()));
                         }
                         else if (method == "player.profile") { reply = Join(Field(1, "original-player"), Number(3, 1)); if (RejectNextProfile) { RejectNextProfile = false; error = "invalid_session"; reply = Array.Empty<byte>(); } }
-                        else if (method == "player.settlement-status") { SettlementMatches.Enqueue(Text(body, 1)); reply = Join(Field(1, "original-match"), Number(3, 1)); }
+                        else if (method == "player.settlement-status") { SettlementMatches.Enqueue(Text(body, 1)); reply = Join(Field(1, ReceiptMatch), Number(3, SettlementConfirmed ? 1UL : 0UL)); }
+                        else if (method == "match.status")
+                        {
+                            MatchRequests.Enqueue(Text(body, 1));
+                            reply = AllocationLost ? Bytes(1, Join(Field(1, "original-request"), Field(2, "Failed"), Field(5, "queue_lost"))) : Join(Bytes(1, Join(Field(1, "original-request"), Field(2, "Allocated"), Field(3, ChangedAllocation == "match" ? "other-match" : "original-match"),
+                                Bytes(4, Join(Field(3, ChangedAllocation == "room" ? "other-room" : "original-room"), Field(4, ChangedAllocation == "node" ? "other-node" : "original-node"), Field(5, ChangedAllocation == "boot" ? "other-boot" : "original-boot"), Field(6, "127.0.0.1:22000"))))), Field(2, "renewed-ticket"));
+                        }
                         else throw new InvalidDataException("Unexpected method: " + method);
                         byte[] response = Bytes(2, Join(Field(1, correlation), Bytes(2, reply), Field(3, error)));
                         byte[] frame = new byte[20 + response.Length]; BinaryPrimitives.WriteInt32LittleEndian(frame, response.Length); BinaryPrimitives.WriteUInt32LittleEndian(frame.AsSpan(4), 402653361u);

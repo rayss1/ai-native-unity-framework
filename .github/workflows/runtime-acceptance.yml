@@ -5,6 +5,8 @@ on:
     types: [opened, synchronize, reopened, labeled]
     paths:
       - .github/workflows/runtime-acceptance.yml
+      - tools/validation/verify-postgres-tests.py
+      - tools/validation/tests/test_postgres_gate.py
       - .dockerignore
       - AiNative.sln
       - Directory.Build.props
@@ -30,6 +32,8 @@ on:
       - main
     paths:
       - .github/workflows/runtime-acceptance.yml
+      - tools/validation/verify-postgres-tests.py
+      - tools/validation/tests/test_postgres_gate.py
       - .dockerignore
       - AiNative.sln
       - Directory.Build.props
@@ -58,6 +62,22 @@ jobs:
     timeout-minutes: 110
     env:
       SOURCE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+      # Disposable CI-only credentials; never a shared deployment database.
+      AINATIVE_TEST_POSTGRES: Host=127.0.0.1;Port=5432;Database=ainative_ci;Username=ainative_ci;Password=ci-only-disposable;Pooling=false
+    services:
+      postgres:
+        image: postgres:17.11
+        env:
+          POSTGRES_USER: ainative_ci
+          POSTGRES_PASSWORD: ci-only-disposable
+          POSTGRES_DB: ainative_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ainative_ci -d ainative_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
     steps:
       - name: Checkout exact submodule state
         uses: actions/checkout@v4
@@ -81,6 +101,37 @@ jobs:
       - name: Run adapter, health, and allocation tests
         working-directory: /tmp
         run: dotnet test "$GITHUB_WORKSPACE/AiNative.sln" --configuration Release --no-build --no-restore
+
+      - name: Test PostgreSQL report gate
+        run: python3 -m unittest discover -s tools/validation/tests -p test_postgres_gate.py -v
+
+      - name: Run real Player persistence tests
+        run: >-
+          dotnet test server/tests/AiNative.Server.Backend.Tests/AiNative.Server.Backend.Tests.csproj
+          --configuration Release --no-build --no-restore
+          --filter FullyQualifiedName~AiNative.Server.Backend.Tests.PostgresTests
+          --logger "trx;LogFileName=player.trx"
+          --results-directory artifacts/postgres-tests
+
+      - name: Run real Coordinator persistence tests
+        run: >-
+          dotnet test server/tests/AiNative.Server.Rooms.Tests/AiNative.Server.Rooms.Tests.csproj
+          --configuration Release --no-build --no-restore
+          --filter FullyQualifiedName~AiNative.Server.Rooms.Tests.PostgresAllocationStoreTests
+          --logger "trx;LogFileName=coordinator.trx"
+          --results-directory artifacts/postgres-tests
+
+      - name: Require all named PostgreSQL cases to pass
+        if: always()
+        run: python3 tools/validation/verify-postgres-tests.py artifacts/postgres-tests
+
+      - name: Retain PostgreSQL test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: runtime-postgres-tests
+          path: artifacts/postgres-tests
+          if-no-files-found: error
 
       - name: Run deterministic Regional, Degraded, and Backpressure profiles
         shell: bash
@@ -124,7 +175,7 @@ jobs:
           export AINATIVE_REPLAY_CAPTURE_PATH="$GITHUB_WORKSPACE/artifacts/runtime-acceptance/direct-battle.anrp"
           test "$(find "$GITHUB_WORKSPACE/artifacts/battle-host" -name Fantasy.config -type f | wc -l)" = '1'
           test -f "$GITHUB_WORKSPACE/artifacts/battle-host/Fantasy-Net.dll"
-          grep -q 'Fantasy-Net/2026.1.1003' "$GITHUB_WORKSPACE/artifacts/battle-host/AiNative.BattleHost.deps.json"
+          grep -q 'Fantasy-Net/2026.1.1004-ainative.1' "$GITHUB_WORKSPACE/artifacts/battle-host/AiNative.BattleHost.deps.json"
           stdout="$GITHUB_WORKSPACE/artifacts/battle-host.stdout.log"
           stderr="$GITHUB_WORKSPACE/artifacts/battle-host.stderr.log"
           dotnet "$GITHUB_WORKSPACE/artifacts/battle-host/AiNative.BattleHost.dll" -m Develop >"$stdout" 2>"$stderr" &
@@ -287,7 +338,7 @@ jobs:
           docker exec "$container_id" sh -c "grep -q '\"tfm\": \"net10.0\"' /app/AiNative.BattleHost.runtimeconfig.json"
           test "$(docker exec "$container_id" sh -c 'find /app -name Fantasy.config -type f | wc -l')" = '1'
           docker exec "$container_id" test -f /app/Fantasy-Net.dll
-          docker exec "$container_id" grep -q 'Fantasy-Net/2026.1.1003' /app/AiNative.BattleHost.deps.json
+          docker exec "$container_id" grep -q 'Fantasy-Net/2026.1.1004-ainative.1' /app/AiNative.BattleHost.deps.json
           probe="$(curl --fail --silent --request POST http://127.0.0.1:5081/admin/kcp-loopback)"
           test "$(jq -r '.status' <<<"$probe")" = 'ok'
           test "$(jq -r '.reconnectedEpoch > .initialConnectionEpoch' <<<"$probe")" = 'true'

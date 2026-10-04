@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using AiNative.Gameplay;
 using AiNative.Realtime;
@@ -72,7 +73,6 @@ namespace AiNative.Client.Prediction
 
         private readonly IRealtimeTransport _transport;
         private readonly ArenaPredictionHistory _history;
-        private readonly byte[] _sendBuffer = new byte[RequiredInputBufferBytes];
         private readonly bool _ownsTransport;
         private readonly uint _entityId;
         private ulong _authoritativeTick;
@@ -142,30 +142,24 @@ namespace AiNative.Client.Prediction
             return new ArenaPredictionPrepareResult(ArenaPredictionPrepareStatus.Prepared, writtenBytes, predicted, droppedOldest);
         }
 
-        public ValueTask<SendResult> SendPreparedAsync(int writtenBytes)
+        /// <summary>
+        /// Sends the caller's encoded input without advancing prediction. The caller must
+        /// keep the frame unchanged until completion and observe the returned send result.
+        /// A rejected send may retry the same frame; do not prepare another input for a retry.
+        /// Call outside the fixed-Tick critical path. Cancellation and transport exceptions
+        /// propagate to the caller, just as they do on IRealtimeTransport.
+        /// </summary>
+        public ValueTask<SendResult> SendPreparedAsync(
+            ReadOnlyMemory<byte> frame,
+            CancellationToken cancellationToken = default)
         {
             if (_disposed) return new ValueTask<SendResult>(new SendResult(SendStatus.Closed, 0));
-            if (writtenBytes < 0 || writtenBytes > _sendBuffer.Length) throw new ArgumentOutOfRangeException(nameof(writtenBytes));
-            return _transport.SendAsync(ArenaClientProtocolV1.InputChannel, _sendBuffer.AsMemory(0, writtenBytes));
-        }
-
-        public ArenaPredictionPrepareResult PrepareAndSendInput(
-            ulong clientTick,
-            int moveXMilli,
-            int moveZMilli,
-            int lookYawMilli,
-            int lookPitchMilli,
-            ArenaButtons buttons,
-            ArenaWeaponId weapon)
-        {
-            ArenaPredictionPrepareResult result = PrepareInput(
-                clientTick, moveXMilli, moveZMilli, lookYawMilli, lookPitchMilli, buttons, weapon, _sendBuffer);
-            if (result.Status == ArenaPredictionPrepareStatus.Prepared)
-            {
-                _ = _transport.SendAsync(ArenaClientProtocolV1.InputChannel, _sendBuffer.AsMemory(0, result.WrittenBytes));
-            }
-
-            return result;
+            if (frame.IsEmpty) throw new ArgumentException("A prepared input frame must not be empty.", nameof(frame));
+            if (frame.Length > RequiredInputBufferBytes)
+                return new ValueTask<SendResult>(new SendResult(SendStatus.PayloadTooLarge, 0));
+            if (cancellationToken.IsCancellationRequested)
+                return new ValueTask<SendResult>(Task.FromCanceled<SendResult>(cancellationToken));
+            return _transport.SendAsync(ArenaClientProtocolV1.InputChannel, frame, cancellationToken);
         }
 
         public ArenaSnapshotApplyResult ApplySnapshot(ReadOnlySpan<byte> frame, in ReceivedPacket packet)

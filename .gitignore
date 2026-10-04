@@ -17,6 +17,8 @@ client/UnityProject/Artifacts/
 /artifacts/
 TestResults/
 coverage/
+__pycache__/
+*.pyc
 
 # IDE state
 .vs/

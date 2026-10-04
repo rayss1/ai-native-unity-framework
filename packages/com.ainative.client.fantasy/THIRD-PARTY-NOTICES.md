@@ -3,15 +3,15 @@
 ## Fantasy.Unity
 
 - Package: `com.fantasy.unity`
-- Version: `2026.1.1001`
-- Pinned source commit: `f8bed0d464924f159d46498f1311206ea0694be8`
+- Version: `2026.1.1002-ainative.1`
+- Pinned source commit: `df4ad5fe5418c8855932de784c7cea6286c4b082`
 - Pinned source: <https://github.com/rayss1/Fantasy>
 - Upstream project: <https://github.com/qq362946/Fantasy>
 - License: modified MIT text with an explicit entity restriction (full applicable text below)
 
 Copyright and license terms are provided by the Fantasy project. This notice and the Fantasy license must be retained with approved Windows and macOS Player distributions that include Fantasy.Unity.
 
-The AI-Native project owner approved extending Windows and macOS client use and distribution to Fantasy.Unity at the commit and package version listed above for WS-26.
+WS-26 approved Windows and macOS client distribution for the historical baseline. On 2026-10-04 the owner authorized the local socket-initialization fork update listed above and its validation. License text and entity restrictions are unchanged. This local update has not been published; prior platform performance evidence does not qualify this new build.
 
 ### Applicable license text
 

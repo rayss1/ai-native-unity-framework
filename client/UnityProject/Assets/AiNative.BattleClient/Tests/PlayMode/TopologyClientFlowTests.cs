@@ -1,6 +1,7 @@
 using System.Collections;
 using AiNative.Client.Application;
 using AiNative.Client.Fantasy;
+using AiNative.Client.Prediction;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
@@ -18,13 +19,19 @@ namespace AiNative.Client.Application.PlayModeTests
                 var first = a.AddComponent<TopologyClientFlow>(); var second = b.AddComponent<TopologyClientFlow>();
                 var gate = new GateConnectionOptions("127.0.0.1", 23001, useTls: false);
                 first.Initialize(gate, automated: true, deadlineSeconds: 120); second.Initialize(gate, automated: true, deadlineSeconds: 120);
+                var firstRemote = new RemoteMotionEvidence(); var secondRemote = new RemoteMotionEvidence();
                 float deadline = Time.realtimeSinceStartup + 125;
-                while (Time.realtimeSinceStartup < deadline && !(first.Completed && second.Completed) && first.Error.Length == 0 && second.Error.Length == 0) yield return null;
+                while (Time.realtimeSinceStartup < deadline && !(first.Completed && second.Completed) && first.Error.Length == 0 && second.Error.Length == 0)
+                {
+                    firstRemote.Sample(first, second); secondRemote.Sample(second, first);
+                    yield return null;
+                }
                 Assert.That(first.Error, Is.Empty, $"first state={first.State} tick={first.Battle?.LastReceivedTick} ack={first.Battle?.LastAcknowledgedSequence} phase={first.Battle?.ArenaPhase} reconnected={first.Reconnected} requested={first.ReconnectRequested} priorAck={first.PreReconnectAcknowledgement} inputs={first.PreparedInputs} played={first.Profile?.Played}");
                 Assert.That(second.Error, Is.Empty, $"second state={second.State} tick={second.Battle?.LastReceivedTick} ack={second.Battle?.LastAcknowledgedSequence} phase={second.Battle?.ArenaPhase} reconnected={second.Reconnected} requested={second.ReconnectRequested} priorAck={second.PreReconnectAcknowledgement} inputs={second.PreparedInputs} played={second.Profile?.Played}");
                 Assert.That(first.Completed && second.Completed, Is.True, "Two-client flow did not finish.");
                 Assert.That(first.MatchId, Is.EqualTo(second.MatchId)); Assert.That(first.RoomId, Is.EqualTo(second.RoomId));
                 Assert.That(first.Reconnected && second.Reconnected, Is.True);
+                firstRemote.AssertComplete("first"); secondRemote.AssertComplete("second");
                 Assert.That(first.Battle.LastAcknowledgedSequence, Is.GreaterThanOrEqualTo(first.PreparedInputs * 0.8), "First client's continuous inputs stalled.");
                 Assert.That(second.Battle.LastAcknowledgedSequence, Is.GreaterThanOrEqualTo(second.PreparedInputs * 0.8), "Second client's continuous inputs stalled.");
                 Assert.That(first.MaxAcknowledgementStallSeconds, Is.LessThan(3));
@@ -33,6 +40,34 @@ namespace AiNative.Client.Application.PlayModeTests
                 Assert.That(first.SettlementConfirmed && second.SettlementConfirmed, Is.True, "Both exact match receipts must be confirmed.");
             }
             finally { Object.Destroy(a); Object.Destroy(b); }
+        }
+        private sealed class RemoteMotionEvidence
+        {
+            private readonly ArenaRemotePose[] _poses = new ArenaRemotePose[ArenaClientProtocolV1.MaxSnapshotPlayers];
+            private bool _hasBefore, _hasAfter, _movedBefore, _movedAfter, _cleared;
+            private double _lastX, _lastZ;
+            public void Sample(TopologyClientFlow own, TopologyClientFlow peer)
+            {
+                if (own.Battle == null) return;
+                int count = own.Battle.AdvanceRemotePresentation(Time.unscaledDeltaTime, _poses);
+                if (own.Battle.State == BattleClientState.Reconnecting && count == 0) _cleared = true;
+                if (count == 0) return;
+                Assert.That(count, Is.EqualTo(1), "Two-player match must present exactly one remote entity.");
+                Assert.That(_poses[0].EntityId, Is.Not.EqualTo(own.Battle.EntityId));
+                if (peer.Battle != null && peer.Battle.EntityId != 0)
+                    Assert.That(_poses[0].EntityId, Is.EqualTo(peer.Battle.EntityId));
+                bool after = own.Reconnected;
+                bool changed = System.Math.Abs(_poses[0].XMillimetres - _lastX) + System.Math.Abs(_poses[0].ZMillimetres - _lastZ) > 1;
+                if (after) { if (_hasAfter && changed) _movedAfter = true; _hasAfter = true; }
+                else { if (_hasBefore && changed) _movedBefore = true; _hasBefore = true; }
+                _lastX = _poses[0].XMillimetres; _lastZ = _poses[0].ZMillimetres;
+            }
+            public void AssertComplete(string client)
+            {
+                Assert.That(_movedBefore, Is.True, client + " did not interpolate moving remote state before reconnect.");
+                Assert.That(_cleared, Is.True, client + " did not clear remote state while reconnecting.");
+                Assert.That(_movedAfter, Is.True, client + " did not restore moving remote state after reconnect.");
+            }
         }
     }
 }

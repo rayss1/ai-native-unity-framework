@@ -159,7 +159,8 @@ public sealed class WorkerTerminationTests
         DisposalBlockedRoom pending = new(disposing, disposed);
         await using BattleWorkerPool pool = new("node", "epoch", 2, 2, 8,
             allocation => allocation.RoomId == "a" ? installed : allocation.RoomId == "b" ? pending : new TrackedRoom());
-        pool.Start(); pool.Reserve(Room("a")); pool.Reserve(Room("healthy")); pool.Reserve(Room("b"));
+        // Equal pre-start Tick costs deterministically place a/b on worker 0 and healthy on worker 1.
+        pool.Reserve(Room("a")); pool.Reserve(Room("healthy")); pool.Reserve(Room("b")); pool.Start();
         try
         {
             await pool.CreateAsync("a", "a", "epoch").AsTask().WaitAsync(Timeout);
@@ -232,6 +233,36 @@ public sealed class WorkerTerminationTests
         WorkerPerformance before = pool.Performance()[0];
         Assert.That(SpinWait.SpinUntil(() => pool.Performance()[0].TickCount >= before.TickCount + 10, Timeout), Is.True);
         Assert.That(pool.Performance()[0].AllocatedBytes - before.AllocatedBytes, Is.Zero);
+    }
+
+    [Test]
+    public async Task PerTickAllocationSeparatesMailboxFromBusinessTickAndKeepsExactIds()
+    {
+        await using BattleWorkerPool pool = new("node", "epoch", 1, 1, 8, _ => new TrackedRoom());
+        pool.Start(); pool.Reserve(Room("a"));
+        await pool.CreateAsync("a", "a", "epoch").AsTask().WaitAsync(Timeout);
+        using ManualResetEventSlim done = new();
+        byte[]? allocation = null;
+        pool.TryPost(0, () => { allocation = new byte[4096]; done.Set(); });
+        Assert.That(done.Wait(Timeout), Is.True);
+        Assert.That(SpinWait.SpinUntil(() => pool.Performance()[0].TickCount >= 3, Timeout), Is.True);
+        var performance = pool.Performance()[0];
+        Type type = performance.GetType();
+        var mailboxProperty = type.GetProperty("SampleMailboxAllocatedBytes");
+        Assert.That(mailboxProperty, Is.Not.Null, "Mailbox and business Tick allocation must be attributable separately.");
+        long[] mailbox = (long[])mailboxProperty!.GetValue(performance)!;
+        long[] room = (long[])type.GetProperty("SampleRoomAllocatedBytes")!.GetValue(performance)!;
+        long[] lifecycle = (long[])type.GetProperty("SampleLifecycleOperations")!.GetValue(performance)!;
+        long[] roomMicros = (long[])type.GetProperty("SampleRoomMicros")!.GetValue(performance)!;
+        Assert.That(mailbox.Length, Is.EqualTo(performance.SampleTickIds.Length));
+        Assert.That(room.Length, Is.EqualTo(performance.SampleTickIds.Length));
+        Assert.That(lifecycle.Length, Is.EqualTo(performance.SampleTickIds.Length));
+        Assert.That(roomMicros.Length, Is.EqualTo(performance.SampleTickIds.Length));
+        Assert.That(roomMicros, Has.All.GreaterThanOrEqualTo(0));
+        Assert.That(mailbox.Any(bytes => bytes >= 4096), Is.True);
+        Assert.That(room, Is.All.Zero);
+        Assert.That(lifecycle.Any(count => count > 0), Is.True);
+        GC.KeepAlive(allocation);
     }
 
     private static RoomAllocation Room(string id) => new()

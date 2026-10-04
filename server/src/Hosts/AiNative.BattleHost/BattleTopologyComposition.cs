@@ -61,7 +61,10 @@ internal static class BattleTopologyComposition
             {
                 workers = pool.Performance(),
                 gc = new { gen0 = GC.CollectionCount(0), gen1 = GC.CollectionCount(1), gen2 = GC.CollectionCount(2), allocatedBytes = GC.GetTotalAllocatedBytes(false), heapSizeBytes = GC.GetGCMemoryInfo().HeapSizeBytes },
-                process = new { privateMemoryBytes = process.PrivateMemorySize64, workingSetBytes = process.WorkingSet64 },
+                process = new { privateMemoryBytes = process.PrivateMemorySize64, workingSetBytes = process.WorkingSet64,
+                    peakWorkingSetBytes = process.PeakWorkingSet64, totalProcessorSeconds = process.TotalProcessorTime.TotalSeconds,
+                    logicalProcessors = Environment.ProcessorCount, availableMemoryBytes = GC.GetGCMemoryInfo().TotalAvailableMemoryBytes },
+                queues = engine.Diagnostics(),
                 replay = new { healthy = engine.ReplayHealthy, canAdmit = engine.ReplayCanAdmit, files = engine.ReplayFiles, accountedBytes = engine.ReplayBytes, incompleteCaptures = engine.IncompleteReplayCount }
             });
         });

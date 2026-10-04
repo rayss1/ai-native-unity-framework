@@ -291,6 +291,14 @@ internal sealed class ArenaRoom
 
             if (!_players[index].Alive)
             {
+                // A dead player's command is processed as a no-op, including on the respawn Tick.
+                // Skipping consumption here permanently accumulates latency at equal send/Tick rates.
+                if (_inputCounts[index] > 0)
+                {
+                    _players[index].LastProcessedInputSequence = _pendingInputs[index, _inputHeads[index]].Sequence;
+                    _inputHeads[index] = (_inputHeads[index] + 1) % InputQueueCapacity;
+                    _inputCounts[index]--;
+                }
                 if (Tick > _deathTicks[index])
                 {
                     Respawn(index);

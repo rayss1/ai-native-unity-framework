@@ -7,7 +7,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../Modules/AiNative.Server.Hosting/AiNative.Server.Hosting.csproj" />
-    <PackageReference Include="Fantasy-Net" Version="2026.1.1003" />
+    <PackageReference Include="Fantasy-Net" Version="2026.1.1004-ainative.1" />
     <None Include="Fantasy.config" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

@@ -57,6 +57,7 @@ internal sealed class FantasyKcpProbe : IAsyncDisposable
 
 internal sealed class FantasyKcpGateway : IAsyncDisposable
 {
+    internal const int DefaultOuterKcpMtu = 1150;
     private readonly ConcurrentDictionary<long, FantasyKcpConnection> _connections = new();
     private readonly ConcurrentQueue<FantasyKcpConnection> _accepted = new();
     private readonly TaskCompletionSource<int> _listening = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -70,7 +71,7 @@ internal sealed class FantasyKcpGateway : IAsyncDisposable
     public FantasyKcpGateway(
         int maxInboundBytesPerConnection = 256 * 1024,
         int maxConnections = 64,
-        int outerKcpMtu = 1150)
+        int outerKcpMtu = DefaultOuterKcpMtu)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxInboundBytesPerConnection);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxConnections);
@@ -134,33 +135,36 @@ internal sealed class FantasyKcpGateway : IAsyncDisposable
 
     public async Task<FantasyKcpProbe> ConnectLoopbackProbeAsync(CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         Scene scene = _scene ?? throw new InvalidOperationException("The Fantasy KCP scene is not ready.");
         TaskCompletionSource<FantasyKcpProbe> connected = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        KCPClientNetwork? network = null;
 
         scene.ThreadSynchronizationContext.Post(() =>
         {
-            KCPClientNetwork network = Entity.Create<KCPClientNetwork>(scene, false, true);
-            network.Initialize(NetworkTarget.Outer, enableReceiveMessageJsonLog: false);
-            Session? clientSession = null;
-
+            if (connected.Task.IsCompleted || scene.IsDisposed) return;
             try
             {
-                clientSession = network.Connect(
+                network = Entity.Create<KCPClientNetwork>(scene, false, true);
+                network.Initialize(NetworkTarget.Outer, enableReceiveMessageJsonLog: false);
+                FantasyProbeConnection.Begin<Session, FantasyKcpProbe>(complete => network.Connect(
                     $"127.0.0.1:{ListeningPort}",
-                    onConnectComplete: () => connected.TrySetResult(new FantasyKcpProbe(clientSession!)),
+                    onConnectComplete: complete,
                     onConnectFail: () => connected.TrySetException(new InvalidOperationException("Fantasy KCP loopback connect failed.")),
                     onConnectDisconnect: () => { },
                     isHttps: false,
-                    connectTimeout: 5000);
+                    connectTimeout: 5000), session => new(session), connected,
+                    probe => probe.DisposeAsync().GetAwaiter().GetResult());
             }
             catch (Exception exception)
             {
-                network.Dispose();
+                network?.Dispose();
                 connected.TrySetException(exception);
             }
         });
 
-        return await connected.Task.WaitAsync(cancellationToken);
+        return await FantasyProbeConnection.WaitOwnedAsync(connected, TimeSpan.FromSeconds(10), cancellationToken,
+            () => FantasyProbeConnection.OnSceneAsync(scene, () => network?.Dispose()), probe => probe.DisposeAsync());
     }
 
     public void BeginDrain()

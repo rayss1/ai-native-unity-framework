@@ -6,7 +6,7 @@
   "unity": "6000.3",
   "dependencies": {
     "com.ainative.realtime": "0.1.0",
-    "com.fantasy.unity": "2026.1.1001"
+    "com.fantasy.unity": "2026.1.1002-ainative.1"
   },
   "author": {
     "name": "AI-Native Unity Framework"

@@ -17,6 +17,143 @@ namespace AiNative.Server.Battle.Tests;
 
 public class TopologyBattleEngineTests
 {
+    [TestCase(true, "futureInput")]
+    [TestCase(false, "staleInput")]
+    public async Task DiagnosticDropsDistinguishRejectedInputAgeFromOtherPackets(bool future, string reason)
+    {
+        await using var f = await Fixture.Create(100000);
+        var player = await JoinPlayer(f, "p1", 20);
+        await f.Until(() => player.Latest<Snapshot>(MessageId.Snapshot).RoomTick >= 40);
+        player.Push(MessageId.InputCommand, new InputCommand { Sequence = 1, RoomTick = future ? ulong.MaxValue : 0 });
+        await f.Until(() => f.Engine.DroppedPackets == 1);
+        AssertDropReasons(f, reason, 1);
+        Assert.That(player.Latest<Snapshot>(MessageId.Snapshot).LastProcessedInputSequence, Is.Zero);
+    }
+
+    [Test]
+    public async Task DiagnosticDropsSeparateTerminalTrafficFromRejectedLiveInputs()
+    {
+        await using var f = await Fixture.Create(30);
+        var player = await JoinPlayer(f, "p1", 20);
+        await JoinPlayer(f, "p2", 21);
+        await f.Until(() => player.Latest<Snapshot>(MessageId.Snapshot).MatchPhase == AiNative.Protocol.V1.ArenaMatchPhase.ArenaMatchFinished);
+        player.Push(MessageId.InputCommand, new InputCommand { Sequence = 1, RoomTick = 0 });
+        await f.Engine.PumpAsync();
+        AssertDropReasons(f, "finishedRoom", 1);
+    }
+
+    [Test]
+    public async Task DiagnosticDropsIdentifyCommandQueueOverflowBeforeWorkerAdmission()
+    {
+        await using var f = await Fixture.Create(100000);
+        var player = await JoinPlayer(f, "p1", 20);
+        using var release = new ManualResetEventSlim();
+        var blocked = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var done = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        Assert.That(f.Pool.TryPost(0, () => { blocked.SetResult(); release.Wait(TimeSpan.FromSeconds(5)); done.SetResult(); }), Is.True);
+        try
+        {
+            await blocked.Task.WaitAsync(TimeSpan.FromSeconds(3));
+            ulong tick = player.Latest<Snapshot>(MessageId.Snapshot).RoomTick;
+            for (uint sequence = 1; sequence <= 257; sequence++)
+                player.Push(MessageId.InputCommand, new InputCommand { Sequence = sequence, RoomTick = tick });
+            for (int pump = 0; pump < 17; pump++) await f.Engine.PumpAsync();
+            AssertDropReasons(f, "commandQueueFull", 1);
+            Assert.That(player.Latest<Snapshot>(MessageId.Snapshot).LastProcessedInputSequence, Is.Zero);
+        }
+        finally { release.Set(); await done.Task.WaitAsync(TimeSpan.FromSeconds(3)); }
+    }
+
+    [Test]
+    public async Task DiagnosticDropsKeepMalformedPacketsOutsideInputAgeClassification()
+    {
+        await using var f = await Fixture.Create(100000);
+        var player = await JoinPlayer(f, "p1", 20);
+        player.Push(MessageId.InputCommand, new InputCommand { Sequence = 1, RoomTick = ulong.MaxValue, MoveXMilli = 1001 });
+        await f.Engine.PumpAsync();
+        AssertDropReasons(f, "other", 1);
+    }
+
+    private static async Task<FakeTransport> JoinPlayer(Fixture f, string id, uint epoch)
+    {
+        var player = f.Connect(epoch);
+        player.Push(MessageId.LoginRequest, f.Login(id)); await f.Engine.PumpAsync();
+        player.Push(MessageId.JoinRoomRequest, new JoinRoomRequest { SessionId = player.Latest<LoginResponse>(MessageId.LoginResponse).SessionId });
+        await f.Until(() => player.Has(MessageId.JoinRoomResponse));
+        return player;
+    }
+
+    [Test]
+    public async Task DiagnosticDropsKeepDuplicateSequenceOutsideInputAgeClassification()
+    {
+        await using var f = await Fixture.Create(100000);
+        var player = await JoinPlayer(f, "p1", 20);
+        player.Push(MessageId.InputCommand, new InputCommand { Sequence = 1, RoomTick = player.Latest<Snapshot>(MessageId.Snapshot).RoomTick });
+        await f.Until(() => player.Latest<Snapshot>(MessageId.Snapshot).LastProcessedInputSequence == 1);
+        player.Push(MessageId.InputCommand, new InputCommand { Sequence = 1, RoomTick = player.Latest<Snapshot>(MessageId.Snapshot).RoomTick });
+        await f.Until(() => f.Engine.DroppedPackets == 1);
+        AssertDropReasons(f, "otherInput", 1);
+    }
+
+    [Test]
+    public async Task DiagnosticDropsDoNotAllocateOnOwnerTickRejectionPath()
+    {
+        await using var f = await Fixture.Create(100000);
+        var player = await JoinPlayer(f, "p1", 20);
+        using var release = new ManualResetEventSlim();
+        var blocked = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var done = new TaskCompletionSource<long>(TaskCreationOptions.RunContinuationsAsynchronously);
+        Assert.That(f.Pool.TryPost(0, () =>
+        {
+            for (int warmup = 0; warmup < 100; warmup++) f.Room!.Tick();
+            blocked.SetResult(); release.Wait(TimeSpan.FromSeconds(5));
+            long before = GC.GetAllocatedBytesForCurrentThread();
+            f.Room!.Tick();
+            long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+            done.SetResult(allocated);
+        }), Is.True);
+        try
+        {
+            await blocked.Task.WaitAsync(TimeSpan.FromSeconds(3));
+            for (uint sequence = 1; sequence <= 128; sequence++)
+                player.Push(MessageId.InputCommand, new InputCommand { Sequence = sequence, RoomTick = ulong.MaxValue });
+            for (int pump = 0; pump < 8; pump++) await f.Engine.PumpAsync();
+            release.Set();
+            Assert.That(await done.Task.WaitAsync(TimeSpan.FromSeconds(3)), Is.Zero);
+            AssertDropReasons(f, "futureInput", 128);
+        }
+        finally { release.Set(); await done.Task.WaitAsync(TimeSpan.FromSeconds(3)); }
+    }
+
+    private static void AssertDropReasons(Fixture f, string expected, long count)
+    {
+        var diagnostics = JsonSerializer.SerializeToElement(f.Engine.Diagnostics());
+        Assert.That(diagnostics.TryGetProperty("droppedPacketReasons", out var reasons), Is.True,
+            "Packet totals must expose the actual rejection boundary so terminal traffic cannot hide live input rejection.");
+        foreach (var reason in reasons.EnumerateObject())
+            Assert.That(reason.Value.GetInt64(), Is.EqualTo(reason.Name == expected ? count : 0), reason.Name);
+        Assert.That(reasons.GetProperty(expected).GetInt64(), Is.EqualTo(count));
+        Assert.That(diagnostics.GetProperty("droppedPackets").GetInt64(), Is.EqualTo(count));
+    }
+
+    [Test]
+    public async Task DiagnosticSnapshotCountsActualRoomInstallationAndRelease()
+    {
+        await using var f = await Fixture.Create(600);
+        var installed = JsonSerializer.SerializeToElement(f.Engine.Diagnostics());
+        Assert.That(installed.GetProperty("liveRooms").GetInt32(), Is.EqualTo(1));
+        Assert.That(installed.GetProperty("lifecycleCount").GetInt64(), Is.EqualTo(1));
+        Assert.That(installed.GetProperty("commandDepth").GetInt32(), Is.Zero);
+        Assert.That(installed.GetProperty("eventDepth").GetInt32(), Is.Zero);
+        Assert.That(await f.Pool.ReleaseAsync("room", "alloc", "boot", coordinatorEpoch: "coord"), Is.Empty);
+        var released = JsonSerializer.SerializeToElement(f.Engine.Diagnostics());
+        Assert.That(released.GetProperty("liveRooms").GetInt32(), Is.Zero);
+        Assert.That(released.GetProperty("lifecycleCount").GetInt64(), Is.EqualTo(2));
+        Assert.That(released.GetProperty("rooms").GetArrayLength(), Is.Zero);
+        // Duplicate release does not fabricate a lifecycle transition.
+        await f.Pool.ReleaseAsync("room", "alloc", "boot", coordinatorEpoch: "coord");
+        Assert.That(JsonSerializer.SerializeToElement(f.Engine.Diagnostics()).GetProperty("lifecycleCount").GetInt64(), Is.EqualTo(2));
+    }
     [Test]
     public async Task RejectedAndUnjoinedConnectionsReturnGatewayCapacityWhileJoinedSessionsRemain()
     {

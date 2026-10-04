@@ -40,9 +40,32 @@ internal sealed class TopologyBattleEngine(FantasyKcpGateway gateway, EntryTicke
         public FileStream? Stream; public ArenaReplayWriter? Writer; public string? PendingPath, FinalPath;
     }
     private long _drops, _eventDrops;
+    private enum PacketDropReason { Other, FutureInput, StaleInput, OtherInput, CommandQueueFull, FinishedRoom }
+    private readonly long[] _packetDropReasons = new long[6];
+    private long _createdRooms, _releasedRooms;
+    private int _connectionCount;
     public BattleWorkerPool Pool { get; set; } = null!;
     public long DroppedPackets => Interlocked.Read(ref _drops);
     public long DroppedEvents => Interlocked.Read(ref _eventDrops);
+    // Snapshot on the diagnostic caller; no enumeration, allocation or export enters Tick.
+    public object Diagnostics() => new
+    {
+        liveRooms = _rooms.Count, connections = Volatile.Read(ref _connectionCount),
+        lifecycleCount = Interlocked.Read(ref _createdRooms) + Interlocked.Read(ref _releasedRooms),
+        commandDepth = _rooms.Values.Sum(room => room.Commands.Count), eventDepth = _rooms.Values.Sum(room => room.Events.Count),
+        commandCapacityPerRoom = 256, eventCapacityPerRoom = 256,
+        droppedPackets = DroppedPackets, droppedEvents = DroppedEvents,
+        droppedPacketReasons = new
+        {
+            other = Interlocked.Read(ref _packetDropReasons[(int)PacketDropReason.Other]),
+            futureInput = Interlocked.Read(ref _packetDropReasons[(int)PacketDropReason.FutureInput]),
+            staleInput = Interlocked.Read(ref _packetDropReasons[(int)PacketDropReason.StaleInput]),
+            otherInput = Interlocked.Read(ref _packetDropReasons[(int)PacketDropReason.OtherInput]),
+            commandQueueFull = Interlocked.Read(ref _packetDropReasons[(int)PacketDropReason.CommandQueueFull]),
+            finishedRoom = Interlocked.Read(ref _packetDropReasons[(int)PacketDropReason.FinishedRoom])
+        },
+        rooms = _rooms.Values.Select(room => new { roomId = room.Allocation.RoomId, room.Finished, room.Disposed }).ToArray()
+    };
     public IWorkerRoom CreateRoom(RoomAllocation allocation)
     {
         if (!ReplayHealthy) throw new InvalidOperationException("replay-persistence-unavailable");
@@ -53,6 +76,7 @@ internal sealed class TopologyBattleEngine(FantasyKcpGateway gateway, EntryTicke
         {
             var room = new RuntimeRoom(this, allocation.Clone(), matchLength);
             if (!_rooms.TryAdd(allocation.RoomId, room)) throw new InvalidOperationException("duplicate-room");
+            Interlocked.Increment(ref _createdRooms);
             if (room.Replay != null) _replays.TryAdd(allocation.AllocationId, new ReplayFile(room.Replay));
             return room;
         }
@@ -74,6 +98,7 @@ internal sealed class TopologyBattleEngine(FantasyKcpGateway gateway, EntryTicke
             }
         }
         foreach (var room in _rooms.Values) Publish(room);
+        Volatile.Write(ref _connectionCount, _connections.Count);
         DrainReplays();
         return ValueTask.CompletedTask;
     }
@@ -115,7 +140,11 @@ internal sealed class TopologyBattleEngine(FantasyKcpGateway gateway, EntryTicke
             }
         }
     }
-    private void Drop() => Interlocked.Increment(ref _drops);
+    private void Drop(PacketDropReason reason = PacketDropReason.Other)
+    {
+        Interlocked.Increment(ref _packetDropReasons[(int)reason]);
+        Interlocked.Increment(ref _drops);
+    }
     private void Handle(Connection c, IMessage message)
     {
         if (message is LoginRequest login)
@@ -125,7 +154,8 @@ internal sealed class TopologyBattleEngine(FantasyKcpGateway gateway, EntryTicke
             Send(c, MessageId.LoginResponse, new LoginResponse { SessionId = room.Sessions[c.Player], ConnectionEpoch = c.Wire.ConnectionEpoch, GlobalRoomId = room.Allocation.RoomId, BootEpoch = room.Allocation.BootEpoch, RoomTick = (ulong)Interlocked.Read(ref room.Clock) });
             return;
         }
-        if (c.Room is not { } r || c.Revoked || r.Finished) { Drop(); return; }
+        if (c.Room is not { } r || c.Revoked) { Drop(); return; }
+        if (r.Finished) { Drop(PacketDropReason.FinishedRoom); return; }
         if (message is JoinRoomRequest join && join.SessionId == r.Sessions[c.Player]) Enqueue(r, new Command(c, default, 1));
         else if (message is ReconnectRequest reconnect && reconnect.SessionId == r.Sessions[c.Player]) Enqueue(r, new Command(c, default, 2));
         else if (message is InputCommand input) Input(c, input);
@@ -138,7 +168,7 @@ internal sealed class TopologyBattleEngine(FantasyKcpGateway gateway, EntryTicke
         try { Enqueue(c.Room!, new Command(c, new ArenaInput(input.Sequence, input.RoomTick, input.MoveXMilli, input.MoveYMilli, input.LookYawMilli, input.LookPitchMilli, (ArenaButtons)input.Buttons, (AiNative.Gameplay.ArenaWeaponId)input.WeaponId), 0)); }
         catch (ArgumentException) { Drop(); }
     }
-    private void Enqueue(RuntimeRoom room, Command command) { if (!room.Commands.TryWrite(command)) Drop(); }
+    private void Enqueue(RuntimeRoom room, Command command) { if (!room.Commands.TryWrite(command)) Drop(PacketDropReason.CommandQueueFull); }
     private void Send(Connection c, MessageId id, IMessage message)
     {
         if (c.Revoked) return;
@@ -204,6 +234,7 @@ internal sealed class TopologyBattleEngine(FantasyKcpGateway gateway, EntryTicke
     {
         private readonly T[] _items = new T[capacity + 1];
         private int _read, _write;
+        public int Count => (Volatile.Read(ref _write) - Volatile.Read(ref _read) + _items.Length) % _items.Length;
         public bool TryWrite(T item) { int write = _write; int next = (write + 1) % _items.Length; if (next == Volatile.Read(ref _read)) return false; _items[write] = item; Volatile.Write(ref _write, next); return true; }
         public bool TryRead(out T item) { int read = _read; if (read == Volatile.Read(ref _write)) { item = default; return false; } item = _items[read]; _items[read] = default; Volatile.Write(ref _read, (read + 1) % _items.Length); return true; }
     }
@@ -262,7 +293,11 @@ internal sealed class TopologyBattleEngine(FantasyKcpGateway gateway, EntryTicke
                 else if (ReferenceEquals(Owners[p], c))
                 {
                     if (_game.SubmitInput(Entities[p], cmd.Input)) Replay?.RecordInput(_game.Tick, Entities[p], cmd.Input);
-                    else _engine.Drop();
+                    // SubmitInput and this classification share the sole Worker-owned game tick.
+                    // Keep the existing future/stale precedence and admission behavior unchanged.
+                    else _engine.Drop(cmd.Input.ClientTick > _game.Tick + 1 ? PacketDropReason.FutureInput :
+                        _game.Tick > cmd.Input.ClientTick && _game.Tick - cmd.Input.ClientTick > ArenaRoom.LagCompensationTicks
+                            ? PacketDropReason.StaleInput : PacketDropReason.OtherInput);
                 }
             }
             _game.TickOnce(); Interlocked.Exchange(ref Clock, (long)_game.Tick);
@@ -282,6 +317,6 @@ internal sealed class TopologyBattleEngine(FantasyKcpGateway gateway, EntryTicke
             for (int i = 0; i < 8; i++) frame.Present[i] = _game.TryGetPlayer((uint)i + 1, out frame.Players[i]); frame.PickupCount = _game.CopyPickups(frame.Pickups); Volatile.Write(ref frame.State, 2);
         }
         public MatchResult BuildResult() { var result = new MatchResult { MatchId = Allocation.MatchId, RoomId = Allocation.RoomId, NodeId = Allocation.NodeId, BootEpoch = Allocation.BootEpoch, Completion = "Finished" }; for (int i = 0; i < Roster.Length; i++) result.Players.Add(new PlayerResult { PlayerId = Roster[i], Won = Entities[i] != 0 && Entities[i] == _leader, Kills = (int)_final[i].Kills }); return result; }
-        public void Dispose() { Disposed = true; Replay?.Abort(); ((ICollection<KeyValuePair<string, RuntimeRoom>>)_engine._rooms).Remove(new(Allocation.RoomId, this)); }
+        public void Dispose() { Disposed = true; Replay?.Abort(); if (((ICollection<KeyValuePair<string, RuntimeRoom>>)_engine._rooms).Remove(new(Allocation.RoomId, this))) Interlocked.Increment(ref _engine._releasedRooms); }
     }
 }

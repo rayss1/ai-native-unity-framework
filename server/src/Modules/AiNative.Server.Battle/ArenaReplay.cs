@@ -131,7 +131,7 @@ internal sealed class ArenaReplayWriter : IDisposable
 public static class ArenaReplayVerifier
 {
     // UTF-8 without BOM, LF-normalized ArenaRoom + Shared ArenaGameplay source; independent of checkout EOL.
-    public const string GameplayFingerprint = "ce3034f62374b59b906abfb31774454f177b126aca2a5c27b9dfb715ba8a8a9f";
+    public const string GameplayFingerprint = "7f368b5cddc3254c660b74e2c3c57654e16828baa0a8ca995dd1f0e310b24a2d";
     public static ArenaReplayVerification Verify(string path, ArenaReplayIdentity expected)
     { if (!path.EndsWith(".anar", StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException("unpublished-arena-replay"); using var stream = File.OpenRead(path); return Verify(stream, expected); }
     public static ArenaReplayVerification Verify(Stream stream, ArenaReplayIdentity expected)

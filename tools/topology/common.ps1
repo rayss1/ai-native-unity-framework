@@ -29,6 +29,7 @@ function Start-OwnedChild($Service, [hashtable]$Extra = @{}) {
  AINATIVE_FANTASY_CONFIG_FILE=(Join-Path $Repo 'infrastructure/topology/Fantasy.config'); ASPNETCORE_URLS=('http://127.0.0.1:' + $Service.Health);
  AINATIVE_POSTGRES_CONNECTION_STRING=$env:AINATIVE_TEST_POSTGRES; AINATIVE_SERVER_TOPOLOGY='true';
  AINATIVE_BATTLE_WORKERS='2'; AINATIVE_ROOMS_PER_WORKER='2'; AINATIVE_BATTLE_MAILBOX_CAPACITY='256'; AINATIVE_MATCH_LENGTH_TICKS='1200';
+ AINATIVE_PLAYERS_PER_MATCH='2'; AINATIVE_ARENA_REPLAY_CAPACITY='4096'; AINATIVE_ARENA_REPLAY_MAX_FILES='1024'; AINATIVE_ARENA_REPLAY_MAX_BYTES='2147483648';
  AINATIVE_OUTBOX_MAX_RESULTS='128'; AINATIVE_OUTBOX_MAX_BYTES='16777216'; AINATIVE_OUTBOX_PATH=(Join-Path $Run ('outbox/' + $Service.Id));
  AINATIVE_ACCEPTANCE_REPORT=(Join-Path $Run 'acceptance.json'); DOTNET_ROOT=(Split-Path $SdkPath)
  }
@@ -36,12 +37,12 @@ function Start-OwnedChild($Service, [hashtable]$Extra = @{}) {
  foreach ($key in $Extra.Keys) { $variables[$key] = $Extra[$key] }
  if($Service.Role -eq 'Battle' -and $Service.Host -eq 'BattleHost') {
   $identity=Get-Content (Join-Path $Run 'replay-identities.json') -Raw | ConvertFrom-Json
-  $configuration=(Get-FileHash (Join-Path $Repo 'infrastructure/topology/Fantasy.config')).Hash+'|workers=2|rooms=2|mailbox=256|ticks='+$variables.AINATIVE_MATCH_LENGTH_TICKS+'|outboxResults=128|outboxBytes=16777216'
+  $configuration=(Get-FileHash (Join-Path $Repo 'infrastructure/topology/Fantasy.config')).Hash
+  foreach($setting in @('AINATIVE_BATTLE_WORKERS','AINATIVE_ROOMS_PER_WORKER','AINATIVE_BATTLE_MAILBOX_CAPACITY','AINATIVE_MATCH_LENGTH_TICKS','AINATIVE_PLAYERS_PER_MATCH','AINATIVE_OUTBOX_MAX_RESULTS','AINATIVE_OUTBOX_MAX_BYTES','AINATIVE_ARENA_REPLAY_CAPACITY','AINATIVE_ARENA_REPLAY_MAX_FILES','AINATIVE_ARENA_REPLAY_MAX_BYTES')) {
+   $configuration+='|'+$setting+'='+$variables[$setting]
+  }
   $configurationHash=[Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($configuration)))
   $variables.AINATIVE_ARENA_REPLAY_PATH=Join-Path $Run ('replay/'+$Service.Id)
-  $variables.AINATIVE_ARENA_REPLAY_CAPACITY='4096'
-  $variables.AINATIVE_ARENA_REPLAY_MAX_FILES='1024'
-  $variables.AINATIVE_ARENA_REPLAY_MAX_BYTES='2147483648'
   $variables.AINATIVE_SOURCE_COMMIT=$identity.Source
   $variables.AINATIVE_FANTASY_COMMIT=$identity.Fantasy
   $variables.AINATIVE_PROTOCOL_IDENTITY=$identity.Protocol

@@ -158,6 +158,20 @@ public class AcceptanceBehaviorTests
     }
 
     [Test]
+    public async Task SettlementPollingQueriesImmediatelyAndDelaysOnlyUnconfirmedResults()
+    {
+        int calls = 0;
+        Func<CancellationToken, Task<AiNative.Protocol.Backend.V1.PlayerProfile?>> probe = _ =>
+            Task.FromResult<AiNative.Protocol.Backend.V1.PlayerProfile?>(++calls == 1 ? null : new() { Played = 1 });
+        var task = (Task<AiNative.Protocol.Backend.V1.PlayerProfile>)Feature("AcceptanceSettlementPolling")
+            .GetMethod("WaitAsync")!.Invoke(null, [probe, CancellationToken.None])!;
+        int immediateCalls = calls;
+        var profile = await task.WaitAsync(TimeSpan.FromSeconds(2));
+        Assert.That(immediateCalls, Is.EqualTo(1), "The first read must run immediately; an unconfirmed reply must yield before retry.");
+        Assert.That(calls, Is.EqualTo(2)); Assert.That(profile.Played, Is.EqualTo(1));
+    }
+
+    [Test]
     public async Task SettlementPollingSurvivesUnavailablePlayerThenRequiresExactlyOne()
     {
         int calls = 0;

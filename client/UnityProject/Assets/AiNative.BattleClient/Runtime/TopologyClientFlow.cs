@@ -21,6 +21,9 @@ namespace AiNative.Client.Application
         private string _requestId = "", _username = "", _password = "", _invitePlayer = "";
         private string _host = "127.0.0.1", _port = "23001", _pin = "", _resultPath = "";
         private bool _tls, _busy, _automated, _started, _disposed, _reconnectRequested, _observedReconnecting;
+        private bool _paused, _resumePending, _skipElapsedFrame;
+        private int _pauseGeneration;
+        private string _runId = "";
         private ulong _priorSession, _inputTick;
         private uint _priorEntity;
         private uint _priorAcknowledgement;
@@ -46,13 +49,17 @@ namespace AiNative.Client.Application
         public int BackendReconnectCount { get; private set; }
         public bool SettlementConfirmed { get; private set; }
         public bool AuthenticationRequired => _backend == null || !_backend.IsAuthenticated;
+        public int PauseCount { get; private set; }
+        public int ResumeCount { get; private set; }
+        public int ResumeCompletedCount { get; private set; }
 
-        public void Initialize(GateConnectionOptions options, bool automated = false, float deadlineSeconds = 120, string resultPath = "")
+        public void Initialize(GateConnectionOptions options, bool automated = false, float deadlineSeconds = 120, string resultPath = "", string runId = "")
         {
             if (_started) throw new InvalidOperationException("Topology flow already started.");
             if (deadlineSeconds < 30 || deadlineSeconds > 3600) throw new ArgumentOutOfRangeException(nameof(deadlineSeconds));
             _options = options ?? throw new ArgumentNullException(nameof(options)); _automated = automated; _deadlineSeconds = deadlineSeconds; _resultPath = resultPath;
             _host = options.Host; _port = options.Port.ToString(); _tls = options.UseTls; _pin = options.CertificateSha256;
+            _runId = runId;
         }
 
         private void Start()
@@ -82,6 +89,7 @@ namespace AiNative.Client.Application
 
         private async Task ConnectAccountAsync(bool register)
         {
+            if (register && Battle != null) throw new GateCallException("account-mismatch-active-battle");
             string previousPlayer = PlayerId, previousState = State;
             if (Battle == null) State = "Authenticating";
             _options = new GateConnectionOptions(_host, int.Parse(_port), _tls, _pin);
@@ -114,10 +122,17 @@ namespace AiNative.Client.Application
 
         private void Update()
         {
-            if (_disposed || Completed) return;
-            _elapsed += Time.unscaledDeltaTime;
-            if (State != "Settling" && State != "AwaitingResult") Battle?.Pump(Time.unscaledDeltaTime);
+            if (_disposed || Completed || _paused) return;
+            float elapsed = _skipElapsedFrame ? 0 : Time.unscaledDeltaTime; _skipElapsedFrame = false;
+            _elapsed += elapsed;
             if (_automated && _elapsed >= _deadlineSeconds) { Fail("topology-timeout"); return; }
+            if (_resumePending)
+            {
+                // Admission renewal is async. Do not spend KCP retries on the expired background ticket.
+                if (!_busy && _backend != null && Time.unscaledTime >= _nextPoll) { _nextPoll = Time.unscaledTime + 1; Run(PollAsync); }
+                return;
+            }
+            if (State != "Settling" && State != "AwaitingResult") Battle?.Pump(elapsed);
             if (Battle != null)
             {
                 if (_automated && State == "Battle" && Battle.State == BattleClientState.Active && Battle.IsPredictionInitialized && Battle.ArenaPhase == ArenaMatchPhase.Active)
@@ -150,7 +165,7 @@ namespace AiNative.Client.Application
 
         private void FixedUpdate()
         {
-            if (Completed || State == "Settling" || Battle == null || Battle.ArenaPhase == ArenaMatchPhase.Finished || Battle.State != BattleClientState.Active || !Battle.IsPredictionInitialized) return;
+            if (_paused || _resumePending || Completed || State == "Settling" || Battle == null || Battle.ArenaPhase == ArenaMatchPhase.Finished || Battle.State != BattleClientState.Active || !Battle.IsPredictionInitialized) return;
             // Authoritative room time prevents backlog after network stalls from scheduling far-future inputs.
             _inputTick = Math.Max(_inputTick + 1, Battle.LastReceivedTick + 1);
             int x = _automated ? ((_inputTick / 60) % 2 == 0 ? 1000 : -1000) : (Input.GetKey(KeyCode.D) ? 1000 : 0) - (Input.GetKey(KeyCode.A) ? 1000 : 0);
@@ -161,27 +176,54 @@ namespace AiNative.Client.Application
 
         private async Task PollAsync()
         {
+            try { await PollCoreAsync(); }
+            finally { if (!_disposed) WriteCheckpoint(); }
+        }
+
+        private async Task PollCoreAsync()
+        {
+            if (_paused) return;
             if (!_backend.IsAuthenticated)
             {
-                if (_automated && Battle != null) await ConnectAccountAsync(register: false);
+                if (Battle != null && (_automated || (_resumePending && _username.Length > 0 && _password.Length > 0))) await ConnectAccountAsync(register: false);
                 else { BackendStatus = "后台连接或登录凭证已失效，请重新登录；当前对局继续。"; return; }
+            }
+            if (_resumePending && Battle != null)
+            {
+                int generation = _pauseGeneration;
+                GateMatch renewed = await _backend.MatchAsync(_requestId, _lifetime.Token);
+                if (renewed.Failure == "queue_lost" && renewed.EntryTicket.Length == 0)
+                {
+                    // A restarted Lobby may forget the queue, while Player still owns the original receipt.
+                    // Missing allocation data can never authorize KCP; any supplied conflicting identity is rejected.
+                    ValidateOriginalMatch(renewed, allowMissing: true);
+                    if (_paused || generation != _pauseGeneration) return;
+                    await PollOriginalSettlementAsync();
+                    if (!Completed) BackendStatus = "原排队记录已失效，正在等待原对局结算；不会创建新对局。";
+                    return;
+                }
+                ValidateOriginalMatch(renewed);
+                if (_paused || generation != _pauseGeneration) return;
+                if (renewed.EntryTicket.Length > 0)
+                {
+                    Battle.ResumeOriginalAllocation(new BattleAdmissionInfo(renewed.RoomId, renewed.BootEpoch, renewed.EntryTicket, renewed.NodeId, PlayerId));
+                    if (State != "Settling") State = "Battle";
+                    ResumeCompletedCount++;
+                    _resumePending = false; BackendStatus = "";
+                    return;
+                }
+                if (renewed.Failure == "room_released") { _resumePending = false; State = "Settling"; }
+                else { BackendStatus = "正在等待原对局的新接入凭证。"; return; }
             }
             if (Battle != null)
             {
-                Profile = await _backend.ProfileAsync(_lifetime.Token); // Also keeps the TCP session active.
-                BackendStatus = "";
-                GateSettlement settlement = await _backend.SettlementAsync(MatchId, _lifetime.Token);
-                if (settlement.Confirmed) { SettlementConfirmed = true; State = "Settling"; }
-                if (Battle.ArenaPhase == ArenaMatchPhase.Finished || State == "Settling")
-                {
-                    State = "Settling";
-                    if (settlement.Confirmed && Profile.Played == _baselinePlayed + 1) { if (_automated && !Reconnected) { Fail("reconnect-not-observed"); return; } Completed = true; State = "Finished"; WriteEvidence(true); }
-                    else if (Profile.Played > _baselinePlayed + 1) Fail("unexpected-profile-increment");
-                    return;
-                }
+                if (await PollOriginalSettlementAsync()) return;
                 GateMatch refreshed = await _backend.MatchAsync(_requestId, _lifetime.Token);
                 if (refreshed.EntryTicket.Length > 0)
+                {
+                    ValidateOriginalMatch(refreshed);
                     Battle.UpdateAdmission(new BattleAdmissionInfo(refreshed.RoomId, refreshed.BootEpoch, refreshed.EntryTicket, refreshed.NodeId, PlayerId));
+                }
                 else if (refreshed.Failure == "room_released" && refreshed.MatchId == MatchId && refreshed.RoomId == RoomId && refreshed.BootEpoch == _match.BootEpoch && refreshed.NodeId == _match.NodeId)
                 {
                     // The final unreliable snapshot can be lost when the room closes. Only this
@@ -222,6 +264,51 @@ namespace AiNative.Client.Application
             }
         }
 
+        private async Task<bool> PollOriginalSettlementAsync()
+        {
+            Profile = await _backend.ProfileAsync(_lifetime.Token); // Also keeps the TCP session active.
+            BackendStatus = "";
+            GateSettlement settlement;
+            try { settlement = await _backend.SettlementAsync(MatchId, _lifetime.Token); }
+            catch (InvalidDataException exception) when (exception.Message == "gate-settlement-identity")
+            {
+                throw new GateCallException("settlement-mismatch-active-battle");
+            }
+            if (settlement.MatchId != MatchId) throw new GateCallException("settlement-mismatch-active-battle");
+            if (settlement.Confirmed) { SettlementConfirmed = true; State = "Settling"; }
+            if (Battle.ArenaPhase != ArenaMatchPhase.Finished && State != "Settling") return false;
+            State = "Settling";
+            if (settlement.Confirmed && Profile.Played == _baselinePlayed + 1)
+            {
+                if (_automated && !Reconnected) { Fail("reconnect-not-observed"); return true; }
+                _resumePending = false; Error = ""; Completed = true; State = "Finished"; WriteEvidence(true);
+            }
+            else if (Profile.Played > _baselinePlayed + 1) Fail("unexpected-profile-increment");
+            return true;
+        }
+
+        private void ValidateOriginalMatch(GateMatch candidate, bool allowMissing = false)
+        {
+            if (_match == null || Mismatch(candidate.MatchId, _match.MatchId, allowMissing) || Mismatch(candidate.RoomId, _match.RoomId, allowMissing) ||
+                Mismatch(candidate.NodeId, _match.NodeId, allowMissing) || Mismatch(candidate.BootEpoch, _match.BootEpoch, allowMissing))
+                throw new GateCallException("allocation-mismatch-active-battle");
+        }
+        private static bool Mismatch(string candidate, string original, bool allowMissing) => candidate != original && !(allowMissing && candidate.Length == 0);
+
+        private void OnApplicationPause(bool paused)
+        {
+            if (_disposed || Completed || paused == _paused) return; // Initial false and duplicate callbacks have no effect.
+            _paused = paused;
+            if (paused) { PauseCount++; _pauseGeneration++; }
+            else
+            {
+                ResumeCount++; _skipElapsedFrame = true;
+                _resumePending = Battle != null; _nextPoll = 0;
+                if (_resumePending) BackendStatus = "正在验证原对局并恢复连接。";
+            }
+            WriteCheckpoint();
+        }
+
         private async void Run(Func<Task> action)
         {
             if (_busy || _disposed) return; _busy = true;
@@ -235,6 +322,10 @@ namespace AiNative.Client.Application
             {
                 if (_disposed) return;
                 string code = exception is GateCallException gate ? gate.Code : exception.GetType().Name;
+                if (Battle != null && (code == "allocation-mismatch-active-battle" || code == "account-mismatch-active-battle" || code == "settlement-mismatch-active-battle"))
+                {
+                    Error = code; BackendStatus = "恢复身份与原对局不一致，已拒绝更换玩家或对局。"; _nextPoll = Time.unscaledTime + 1; return;
+                }
                 if (_backend != null && (code == "session-expired" || code == "invalid_session" || code == "invalid-session" || code == "unauthorized"))
                 {
                     BackendStatus = "登录凭证已失效，请重新登录；当前对局继续，结算会重试。";
@@ -272,7 +363,7 @@ namespace AiNative.Client.Application
                 GUILayout.Label("接入地址"); _host = GUILayout.TextField(_host); _port = GUILayout.TextField(_port); _tls = GUILayout.Toggle(_tls, "使用 TLS");
                 if (_tls) { GUILayout.Label("测试证书 SHA256（正式证书可留空）"); _pin = GUILayout.TextField(_pin); }
                 GUILayout.Label("账号"); _username = GUILayout.TextField(_username, 64); GUILayout.Label("密码"); _password = GUILayout.PasswordField(_password, '*', 256);
-                if (GUILayout.Button("注册并登录")) Run(() => ConnectAccountAsync(true));
+                if (Battle == null && GUILayout.Button("注册并登录")) Run(() => ConnectAccountAsync(true));
                 if (GUILayout.Button("登录 / 恢复后台连接")) Run(() => ConnectAccountAsync(false));
             }
             else
@@ -302,7 +393,7 @@ namespace AiNative.Client.Application
                 if (Battle != null)
                 {
                     GUILayout.Label("房间：" + RoomId);
-                    if (GUILayout.Button("重新连接战斗")) Battle.RequestReconnect();
+                    if (GUILayout.Button("重新连接战斗")) { _resumePending = true; _nextPoll = 0; }
                 }
             }
             GUI.enabled = true; GUILayout.EndArea();
@@ -311,17 +402,25 @@ namespace AiNative.Client.Application
         private void WriteEvidence(bool success)
         {
             if (_resultPath.Length == 0) return;
-            try
-            {
-                string fullPath = Path.GetFullPath(_resultPath); Directory.CreateDirectory(Path.GetDirectoryName(fullPath));
-                File.WriteAllText(fullPath, JsonUtility.ToJson(new Evidence { success = success, error = Error, playerId = PlayerId, matchId = MatchId, roomId = RoomId, bootEpoch = _match?.BootEpoch ?? "", reconnected = Reconnected, settlementConfirmed = SettlementConfirmed, backendReconnectCount = BackendReconnectCount, preparedInputs = PreparedInputs, maxAcknowledgementStallSeconds = MaxAcknowledgementStallSeconds, played = Profile?.Played ?? 0, lastTick = Battle?.LastReceivedTick.ToString() ?? "0", lastAcknowledgedSequence = Battle?.LastAcknowledgedSequence ?? 0 }, true));
-            }
-            catch (Exception exception) { Error = "evidence-write:" + exception.GetType().Name; success = false; }
+            if (!WriteCheckpoint(success)) success = false;
 #if !UNITY_EDITOR
             global::UnityEngine.Application.Quit(success ? 0 : 1);
 #endif
         }
-        [Serializable] private sealed class Evidence { public bool success, reconnected, settlementConfirmed; public string error, playerId, matchId, roomId, bootEpoch, lastTick; public long played, preparedInputs; public uint lastAcknowledgedSequence; public int backendReconnectCount; public float maxAcknowledgementStallSeconds; }
+        private bool WriteCheckpoint(bool success = false)
+        {
+            if (_resultPath.Length == 0) return true;
+            try
+            {
+                string fullPath = Path.GetFullPath(_resultPath); Directory.CreateDirectory(Path.GetDirectoryName(fullPath));
+                File.WriteAllText(fullPath, JsonUtility.ToJson(new Evidence { success = success || (Completed && State == "Finished"), completed = Completed, state = State, runId = _runId, paused = _paused,
+                    pauseCount = PauseCount, resumeCount = ResumeCount, resumeCompletedCount = ResumeCompletedCount, resumePending = _resumePending,
+                    error = Error, playerId = PlayerId, matchId = MatchId, roomId = RoomId, nodeId = _match?.NodeId ?? "", bootEpoch = _match?.BootEpoch ?? "", reconnected = Reconnected, settlementConfirmed = SettlementConfirmed, backendReconnectCount = BackendReconnectCount, preparedInputs = PreparedInputs, maxAcknowledgementStallSeconds = MaxAcknowledgementStallSeconds, played = Profile?.Played ?? 0, lastTick = Battle?.LastReceivedTick.ToString() ?? "0", lastAcknowledgedSequence = Battle?.LastAcknowledgedSequence ?? 0 }, true));
+                return true;
+            }
+            catch (Exception exception) { Error = "evidence-write:" + exception.GetType().Name; return false; }
+        }
+        [Serializable] private sealed class Evidence { public bool success, reconnected, settlementConfirmed, completed, paused, resumePending; public string error, playerId, matchId, roomId, nodeId, bootEpoch, lastTick, state, runId; public long played, preparedInputs; public uint lastAcknowledgedSequence; public int backendReconnectCount, pauseCount, resumeCount, resumeCompletedCount; public float maxAcknowledgementStallSeconds; }
         private async void OnDestroy()
         {
             _disposed = true; _lifetime.Cancel(); _backend?.Dispose(); if (Battle != null) await Battle.DisposeAsync(); _lifetime.Dispose();

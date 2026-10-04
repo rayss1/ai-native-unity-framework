@@ -24,8 +24,14 @@ public sealed class FantasyServiceRuntime : IServiceRpc, IClientNotifier, IAsync
     private IServiceHandler? _handler;
     private Scene? _scene;
     private readonly ConcurrentDictionary<string, Session> _outer = new(StringComparer.Ordinal);
+    private readonly FantasyBattleProbeGroups _probeGroups = new();
     public FantasyServiceRuntime(int sourceSceneId, ServiceRole role, PeerAuthentication auth)
-    { _sourceSceneId = sourceSceneId; _role = role; _auth = auth; }
+    {
+        // Independent acceptance probes do not construct a Battle gateway.
+        // Configure vendor-global settings before the first outer KCP network.
+        global::Fantasy.Network.KCP.KCPSettings.ConfigureOuterMtu(FantasyKcpGateway.DefaultOuterKcpMtu);
+        _sourceSceneId = sourceSceneId; _role = role; _auth = auth;
+    }
     public bool IsReady => _ready.Task.IsCompletedSuccessfully;
     public void SetHandler(IServiceHandler handler) => _handler = handler;
     public Task WaitUntilReadyAsync(CancellationToken ct = default) => _ready.Task.WaitAsync(ct);
@@ -52,24 +58,33 @@ public sealed class FantasyServiceRuntime : IServiceRpc, IClientNotifier, IAsync
     }
     public Task<FantasyBackendProbe> ConnectGateProbeAsync(string endpoint, CancellationToken ct = default) =>
         FantasyBackendProbe.ConnectAsync(_scene ?? throw new InvalidOperationException("runtime-not-ready"), endpoint, ct);
+    internal Task<FantasyBattleProbeGroup> CreateBattleProbeGroupAsync(CancellationToken ct = default)
+    {
+        if (_role != ServiceRole.Client) throw new InvalidOperationException("probe-group-requires-client-runtime");
+        return _probeGroups.CreateAsync(_scene ?? throw new InvalidOperationException("runtime-not-ready"), ct);
+    }
     internal Task<FantasyKcpProbe> ConnectBattleProbeAsync(string endpoint, CancellationToken ct = default)
     {
+        ct.ThrowIfCancellationRequested();
         Scene scene = _scene ?? throw new InvalidOperationException("runtime-not-ready");
         TaskCompletionSource<FantasyKcpProbe> connected = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        global::Fantasy.Network.KCP.KCPClientNetwork? network = null;
         scene.ThreadSynchronizationContext.Post(() =>
         {
-            var network = global::Fantasy.Entitas.Entity.Create<global::Fantasy.Network.KCP.KCPClientNetwork>(scene, false, true);
-            network.Initialize(NetworkTarget.Outer, enableReceiveMessageJsonLog: false);
-            Session? session = null;
+            if (connected.Task.IsCompleted || scene.IsDisposed) return;
             try
             {
-                session = network.Connect(endpoint, onConnectComplete: () => connected.TrySetResult(new FantasyKcpProbe(session!)),
+                network = global::Fantasy.Entitas.Entity.Create<global::Fantasy.Network.KCP.KCPClientNetwork>(scene, false, true);
+                network.Initialize(NetworkTarget.Outer, enableReceiveMessageJsonLog: false);
+                FantasyProbeConnection.Begin<Session, FantasyKcpProbe>(complete => network.Connect(endpoint, onConnectComplete: complete,
                     onConnectFail: () => connected.TrySetException(new ServiceException("unavailable")), onConnectDisconnect: () => { },
-                    isHttps: false, connectTimeout: 5000);
+                    isHttps: false, connectTimeout: 5000), session => new(session), connected,
+                    probe => probe.DisposeAsync().GetAwaiter().GetResult());
             }
-            catch (Exception) { network.Dispose(); connected.TrySetException(new ServiceException("unavailable")); }
+            catch (Exception) { network?.Dispose(); connected.TrySetException(new ServiceException("unavailable")); }
         });
-        return connected.Task.WaitAsync(TimeSpan.FromSeconds(10), ct);
+        return FantasyProbeConnection.WaitOwnedAsync(connected, TimeSpan.FromSeconds(10), ct,
+            () => FantasyProbeConnection.OnSceneAsync(scene, () => network?.Dispose()), probe => probe.DisposeAsync());
     }
     public async Task RunAsync(CancellationToken ct)
     {
@@ -151,5 +166,5 @@ public sealed class FantasyServiceRuntime : IServiceRpc, IClientNotifier, IAsync
         finally { runtime._handlers.Release(); ServiceDiagnostics.RecordRpc(request.Method, runtime._role, started, response.Error.Length == 0); }
         return response.ToByteArray();
     }
-    public ValueTask DisposeAsync() { _lifetime.Cancel(); _auth.Dispose(); return ValueTask.CompletedTask; }
+    public async ValueTask DisposeAsync() { await _probeGroups.DisposeAsync(); _lifetime.Cancel(); _auth.Dispose(); }
 }

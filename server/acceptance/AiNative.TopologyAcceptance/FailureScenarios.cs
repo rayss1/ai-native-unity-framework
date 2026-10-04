@@ -12,11 +12,75 @@ using AiNative.Server.Protocol;
 using Google.Protobuf;
 using Npgsql;
 
+// Qualification-only cleanup. Party IDs and original identity are retained; unknown mutation replies never count as success.
+internal static class QualificationPartyCleanup
+{
+    public static async Task LeaveAsync(string playerId, string partyId, string requestId,
+        Func<string, IMessage, CancellationToken, Task<ServiceReply>> call, TimeProvider clock)
+    {
+        long started = clock.GetTimestamp();
+        TimeSpan timeout = TimeSpan.FromSeconds(30);
+        int leaveAttempts = 0;
+        Exception? lastStatusFailure = null;
+        while (clock.GetElapsedTime(started) < timeout)
+        {
+            ServiceReply reply;
+            try { reply = await call(ServiceMethods.PartyGet, new PartyCommand { PartyId = partyId }, CancellationToken.None); }
+            catch (Exception failure) when (failure is TimeoutException or ServiceException)
+            { throw new InvalidOperationException("qualification-party-cleanup-unconfirmed", failure); }
+            if (reply.Error == "party_not_found") return;
+            if (!reply.Success) throw new InvalidOperationException("qualification-party-cleanup-unconfirmed");
+            PartyState party = reply.Read(PartyState.Parser);
+            if (party.PartyId != partyId || party.Members.Count != 1 || party.Members[0].PlayerId != playerId)
+                throw new InvalidOperationException("qualification-party-cleanup-identity-conflict");
+            if (party.QueueRequestId.Length > 0)
+            {
+                if (party.QueueRequestId != requestId) throw new InvalidOperationException("qualification-party-cleanup-request-conflict");
+                try
+                {
+                    var statusReply = await call(ServiceMethods.MatchStatus, new MatchQuery { RequestId = requestId }, CancellationToken.None);
+                    if (!statusReply.Success)
+                    {
+                        lastStatusFailure = new InvalidOperationException("match-status-rejected:" + statusReply.Error);
+                        // Gate issues a ticket for cached ready status. Coordinator can already be
+                        // Released before Match's next pump clears that status and Lobby's queue.
+                        // A rejected ticket proves neither party absence nor permission to cancel.
+                        if (statusReply.Error != "invalid_allocation")
+                            throw new InvalidOperationException("qualification-party-cleanup-unconfirmed", lastStatusFailure);
+                        if (clock.GetElapsedTime(started) < timeout) await Task.Delay(250);
+                        continue;
+                    }
+                    var status = statusReply.Read(MatchReady.Parser).Status;
+                    // An allocated room must finish through its original battle and settlement; never cancel it here.
+                    if (status.State == "queued")
+                    {
+                        var cancelled = await call(ServiceMethods.QueueCancel, new MatchQuery { RequestId = requestId }, CancellationToken.None);
+                        if (!cancelled.Success) throw new InvalidOperationException("qualification-party-cleanup-unconfirmed");
+                    }
+                }
+                catch (Exception failure) when (failure is TimeoutException or ServiceException)
+                { throw new InvalidOperationException("qualification-party-cleanup-unconfirmed", failure); }
+            }
+            else
+            {
+                if (++leaveAttempts > 3) throw new InvalidOperationException("qualification-party-cleanup-unconfirmed");
+                try { await call(ServiceMethods.PartyLeave, new PartyCommand { PartyId = partyId, ExpectedVersion = party.Version }, CancellationToken.None); }
+                catch (Exception failure) when (failure is TimeoutException or ServiceException) { /* Verify the uncertain mutation through PartyGet below. */ }
+                // Even a successful reply is followed by an authoritative absence check, using the same party ID.
+                continue;
+            }
+            if (clock.GetElapsedTime(started) < timeout) await Task.Delay(250);
+        }
+        throw new InvalidOperationException("qualification-party-cleanup-unconfirmed", lastStatusFailure);
+    }
+}
+
 internal static class FailureScenarios
 {
     public static async Task RunAsync(FantasyServiceRuntime runtime, string mode, List<object> evidence, CancellationToken ct)
     {
         var fixture = new Fixture(runtime, evidence, ct);
+        if (mode == "qualification") { await new ArenaCapacityRunner(runtime, fixture, evidence, ct).RunAsync(); return; }
         if (mode is "capacity" or "bots") { await fixture.CapacityAndBots(mode == "bots"); return; }
         if (mode == "party-notifications") { await fixture.PartyNotifications(); return; }
         await using Pair pair = await fixture.CreatePair();
@@ -151,24 +215,90 @@ internal static class FailureScenarios
         }
         public async Task<(FantasyBackendProbe gate, LoginResult login, string request, string partyId)> Queue()
         {
-            var gate = await runtime.ConnectGateProbeAsync("127.0.0.1:23001", ct);
-            var account = new AccountRequest { Username = "fault_" + Guid.NewGuid().ToString("N")[..16], Password = Guid.NewGuid().ToString("N") };
-            var login = (await gate.CallAsync(ServiceMethods.RegisterAccount, account.ToByteArray(), ct:ct)).Read(LoginResult.Parser);
-            await using var loginConnection = await runtime.ConnectGateProbeAsync("127.0.0.1:23001",ct);
-            login = (await loginConnection.CallAsync(ServiceMethods.Login,account.ToByteArray(),ct:ct)).Read(LoginResult.Parser);
-            var party = (await gate.CallAsync(ServiceMethods.PartyCreate, new Empty().ToByteArray(), login.SessionToken, ct)).Read(PartyState.Parser);
-            party = (await gate.CallAsync(ServiceMethods.PartyReady, new PartyCommand { PartyId = party.PartyId, ExpectedVersion = party.Version, Ready = true }.ToByteArray(), login.SessionToken, ct)).Read(PartyState.Parser);
-            string request = Guid.NewGuid().ToString("N");
-            (await gate.CallAsync(ServiceMethods.PartyQueue, new PartyQueueRequest { PartyId = party.PartyId, ExpectedVersion = party.Version, RequestId = request }.ToByteArray(), login.SessionToken, ct)).Read(MatchStatus.Parser);
-            return (gate,login,request,party.PartyId);
+            PreparedMember member = await Prepare(ct);
+            try { await Enqueue(member, ct); return (member.gate, member.login, member.request, member.partyId); }
+            catch { await member.DisposeAsync(); throw; }
         }
-        public async Task<MatchReady> Ready(FantasyBackendProbe gate, LoginResult login, string request, bool allowFailure = false)
+        public sealed record PreparedMember(FantasyBackendProbe gate, LoginResult login, string request, string partyId, ulong partyVersion,
+            Func<PreparedMember, Task>? cleanup = null) : IAsyncDisposable
         {
+            readonly object ownership = new();
+            Task? disposal, transportDisposal;
+            public ValueTask DisposeTransportAsync()
+            { lock (ownership) return new(transportDisposal ??= gate.DisposeAsync().AsTask()); }
+            public ValueTask DisposeAsync()
+            { lock (ownership) return new(disposal ??= DisposeCoreAsync()); }
+            async Task DisposeCoreAsync()
+            { try { if (cleanup is not null) await cleanup(this); } finally { await DisposeTransportAsync(); } }
+        }
+        public async Task<PreparedMember> Prepare(CancellationToken token, bool cleanupParty = false)
+        {
+            token.ThrowIfCancellationRequested();
+            // Await the bounded connection attempt before observing cancellation, so a late probe always has an owner.
+            var gate = await runtime.ConnectGateProbeAsync("127.0.0.1:23001", CancellationToken.None);
+            LoginResult? login = null;
+            PartyState? party = null;
+            string request = Guid.NewGuid().ToString("N");
+            try
+            {
+                token.ThrowIfCancellationRequested();
+                var account = new AccountRequest { Username = "fault_" + Guid.NewGuid().ToString("N")[..16], Password = Guid.NewGuid().ToString("N") };
+                login = (await gate.CallAsync(ServiceMethods.RegisterAccount, account.ToByteArray(), ct:token)).Read(LoginResult.Parser);
+                await using var loginConnection = await runtime.ConnectGateProbeAsync("127.0.0.1:23001",CancellationToken.None);
+                token.ThrowIfCancellationRequested();
+                login = (await loginConnection.CallAsync(ServiceMethods.Login,account.ToByteArray(),ct:token)).Read(LoginResult.Parser);
+                // Cancellation of the probe waiter cannot cancel an already accepted backend mutation.
+                // Qualification awaits its bounded reply before transferring or cleaning the known party.
+                CancellationToken mutation = cleanupParty ? CancellationToken.None : token;
+                token.ThrowIfCancellationRequested();
+                try { party = (await gate.CallAsync(ServiceMethods.PartyCreate, new Empty().ToByteArray(), login.SessionToken, mutation)).Read(PartyState.Parser); }
+                catch (Exception failure) when (cleanupParty && failure is TimeoutException or ServiceException)
+                { throw new InvalidOperationException("qualification-party-create-outcome-unknown", failure); }
+                token.ThrowIfCancellationRequested();
+                party = (await gate.CallAsync(ServiceMethods.PartyReady, new PartyCommand { PartyId = party.PartyId, ExpectedVersion = party.Version, Ready = true }.ToByteArray(), login.SessionToken, mutation)).Read(PartyState.Parser);
+                token.ThrowIfCancellationRequested();
+                return new(gate, login, request, party.PartyId, party.Version, cleanupParty ? CleanupPreparedParty : null);
+            }
+            catch
+            {
+                try
+                {
+                    if (cleanupParty && party is not null && login is not null)
+                        await CleanupPreparedParty(new(gate, login, request, party.PartyId, party.Version));
+                }
+                finally { await gate.DisposeAsync(); }
+                throw;
+            }
+        }
+        public async Task KeepPreparedAlive(PreparedMember member, CancellationToken token)
+        {
+            // Await the whole bounded call. A cancelled response waiter would still leave an RPC in flight at handoff.
+            var party = (await member.gate.CallAsync(ServiceMethods.PartyGet,
+                new PartyCommand { PartyId = member.partyId }.ToByteArray(), member.login.SessionToken, CancellationToken.None)).Read(PartyState.Parser);
+            Check(member.login.ExpiresUnixSeconds > DateTimeOffset.UtcNow.ToUnixTimeSeconds() && party.PartyId == member.partyId &&
+                party.Version == member.partyVersion && party.QueueRequestId.Length == 0 && party.Members.Count == 1 &&
+                party.Members[0].PlayerId == member.login.PlayerId && party.Members[0].Ready, "qualification-prepared-party-changed");
+        }
+        async Task CleanupPreparedParty(PreparedMember member)
+        {
+            // The original Gate can expire during a match. This fresh connection uses the original session and identity.
+            await using var gate = await runtime.ConnectGateProbeAsync("127.0.0.1:23001", CancellationToken.None);
+            await QualificationPartyCleanup.LeaveAsync(member.login.PlayerId, member.partyId, member.request,
+                async (method, payload, token) => await gate.CallAsync(method, payload.ToByteArray(), member.login.SessionToken, token), TimeProvider.System);
+        }
+        public async Task Enqueue(PreparedMember member, CancellationToken token)
+        {
+            (await member.gate.CallAsync(ServiceMethods.PartyQueue,
+                new PartyQueueRequest { PartyId = member.partyId, ExpectedVersion = member.partyVersion, RequestId = member.request }.ToByteArray(), member.login.SessionToken, token)).Read(MatchStatus.Parser);
+        }
+        public async Task<MatchReady> Ready(FantasyBackendProbe gate, LoginResult login, string request, bool allowFailure = false, CancellationToken? cancellation = null)
+        {
+            CancellationToken token = cancellation ?? ct;
             for(int i=0;i<150;i++) {
-                var ready=(await gate.CallAsync(ServiceMethods.MatchStatus,new MatchQuery{RequestId=request}.ToByteArray(),login.SessionToken,ct)).Read(MatchReady.Parser);
+                var ready=(await gate.CallAsync(ServiceMethods.MatchStatus,new MatchQuery{RequestId=request}.ToByteArray(),login.SessionToken,token)).Read(MatchReady.Parser);
                 if(ready.EntryTicket.Length>0) return ready;
                 if(ready.Status.State=="failed" || ready.Status.Failure.Length>0) { if(allowFailure)return ready; throw new InvalidOperationException("match-failure:"+ready.Status.Failure); }
-                await Task.Delay(200,ct);
+                await Task.Delay(200,token);
             }
             throw new TimeoutException("allocation-not-ready");
         }
@@ -180,27 +310,28 @@ internal static class FailureScenarios
             var entityA=await Join(wireA.Transport,readyA);var entityB=await Join(wireB.Transport,readyB);
             return new(a.gate,b.gate,a.login,b.login,a.request,b.request,readyA,readyB,wireA,wireB,entityA.EntityId,entityB.EntityId);
         }
-        public async Task<JoinRoomResponse> Join(IRealtimeTransport transport,MatchReady ready)
+        public async Task<JoinRoomResponse> Join(IRealtimeTransport transport,MatchReady ready,CancellationToken? cancellation = null)
         {
-            await Send(transport,MessageId.LoginRequest,new LoginRequest{ProtocolMajor=1,ClientBuild="failure-acceptance",EntryTicket=ready.EntryTicket,GlobalRoomId=ready.Status.Allocation.RoomId});
-            var login=await Receive<LoginResponse>(transport,MessageId.LoginResponse,10);
+            await Send(transport,MessageId.LoginRequest,new LoginRequest{ProtocolMajor=1,ClientBuild="failure-acceptance",EntryTicket=ready.EntryTicket,GlobalRoomId=ready.Status.Allocation.RoomId},cancellation);
+            var login=await Receive<LoginResponse>(transport,MessageId.LoginResponse,10,cancellation);
             Check(login.BootEpoch==ready.Status.Allocation.BootEpoch,"join-boot-identity");
-            await Send(transport,MessageId.JoinRoomRequest,new JoinRoomRequest{SessionId=login.SessionId,RequestedRoom=1});
-            return await Receive<JoinRoomResponse>(transport,MessageId.JoinRoomResponse,10);
+            await Send(transport,MessageId.JoinRoomRequest,new JoinRoomRequest{SessionId=login.SessionId,RequestedRoom=1},cancellation);
+            return await Receive<JoinRoomResponse>(transport,MessageId.JoinRoomResponse,10,cancellation);
         }
-        public async Task Send(IRealtimeTransport transport,MessageId id,IMessage message)
-        {byte[] bytes=new byte[1200];Check(RealtimeProtocolCodec.TryEncode(id,message,bytes,out var channel,out int length),"encode");Check((await transport.SendAsync(channel,bytes.AsMemory(0,length),ct)).Status==SendStatus.Accepted,"send");}
-        public async Task<T> Receive<T>(IRealtimeTransport transport,MessageId id,int seconds) where T:IMessage
+        public async Task Send(IRealtimeTransport transport,MessageId id,IMessage message,CancellationToken? cancellation = null)
+        {byte[] bytes=new byte[1200];Check(RealtimeProtocolCodec.TryEncode(id,message,bytes,out var channel,out int length),"encode");Check((await transport.SendAsync(channel,bytes.AsMemory(0,length),cancellation ?? ct)).Status==SendStatus.Accepted,"send");}
+        public async Task<T> Receive<T>(IRealtimeTransport transport,MessageId id,int seconds,CancellationToken? cancellation = null) where T:IMessage
         {
+            CancellationToken token = cancellation ?? ct;
             var end=DateTime.UtcNow.AddSeconds(seconds);byte[] bytes=new byte[1200];
-            while(DateTime.UtcNow<end){while(transport.TryReceive(bytes,out var packet))if(packet.IsComplete && RealtimeProtocolCodec.TryDecode(bytes.AsSpan(0,packet.WrittenBytes),out var decoded)==ProtocolDecodeStatus.Accepted && decoded.MessageId==id)return(T)decoded.Message;await Task.Delay(10,ct);}
+            while(DateTime.UtcNow<end){while(transport.TryReceive(bytes,out var packet))if(packet.IsComplete && RealtimeProtocolCodec.TryDecode(bytes.AsSpan(0,packet.WrittenBytes),out var decoded)==ProtocolDecodeStatus.Accepted && decoded.MessageId==id)return(T)decoded.Message;await Task.Delay(10,token);}
             throw new TimeoutException("receive-"+id);
         }
         public Task<Snapshot> Snapshot(IRealtimeTransport transport)=>Receive<Snapshot>(transport,MessageId.Snapshot,15);
-        public Task<Snapshot> FreshSnapshot(IRealtimeTransport transport)
+        public Task<Snapshot> FreshSnapshot(IRealtimeTransport transport,CancellationToken? cancellation = null)
         {
             byte[] bytes = new byte[1200]; while (transport.TryReceive(bytes, out _)) { }
-            return Snapshot(transport);
+            return Receive<Snapshot>(transport,MessageId.Snapshot,15,cancellation);
         }
         public async Task<Snapshot> Finished(IRealtimeTransport transport)
         {Snapshot value;do{value=await Snapshot(transport);}while(value.MatchPhase!=ArenaMatchPhase.ArenaMatchFinished);return value;}

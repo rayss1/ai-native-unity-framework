@@ -155,6 +155,48 @@ Consumers: simulation rules, replay, golden-vector tests
 
 `IStateHasher.ComputeHash(ReadOnlySpan<byte>)` hashes a caller-owned canonical representation. The first implementation is xxHash64 with seed zero; canonical state bytes are versioned, little-endian, and independent of object layout or locale.
 
+## Arena prediction input forwarding
+
+Owner: Client prediction package (`com.ainative.client.prediction`)
+
+Arena input forwarding uses `ArenaClientPredictionAdapter.PrepareInput` with a
+caller-owned destination, followed outside Tick by
+`SendPreparedAsync(ReadOnlyMemory<byte>, CancellationToken)`. The supplied memory
+remains immutable until send completion; the returned `SendResult`, cancellation
+and transport exception remain observable. Retrying backpressure resends identical
+bytes without advancing prediction. The 2026-10-04 pre-release correction removes
+the unused byte-count-only send and fire-and-forget convenience method; source
+consumers migrate to this explicit-memory path (see the prediction package README).
+No Shared port, input sequence semantics or wire representation changes.
+
+## Arena remote presentation
+
+Owner: Client prediction package (`com.ainative.client.prediction`)
+Consumer: Unity application composition
+
+`ArenaClientProtocolV1.TryDecodePlayers` decodes the existing full Snapshot into
+caller-owned `Span<ArenaSnapshotPlayer>` storage, with at most eight distinct
+nonzero entity IDs. Invalid, duplicate or oversized data fails without changing
+the destination. This bounded Arena decoder does not constrain the retained
+legacy 64-player snapshot path.
+
+`ArenaRemotePresentation` is single-owner-thread state with eight entity slots
+and sixteen snapshots per entity. `ApplySnapshot(frame, localEntityId)` rejects
+non-increasing server ticks and excludes the local entity from presentation.
+`Advance(deltaSeconds, Span<ArenaRemotePose>)` emits world-space millimetres,
+millidegree yaw and alive state. It targets a six-Tick delay, interpolates shortest
+yaw, holds rather than extrapolates on starvation, and rebuilds the delay without
+moving render time backward. Alive transitions or jumps above 5,000 mm reset that
+entity's history. Missing members are removed immediately. `Reset` clears history
+at every connection/room change; the application validates admission and packet
+epoch before applying snapshots. The low-level decoder can describe eight remote
+entities when the local entity is absent; application composition requires its
+local entity to be present and therefore owns seven reusable remote visuals.
+
+No authority, collision, local prediction, wire schema or Shared port changes.
+These initial presentation parameters are bounded implementation defaults,
+independent of the server correction and performance acceptance thresholds.
+
 ## Client prediction primitives
 
 Owner: Shared Gameplay
