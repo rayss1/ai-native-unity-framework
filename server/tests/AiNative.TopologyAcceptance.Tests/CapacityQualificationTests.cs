@@ -218,6 +218,38 @@ public class CapacityQualificationTests
     }
 
     [Test]
+    public void WeaponCycleSendsAnEmptyAttemptBeforeSwitchAndRespawnRestoresAmmo()
+    {
+        dynamic counters = Activator.CreateInstance(Feature("QualificationCombatEvidence"), new object[] { new uint[] { 1, 2 } })!;
+        Assert.That((uint)counters.SelectWeapon(1u), Is.EqualTo(1u));
+        for (uint sequence = 1; sequence <= 40; sequence++)
+        {
+            var fire = new ReliableEvent { Sequence = sequence, CombatEvent = new ArenaCombatEvent { SourceEntityId = 1, WeaponId = ArenaWeaponId.ArenaWeaponMachinegun } };
+            counters.Observe(fire, true); counters.Observe(fire, true);
+        }
+        Assert.That((uint)counters.SelectWeapon(1u), Is.EqualTo(1u), "Selecting or failing to send must not switch early.");
+        Assert.That((uint)counters.SelectWeapon(1u), Is.EqualTo(1u));
+        Assert.That((bool)counters.RecordAcceptedFireAttempt(1u, 1u), Is.True);
+        Assert.That((uint)counters.SelectWeapon(1u), Is.EqualTo(2u));
+        Assert.That((uint)counters.SelectWeapon(2u), Is.EqualTo(2u));
+        counters.Observe(new ReliableEvent { Sequence = 41, CombatEvent = new ArenaCombatEvent { EventType = ArenaCombatEventType.ArenaEventRespawn, SourceEntityId = 1 } }, true);
+        Assert.That((bool)counters.AmmoExhausted(1u, 1u), Is.False);
+        Assert.That((bool)counters.RecordAcceptedFireAttempt(1u, 2u), Is.False);
+        Assert.That((uint)counters.SelectWeapon(1u), Is.EqualTo(2u));
+    }
+
+    [Test]
+    public void WeaponCycleRetainsFourSecondMaximumDwellAndDoesNotCountReadAsSend()
+    {
+        dynamic counters = Activator.CreateInstance(Feature("QualificationCombatEvidence"), new object[] { new uint[] { 1 } })!;
+        for (int i = 0; i < 1000; i++) Assert.That((uint)counters.SelectWeapon(1u), Is.EqualTo(1u));
+        for (int i = 0; i < 239; i++) Assert.That((bool)counters.RecordAcceptedFireAttempt(1u, 1u), Is.False);
+        Assert.That((uint)counters.SelectWeapon(1u), Is.EqualTo(1u));
+        Assert.That((bool)counters.RecordAcceptedFireAttempt(1u, 1u), Is.False);
+        Assert.That((uint)counters.SelectWeapon(1u), Is.EqualTo(2u));
+    }
+
+    [Test]
     public void EightPlayerQualificationKeepsRealCombatAfterWarmupWithFiniteAmmo()
     {
         Type type = Assembly.Load("AiNative.Server.Battle").GetType("AiNative.BattleHost.ArenaRoom")!;
@@ -230,7 +262,11 @@ public class CapacityQualificationTests
         var states = (AiNative.Gameplay.ArenaPlayerState[])type.GetField("_players", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(room)!;
         var events = (System.Collections.IList)type.GetField("_events", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(room)!;
         var random = new Random(20261002); long[] counts = new long[6]; long[] playerFire = new long[8];
-        uint sequence = 0; int rotations = 0;
+        uint sequence = 0; int rotations = 0; long emptyAttempts = 0;
+        uint lastFireElapsed = 0, maximumNoFireTicks = 0;
+        var ammo = (int[,])type.GetField("_ammo", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(room)!;
+        dynamic combat = Activator.CreateInstance(Feature("QualificationCombatEvidence"), new object[] { entities })!;
+        uint eventSequence = 0;
         PlayerState State(int i) => new() { EntityId = entities[i], Alive = states[i].Alive, PositionXMilli = states[i].PositionXMillimetres,
             PositionYMilli = states[i].PositionYMillimetres, PositionZMilli = states[i].PositionZMillimetres,
             YawMillidegrees = states[i].YawMillidegrees, PitchMillidegrees = states[i].PitchMillidegrees };
@@ -242,6 +278,9 @@ public class CapacityQualificationTests
                 for (int i = 0; i < 8; i++) { object?[] args = [0u]; join.Invoke(room, args); entities[i] = (uint)args[0]!; }
                 states = (AiNative.Gameplay.ArenaPlayerState[])type.GetField("_players", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(room)!;
                 events = (System.Collections.IList)type.GetField("_events", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(room)!;
+                ammo = (int[,])type.GetField("_ammo", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(room)!;
+                combat = Activator.CreateInstance(Feature("QualificationCombatEvidence"), new object[] { entities })!;
+                eventSequence = 0;
                 random = new Random(unchecked(20261002 + rotations * 104729));
             }
             sequence++;
@@ -252,21 +291,33 @@ public class CapacityQualificationTests
                 var look = enemy is null ? (0, 0) : ((int, int))aim.Invoke(null, [self, enemy])!;
                 var movement = enemy is null ? (0, 0) : ((int, int))move.Invoke(null, [self, enemy, random.Next(2) == 0 ? 250 : -250])!;
                 var input = new AiNative.Gameplay.ArenaInput(sequence, sequence, movement.Item1,
-                    movement.Item2, look.Item1, look.Item2, AiNative.Gameplay.ArenaButtons.Fire, (AiNative.Gameplay.ArenaWeaponId)(1 + sequence / 240 % 3));
-                submit.Invoke(room, [entities[i], input]);
+                    movement.Item2, look.Item1, look.Item2, AiNative.Gameplay.ArenaButtons.Fire, (AiNative.Gameplay.ArenaWeaponId)(uint)combat.SelectWeapon(entities[i]));
+                Assert.That((bool)submit.Invoke(room, [entities[i], input])!, Is.True);
+                if (elapsed > 3600 && ammo[i, (int)input.Weapon - 1] == 0) emptyAttempts++;
+                combat.RecordAcceptedFireAttempt(entities[i], (uint)input.Weapon);
             }
             tick.Invoke(room, null);
             foreach (object e in events)
             {
                 int kind = Convert.ToInt32(e.GetType().GetProperty("Kind")!.GetValue(e));
+                if (kind == 0) lastFireElapsed = elapsed;
+                combat.Observe(new ReliableEvent { Sequence = ++eventSequence, CombatEvent = new ArenaCombatEvent {
+                    EventType = (ArenaCombatEventType)kind,
+                    SourceEntityId = (uint)e.GetType().GetProperty("SourceEntityId")!.GetValue(e)!,
+                    WeaponId = (ArenaWeaponId)Convert.ToInt32(e.GetType().GetProperty("Weapon")!.GetValue(e)) } }, elapsed > 3600);
                 if (elapsed > 3600) { counts[kind]++; if (kind == 0) playerFire[Array.IndexOf(entities, (uint)e.GetType().GetProperty("SourceEntityId")!.GetValue(e)!)]++; }
             }
             events.Clear();
+            if (elapsed > 3600) maximumNoFireTicks = Math.Max(maximumNoFireTicks, elapsed - lastFireElapsed);
         }
         TestContext.WriteLine("Measured combat after 60s warmup: " + string.Join(",", counts) + "; player fire=" + string.Join(",", playerFire) + "; score/time rotations=" + rotations);
         Assert.That(rotations, Is.GreaterThan(0));
         Assert.That(counts[0], Is.GreaterThan(0), "Finite ammunition must not leave measurement idle");
         Assert.That(counts[1], Is.GreaterThan(0)); Assert.That(counts[2], Is.GreaterThan(0)); Assert.That(counts[3], Is.GreaterThan(0));
+        Assert.That(counts[5], Is.GreaterThan(0));
         Assert.That(playerFire, Has.All.GreaterThan(0));
+        Assert.That(emptyAttempts, Is.GreaterThan(0), "Qualification must actually attempt fire with an exhausted magazine.");
+        Assert.That(maximumNoFireTicks, Is.LessThanOrEqualTo(300), "Empty magazines must not turn the combat workload idle.");
+        TestContext.WriteLine($"Actual empty attempts={emptyAttempts}; maximum no-fire ticks={maximumNoFireTicks}");
     }
 }

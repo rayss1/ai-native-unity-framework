@@ -268,6 +268,7 @@ internal sealed class ArenaCapacityRunner(FantasyServiceRuntime runtime, Failure
                 workerReports.All(worker => worker.data.GetProperty("observedTicks").GetInt64() >= options.DurationSeconds * 59.5);
             var report = new { scenario = "actual-arena-capacity-qualification", passed, options,
                 clientHarness = new { battleMessageOwnership = "one independent MultiThread Scene per room generation",
+                    weaponGenerator = "staggered-ammo-cycle-v2: four-second maximum dwell; send one observed-empty Fire before early rotation",
                     clientsPerGroup = options.PlayersPerRoom, maximumConcurrentRoomGroups = options.RoomCount,
                     gateMessageOwnership = "single acceptance root Scene", resourceAccounting = "whole-host audit includes all client threads and sockets" },
                 measurementStartUtc = diagnostics.First().Utc, measurementEndUtc = diagnostics.Last().Utc,
@@ -764,7 +765,7 @@ internal sealed class ArenaCapacityRunner(FantasyServiceRuntime runtime, Failure
                     var movement = enemy is null ? (X: 0, Z: 0) : QualificationAim.MoveToward(self, enemy, random.Next(2) == 0 ? 250 : -250);
                     var input = new InputCommand { Sequence = sequence, RoomTick = client.Last.RoomTick + 1,
                         MoveXMilli = movement.X, MoveYMilli = movement.Z, LookYawMilli = look.Yaw,
-                        LookPitchMilli = look.Pitch, Buttons = 1, WeaponId = 1 + sequence / 240 % 3 };
+                        LookPitchMilli = look.Pitch, Buttons = 1, WeaponId = room.Combat.SelectWeapon(client.Entity) };
                     Check(client.Pending.Count < 512, "qualification-bounded-unacknowledged-inputs");
                     client.Pending[sequence] = now;
                     client.LookCommands[sequence] = look;
@@ -779,7 +780,8 @@ internal sealed class ArenaCapacityRunner(FantasyServiceRuntime runtime, Failure
                         if (client.FirstMeasuredInputSequence == 0) client.FirstMeasuredInputSequence = sequence;
                         client.LastMeasuredInputSequence = sequence;
                     }
-                    if (now >= measurementStart && now < measurementEnd && room.Combat.AmmoExhausted(client.Entity, input.WeaponId)) client.AmmoExhaustedInputs++;
+                    bool emptyAttempt = room.Combat.RecordAcceptedFireAttempt(client.Entity, input.WeaponId);
+                    if (now >= measurementStart && now < measurementEnd && emptyAttempt) client.AmmoExhaustedInputs++;
                     if (room.LastFireTimestamp != 0 && now - room.LastFireTimestamp > Stopwatch.Frequency * 5) client.NoFireInputs++;
                     if (now - client.LastAckTimestamp > Stopwatch.Frequency * 5 && now - client.Started > Stopwatch.Frequency * 5)
                         throw new InvalidOperationException("qualification-player-ack-stalled");

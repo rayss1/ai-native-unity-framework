@@ -125,6 +125,8 @@ public static class QualificationAim
 public sealed class QualificationCombatEvidence(uint[] entities)
 {
     readonly Dictionary<uint, int[]> ammo = entities.ToDictionary(entity => entity, _ => Magazines());
+    readonly Dictionary<uint, uint> selectedWeapons = entities.ToDictionary(entity => entity, entity => 1u + (entity - 1) % 3);
+    readonly Dictionary<uint, int> weaponAttempts = entities.ToDictionary(entity => entity, _ => 0);
     readonly long[] total = new long[6], measured = new long[6];
     readonly Dictionary<uint, long> playerFire = [];
     uint lastSequence;
@@ -147,6 +149,18 @@ public sealed class QualificationCombatEvidence(uint[] entities)
         if (kind == 3 && ammo.ContainsKey(combat.SourceEntityId)) ammo[combat.SourceEntityId] = Magazines();
     }
     public bool AmmoExhausted(uint entity, uint weapon) => weapon is >= 1 and <= 3 && ammo.TryGetValue(entity, out var value) && value[weapon - 1] == 0;
+    public uint SelectWeapon(uint entity) => selectedWeapons[entity];
+    public bool RecordAcceptedFireAttempt(uint entity, uint weapon)
+    {
+        if (selectedWeapons[entity] != weapon) throw new InvalidOperationException("qualification-weapon-selection-mismatch");
+        bool empty = AmmoExhausted(entity, weapon);
+        // Preserve the original four-second weapon cadence, with per-player phases to avoid
+        // synchronized deaths repeatedly resetting every magazine before it can be exhausted.
+        // An observed empty Fire is still sent before an early rotation, never counted alone.
+        if (empty || ++weaponAttempts[entity] >= 240)
+        { selectedWeapons[entity] = weapon % 3 + 1; weaponAttempts[entity] = 0; }
+        return empty;
+    }
     public long MeasuredFire(uint entity) => playerFire.GetValueOrDefault(entity);
     public JsonElement Report() => JsonSerializer.SerializeToElement(new { fire = total[0], hit = total[1], kills = total[2], respawns = total[3], switches = total[5],
         measuredFire = measured[0], measuredHit = measured[1], measuredKills = measured[2], measuredRespawns = measured[3], measuredSwitches = measured[5], measuredSequenceGaps = gaps });
