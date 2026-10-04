@@ -1,8 +1,8 @@
 # Fantasy socket initialization: evidence and proposed fork change
 
-Status: Implementation authorized on 2026-10-04; local candidate integrated, full qualification in progress.
+Status: Implemented and adopted; [final local qualification](battle-slice-qualification-2026-10-05.md) passed at64 concurrent clients on2026-10-05. The128-client profile failed and remains unqualified.
 
-Current local fork: `df4ad5fe5418c8855932de784c7cea6286c4b082`; versions Fantasy-Net `2026.1.1004-ainative.1`, Fantasy.Unity `2026.1.1002-ainative.1`. The parent repository is uncommitted, and nothing has been pushed or published. Earlier proposal/candidate evidence below is historical. The implemented zero-step behavior is a no-op, as specified in the approved plan.
+Current fork: `df4ad5fe5418c8855932de784c7cea6286c4b082`; versions Fantasy-Net `2026.1.1004-ainative.1`, Fantasy.Unity `2026.1.1002-ainative.1`. The measured parent candidate is `4c7e4929f559eb977dd0bac3e5f4821d6f3b1df2`; the owner authorized commits, branch publication and PR creation. Earlier proposal/candidate evidence below is historical. The implemented zero-step behavior is a no-op, as specified in the approved plan.
 
 ## Observed problem
 
