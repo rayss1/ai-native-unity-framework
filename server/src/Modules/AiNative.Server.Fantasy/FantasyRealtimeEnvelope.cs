@@ -3,6 +3,7 @@ using Fantasy.Async;
 using Fantasy.Event;
 using Fantasy.Network;
 using Fantasy.Network.Interface;
+using Fantasy.Platform.Net;
 using LightProto;
 
 namespace AiNative.Server.Fantasy;
@@ -46,12 +47,12 @@ internal sealed class FantasyGatewaySceneCreatedEvent : AsyncEventSystem<OnCreat
 {
     protected override async FTask Handler(OnCreateScene created)
     {
-        if (string.Equals(
-                created.Scene.SceneConfig.NetworkProtocol,
+        if (SceneConfigData.Instance.TryGet(created.Scene.SceneConfigId, out var config) && config.OuterPort > 0 && string.Equals(
+                config.NetworkProtocol,
                 nameof(NetworkProtocolType.KCP),
                 StringComparison.Ordinal))
         {
-            FantasyKcpGatewayBridge.MarkListening(created.Scene, created.Scene.SceneConfig.OuterPort);
+            FantasyKcpGatewayBridge.MarkListening(created.Scene, config.OuterPort);
         }
 
         await FTask.CompletedTask;

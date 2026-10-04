@@ -7,7 +7,14 @@ namespace AiNative.Server.Rooms;
 
 public interface IWorkerRoom : IDisposable { void Tick(); }
 public sealed record WorkerPerformance(int WorkerId, long TickCount, long OverBudgetTicks, long AllocatedBytes,
-    long LastTickMicros, long FirstSampleTick, long[] RecentTickMicros, long[] SampleTickIds);
+    long LastTickMicros, long FirstSampleTick, long[] RecentTickMicros, long[] SampleTickIds)
+{
+    public long LifecycleOperations { get; init; }
+    public long[] SampleRoomAllocatedBytes { get; init; } = [];
+    public long[] SampleRoomMicros { get; init; } = [];
+    public long[] SampleMailboxAllocatedBytes { get; init; } = [];
+    public long[] SampleLifecycleOperations { get; init; } = [];
+}
 
 /// <summary>One dedicated owner thread per group. Admission and installation never move a live room.</summary>
 public sealed class BattleWorkerPool : IAsyncDisposable
@@ -312,6 +319,9 @@ public sealed class BattleWorkerPool : IAsyncDisposable
         private int _stopping, _faulted, _terminated, _cleanupStarted;
         private long _lastTickMicros;
         private readonly long[] _tickSamples = new long[4096], _sampleIds = new long[4096];
+        private readonly long[] _roomAllocationSamples = new long[4096], _mailboxAllocationSamples = new long[4096], _lifecycleSamples = new long[4096];
+        private readonly long[] _roomMicrosSamples = new long[4096];
+        private long _lifecycleOperations;
         private long _ticks, _overBudget, _allocated;
         private readonly Action<Worker> _stopped;
         public Worker(int id, int capacity, int mailboxCapacity, Action<Worker> stopped)
@@ -335,18 +345,25 @@ public sealed class BattleWorkerPool : IAsyncDisposable
             long end = Interlocked.Read(ref _ticks), first = Math.Max(1, end - 511);
             List<long> samples = new();
             List<long> ids = new();
+            List<long> roomAllocation = new(), mailboxAllocation = new(), lifecycle = new();
+            List<long> roomMicros = new();
             for (long id = first; id <= end; id++)
             {
                 int slot = (int)(id % _tickSamples.Length);
                 long before = Volatile.Read(ref _sampleIds[slot]), value = Interlocked.Read(ref _tickSamples[slot]);
-                if (before == id && Volatile.Read(ref _sampleIds[slot]) == id) { samples.Add(value); ids.Add(id); }
+                long roomBytes = Interlocked.Read(ref _roomAllocationSamples[slot]), mailboxBytes = Interlocked.Read(ref _mailboxAllocationSamples[slot]), transitions = Interlocked.Read(ref _lifecycleSamples[slot]);
+                long businessMicros = Interlocked.Read(ref _roomMicrosSamples[slot]);
+                if (before == id && Volatile.Read(ref _sampleIds[slot]) == id)
+                { samples.Add(value); ids.Add(id); roomAllocation.Add(roomBytes); mailboxAllocation.Add(mailboxBytes); lifecycle.Add(transitions); roomMicros.Add(businessMicros); }
             }
-            return new(Id, end, Interlocked.Read(ref _overBudget), Interlocked.Read(ref _allocated), LastTickMicros, first, samples.ToArray(), ids.ToArray());
+            return new(Id, end, Interlocked.Read(ref _overBudget), Interlocked.Read(ref _allocated), LastTickMicros, first, samples.ToArray(), ids.ToArray())
+            { LifecycleOperations = Interlocked.Read(ref _lifecycleOperations), SampleRoomAllocatedBytes = roomAllocation.ToArray(),
+                SampleMailboxAllocatedBytes = mailboxAllocation.ToArray(), SampleLifecycleOperations = lifecycle.ToArray(), SampleRoomMicros = roomMicros.ToArray() };
         }
         public void Start() => _thread.Start();
         public bool TryPost(Action action, Action? rejected = null) => !Unavailable && _mailbox.Writer.TryWrite(new(action, rejected));
-        public void Install(int index, IWorkerRoom room) => _slots[index] = room;
-        public void Remove(int index) { IWorkerRoom? room = _slots[index]; _slots[index] = null; room?.Dispose(); }
+        public void Install(int index, IWorkerRoom room) { _slots[index] = room; Interlocked.Increment(ref _lifecycleOperations); }
+        public void Remove(int index) { IWorkerRoom? room = _slots[index]; _slots[index] = null; if (room is not null) { Interlocked.Increment(ref _lifecycleOperations); room.Dispose(); } }
         public void Stop() { Volatile.Write(ref _stopping, 1); _mailbox.Writer.TryComplete(); }
         public void Join()
         {
@@ -363,21 +380,30 @@ public sealed class BattleWorkerPool : IAsyncDisposable
                 {
                     long started = Stopwatch.GetTimestamp();
                     long allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+                    long lifecycleBefore = Interlocked.Read(ref _lifecycleOperations);
                     for (int n = 0; n < _mailboxCapacity && Volatile.Read(ref _stopping) == 0 && _mailbox.Reader.TryRead(out Command command); n++)
                     {
                         try { command.Execute(); }
                         catch { try { command.Rejected?.Invoke(); } catch { } throw; }
                     }
+                    long beforeRooms = GC.GetAllocatedBytesForCurrentThread();
+                    long roomsStarted = Stopwatch.GetTimestamp();
                     for (int i = 0; i < _slots.Length; i++) _slots[i]?.Tick();
+                    long roomsElapsed = Stopwatch.GetTimestamp() - roomsStarted;
+                    long afterRooms = GC.GetAllocatedBytesForCurrentThread();
                     long elapsed = Stopwatch.GetTimestamp() - started;
                     long micros = elapsed * 1_000_000 / Stopwatch.Frequency;
                     Interlocked.Exchange(ref _lastTickMicros, micros);
-                    Interlocked.Add(ref _allocated, GC.GetAllocatedBytesForCurrentThread() - allocatedBefore);
+                    Interlocked.Add(ref _allocated, afterRooms - allocatedBefore);
                     if (elapsed > period) Interlocked.Increment(ref _overBudget);
                     long tickId = Interlocked.Read(ref _ticks) + 1;
                     int sampleSlot = (int)(tickId % _tickSamples.Length);
                     Volatile.Write(ref _sampleIds[sampleSlot], 0);
                     Interlocked.Exchange(ref _tickSamples[sampleSlot], micros);
+                    Interlocked.Exchange(ref _roomAllocationSamples[sampleSlot], afterRooms - beforeRooms);
+                    Interlocked.Exchange(ref _roomMicrosSamples[sampleSlot], roomsElapsed * 1_000_000 / Stopwatch.Frequency);
+                    Interlocked.Exchange(ref _mailboxAllocationSamples[sampleSlot], beforeRooms - allocatedBefore);
+                    Interlocked.Exchange(ref _lifecycleSamples[sampleSlot], Interlocked.Read(ref _lifecycleOperations) - lifecycleBefore);
                     Volatile.Write(ref _sampleIds[sampleSlot], tickId);
                     Interlocked.Exchange(ref _ticks, tickId);
                     deadline += period;

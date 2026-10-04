@@ -5,10 +5,10 @@ repo_root="$(git rev-parse --show-toplevel)"
 editor_path="${UNITY_EDITOR_PATH:-/Applications/Unity/Hub/Editor/6000.3.23f1/Unity.app/Contents/MacOS/Unity}"
 sdk_image='mcr.microsoft.com/dotnet/sdk:10.0.202-noble@sha256:adc02be8b87957d07208a4a3e51775935b33bad3317de8c45b1e67357b4c073b'
 runtime_image='mcr.microsoft.com/dotnet/aspnet:10.0.4-noble@sha256:8b75cdf59a5068d9adfd8a6d202cc7671b2dc8f5f46c51e3b88a0a632e8fad1f'
-expected_fantasy='f8bed0d464924f159d46498f1311206ea0694be8'
+expected_fantasy='df4ad5fe5418c8855932de784c7cea6286c4b082'
 expected_unity_version='6000.3.23f1'
 expected_unity_revision='09d2ecc7fb28'
-expected_fantasy_url='https://github.com/rayss1/Fantasy.git?path=/Fantasy.Packages/Fantasy.Unity#f8bed0d464924f159d46498f1311206ea0694be8'
+expected_fantasy_url='file:../../../server/vendor/Fantasy/Fantasy.Packages/Fantasy.Unity'
 kcp_port=22000
 health_port=22080
 container_id=''
@@ -155,9 +155,8 @@ protocol_schema="$repo_root/shared/schemas/ainative/v1/gameplay.proto"
 
 [[ "$(jq -r '.dependencies["com.fantasy.unity"]' "$manifest")" == "$expected_fantasy_url" ]] || fail 'The UPM manifest does not pin the approved Fantasy.Unity source.'
 [[ "$(jq -r '.dependencies["com.fantasy.unity"].version' "$lock_file")" == "$expected_fantasy_url" ]] || fail 'The UPM lock does not retain the approved Fantasy.Unity URL.'
-[[ "$(jq -r '.dependencies["com.fantasy.unity"].source' "$lock_file")" == 'git' ]] || fail 'Fantasy.Unity must remain a Git-pinned UPM dependency.'
-[[ "$(jq -r '.dependencies["com.fantasy.unity"].hash' "$lock_file")" == "$fantasy_commit" ]] || fail 'The UPM lock Fantasy.Unity hash differs from the gitlink.'
-[[ "$(jq -r '.dependencies["com.fantasy.unity"]' "$fantasy_package")" == '2026.1.1001' ]] || fail 'The client package Fantasy.Unity version differs from the approved version.'
+[[ "$(jq -r '.dependencies["com.fantasy.unity"].source' "$lock_file")" == 'local' ]] || fail 'Fantasy.Unity must remain a local UPM dependency from the pinned gitlink.'
+[[ "$(jq -r '.dependencies["com.fantasy.unity"]' "$fantasy_package")" == '2026.1.1002-ainative.1' ]] || fail 'The client package Fantasy.Unity version differs from the approved version.'
 grep -qi 'MIT License' "$fantasy_license" || fail 'The Fantasy license is missing its MIT heading.'
 grep -qi 'explicitly prohibited' "$fantasy_license" || fail 'The Fantasy entity restriction is missing.'
 grep -qi 'macOS' "$fantasy_notice" || fail 'The Fantasy notice must record the approved macOS distribution scope.'

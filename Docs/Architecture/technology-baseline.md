@@ -153,7 +153,9 @@ Physics, navigation, HybridCLR, UI, DOTS, localization, platform services, and o
 
 ### 6.2 Fantasy foundation and fork policy
 
-The server platform is based on the project-maintained [rayss1/Fantasy fork](https://github.com/rayss1/Fantasy). Its source is embedded at `server/vendor/Fantasy` as an exact, opaque gitlink. The tracked `Fantasy-Net` package is a production dependency only of `AiNative.Server.Fantasy` and the Battle Host composition root. `Fantasy.Unity` `2026.1.1001` from the same commit is confined to `com.ainative.client.fantasy`; other Client packages, application code, Shared, and public transport ports do not reference Fantasy namespaces.
+The 2026-10-04 local validation candidate uses Fantasy `df4ad5fe5418c8855932de784c7cea6286c4b082`, Fantasy-Net `2026.1.1004-ainative.1` and Fantasy.Unity `2026.1.1002-ainative.1`. Unity consumes the fixed vendor submodule through a local UPM path. The owner approved this focused socket-initialization change; see [implementation and validation evidence](fantasy-socket-initialization-proposal-2026-10-04.md). The historical release/platform claims below do not qualify the new candidate.
+
+The server platform is based on the project-maintained [rayss1/Fantasy fork](https://github.com/rayss1/Fantasy). Its source is embedded at `server/vendor/Fantasy` as an exact, opaque gitlink. The tracked `Fantasy-Net` package is confined to the Fantasy adapter, approved Host composition roots and acceptance tooling. `Fantasy.Unity` from the same commit is confined to `com.ainative.client.fantasy`; other Client packages, application code, Shared, and public transport ports do not reference Fantasy namespaces.
 
 Fantasy provides the initial server infrastructure for:
 

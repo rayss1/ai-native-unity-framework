@@ -216,7 +216,7 @@ namespace AiNative.Client.Editor
             return previousArchitecture;
         }
 
-        private static void CopyThirdPartyNotice(string outputDirectory)
+        internal static void CopyThirdPartyNotice(string outputDirectory)
         {
             UnityEditor.PackageManager.PackageInfo clientPackage =
                 UnityEditor.PackageManager.PackageInfo.FindForAssembly(
@@ -233,7 +233,7 @@ namespace AiNative.Client.Editor
 
             string notice = File.ReadAllText(source);
             if (notice.IndexOf("MIT", StringComparison.OrdinalIgnoreCase) < 0 ||
-                notice.IndexOf("f8bed0d464924f159d46498f1311206ea0694be8", StringComparison.OrdinalIgnoreCase) < 0 ||
+                notice.IndexOf("df4ad5fe5418c8855932de784c7cea6286c4b082", StringComparison.OrdinalIgnoreCase) < 0 ||
                 notice.IndexOf("entity", StringComparison.OrdinalIgnoreCase) < 0)
             {
                 throw new InvalidDataException(

@@ -5,6 +5,12 @@ param(
         else { 'C:\Program Files\Unity\Hub\Editor\6000.3.23f1\Editor\Unity.exe' }
     ),
     [string] $EvidenceDirectory,
+    [string] $SdkPath = 'dotnet',
+    [ValidateRange(1, 1000000)]
+    [int] $ExpectedEditModePassed = 95,
+    [ValidateSet('Baseline','Candidate')][string] $Profile = 'Baseline',
+    [ValidateRange(10,7200)]
+    [int] $UnityTimeoutSeconds = 1800,
     [string] $HostAddress = '127.0.0.1',
     [ValidateRange(1, 65535)]
     [int] $KcpPort = 22000,
@@ -18,6 +24,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+. "$PSScriptRoot/validation/nunit-report.ps1"
 $unityAllUsersProfile = [Environment]::GetEnvironmentVariable('ALLUSERSPROFILE')
 if ([string]::IsNullOrWhiteSpace($unityAllUsersProfile)) {
     $unityAllUsersProfile = [Environment]::GetEnvironmentVariable('ProgramData')
@@ -58,22 +65,7 @@ function Assert-NUnitResult {
         throw "Unity did not produce $Label NUnit results at: $Path"
     }
 
-    [xml] $document = Get-Content -LiteralPath $Path -Raw
-    $run = $document.'test-run'
-    $passed = [int] $run.passed
-    $failed = [int] $run.failed
-    $skipped = [int] $run.skipped
-    $result = [string] $run.result
-    if ($result -ne 'Passed' -or $passed -ne $ExpectedPassed -or $failed -ne 0 -or $skipped -ne 0) {
-        throw "Expected exactly $ExpectedPassed passed, 0 failed, and 0 skipped $Label tests; got result=$result passed=$passed failed=$failed skipped=$skipped."
-    }
-
-    return [pscustomobject]@{
-        Result = $result
-        Passed = $passed
-        Failed = $failed
-        Skipped = $skipped
-    }
+    return Assert-AiNativeNUnitReport -Path $Path -ExpectedPassed $ExpectedPassed
 }
 
 function Invoke-Unity {
@@ -93,10 +85,14 @@ function Invoke-Unity {
 
     $process = [System.Diagnostics.Process]::new()
     $process.StartInfo = $startInfo
-    [void] $process.Start()
-    $process.WaitForExit()
-    if ($process.ExitCode -ne 0) {
-        throw "$Description failed with Unity exit code $($process.ExitCode)."
+    $started = $false
+    try {
+        $started = $process.Start()
+        if (-not $process.WaitForExit($UnityTimeoutSeconds * 1000)) { throw "$Description timed out after $UnityTimeoutSeconds seconds." }
+        if ($process.ExitCode -ne 0) { throw "$Description failed with Unity exit code $($process.ExitCode)." }
+    } finally {
+        if ($started -and -not $process.HasExited) { $process.Kill($true); $process.WaitForExit() }
+        $process.Dispose()
     }
 }
 
@@ -112,14 +108,19 @@ function Get-UnityVersionOutput {
 
     $process = [System.Diagnostics.Process]::new()
     $process.StartInfo = $startInfo
-    [void] $process.Start()
-    $stdout = $process.StandardOutput.ReadToEnd()
-    $stderr = $process.StandardError.ReadToEnd()
-    $process.WaitForExit()
-    if ($process.ExitCode -ne 0) {
-        throw "Unity -version failed with exit code $($process.ExitCode): $stderr"
+    $started = $false
+    try {
+        $started = $process.Start()
+        $stdoutTask = $process.StandardOutput.ReadToEndAsync()
+        $stderrTask = $process.StandardError.ReadToEndAsync()
+        if (-not $process.WaitForExit(60000)) { throw 'Unity -version timed out after 60 seconds.' }
+        $stdout = $stdoutTask.GetAwaiter().GetResult(); $stderr = $stderrTask.GetAwaiter().GetResult()
+        if ($process.ExitCode -ne 0) { throw "Unity -version failed with exit code $($process.ExitCode): $stderr" }
+        return ($stdout + [Environment]::NewLine + $stderr).Trim()
+    } finally {
+        if ($started -and -not $process.HasExited) { $process.Kill($true); $process.WaitForExit() }
+        $process.Dispose()
     }
-    return ($stdout + [Environment]::NewLine + $stderr).Trim()
 }
 
 $repositoryRoot = (& git rev-parse --show-toplevel).Trim()
@@ -139,21 +140,22 @@ if (-not (Test-Path -LiteralPath $UnityEditorPath -PathType Leaf)) {
     throw "Unity Editor was not found at: $UnityEditorPath"
 }
 
-$dirty = & git -C $repositoryRoot status --porcelain --untracked-files=all
-if ($LASTEXITCODE -ne 0) {
-    throw 'git status failed.'
-}
-if ($dirty) {
+& git -C $repositoryRoot diff --quiet HEAD --
+$trackedDirty = $LASTEXITCODE -ne 0
+$unknown = @(& git -C $repositoryRoot ls-files --others --exclude-standard)
+if ($LASTEXITCODE -ne 0 -or $trackedDirty -or $unknown.Count -ne 0) {
     throw 'The worktree is dirty. Commit, stash, or remove changes so the evidence identifies an exact revision.'
 }
 
 $commit = (& git -C $repositoryRoot rev-parse HEAD).Trim()
+if ($Profile -eq 'Baseline' -and ($commit -ne 'c9098be7e2a44efc42182a87aca2551648993705' -or $ExpectedEditModePassed -ne 95)) { throw 'Baseline Windows profile requires c9098be and 95 EditMode tests' }
+if ($Profile -eq 'Candidate' -and ($commit -eq 'c9098be7e2a44efc42182a87aca2551648993705' -or $ExpectedEditModePassed -ne 128)) { throw 'Candidate Windows profile requires a new source and the reviewed 128-test inventory' }
 $fantasyCommit = (& git -C $repositoryRoot rev-parse 'HEAD:server/vendor/Fantasy').Trim()
 if ($LASTEXITCODE -ne 0) {
     throw 'The pinned Fantasy gitlink could not be resolved.'
 }
-if ($fantasyCommit -ne 'f8bed0d464924f159d46498f1311206ea0694be8') {
-    throw "Expected Fantasy f8bed0d464924f159d46498f1311206ea0694be8, found: $fantasyCommit"
+if ($fantasyCommit -ne 'df4ad5fe5418c8855932de784c7cea6286c4b082') {
+    throw "Expected Fantasy df4ad5fe5418c8855932de784c7cea6286c4b082, found: $fantasyCommit"
 }
 
 $projectVersionPath = Join-Path $repositoryRoot 'client/UnityProject/ProjectSettings/ProjectVersion.txt'
@@ -172,22 +174,22 @@ if (-not $EvidenceDirectory) {
     $EvidenceDirectory = Join-Path $repositoryRoot "artifacts/unity-windows/$commit"
 }
 $EvidenceDirectory = [System.IO.Path]::GetFullPath($EvidenceDirectory)
-New-Item -ItemType Directory -Path $EvidenceDirectory -Force | Out-Null
+if (Test-Path -LiteralPath $EvidenceDirectory) { throw 'Use a new Windows evidence directory; retained reports must not be reused.' }
+New-Item -ItemType Directory -Path $EvidenceDirectory | Out-Null
 
 $manifestPath = Join-Path $repositoryRoot 'client/UnityProject/Packages/manifest.json'
 $lockPath = Join-Path $repositoryRoot 'client/UnityProject/Packages/packages-lock.json'
 $fantasyPackagePath = Join-Path $repositoryRoot 'packages/com.ainative.client.fantasy/package.json'
 $fantasyNoticeSource = Join-Path $repositoryRoot 'packages/com.ainative.client.fantasy/THIRD-PARTY-NOTICES.md'
 $fantasyLicenseSource = Join-Path $repositoryRoot 'server/vendor/Fantasy/Fantasy.Packages/Fantasy.Unity/LICENSE'
-$expectedFantasyGitUrl = 'https://github.com/rayss1/Fantasy.git?path=/Fantasy.Packages/Fantasy.Unity#f8bed0d464924f159d46498f1311206ea0694be8'
+$expectedFantasyLocalPath = 'file:../../../server/vendor/Fantasy/Fantasy.Packages/Fantasy.Unity'
 $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
 $packageLock = Get-Content -LiteralPath $lockPath -Raw | ConvertFrom-Json
 $clientFantasyPackage = Get-Content -LiteralPath $fantasyPackagePath -Raw | ConvertFrom-Json
-if ($manifest.dependencies.'com.fantasy.unity' -ne $expectedFantasyGitUrl -or
-    $packageLock.dependencies.'com.fantasy.unity'.version -ne $expectedFantasyGitUrl -or
-    $packageLock.dependencies.'com.fantasy.unity'.source -ne 'git' -or
-    $packageLock.dependencies.'com.fantasy.unity'.hash -ne $fantasyCommit -or
-    $clientFantasyPackage.dependencies.'com.fantasy.unity' -ne '2026.1.1001') {
+if ($manifest.dependencies.'com.fantasy.unity' -ne $expectedFantasyLocalPath -or
+    $packageLock.dependencies.'com.fantasy.unity'.version -ne $expectedFantasyLocalPath -or
+    $packageLock.dependencies.'com.fantasy.unity'.source -ne 'local' -or
+    $clientFantasyPackage.dependencies.'com.fantasy.unity' -ne '2026.1.1002-ainative.1') {
     throw 'The Fantasy.Unity manifest, package declaration, or UPM lock does not match the approved version and commit.'
 }
 $metadataPath = Join-Path $EvidenceDirectory 'metadata.txt'
@@ -196,7 +198,7 @@ $metadata.Add("commit=$commit")
 $metadata.Add("fantasy_commit=$fantasyCommit")
 $metadata.Add("validated_at_utc=$([DateTime]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ssZ'))")
 $metadata.Add("host=$([System.Environment]::OSVersion.VersionString)")
-$dotnetSdk = (& dotnet --version).Trim()
+$dotnetSdk = (& $SdkPath --version).Trim()
 if ($dotnetSdk -ne '10.0.202') {
     throw "Expected .NET SDK 10.0.202, found: $dotnetSdk"
 }
@@ -217,6 +219,9 @@ $metadata | Set-Content -LiteralPath $metadataPath -Encoding utf8
 (& git -C $repositoryRoot submodule status --recursive) | Add-Content -LiteralPath $metadataPath -Encoding utf8
 
 $unityProject = Join-Path $repositoryRoot 'client/UnityProject'
+if (Test-Path -LiteralPath (Join-Path $unityProject 'Library/UnityLockfile')) { throw 'The validation project is open in an Editor; use an isolated checkout.' }
+$settingsPath = Join-Path $unityProject 'ProjectSettings/ProjectSettings.asset'
+$settingsSnapshot = [IO.File]::ReadAllBytes($settingsPath)
 $editModeXml = Join-Path $EvidenceDirectory 'editmode.xml'
 $editModeLog = Join-Path $EvidenceDirectory 'editmode.log'
 $playModeXml = Join-Path $EvidenceDirectory 'playmode.xml'
@@ -234,7 +239,7 @@ $playerStderr = Join-Path $EvidenceDirectory 'player.stderr.log'
 $hostProcess = $null
 $playerProcess = $null
 try {
-    Invoke-CheckedNative -FilePath 'dotnet' -Description 'Battle Host publish' -ArgumentList @(
+    Invoke-CheckedNative -FilePath $SdkPath -Description 'Battle Host publish' -ArgumentList @(
         'publish',
         (Join-Path $repositoryRoot 'server/src/Hosts/AiNative.BattleHost/AiNative.BattleHost.csproj'),
         '-c', 'Release',
@@ -248,6 +253,7 @@ try {
     }
 
     $hostEnvironment = @{
+        DOTNET_ROOT = Split-Path (Get-Command $SdkPath).Source
         ASPNETCORE_URLS = "http://127.0.0.1:$HealthPort"
         AINATIVE_FANTASY_ENABLED = 'true'
         AINATIVE_FANTASY_OUTER_KCP_MTU = '1150'
@@ -304,16 +310,17 @@ try {
         '-testResults', $editModeXml,
         '-logFile', $editModeLog
     )
-    $editMode = Assert-NUnitResult -Path $editModeXml -ExpectedPassed 56 -Label 'EditMode'
+    $editMode = Assert-AiNativeNUnitReport -Path $editModeXml -ExpectedPassed $ExpectedEditModePassed -FixtureCounts (Get-AiNativeEditModeFixtureCounts -Profile $Profile)
 
     Invoke-Unity -Description 'Unity PlayMode validation' -ArgumentList @(
         '-batchmode', '-nographics',
         '-projectPath', $unityProject,
         '-runTests', '-testPlatform', 'PlayMode',
+        '-testFilter', 'AiNative.Client.Application.PlayModeTests.BattleClientKcpPlayModeTests',
         '-testResults', $playModeXml,
         '-logFile', $playModeLog
     )
-    $playMode = Assert-NUnitResult -Path $playModeXml -ExpectedPassed 2 -Label 'PlayMode'
+    $playMode = Assert-AiNativeNUnitReport -Path $playModeXml -ExpectedPassed 3 -FixtureCounts @{'AiNative.Client.Application.PlayModeTests.BattleClientKcpPlayModeTests'=3}
 
     New-Item -ItemType Directory -Path $playerDirectory -Force | Out-Null
     Invoke-Unity -Description 'Windows x64 Mono Player build' -ArgumentList @(
@@ -400,6 +407,7 @@ try {
 
 }
 finally {
+    [IO.File]::WriteAllBytes($settingsPath,$settingsSnapshot)
     if ($null -ne $playerProcess -and -not $playerProcess.HasExited) {
         Stop-Process -Id $playerProcess.Id -Force
         $playerProcess.WaitForExit()
@@ -413,12 +421,16 @@ finally {
     }
 }
 
-$postValidationDirty = & git -C $repositoryRoot status --porcelain --untracked-files=all
-if ($LASTEXITCODE -ne 0) {
-    throw 'The post-validation git status check failed.'
-}
-if ($postValidationDirty) {
+& git -C $repositoryRoot diff --quiet HEAD --
+$postTrackedDirty = $LASTEXITCODE -ne 0
+$postUnknown = @(& git -C $repositoryRoot ls-files --others --exclude-standard)
+if ($LASTEXITCODE -ne 0 -or $postTrackedDirty -or $postUnknown.Count -ne 0) {
     throw 'Validation completed, but the worktree is no longer clean. Inspect Unity-generated changes before accepting the evidence.'
 }
 
+@{
+    source=$commit; fantasy=$fantasyCommit; profile=$Profile
+    tests=@($editMode,$playMode)
+    artifacts=@(@($metadataPath,(Join-Path $EvidenceDirectory 'summary.txt'),$editModeXml,$playModeXml,$smokeJson,$playerPath,$playerNotice,$playerFantasyLicense,$editModeLog,$playModeLog,$buildLog) | ForEach-Object { Get-AiNativeEvidenceFile -Path $_ })
+} | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $EvidenceDirectory 'reports.json') -Encoding utf8
 Write-Host "Windows Unity validation passed. Evidence: $EvidenceDirectory"

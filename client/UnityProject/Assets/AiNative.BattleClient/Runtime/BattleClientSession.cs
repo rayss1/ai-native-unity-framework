@@ -112,6 +112,7 @@ namespace AiNative.Client.Application
         private uint _localRoomId;
         private readonly ReplaceableRealtimeTransportSlot _transportSlot = new ReplaceableRealtimeTransportSlot();
         private readonly InputFrameRing _inputRing;
+        private readonly ArenaRemotePresentation _remotePresentation = new ArenaRemotePresentation();
         private readonly PresentationCorrectionSmoother _presentation =
             new PresentationCorrectionSmoother();
         private readonly byte[] _receiveBuffer = new byte[BattleClientProtocolV1.MaxFrameBytes];
@@ -185,6 +186,9 @@ namespace AiNative.Client.Application
         public ulong SessionId => _sessionId;
 
         public uint EntityId => _entityId;
+
+        public int AdvanceRemotePresentation(float deltaSeconds, Span<ArenaRemotePose> destination)
+            => _remotePresentation.Advance(deltaSeconds, destination);
 
         public uint ConnectionEpoch => _connectionEpoch;
 
@@ -408,11 +412,56 @@ namespace AiNative.Client.Application
             BeginReconnect();
         }
 
+        /// <summary>Restarts only the original topology allocation after Gate has renewed its admission.
+        /// Call on the Pump thread; an exhausted connection can recover without starting another match.</summary>
+        public bool ResumeOriginalAllocation(BattleAdmissionInfo admission)
+        {
+            if (admission == null || string.IsNullOrEmpty(admission.EntryTicket))
+                throw new ArgumentException("A renewed entry ticket is required.", nameof(admission));
+            UpdateAdmission(admission); // Validate identity before altering any connection or prediction state.
+            if (IsArenaFinished) return false;
+            _connectCancellation?.Cancel();
+            Task<BattleTransportConnection> abandoned = _connectTask;
+            _connectTask = null;
+            if (abandoned != null) _ = DisposeAbandonedConnectionAsync(abandoned);
+            State = BattleClientState.Reconnecting;
+            _faultReason = "";
+            _presentation.ResetState();
+            _remotePresentation.Reset();
+            _topologyReconnecting = true;
+            // Unsent commands from the suspended owner must never cross the new authenticated connection.
+            _inputRing.Clear();
+            if (_prediction != null) _ = _prediction.DisposeAsync();
+            if (_arenaPrediction != null) _ = _arenaPrediction.DisposeAsync();
+            _prediction = null; _arenaPrediction = null;
+            _hasArenaState = false; _arenaState = default; _arenaPhase = default;
+            _arenaRemainingTicks = 0; _arenaLeaderEntityId = 0;
+            _lastAcknowledgedSequence = 0; _lastReceivedTick = 0;
+            _sessionId = 0; _entityId = 0; _localRoomId = 0;
+            _awaitingReconnectResponse = false;
+            _phaseElapsedSeconds = 0;
+            _reconnectAttempts = 1;
+            _retryDelayRemainingSeconds = ReconnectDelaySeconds[0];
+            _transportSlot.DetachAndDispose();
+            return true;
+        }
+
+        private static async Task DisposeAbandonedConnectionAsync(Task<BattleTransportConnection> abandoned)
+        {
+            try
+            {
+                BattleTransportConnection connection = await abandoned;
+                if (connection.Transport != null) await connection.Transport.DisposeAsync();
+            }
+            catch (Exception) { /* The canceled connector owns its partial connection. */ }
+        }
+
         public async ValueTask DisposeAsync()
         {
             if (_disposed) return;
             _disposed = true;
             State = BattleClientState.Disposed;
+            _remotePresentation.Reset();
             _connectCancellation?.Cancel();
             Task<BattleTransportConnection> pendingConnect = _connectTask;
             _connectTask = null;
@@ -634,6 +683,7 @@ namespace AiNative.Client.Application
                 return;
             }
 
+            _remotePresentation.Reset();
             _entityId = entityId;
             _localRoomId = roomId;
             _prediction = new ClientPredictionAdapter(_transportSlot, entityId);
@@ -705,10 +755,13 @@ namespace AiNative.Client.Application
                  admittedTick < _lastReceivedTick || admittedAcknowledgement < _lastAcknowledgedSequence)) return;
             if (ArenaClientProtocolV1.TryDecodeSnapshot(frame, _entityId, out DecodedArenaSnapshot arena) && arena.HasArenaData)
             {
+                Span<ArenaSnapshotPlayer> validatedPlayers = stackalloc ArenaSnapshotPlayer[ArenaClientProtocolV1.MaxSnapshotPlayers];
+                if (!ArenaClientProtocolV1.TryDecodePlayers(frame, validatedPlayers, out _, out _)) return;
                 if ((ulong)arena.State.Tick < _lastReceivedTick || arena.Acknowledgement < _lastAcknowledgedSequence) return;
                 _arenaPrediction ??= new ArenaClientPredictionAdapter(_transportSlot, _entityId);
                 ArenaSnapshotApplyResult result = _arenaPrediction.ApplySnapshot(frame, packet);
                 if (result.Status is not (ArenaSnapshotApplyStatus.Initialized or ArenaSnapshotApplyStatus.Reconciled)) return;
+                _remotePresentation.ApplySnapshot(frame, _entityId);
                 bool finished = arena.Phase == ArenaMatchPhase.Finished;
                 if (finished)
                 {
@@ -787,28 +840,14 @@ namespace AiNative.Client.Application
                 return;
             }
 
-            State = BattleClientState.Reconnecting;
-            _presentation.ResetState();
             if (_admission is not null)
             {
-                _topologyReconnecting = true;
-                // A new authenticated owner starts from authority; unsent commands must not cross connections.
-                _inputRing.Clear();
-                _ = _prediction.DisposeAsync();
-                if (_arenaPrediction is not null) _ = _arenaPrediction.DisposeAsync();
-                _prediction = null;
-                _arenaPrediction = null;
-                _hasArenaState = false;
-                _arenaState = default;
-                _arenaPhase = default;
-                _arenaRemainingTicks = 0;
-                _arenaLeaderEntityId = 0;
-                _lastAcknowledgedSequence = 0;
-                _lastReceivedTick = 0;
-                _sessionId = 0;
-                _entityId = 0;
-                _localRoomId = 0;
+                ResumeOriginalAllocation(_admission);
+                return;
             }
+            State = BattleClientState.Reconnecting;
+            _presentation.ResetState();
+            _remotePresentation.Reset();
             _awaitingReconnectResponse = false;
             _reconnectAttempts = 1;
             _retryDelayRemainingSeconds = ReconnectDelaySeconds[0];
@@ -837,6 +876,7 @@ namespace AiNative.Client.Application
             State = BattleClientState.Faulted;
             _connectCancellation?.Cancel();
             _presentation.ResetState();
+            _remotePresentation.Reset();
         }
 
         private static KinematicState ToKinematic(in ArenaPlayerState state)

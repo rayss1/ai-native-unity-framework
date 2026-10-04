@@ -15,6 +15,8 @@ using System.Threading.Channels;
 List<object> evidence = [];
 string output = Environment.GetEnvironmentVariable("AINATIVE_ACCEPTANCE_REPORT") ?? "acceptance.json";
 AcceptanceOptions options = AcceptanceOptions.Load(Environment.GetEnvironmentVariable);
+if (Environment.GetEnvironmentVariable("AINATIVE_ACCEPTANCE_MODE") == "qualification")
+    _ = ArenaCapacityOptions.Load(Environment.GetEnvironmentVariable);
 using CancellationTokenSource deadline = new(options.Deadline);
 CancellationToken ct = deadline.Token;
 ServiceRole role = Enum.Parse<ServiceRole>(Environment.GetEnvironmentVariable("AINATIVE_ACCEPTANCE_ROLE") ?? "Client");
@@ -250,10 +252,11 @@ public static class AcceptanceSettlementPolling
     {
         while (true)
         {
-            await Task.Delay(300, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
             PlayerProfile? profile = await probe(cancellationToken);
             if (profile?.Played == 1) return profile;
             if (profile?.Played > 1) throw new InvalidOperationException("settlement-count-exceeds-one");
+            await Task.Delay(300, cancellationToken);
         }
     }
 }

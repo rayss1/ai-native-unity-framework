@@ -13,6 +13,8 @@ The new [single-region server topology](Docs/ADR/0017-single-region-service-topo
 
 ## Clone and initialize dependencies
 
+Fantasy.Unity is read locally from the pinned `server/vendor/Fantasy` submodule. Initialize that submodule before opening Unity; UPM does not fetch a separate Git copy.
+
 For a new checkout, initialize the pinned vendor source at clone time:
 
 ```bash
@@ -36,6 +38,8 @@ git add server/vendor/Fantasy
 ## Validate
 
 For local Unity CLI setup, project defaults and EditMode/real-KCP PlayMode commands, see [Unity CLI validation](Docs/Architecture/unity-cli-validation.md). The CLI development path accepts the current worktree; exact-commit qualification remains separate.
+
+The [current-source validation entry](tools/validation/README.md) combines explicit clean-source .NET, architecture, Unity, Windows and topology publication/acceptance phases with retained provenance. The [release validation plan and evidence ledger](Docs/Architecture/release-validation-2026-10-03.md) tracks complete-match, capacity/soak and Android build/device gates separately.
 
 ```powershell
 dotnet restore AiNative.sln

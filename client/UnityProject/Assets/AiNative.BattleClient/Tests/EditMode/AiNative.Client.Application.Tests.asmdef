@@ -3,6 +3,7 @@
   "rootNamespace": "AiNative.Client.Application.Tests",
   "references": [
     "AiNative.Client.Application",
+    "AiNative.Client.Application.Editor",
     "AiNative.Client.Fantasy",
     "AiNative.Client.Prediction",
     "AiNative.Gameplay",

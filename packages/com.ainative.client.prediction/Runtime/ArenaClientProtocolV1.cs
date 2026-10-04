@@ -49,6 +49,82 @@ namespace AiNative.Client.Prediction
             TransportDelivery.Unreliable,
             TransportOrdering.Sequenced);
 
+        public const int MaxSnapshotPlayers = 8;
+
+        /// <summary>Decodes a full v1 snapshot atomically into caller storage; failure writes nothing.</summary>
+        public static bool TryDecodePlayers(ReadOnlySpan<byte> frame, Span<ArenaSnapshotPlayer> destination, out int count, out long tick)
+        {
+            count = 0; tick = 0;
+            if (frame.Length < HeaderBytes || frame.Length > MaxDatagramBytes ||
+                BinaryPrimitives.ReadUInt16LittleEndian(frame) != SnapshotMessageId) return false;
+            Span<ArenaSnapshotPlayer> scratch = stackalloc ArenaSnapshotPlayer[MaxSnapshotPlayers];
+            int offset = HeaderBytes, written = 0, seen = 0;
+            uint major = 0;
+            ulong serverTick = 0;
+            while (offset < frame.Length)
+            {
+                if (!TryReadKey(frame, ref offset, out int field, out int wire)) return false;
+                if (field <= 10)
+                {
+                    int expectedWire = field == 2 || field == 3 || field == 5 ? 1 : field == 4 || field == 10 ? 2 : 0;
+                    if (wire != expectedWire) return false;
+                    if (field != 4 && field != 10)
+                    {
+                        int bit = 1 << field;
+                        if ((seen & bit) != 0) return false;
+                        seen |= bit;
+                    }
+                }
+                if (field == 1) { if (!TryReadUInt32(frame, ref offset, out major)) return false; }
+                else if (field == 2) { if (!TryReadFixed64(frame, ref offset, out serverTick)) return false; }
+                else if (field == 4)
+                {
+                    if (written == MaxSnapshotPlayers || !TryReadLength(frame, ref offset, out ReadOnlySpan<byte> payload) ||
+                        !TryReadPlayerIdentity(payload, out uint id)) return false;
+                    for (int i = 0; i < written; i++) if (scratch[i].EntityId == id) return false;
+                    bool found = false, arena = false;
+                    ArenaPlayerState state = default;
+                    if (!TryReadPlayer(payload, id, ref found, ref state, ref arena) || !found) return false;
+                    scratch[written++] = new ArenaSnapshotPlayer(id, state);
+                }
+                else if (field >= 6 && field <= 9)
+                {
+                    if (!TryReadUInt32(frame, ref offset, out uint value) || (field == 7 && value > 2)) return false;
+                }
+                else if (!TrySkip(frame, ref offset, wire)) return false;
+            }
+            if (major != 1 || (seen & (1 << 2)) == 0 || serverTick > long.MaxValue || destination.Length < written) return false;
+            for (int i = 0; i < written; i++)
+            {
+                ArenaPlayerState state = scratch[i].State;
+                state.Tick = (long)serverTick;
+                scratch[i] = new ArenaSnapshotPlayer(scratch[i].EntityId, state);
+            }
+            scratch.Slice(0, written).CopyTo(destination);
+            count = written; tick = (long)serverTick;
+            return true;
+        }
+
+        private static bool TryReadPlayerIdentity(ReadOnlySpan<byte> payload, out uint id)
+        {
+            id = 0;
+            int offset = 0, seen = 0;
+            while (offset < payload.Length)
+            {
+                if (!TryReadKey(payload, ref offset, out int field, out int wire)) return false;
+                if (field <= 14)
+                {
+                    int bit = 1 << field;
+                    if (wire != 0 || (seen & bit) != 0 || !TryReadUInt32(payload, ref offset, out uint value)) return false;
+                    seen |= bit;
+                    if (field == 1) id = value;
+                    if (field == 12 && value > 1) return false;
+                }
+                else if (!TrySkip(payload, ref offset, wire)) return false;
+            }
+            return id != 0;
+        }
+
         public static bool TryEncodeInput(
             in ArenaInput input,
             Span<byte> destination,

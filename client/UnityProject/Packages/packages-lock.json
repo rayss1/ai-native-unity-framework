@@ -6,7 +6,7 @@
       "source": "local",
       "dependencies": {
         "com.ainative.realtime": "0.1.0",
-        "com.fantasy.unity": "2026.1.1001"
+        "com.fantasy.unity": "2026.1.1002-ainative.1"
       }
     },
     "com.ainative.client.prediction": {
@@ -31,13 +31,18 @@
       "dependencies": {}
     },
     "com.fantasy.unity": {
-      "version": "https://github.com/rayss1/Fantasy.git?path=/Fantasy.Packages/Fantasy.Unity#f8bed0d464924f159d46498f1311206ea0694be8",
+      "version": "file:../../../server/vendor/Fantasy/Fantasy.Packages/Fantasy.Unity",
       "depth": 0,
-      "source": "git",
+      "source": "local",
       "dependencies": {
         "com.unity.nuget.newtonsoft-json": "3.2.1"
-      },
-      "hash": "f8bed0d464924f159d46498f1311206ea0694be8"
+      }
+    },
+    "com.unity.modules.androidjni": {
+      "version": "1.0.0",
+      "depth": 0,
+      "source": "builtin",
+      "dependencies": {}
     },
     "com.unity.burst": {
       "version": "1.8.30",

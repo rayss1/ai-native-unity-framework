@@ -7,6 +7,37 @@ public sealed class ArenaReplayTests
 {
     private static readonly ArenaReplayIdentity Identity = new("source", "fantasy", "protocol", "config");
     [Test]
+    public void ConsumedRespawnInputsReplayWithEveryStateHashAndRejectOldFingerprint()
+    {
+        using var stream = new MemoryStream(); var game = new ArenaRoom(400);
+        var capture = new ArenaReplayCapture(Identity, "room", "allocation", "match", "node", "boot", 400, 2000);
+        game.TryJoin(out uint shooter); capture.RecordJoin(game.Tick, shooter);
+        game.TryJoin(out uint target); capture.RecordJoin(game.Tick, target);
+        var events = new ArenaCombatEventRecord[256]; int respawns = 0;
+        for (uint sequence = 1; sequence <= 400; sequence++)
+        {
+            Submit(shooter, new ArenaInput(sequence, game.Tick + 1, 0, 0, sequence == 1 ? 90000 : 0, 0, ArenaButtons.Fire, ArenaWeaponId.Machinegun));
+            Submit(target, new ArenaInput(sequence, game.Tick + 1, 0, 0, 0, 0, ArenaButtons.None, ArenaWeaponId.None));
+            game.TickOnce(); capture.RecordTick(game.Tick, game.ComputeStateHash());
+            game.TryGetPlayer(target, out var state);
+            Assert.That(state.LastProcessedInputSequence, Is.EqualTo(sequence));
+            int count = game.DrainEvents(events);
+            respawns += events.Take(count).Count(e => e.Kind == ArenaCombatEventKind.Respawn);
+        }
+        Assert.That(respawns, Is.GreaterThan(0));
+        capture.Complete(game.Tick, game.ComputeStateHash());
+        using var writer = new ArenaReplayWriter(stream, capture); writer.Drain(); stream.Position = 0;
+        Assert.That(ArenaReplayVerifier.Verify(stream, Identity).FinalHash, Is.EqualTo(game.ComputeStateHash()));
+        byte[] bytes = stream.ToArray();
+        byte[] current = System.Text.Encoding.UTF8.GetBytes(ArenaReplayVerifier.GameplayFingerprint);
+        int offset = bytes.AsSpan().IndexOf(current);
+        Assert.That(offset, Is.GreaterThan(0));
+        System.Text.Encoding.UTF8.GetBytes("ce3034f62374b59b906abfb31774454f177b126aca2a5c27b9dfb715ba8a8a9f").CopyTo(bytes, offset);
+        Assert.Throws<InvalidDataException>(() => ArenaReplayVerifier.Verify(new MemoryStream(bytes), Identity));
+        void Submit(uint entity, ArenaInput input)
+        { Assert.That(game.SubmitInput(entity, input), Is.True); capture.RecordInput(game.Tick, entity, input); }
+    }
+    [Test]
     public void CapturedLifecycleInputsAndEveryTickHashReplayRealArena()
     {
         using var stream = new MemoryStream(); var game = new ArenaRoom(600);

@@ -13,6 +13,23 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # Disposable CI-only credentials; never a connection to a shared deployment.
+    env:
+      AINATIVE_TEST_POSTGRES: Host=127.0.0.1;Port=5432;Database=ainative_ci;Username=ainative_ci;Password=ci-only-disposable;Pooling=false
+    services:
+      postgres:
+        image: postgres:17.11
+        env:
+          POSTGRES_USER: ainative_ci
+          POSTGRES_PASSWORD: ci-only-disposable
+          POSTGRES_DB: ainative_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ainative_ci -d ainative_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
 
     steps:
       - name: Checkout
@@ -67,6 +84,37 @@ jobs:
       - name: Test .NET 10
         run: dotnet test AiNative.sln --configuration Release --no-build --no-restore
 
+      - name: Test PostgreSQL report gate
+        run: python3 -m unittest discover -s tools/validation/tests -p test_postgres_gate.py -v
+
+      - name: Run real Player persistence tests
+        run: >-
+          dotnet test server/tests/AiNative.Server.Backend.Tests/AiNative.Server.Backend.Tests.csproj
+          --configuration Release --no-build --no-restore
+          --filter FullyQualifiedName~AiNative.Server.Backend.Tests.PostgresTests
+          --logger "trx;LogFileName=player.trx"
+          --results-directory artifacts/postgres-tests
+
+      - name: Run real Coordinator persistence tests
+        run: >-
+          dotnet test server/tests/AiNative.Server.Rooms.Tests/AiNative.Server.Rooms.Tests.csproj
+          --configuration Release --no-build --no-restore
+          --filter FullyQualifiedName~AiNative.Server.Rooms.Tests.PostgresAllocationStoreTests
+          --logger "trx;LogFileName=coordinator.trx"
+          --results-directory artifacts/postgres-tests
+
+      - name: Require all named PostgreSQL cases to pass
+        if: always()
+        run: python3 tools/validation/verify-postgres-tests.py artifacts/postgres-tests
+
+      - name: Retain PostgreSQL test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dotnet-postgres-tests
+          path: artifacts/postgres-tests
+          if-no-files-found: error
+
       - name: Publish Battle Host
         run: |
           dotnet publish server/src/Hosts/AiNative.BattleHost/AiNative.BattleHost.csproj \
@@ -77,7 +125,7 @@ jobs:
             --nologo
           test "$(find artifacts/product/battle-host -name Fantasy.config -type f | wc -l)" = '1'
           test -f artifacts/product/battle-host/Fantasy-Net.dll
-          grep -q 'Fantasy-Net/2026.1.1003' artifacts/product/battle-host/AiNative.BattleHost.deps.json
+          grep -q 'Fantasy-Net/2026.1.1004-ainative.1' artifacts/product/battle-host/AiNative.BattleHost.deps.json
           test "$(jq -r '.runtimeOptions.tfm' artifacts/product/battle-host/AiNative.BattleHost.runtimeconfig.json)" = 'net10.0'
 
       - name: Audit dependencies

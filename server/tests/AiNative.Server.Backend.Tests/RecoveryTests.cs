@@ -9,6 +9,31 @@ namespace AiNative.Server.Backend.Tests;
 
 public sealed class RecoveryTests
 {
+    [Test]
+    public async Task Released_room_rejects_ticket_until_match_pump_reconciles_original_party()
+    {
+        using var f = new RecoveryFixture();
+        var login = await f.LoginAsync("leader", "leader");
+        var party = await f.CreateReadyQueueAsync("leader", login, "queue");
+        await f.Router.Match.PumpAsync(default);
+        f.Router.Room!.State = "Released";
+        var query = new MatchQuery { RequestId = "queue" };
+        Assert.That((await f.CallAsync("leader", ServiceMethods.MatchStatus, query, login.SessionToken)).Error,
+            Is.EqualTo("invalid_allocation"));
+        Assert.That((await LobbyCall(f, login.PlayerId, ServiceMethods.PartyGet,
+            new PartyCommand { PartyId = party.PartyId })).Read(PartyState.Parser).QueueRequestId, Is.EqualTo("queue"));
+        await f.Router.Match.PumpAsync(default);
+        var terminal = (await f.CallAsync("leader", ServiceMethods.MatchStatus, query, login.SessionToken)).Read(MatchReady.Parser);
+        Assert.That((terminal.Status.State, terminal.Status.Failure), Is.EqualTo(("failed", "room_released")));
+        var cleared = (await LobbyCall(f, login.PlayerId, ServiceMethods.PartyGet,
+            new PartyCommand { PartyId = party.PartyId })).Read(PartyState.Parser);
+        Assert.That(cleared.QueueRequestId, Is.Empty);
+        Assert.That((await LobbyCall(f, login.PlayerId, ServiceMethods.PartyLeave,
+            new PartyCommand { PartyId = party.PartyId, ExpectedVersion = cleared.Version })).Success, Is.True);
+        Assert.That((await LobbyCall(f, login.PlayerId, ServiceMethods.PartyGet,
+            new PartyCommand { PartyId = party.PartyId })).Error, Is.EqualTo("party_not_found"));
+    }
+
     static ValueTask<ServiceReply> LobbyCall(RecoveryFixture f, string player, string method, IMessage request) => f.Router.Lobby.HandleAsync(new(ServiceRole.Gate, "gate", player), method, request.ToByteArray());
     [Test]
     public async Task Match_restart_invalidates_party_readiness_and_cannot_silently_rejoin_old_request()

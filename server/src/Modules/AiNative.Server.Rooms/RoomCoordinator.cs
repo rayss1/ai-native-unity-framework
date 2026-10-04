@@ -172,9 +172,24 @@ public sealed class RoomCoordinator : IServiceHandler
             if (_rooms.Count >= _maxStoredRooms) return ServiceReply.Reject("room-history-capacity");
             if (_rooms.Values.Any(x => (Active(x) || _unfencedLost.Contains(x.RoomId)) && x.PlayerIds.Intersect(request.PlayerIds, StringComparer.Ordinal).Any()))
                 return ServiceReply.Reject("player-already-allocated");
-            Node? selected = _nodes.Values.Where(x => Healthy(x))
-                .OrderByDescending(x => x.Report.Workers.Sum(w => w.AvailableRooms))
-                .ThenBy(x => x.Report.NodeId, StringComparer.Ordinal).FirstOrDefault();
+            Node? selected = SelectNode();
+            if (selected is null)
+            {
+                // Completed rooms may free slots before the next heartbeat. Refresh
+                // fenced inventory once without discarding a negative admission gate.
+                foreach (Node cached in _nodes.Values.Where(Admitting).ToArray())
+                {
+                    try
+                    {
+                        await ReportAsync(new(ServiceRole.Battle, cached.Report.NodeId), cached.Report.Clone(), ct);
+                    }
+                    catch (TimeoutException) { _nodes.Remove(cached.Report.NodeId); }
+                    catch (ServiceException ex) when (ex.Code is "unavailable" or "timeout")
+                    { _nodes.Remove(cached.Report.NodeId); }
+                    if (SelectNode() is not null) break;
+                }
+                selected = SelectNode();
+            }
             if (selected is null) return ServiceReply.Reject("capacity-unavailable");
             room = new()
             {
@@ -214,9 +229,19 @@ public sealed class RoomCoordinator : IServiceHandler
         return ServiceReply.From(room.Clone());
     }
 
-    private bool Healthy(Node node) => !node.Report.Draining && node.Report.OutboxHealthy &&
-        _clock.GetUtcNow() - node.Seen <= TimeSpan.FromSeconds(20) &&
-        node.Report.Workers.Any(x => x.AvailableRooms > 0 && x.MailboxAvailable > 0);
+    private Node? SelectNode() => _nodes.Values.Where(node => Admitting(node) && AvailableCapacity(node) > 0)
+        .OrderByDescending(AvailableCapacity).ThenBy(node => node.Report.NodeId, StringComparer.Ordinal).FirstOrDefault();
+    private bool Admitting(Node node) => !node.Report.Draining && node.Report.OutboxHealthy &&
+        _clock.GetUtcNow() - node.Seen <= TimeSpan.FromSeconds(20);
+    private int AvailableCapacity(Node node)
+    {
+        // Reported rooms are already reflected in AvailableRooms. Only ownership
+        // persisted after that inventory needs an additional conservative deduction.
+        int unreported = _rooms.Values.Count(room => Active(room) && room.NodeId == node.Report.NodeId &&
+            room.BootEpoch == node.Report.BootEpoch && !node.Report.Rooms.Any(inventory => inventory.RoomId == room.RoomId));
+        int available = node.Report.Workers.Where(worker => worker.MailboxAvailable > 0).Sum(worker => worker.AvailableRooms);
+        return Math.Max(0, available - unreported);
+    }
     private static bool Active(RoomAllocation room) => room.State is "Reserved" or "Ready";
     private static bool ValidReport(BattleNodeReport report) => Identifier(report.NodeId) && Identifier(report.BootEpoch) &&
         !string.IsNullOrWhiteSpace(report.Address) && System.Text.Encoding.UTF8.GetByteCount(report.Address) <= 512 &&

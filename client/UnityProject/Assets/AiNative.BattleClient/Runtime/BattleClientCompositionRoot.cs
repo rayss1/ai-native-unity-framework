@@ -30,6 +30,8 @@ namespace AiNative.Client.Application
         private Camera _playerCamera;
         private Light _arenaLight;
         private GUIStyle _hudStyle;
+        private ArenaRemoteVisualPool _remoteVisuals;
+        private readonly ArenaRemotePose[] _remotePoses = new ArenaRemotePose[ArenaClientProtocolV1.MaxSnapshotPlayers];
 
         public BattleClientSession Session => _topology != null ? _topology.Battle : _session;
 
@@ -38,6 +40,22 @@ namespace AiNative.Client.Application
             global::UnityEngine.Application.runInBackground = true;
             QualitySettings.vSyncCount = 0;
             global::UnityEngine.Application.targetFrameRate = 60;
+#if UNITY_ANDROID && !UNITY_EDITOR
+            _topology = gameObject.AddComponent<TopologyClientFlow>();
+            try
+            {
+                AndroidClientLaunchConfiguration configuration = AndroidClientLaunchConfiguration.ReadCurrentIntent();
+                _topology.Initialize(configuration.GateOptions, configuration.Automated, configuration.TimeoutSeconds, configuration.ResultPath, configuration.RunId);
+            }
+            catch (ArgumentException)
+            {
+                // Invalid public intent never enables account automation. The ordinary login UI remains available.
+                AndroidClientLaunchConfiguration configuration = AndroidClientLaunchConfiguration.Parse(new System.Collections.Generic.Dictionary<string, string>(), global::UnityEngine.Application.persistentDataPath);
+                _topology.Initialize(configuration.GateOptions, false, configuration.TimeoutSeconds, configuration.ResultPath, configuration.RunId);
+                Debug.LogWarning("Android launch configuration was rejected; interactive login is available.");
+            }
+            return;
+#else
             string[] arguments = Environment.GetCommandLineArgs();
             if (Array.IndexOf(arguments, "--ainative-topology") >= 0 || Array.IndexOf(arguments, "--ainative-topology-smoke") >= 0)
             {
@@ -49,6 +67,7 @@ namespace AiNative.Client.Application
                 _launch.Host,
                 _launch.Port,
                 global::UnityEngine.Application.version);
+#endif
         }
 
         private void Start() => _session?.Start();
@@ -62,6 +81,7 @@ namespace AiNative.Client.Application
             _playerVisual.transform.localPosition = Vector3.up;
             Renderer renderer = _playerVisual.GetComponent<Renderer>();
             renderer.sharedMaterial = LoadGreyboxMaterial("Player");
+            _remoteVisuals = new ArenaRemoteVisualPool(renderer.sharedMaterial);
             GameObject cameraObject = new GameObject("LocalPlayerCamera");
             cameraObject.transform.SetParent(_playerVisual.transform, false);
             cameraObject.transform.localPosition = new Vector3(0f, 0.65f, -4f);
@@ -117,6 +137,8 @@ namespace AiNative.Client.Application
         {
             // Unity may have already destroyed native objects during Player shutdown.
             // The camera is a child of the player and is destroyed with it.
+            _remoteVisuals?.Dispose();
+            _remoteVisuals = null;
             if (_playerVisual != null) Destroy(_playerVisual);
             if (_floorVisual != null) Destroy(_floorVisual);
             if (_arenaLight != null) Destroy(_arenaLight.gameObject);
@@ -220,6 +242,8 @@ namespace AiNative.Client.Application
         private void LateUpdate()
         {
             BattleClientSession session = Session;
+            int remoteCount = session?.AdvanceRemotePresentation(Time.unscaledDeltaTime, _remotePoses) ?? 0;
+            _remoteVisuals?.Apply(_remotePoses, remoteCount);
             if (session is null) return;
             if (session.TryAdvancePresentation(
                     Time.unscaledDeltaTime,
