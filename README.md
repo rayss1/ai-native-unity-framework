@@ -5,6 +5,8 @@ The repository contains the first production vertical-slice foundation: one Shar
 
 The new [single-region server topology](Docs/ADR/0017-single-region-service-topology.md) adds independent Gate, Player, Lobby, Match and Room Coordinator processes, plus multiple Battle processes with fixed Worker groups. It includes PostgreSQL ownership/settlement storage, signed admission, bounded durable results, Arena replay and actual local multi-process acceptance. See [operations and launch commands](Docs/Architecture/server-topology-operations.md) and the [implementation/qualification ledger](Docs/Architecture/server-topology-plan.md). Local evidence does not qualify production room density, Linux/TLS deployment or Unity/IL2CPP clients.
 
+The latest [Windows local battle-slice qualification](Docs/Architecture/battle-slice-qualification-2026-10-06.md) passed the original32/64/128-client ladder and128-client one-hour soak with the bounded five-second terminal drain. Its hardware, explicit input-driver configuration and platform limits are recorded with the evidence.
+
 ## Requirements
 
 - .NET SDK 10.0.202 baseline. `global.json` prefers the 10.0.2xx feature band and allows a newer stable 10.0 SDK (for example, 10.0.401) when that band is unavailable. Release images and qualification scripts retain their explicitly pinned SDK.

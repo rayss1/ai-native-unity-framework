@@ -157,6 +157,12 @@ internal sealed class ArenaCapacityRunner(FantasyServiceRuntime runtime, Failure
     readonly Dictionary<string, QualificationWorkerWindow> windows = [];
     readonly Dictionary<string, long> lifecycle = [];
     readonly string runDirectory = HostSettings.Required("AINATIVE_ACCEPTANCE_RUN_DIRECTORY");
+    readonly bool driverTimingEnabled = Environment.GetEnvironmentVariable("AINATIVE_QUALIFICATION_DRIVER_TIMING") == "1";
+    readonly string driverWaitMode = QualificationDriverExecution.SelectWaitMode(
+        Environment.GetEnvironmentVariable("AINATIVE_QUALIFICATION_DRIVER_WAIT"), OperatingSystem.IsWindows());
+    readonly ThreadPriority driverThreadPriority = QualificationDriverExecution.SelectThreadPriority(
+        Environment.GetEnvironmentVariable("AINATIVE_QUALIFICATION_DRIVER_PRIORITY"), OperatingSystem.IsWindows(),
+        QualificationDriverExecution.SelectWaitMode(Environment.GetEnvironmentVariable("AINATIVE_QUALIFICATION_DRIVER_WAIT"), OperatingSystem.IsWindows()));
     long measurementStart = long.MaxValue, measurementEnd = long.MaxValue;
     long occupancyTimestamp, occupiedTicks, slotTicks, maximumGapTicks;
     readonly object occupancyGate = new();
@@ -172,6 +178,7 @@ internal sealed class ArenaCapacityRunner(FantasyServiceRuntime runtime, Failure
     {
         using CancellationTokenSource stop = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
         using CancellationTokenSource diagnosticsStop = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
+        using QualificationWaitWitness? waitWitness = driverTimingEnabled ? new() : null;
         List<Task> slotTasks = [];
         Task? diagnosticTask = null;
         bool terminalPassed = false;
@@ -189,6 +196,7 @@ internal sealed class ArenaCapacityRunner(FantasyServiceRuntime runtime, Failure
             await warmup;
             measurementStart = Stopwatch.GetTimestamp();
             measurementEnd = measurementStart + (long)(options.DurationSeconds * (double)Stopwatch.Frequency);
+            waitWitness?.Start(measurementStart, measurementEnd);
             lock (occupancyGate) { occupancyTimestamp = measurementStart; collecting = true; }
             await CollectDiagnostics();
             diagnosticTask = Task.Run(async () =>
@@ -207,6 +215,7 @@ internal sealed class ArenaCapacityRunner(FantasyServiceRuntime runtime, Failure
             if (await Task.WhenAny(measure, failedSlot, diagnosticTask) == failedSlot) await failedSlot;
             if (diagnosticTask.IsFaulted) await diagnosticTask;
             await measure;
+            waitWitness?.Stop();
             AccountOccupancy();
             lock (occupancyGate) collecting = false;
             diagnosticsStop.Cancel();
@@ -214,6 +223,8 @@ internal sealed class ArenaCapacityRunner(FantasyServiceRuntime runtime, Failure
             await CollectDiagnostics();
             // Every current room remains driven through its ordinary score/time finish and settlement.
             await Task.WhenAll(slotTasks);
+            JsonElement terminalDelivery = await CollectTerminalDelivery();
+            Check(QualificationTerminalDeliveryGate.Passes(terminalDelivery), "qualification-terminal-delivery-failed");
             List<object> replay = [];
             foreach (LoadRoom room in completed.OrderBy(room => room.Allocation.RoomId))
             {
@@ -241,16 +252,19 @@ internal sealed class ArenaCapacityRunner(FantasyServiceRuntime runtime, Failure
                 long eventMaximum = group.Max(point => point.Data.GetProperty("queues").GetProperty("eventDepth").GetInt64());
                 long eventDrops = last.Data.GetProperty("queues").GetProperty("droppedEvents").GetInt64() - first.Data.GetProperty("queues").GetProperty("droppedEvents").GetInt64();
                 long packetDrops = last.Data.GetProperty("queues").GetProperty("droppedPackets").GetInt64() - first.Data.GetProperty("queues").GetProperty("droppedPackets").GetInt64();
+                long terminalDeliveryFailures = group.Max(point => point.Data.GetProperty("queues").GetProperty("terminalDeliveryFailures").GetInt64());
+                long terminalDeliveryTimeouts = group.Max(point => point.Data.GetProperty("queues").GetProperty("terminalDeliveryTimeouts").GetInt64());
                 bool healthy = group.All(point => point.Data.GetProperty("replay").GetProperty("healthy").GetBoolean() &&
                     point.Data.GetProperty("replay").GetProperty("incompleteCaptures").GetInt64() == 0);
                 return new { node = group.Key, cpuPercent = cpu, peakWorkingSetBytes = peak, availableMemoryBytes = available,
                     cpuDenominator = "Environment.ProcessorCount logical processors; no explicit process CPU quota", availableMemorySource = "GC.GetGCMemoryInfo().TotalAvailableMemoryBytes",
                     hostAggregateHeadroomQualified = false,
-                    commandMaximum, eventMaximum, eventDrops, packetDrops, gcStart = first.Data.GetProperty("gc"), gcEnd = last.Data.GetProperty("gc"),
+                    commandMaximum, eventMaximum, eventDrops, packetDrops, terminalDeliveryFailures, terminalDeliveryTimeouts,
+                    gcStart = first.Data.GetProperty("gc"), gcEnd = last.Data.GetProperty("gc"),
                     processAllocatedBytesDuringWindow = last.Data.GetProperty("gc").GetProperty("allocatedBytes").GetInt64() - first.Data.GetProperty("gc").GetProperty("allocatedBytes").GetInt64(),
                     memoryStartBytes = a.GetProperty("workingSetBytes").GetInt64(), memoryEndBytes = b.GetProperty("workingSetBytes").GetInt64(),
                     memorySlopeBytesPerSecond = (b.GetProperty("workingSetBytes").GetInt64() - a.GetProperty("workingSetBytes").GetInt64()) / seconds,
-                    passed = QualificationResourceGate.Passes(cpu, peak, available) && eventDrops == 0 && healthy &&
+                    passed = QualificationResourceGate.Passes(cpu, peak, available) && eventDrops == 0 && terminalDeliveryFailures == 0 && healthy &&
                         commandMaximum <= options.WorkerCount * options.RoomsPerWorker * 256 && eventMaximum <= options.WorkerCount * options.RoomsPerWorker * 256 };
             }).ToArray();
             var clients = completed.SelectMany(room => room.Clients.Select(client => client.Report(measurementStart, measurementEnd, options.InputHz,
@@ -266,13 +280,20 @@ internal sealed class ArenaCapacityRunner(FantasyServiceRuntime runtime, Failure
                 Combat("measuredFire") > 0 && Combat("measuredHit") > 0 && Combat("measuredKills") > 0 && Combat("measuredRespawns") > 0 && Combat("measuredSwitches") > 0 && Combat("measuredSequenceGaps") == 0 &&
                 completed.Sum(room => room.Clients.Sum(client => client.AmmoExhaustedInputs)) > 0 &&
                 workerReports.All(worker => worker.data.GetProperty("observedTicks").GetInt64() >= options.DurationSeconds * 59.5);
+            using var currentProcess = Process.GetCurrentProcess();
             var report = new { scenario = "actual-arena-capacity-qualification", passed, options,
                 clientHarness = new { battleMessageOwnership = "one independent MultiThread Scene per room generation",
+                    inputDriverWait = driverWaitMode,
+                    configuredInputDriverThreadPriority = driverThreadPriority.ToString(),
+                    inputDriverPriorityApplication = driverWaitMode == "windows-high-resolution"
+                        ? "set before each owned driver starts; dynamic OS priority not sampled"
+                        : "not applied; task-delay pool priority not measured",
+                    processPriorityClassAtReport = currentProcess.PriorityClass.ToString(),
                     weaponGenerator = "staggered-ammo-cycle-v2: four-second maximum dwell; send one observed-empty Fire before early rotation",
                     clientsPerGroup = options.PlayersPerRoom, maximumConcurrentRoomGroups = options.RoomCount,
                     gateMessageOwnership = "single acceptance root Scene", resourceAccounting = "whole-host audit includes all client threads and sockets" },
                 measurementStartUtc = diagnostics.First().Utc, measurementEndUtc = diagnostics.Last().Utc,
-                workers = workerReports, nodes = resources, players = clients, completedRooms = completed.Count,
+                workers = workerReports, nodes = resources, players = clients, completedRooms = completed.Count, terminalDelivery,
                 occupancy = new { ratio = occupancy, minimumRatio = .95, expectedSlots = options.RoomCount,
                     activeRoomSeconds = occupiedTicks / (double)Stopwatch.Frequency, expectedRoomSeconds = slotTicks / (double)Stopwatch.Frequency,
                     maximumReplacementSeconds = maximumGapTicks / (double)Stopwatch.Frequency },
@@ -292,6 +313,21 @@ internal sealed class ArenaCapacityRunner(FantasyServiceRuntime runtime, Failure
                     os = System.Runtime.InteropServices.RuntimeInformation.OSDescription, runtime = System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription },
                 limitations = new[] { "Real Arena workload; does not qualify the legacy 64-player room", "Application payload counters do not prove on-wire Regional/Degraded impairment budgets", "Per-process 80% CPU/GC-available-memory limits do not establish 20% headroom for two nodes sharing one host", "Every measured business Tick requires zero allocation; all mailbox/lifecycle bytes and exact steady coverage are retained" } };
             File.WriteAllText(Path.Combine(runDirectory, "qualification-detail.json"), JsonSerializer.Serialize(report));
+            if (driverTimingEnabled)
+                File.WriteAllText(Path.Combine(runDirectory, "qualification-driver-timing.json"), JsonSerializer.Serialize(new
+                {
+                    scope = "Diagnostic only; measured-loop histograms, bounded slow-cycle samples; send schedule and gates unchanged",
+                    waitWitness = waitWitness?.Report(),
+                    process = new { allocatedBytes = GC.GetTotalAllocatedBytes(false), gen0 = GC.CollectionCount(0), gen1 = GC.CollectionCount(1), gen2 = GC.CollectionCount(2),
+                        threadPoolThreads = ThreadPool.ThreadCount, pendingWork = ThreadPool.PendingWorkItemCount, gcPausePercent = GC.GetGCMemoryInfo().PauseTimePercentage },
+                    rooms = owned.OrderBy(room => room.Slot).ThenBy(room => room.Generation).Select(room => new
+                    {
+                        room.Slot, room.Generation, room.Allocation.RoomId, room.DiagnosticStartedUtc, room.DiagnosticStartedTicks,
+                        room.DiagnosticInitialThread, room.DiagnosticContext, room.DiagnosticThreadChanges,
+                        room.MeasuredDeadlineResets, room.MeasuredSkippedPeriods, room.SlowCyclesOmitted,
+                        histograms = room.Timing?.Report(), slowCycles = room.SlowCycles?.Take(room.SlowCycleCount)
+                    })
+                }));
             File.WriteAllText(Path.Combine(runDirectory, "qualification-latency-samples.json"), JsonSerializer.Serialize(samples));
             evidence.Add(report);
             Check(passed, "qualification-gates");
@@ -408,7 +444,9 @@ internal sealed class ArenaCapacityRunner(FantasyServiceRuntime runtime, Failure
             RecordPhase(slot, generation, "all-ready-joined-fresh", allocation, joiningStart);
             var room = new LoadRoom(allocation, results.Select(result => result.client).ToList(), slot, generation, resources);
             owned.Add(room);
-            room.Driver = DriveRoom(room, token);
+            room.Driver = driverWaitMode == "windows-high-resolution"
+                ? QualificationDriverExecution.Run(wait => DriveRoom(room, token, wait), () => new WindowsQualificationDriverWait(token), driverThreadPriority)
+                : DriveRoom(room, token);
             return room;
 
             async Task<(LoadClient client, RoomAllocation allocation)> JoinMember(int index)
@@ -651,6 +689,24 @@ internal sealed class ArenaCapacityRunner(FantasyServiceRuntime runtime, Failure
         }
     }
 
+    async Task<JsonElement> CollectTerminalDelivery()
+    {
+        // Correctness after all tail rooms retire; never append to measured performance samples.
+        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+        List<object> nodes = [];
+        foreach (var node in new[] { (Id: "battle-1", Port: 24106), (Id: "battle-2", Port: 24107) })
+        {
+            using var json = JsonDocument.Parse(await http.GetStringAsync($"http://127.0.0.1:{node.Port}/health/diagnostics", cancellation));
+            var queues = json.RootElement.GetProperty("queues");
+            nodes.Add(new { node = node.Id,
+                terminalDelivered = queues.GetProperty("terminalDelivered").GetInt64(),
+                terminalDeliveryFailures = queues.GetProperty("terminalDeliveryFailures").GetInt64(),
+                terminalDeliveryTimeouts = queues.GetProperty("terminalDeliveryTimeouts").GetInt64() });
+        }
+        var report = JsonSerializer.SerializeToElement(new { recordedUtc = DateTimeOffset.UtcNow, scope = "after-all-tail-room-settlements-and-releases", nodes });
+        await File.WriteAllTextAsync(Path.Combine(runDirectory, "qualification-terminal-delivery.json"), report.GetRawText(), cancellation);
+        return report;
+    }
     async Task CollectDiagnostics()
     {
         using HttpClient http = new() { Timeout = TimeSpan.FromSeconds(3) };
@@ -688,9 +744,18 @@ internal sealed class ArenaCapacityRunner(FantasyServiceRuntime runtime, Failure
         await File.WriteAllTextAsync(Path.Combine(runDirectory, "qualification-failure-nodes.json"), JsonSerializer.Serialize(nodes));
     }
 
-    async Task DriveRoom(LoadRoom room, CancellationToken token)
+    async Task DriveRoom(LoadRoom room, CancellationToken token, Action? ownedWait = null)
     {
         RecordPhase(room.Slot, room.Generation, "driver-start", room.Allocation);
+        if (driverTimingEnabled)
+        {
+            room.Timing = new(); room.SlowCycles = new DriverSlowCycle[256];
+            room.DiagnosticStartedUtc = DateTimeOffset.UtcNow; room.DiagnosticStartedTicks = Stopwatch.GetTimestamp();
+            room.DiagnosticInitialThread = Environment.CurrentManagedThreadId;
+            room.DiagnosticContext = SynchronizationContext.Current?.GetType().FullName;
+        }
+        int lastThread = room.DiagnosticInitialThread;
+        long priorDelayStart = 0;
         var random = new Random(unchecked(options.Seed + room.Slot * 7919 + room.Generation * 104729));
         byte[] receive = new byte[1200], send = new byte[1200];
         long period = Stopwatch.Frequency / options.InputHz, next = Stopwatch.GetTimestamp();
@@ -699,6 +764,15 @@ internal sealed class ArenaCapacityRunner(FantasyServiceRuntime runtime, Failure
         while (true)
         {
             long now = Stopwatch.GetTimestamp();
+            bool timingMeasured = room.Timing is not null && now >= measurementStart && now < measurementEnd;
+            long delayElapsed = priorDelayStart == 0 ? 0 : now - priorDelayStart;
+            if (timingMeasured)
+            {
+                if (priorDelayStart != 0) room.Timing!.DelayResume.Record(delayElapsed);
+                int thread = Environment.CurrentManagedThreadId;
+                if (thread != lastThread) room.DiagnosticThreadChanges++;
+                lastThread = thread;
+            }
             foreach (LoadClient client in room.Clients)
             {
                 for (int n = 0; n < 64 && client.Wire.Transport.TryReceive(receive, out var packet); n++)
@@ -732,6 +806,8 @@ internal sealed class ArenaCapacityRunner(FantasyServiceRuntime runtime, Failure
                     }
                 }
             }
+            long receiveEnded = timingMeasured ? Stopwatch.GetTimestamp() : 0;
+            if (timingMeasured) room.Timing!.Receive.Record(receiveEnded - now);
             bool finishing = room.Clients.Any(client => client.Last.MatchPhase == ArenaMatchPhase.ArenaMatchFinished);
             if (finishing) EndInputLoad(room, now);
             if (room.Clients.All(client => client.Last.MatchPhase == ArenaMatchPhase.ArenaMatchFinished))
@@ -747,8 +823,15 @@ internal sealed class ArenaCapacityRunner(FantasyServiceRuntime runtime, Failure
             }
             if (now >= next && !finishing)
             {
+                if (timingMeasured) room.Timing!.DeadlineLateness.Record(Math.Max(0, receiveEnded - next));
                 next += period;
-                if (now > next + period) { foreach (LoadClient client in room.Clients) client.MissedSendDeadlines++; next = now + period; }
+                if (now > next + period)
+                {
+                    if (timingMeasured) { room.MeasuredDeadlineResets++; room.MeasuredSkippedPeriods += (now - next) / period + 1; }
+                    foreach (LoadClient client in room.Clients) client.MissedSendDeadlines++;
+                    next = now + period;
+                }
+                long sendingStarted = timingMeasured ? Stopwatch.GetTimestamp() : 0;
                 foreach (LoadClient client in room.Clients)
                 {
                     var self = client.Last.Players.First(player => player.EntityId == client.Entity).Clone();
@@ -786,14 +869,31 @@ internal sealed class ArenaCapacityRunner(FantasyServiceRuntime runtime, Failure
                     if (now - client.LastAckTimestamp > Stopwatch.Frequency * 5 && now - client.Started > Stopwatch.Frequency * 5)
                         throw new InvalidOperationException("qualification-player-ack-stalled");
                 }
+                if (timingMeasured) room.Timing!.SendBatch.Record(Stopwatch.GetTimestamp() - sendingStarted);
             }
-            await Task.Delay(1, token);
+            if (timingMeasured)
+            {
+                long ended = Stopwatch.GetTimestamp();
+                room.Timing!.LoopWork.Record(ended - now);
+                if (ended - now > period / 2 || delayElapsed > period)
+                {
+                    if (room.SlowCycleCount < room.SlowCycles!.Length)
+                        room.SlowCycles[room.SlowCycleCount++] = new(now, receiveEnded, ended, delayElapsed,
+                            Environment.CurrentManagedThreadId, GC.CollectionCount(0), GC.CollectionCount(1), GC.CollectionCount(2), ThreadPool.PendingWorkItemCount);
+                    else room.SlowCyclesOmitted++;
+                }
+            }
+            priorDelayStart = room.Timing is not null ? Stopwatch.GetTimestamp() : 0;
+            if (ownedWait is null) await Task.Delay(1, token);
+            else ownedWait();
         }
     }
 
     static void Check(bool condition, string reason) { if (!condition) throw new InvalidOperationException(reason); }
     static JsonElement ReadIdentity(string path) { using var document = JsonDocument.Parse(File.ReadAllText(path)); return document.RootElement.Clone(); }
 
+    readonly record struct DriverSlowCycle(long LoopStartedTicks, long ReceiveEndedTicks, long LoopEndedTicks, long DelayResumeTicks,
+        int ThreadId, int Gen0, int Gen1, int Gen2, long PendingThreadPoolWork);
     sealed class LoadRoom(RoomAllocation allocation, List<LoadClient> clients, int slot, int generation,
         QualificationRoomResources resources) : IAsyncDisposable
     {
@@ -805,6 +905,12 @@ internal sealed class ArenaCapacityRunner(FantasyServiceRuntime runtime, Failure
         public long InputEnded;
         public ulong MatchStartTick;
         public long LastFireTimestamp;
+        public QualificationDriverTiming? Timing;
+        public DateTimeOffset DiagnosticStartedUtc;
+        public long DiagnosticStartedTicks, MeasuredDeadlineResets, MeasuredSkippedPeriods, SlowCyclesOmitted;
+        public int DiagnosticInitialThread, DiagnosticThreadChanges, SlowCycleCount;
+        public string? DiagnosticContext;
+        public DriverSlowCycle[]? SlowCycles;
         public readonly QualificationCombatEvidence Combat = new(clients.Select(client => client.Entity).ToArray());
         public string ReplayPath(string run) => Path.Combine(run, "replay", Allocation.NodeId,
             Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(Allocation.AllocationId + ":" + Allocation.RoomId + ":" + Allocation.BootEpoch))).ToLowerInvariant() + ".anar");

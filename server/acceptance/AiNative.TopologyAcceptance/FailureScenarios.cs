@@ -80,6 +80,7 @@ internal static class FailureScenarios
     public static async Task RunAsync(FantasyServiceRuntime runtime, string mode, List<object> evidence, CancellationToken ct)
     {
         var fixture = new Fixture(runtime, evidence, ct);
+        if (mode == "terminal-delivery") { await TerminalDeliveryScenarios.RunAsync(runtime, fixture, evidence, ct); return; }
         if (mode == "qualification") { await new ArenaCapacityRunner(runtime, fixture, evidence, ct).RunAsync(); return; }
         if (mode is "capacity" or "bots") { await fixture.CapacityAndBots(mode == "bots"); return; }
         if (mode == "party-notifications") { await fixture.PartyNotifications(); return; }

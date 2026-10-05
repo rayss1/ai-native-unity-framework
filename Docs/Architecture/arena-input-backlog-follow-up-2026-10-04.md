@@ -1,6 +1,6 @@
 # Arena input backlog: approved repair and qualification
 
-Status: owner approved the follow-up and commit/PR publication on2026-10-04. The repair under [ADR-0018](../ADR/0018-arena-dead-input-consumption.md) and [fresh local qualification](battle-slice-qualification-2026-10-05.md) are complete at64 clients;128 failed occupancy/input-rate checks. All acceptance gates remain unchanged. Fantasy remains at `df4ad5fe5418c8855932de784c7cea6286c4b082`.
+Status: owner approved this follow-up and commit/PR publication on2026-10-04. The [ADR-0018](../ADR/0018-arena-dead-input-consumption.md) repair and [earlier64-client result](battle-slice-qualification-2026-10-05.md) are retained. The subsequent terminal-delivery/pacing candidate completed [Windows local128-client qualification](battle-slice-qualification-2026-10-06.md) without lowering gates. Fantasy remains at `df4ad5fe5418c8855932de784c7cea6286c4b082`.
 
 ## Evidence
 

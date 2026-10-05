@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text.Json;
 using AiNative.Protocol.Backend.V1;
@@ -14,8 +15,15 @@ public sealed class PlayerService : IServiceHandler
     readonly TimeProvider clock;
     readonly IServiceRpc? roomRpc;
     readonly TimeSpan sessionLifetime, entryLifetime;
+    static readonly bool qualificationAuthTiming = Environment.GetEnvironmentVariable("AINATIVE_QUALIFICATION_AUTH_TIMING") == "1";
+    static readonly BoundedPasswordHasher sharedPasswordHasher = new(HashPassword);
+    readonly BoundedPasswordHasher passwordHasher;
     public PlayerService(IPlayerStore store, RSA signingKey, TimeProvider clock, IServiceRpc? roomRpc = null, TimeSpan? sessionLifetime = null, TimeSpan? entryLifetime = null)
+        : this(store, signingKey, clock, sharedPasswordHasher, roomRpc, sessionLifetime, entryLifetime) { }
+    internal PlayerService(IPlayerStore store, RSA signingKey, TimeProvider clock, BoundedPasswordHasher passwordHasher,
+        IServiceRpc? roomRpc = null, TimeSpan? sessionLifetime = null, TimeSpan? entryLifetime = null)
     {
+        this.passwordHasher = passwordHasher;
         this.store = store; this.clock = clock; this.roomRpc = roomRpc; tokens = new(signingKey, clock);
         this.sessionLifetime = sessionLifetime ?? TimeSpan.FromHours(8);
         this.entryLifetime = entryLifetime ?? TimeSpan.FromMinutes(2);
@@ -39,14 +47,15 @@ public sealed class PlayerService : IServiceHandler
                     if (method == ServiceMethods.RegisterAccount)
                     {
                         var salt = RandomNumberGenerator.GetBytes(32);
-                        account = new(Guid.NewGuid().ToString("N"), username, salt, HashPassword(request.Password, salt));
+                        byte[] hash = await passwordHasher.HashAsync(request.Password, salt, "register", cancellationToken);
+                        account = new(Guid.NewGuid().ToString("N"), username, salt, hash);
                         if (!await store.CreateAsync(account, cancellationToken)) return ServiceReply.Reject("username_exists");
                     }
                     else
                     {
                         account = await store.FindAsync(username, cancellationToken);
                         // Always run the KDF, including unknown accounts, to reduce username timing disclosure.
-                        var actual = HashPassword(request.Password, account?.Salt ?? new byte[32]);
+                        var actual = await passwordHasher.HashAsync(request.Password, account?.Salt ?? new byte[32], "login", cancellationToken);
                         if (account is null || !CryptographicOperations.FixedTimeEquals(actual, account.PasswordHash)) return ServiceReply.Reject("invalid_credentials");
                     }
                     var expiry = clock.GetUtcNow().Add(sessionLifetime).ToUnixTimeSeconds();
@@ -118,7 +127,64 @@ public sealed class PlayerService : IServiceHandler
         return reply.Read(RoomAllocation.Parser);
     }
     static bool SameRoom(RoomAllocation room, string match, string roomId, string node, string epoch, IEnumerable<string> players) => room.MatchId == match && room.RoomId == roomId && room.NodeId == node && room.BootEpoch == epoch && room.PlayerIds.Order(StringComparer.Ordinal).SequenceEqual(players.Order(StringComparer.Ordinal));
-    static byte[] HashPassword(string password, byte[] salt) => Rfc2898DeriveBytes.Pbkdf2(password, salt, 210000, HashAlgorithmName.SHA256, 32);
+    static byte[] HashPassword(string password, byte[] salt, string operation)
+    {
+        // Read once at process initialization. The default path performs no diagnostic allocation or timing.
+        if (!qualificationAuthTiming) return Rfc2898DeriveBytes.Pbkdf2(password, salt, 210000, HashAlgorithmName.SHA256, 32);
+        return QualificationAuthTiming.Hash(password, salt, operation);
+    }
+    private static class QualificationAuthTiming
+    {
+        const int MaximumRecords = 8192;
+        static long calls, writeFailures;
+        static QualificationAuthTiming()
+        {
+            AppDomain.CurrentDomain.ProcessExit += (_, _) => Write(new
+            {
+                eventName = "qualification-auth-timing-terminal", utc = DateTimeOffset.UtcNow,
+                attemptedRecords = Math.Min(Interlocked.Read(ref calls), MaximumRecords),
+                omittedRecords = Math.Max(0, Interlocked.Read(ref calls) - MaximumRecords),
+                writeFailures = Interlocked.Read(ref writeFailures), maximumRecords = MaximumRecords
+            });
+        }
+        internal static byte[] Hash(string password, byte[] salt, string operation)
+        {
+            long ordinal = Interlocked.Increment(ref calls);
+            if (ordinal > MaximumRecords)
+            {
+                if (ordinal == MaximumRecords + 1) Write(new
+                {
+                    eventName = "qualification-auth-timing-overflow", utc = DateTimeOffset.UtcNow,
+                    omittedRecords = 1, maximumRecords = MaximumRecords,
+                    finalCountEvent = "qualification-auth-timing-terminal"
+                });
+                return Rfc2898DeriveBytes.Pbkdf2(password, salt, 210000, HashAlgorithmName.SHA256, 32);
+            }
+            int threadId = Environment.CurrentManagedThreadId;
+            string? synchronizationContext = SynchronizationContext.Current?.GetType().FullName;
+            DateTimeOffset startedUtc = DateTimeOffset.UtcNow;
+            long started = Stopwatch.GetTimestamp();
+            try { return Rfc2898DeriveBytes.Pbkdf2(password, salt, 210000, HashAlgorithmName.SHA256, 32); }
+            finally
+            {
+                long ended = Stopwatch.GetTimestamp();
+                Write(new
+                {
+                    eventName = "qualification-auth-kdf", ordinal, operation, startedUtc,
+                    startedTicks = started, endedTicks = ended, durationTicks = ended - started,
+                    stopwatchFrequency = Stopwatch.Frequency,
+                    durationMilliseconds = (ended - started) * 1000d / Stopwatch.Frequency,
+                    threadId, synchronizationContext
+                });
+            }
+        }
+        static void Write<T>(T record)
+        {
+            try { Console.Error.WriteLine(JsonSerializer.Serialize(record)); }
+            catch (Exception error) when (error is IOException or ObjectDisposedException)
+            { Interlocked.Increment(ref writeFailures); }
+        }
+    }
 }
 
 internal static class Identifiers

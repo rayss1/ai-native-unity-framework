@@ -126,6 +126,7 @@ namespace AiNative.Client.Application
         private int _reconnectAttempts;
         private bool _awaitingReconnectResponse;
         private bool _disposed;
+        private bool _sendFailed;
         private string _faultReason = string.Empty;
         private ulong _sessionId;
         private uint _entityId;
@@ -310,14 +311,19 @@ namespace AiNative.Client.Application
                 }
             }
 
-            if (State == BattleClientState.Active &&
-                _transportSlot.State is TransportState.Closed or TransportState.Faulted)
+            // Observe closure before draining: no new packet can be admitted after that boundary.
+            // If closure races this pump, retain ownership until the next bounded receive pass.
+            bool reconnectPending = _sendFailed ||
+                _transportSlot.State is TransportState.Closed or TransportState.Faulted;
+            bool inboundDrained = PumpReceive();
+            if (reconnectPending && inboundDrained && State == BattleClientState.Active && !IsArenaFinished)
             {
+                _sendFailed = false;
                 BeginReconnect();
             }
 
-            PumpReceive();
-            if (State == BattleClientState.Active && !IsArenaFinished)
+            if (State == BattleClientState.Active && !IsArenaFinished && !_sendFailed &&
+                _transportSlot.State == TransportState.Connected)
             {
                 FlushInputRing();
             }
@@ -426,6 +432,7 @@ namespace AiNative.Client.Application
             if (abandoned != null) _ = DisposeAbandonedConnectionAsync(abandoned);
             State = BattleClientState.Reconnecting;
             _faultReason = "";
+            _sendFailed = false;
             _presentation.ResetState();
             _remotePresentation.Reset();
             _topologyReconnecting = true;
@@ -595,11 +602,20 @@ namespace AiNative.Client.Application
             }
         }
 
-        private void PumpReceive()
+        /// <summary>Settlement-tail receive pass. Never connects, sends inputs, or retries control traffic.</summary>
+        internal bool DrainAcceptedPackets()
+        {
+            if (_disposed) return true;
+            bool closedBeforeRead = _transportSlot.State is TransportState.Closed or TransportState.Faulted;
+            bool drained = PumpReceive(receiveOnly: true);
+            return closedBeforeRead && drained;
+        }
+        private bool PumpReceive(bool receiveOnly = false)
         {
             int budget = 256;
-            while (budget-- > 0 && _transportSlot.TryReceive(_receiveBuffer, out ReceivedPacket packet))
+            while (budget-- > 0)
             {
+                if (!_transportSlot.TryReceive(_receiveBuffer, out ReceivedPacket packet)) return true;
                 if (!packet.IsComplete || packet.WrittenBytes > _receiveBuffer.Length)
                 {
                     continue;
@@ -607,6 +623,13 @@ namespace AiNative.Client.Application
 
                 ReadOnlySpan<byte> frame = _receiveBuffer.AsSpan(0, packet.WrittenBytes);
                 ushort messageId = BattleClientProtocolV1.ReadMessageId(frame);
+                if (receiveOnly)
+                {
+                    if (_prediction != null && (State is BattleClientState.Active or BattleClientState.Faulted) &&
+                        messageId == BattleClientProtocolV1.SnapshotMessageId)
+                        ApplySnapshot(frame, packet);
+                    continue;
+                }
                 if (State == BattleClientState.LoggingIn &&
                     packet.Channel.Equals(BattleClientProtocolV1.ControlChannel) &&
                     messageId == BattleClientProtocolV1.LoginResponseMessageId)
@@ -632,6 +655,8 @@ namespace AiNative.Client.Application
                     ApplySnapshot(frame, packet);
                 }
             }
+            // Budget exhaustion is not proof of an empty queue; preserve it for the next frame.
+            return false;
         }
 
         private void HandleLogin(ReadOnlySpan<byte> frame)
@@ -811,7 +836,7 @@ namespace AiNative.Client.Application
                 }
                 catch (Exception)
                 {
-                    BeginReconnect();
+                    _sendFailed = true;
                     return;
                 }
 
@@ -824,7 +849,7 @@ namespace AiNative.Client.Application
                     _droppedInputFrames++;
                     if (result.Status is SendStatus.Closed or SendStatus.Faulted)
                     {
-                        BeginReconnect();
+                        _sendFailed = true;
                         return;
                     }
                 }
@@ -846,6 +871,7 @@ namespace AiNative.Client.Application
                 return;
             }
             State = BattleClientState.Reconnecting;
+            _sendFailed = false;
             _presentation.ResetState();
             _remotePresentation.Reset();
             _awaitingReconnectResponse = false;
@@ -875,6 +901,7 @@ namespace AiNative.Client.Application
             _faultReason = string.IsNullOrWhiteSpace(reason) ? "Unknown battle client failure." : reason;
             State = BattleClientState.Faulted;
             _connectCancellation?.Cancel();
+            _sendFailed = false;
             _presentation.ResetState();
             _remotePresentation.Reset();
         }

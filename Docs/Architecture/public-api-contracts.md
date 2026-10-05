@@ -109,7 +109,7 @@ Contract:
 
 Owner: `com.ainative.client.fantasy`
 Consumers: Unity application Composition Root through `IRealtimeTransport`
-Dependencies: `AiNative.Realtime`, pinned `Fantasy.Unity` `2026.1.1001`
+Dependencies: `AiNative.Realtime`, pinned `Fantasy.Unity` `2026.1.1002-ainative.1`
 
 This is the first concrete Unity implementation of `IRealtimeTransport`; it does not change that shared port. `FantasyKcpTransportOptions` supplies Host, Port, and connection timeout. `ConnectAsync` returns `FantasyKcpConnectResult`, whose stable `FantasyKcpConnectStatus` distinguishes Connected, InvalidConfiguration, TimedOut, Cancelled, and Faulted without exposing Fantasy types.
 
@@ -121,6 +121,7 @@ Contract:
 - `TryAdvanceConnectionEpoch` accepts only nonzero, monotonic values. Login and reconnect responses are decoded and bound by the application before prediction receives subsequent packets.
 - The read-only `FantasyKcpTransportDiagnostics` snapshot reports accepted sends/receives, send backpressure, oversized frames, invalid channels, stale sequences, inbound drops, and connection faults.
 - Disposal unregisters Session routing before releasing the Session; late callbacks are ignored. Fantasy Session, messages, and generated registration types do not enter prediction, Shared, or application state.
+- Remote closure stops new sends and packet admission but preserves the already accepted, bounded inbound queue for `TryReceive`. Explicit disposal releases the remainder. The application consumes these packets before deciding to reconnect; exhausting its per-frame receive budget defers that decision to a later frame. Neither transport acknowledgement nor queue admission proves that an application has displayed a terminal state.
 
 ## `IAssetService`
 

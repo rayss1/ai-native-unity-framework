@@ -23,7 +23,7 @@ internal interface IFantasyOutboundDispatcher
     void DisposeSession();
 }
 
-internal sealed class FantasyOutboundDispatcher(Session session) : IFantasyOutboundDispatcher
+internal sealed class FantasyOutboundDispatcher(Session session) : IFantasyOutboundDispatcher, IFantasySendDrainDispatcher
 {
     private readonly global::Fantasy.Scene _ownerScene = session.Scene;
     public bool IsClosed => session.IsDisposed;
@@ -34,9 +34,20 @@ internal sealed class FantasyOutboundDispatcher(Session session) : IFantasyOutbo
     public void Send(FantasyRealtimeEnvelope envelope) => session.Send(envelope);
 
     public void DisposeSession() => session.Dispose();
+
+    public bool TryPostSendDrainCheck(Action action)
+    {
+        if (_ownerScene.IsDisposed || session.IsDisposed) return false;
+        // Unlike ordinary outbound work, this callback must observe a session closed after posting.
+        _ownerScene.ThreadSynchronizationContext.Post(action);
+        return true;
+    }
+
+    public bool TryGetPendingKcpSends(out uint count) =>
+        FantasyKcpSendDrainObservation.TryRead(session, out count);
 }
 
-internal sealed class FantasySessionSender : IFantasySessionSender
+internal sealed partial class FantasySessionSender : IFantasySessionSender, IFantasySendDrain
 {
     private readonly IFantasyOutboundDispatcher _dispatcher;
     private readonly ConcurrentQueue<FantasyRealtimeEnvelope> _outbound = new();
@@ -184,6 +195,7 @@ internal sealed class FantasySessionSender : IFantasySessionSender
             return;
         }
 
+        FailPendingSendDrainCheck();
         DrainDisposedOutbound();
 
         if (!_dispatcher.IsClosed)
@@ -276,7 +288,7 @@ internal sealed class FantasySessionSender : IFantasySessionSender
     }
 }
 
-internal sealed class FantasyRealtimeTransport : IRealtimeTransport
+internal sealed class FantasyRealtimeTransport : IRealtimeTransport, IFantasySendDrain
 {
     private const int MaxDatagramBytes = 1200;
     private readonly IFantasySessionSender _sender;
@@ -308,6 +320,17 @@ internal sealed class FantasyRealtimeTransport : IRealtimeTransport
             if (_sender.IsClosed) Volatile.Write(ref _state, (int)TransportState.Closed);
             return (TransportState)Volatile.Read(ref _state);
         }
+    }
+
+    public async Task<FantasySendDrainStatus> CheckSendDrainAsync()
+    {
+        try
+        {
+            if (State != TransportState.Connected || _sender is not IFantasySendDrain drain)
+                return FantasySendDrainStatus.Failed;
+            return await drain.CheckSendDrainAsync().ConfigureAwait(false);
+        }
+        catch { return FantasySendDrainStatus.Failed; }
     }
 
     public ValueTask<SendResult> SendAsync(

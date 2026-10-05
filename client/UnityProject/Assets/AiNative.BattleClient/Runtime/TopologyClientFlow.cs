@@ -23,6 +23,9 @@ namespace AiNative.Client.Application
         private bool _tls, _busy, _automated, _started, _disposed, _reconnectRequested, _observedReconnecting;
         private bool _paused, _resumePending, _skipElapsedFrame;
         private int _pauseGeneration;
+        private bool _battleReceiveComplete, _successExitPending, _evidenceSuccess;
+        private float _successExitElapsed;
+        private const float TerminalReceiveExitTimeoutSeconds = 5f;
         private string _runId = "";
         private ulong _priorSession, _inputTick;
         private uint _priorEntity;
@@ -122,7 +125,13 @@ namespace AiNative.Client.Application
 
         private void Update()
         {
-            if (_disposed || Completed || _paused) return;
+            if (_disposed || _paused) return;
+            if (Completed || State == "Settling" || State == "AwaitingResult")
+            {
+                if (!_battleReceiveComplete && Battle != null) _battleReceiveComplete = Battle.DrainAcceptedPackets();
+                AdvanceTerminalCompletion(Time.unscaledDeltaTime);
+                if (Completed) return;
+            }
             float elapsed = _skipElapsedFrame ? 0 : Time.unscaledDeltaTime; _skipElapsedFrame = false;
             _elapsed += elapsed;
             if (_automated && _elapsed >= _deadlineSeconds) { Fail("topology-timeout"); return; }
@@ -147,7 +156,7 @@ namespace AiNative.Client.Application
                     State = "AwaitingResult";
                     BackendStatus = "战斗连接中断，正在查询原对局状态和结算。";
                 }
-                if (_automated && !_reconnectRequested && Battle.IsPredictionInitialized && Battle.LastAcknowledgedSequence >= 30)
+                if (_automated && State == "Battle" && !_reconnectRequested && Battle.IsPredictionInitialized && Battle.LastAcknowledgedSequence >= 30)
                 {
                     _reconnectRequested = true; _priorSession = Battle.SessionId; _priorEntity = Battle.EntityId; _priorAcknowledgement = Battle.LastAcknowledgedSequence; Battle.RequestReconnect();
                     _observedReconnecting = Battle.State == BattleClientState.Reconnecting;
@@ -165,7 +174,7 @@ namespace AiNative.Client.Application
 
         private void FixedUpdate()
         {
-            if (_paused || _resumePending || Completed || State == "Settling" || Battle == null || Battle.ArenaPhase == ArenaMatchPhase.Finished || Battle.State != BattleClientState.Active || !Battle.IsPredictionInitialized) return;
+            if (_paused || _resumePending || Completed || State == "Settling" || State == "AwaitingResult" || Battle == null || Battle.ArenaPhase == ArenaMatchPhase.Finished || Battle.State != BattleClientState.Active || !Battle.IsPredictionInitialized) return;
             // Authoritative room time prevents backlog after network stalls from scheduling far-future inputs.
             _inputTick = Math.Max(_inputTick + 1, Battle.LastReceivedTick + 1);
             int x = _automated ? ((_inputTick / 60) % 2 == 0 ? 1000 : -1000) : (Input.GetKey(KeyCode.D) ? 1000 : 0) - (Input.GetKey(KeyCode.A) ? 1000 : 0);
@@ -399,10 +408,34 @@ namespace AiNative.Client.Application
             GUI.enabled = true; GUILayout.EndArea();
         }
 
+        private void AdvanceTerminalCompletion(float elapsedSeconds)
+        {
+            if (!_successExitPending) return;
+            if (Battle?.ArenaPhase == ArenaMatchPhase.Finished && _battleReceiveComplete)
+            {
+                _successExitPending = false;
+                WriteEvidence(true);
+                return;
+            }
+            _successExitElapsed += elapsedSeconds;
+            if (_successExitElapsed < TerminalReceiveExitTimeoutSeconds) return;
+            _successExitPending = false;
+            Error = "terminal-receive-timeout";
+            WriteEvidence(false);
+        }
+
         private void WriteEvidence(bool success)
         {
             if (_resultPath.Length == 0) return;
-            if (!WriteCheckpoint(success)) success = false;
+            // Settlement remains completed immediately. Only the automated evidence/process exit waits.
+            if (success && Battle != null && (Battle.ArenaPhase != ArenaMatchPhase.Finished || !_battleReceiveComplete))
+            {
+                if (!_successExitPending) { _successExitPending = true; _successExitElapsed = 0; }
+                WriteCheckpoint();
+                return;
+            }
+            _evidenceSuccess = success;
+            if (!WriteCheckpoint(success)) { success = false; _evidenceSuccess = false; }
 #if !UNITY_EDITOR
             global::UnityEngine.Application.Quit(success ? 0 : 1);
 #endif
@@ -413,14 +446,14 @@ namespace AiNative.Client.Application
             try
             {
                 string fullPath = Path.GetFullPath(_resultPath); Directory.CreateDirectory(Path.GetDirectoryName(fullPath));
-                File.WriteAllText(fullPath, JsonUtility.ToJson(new Evidence { success = success || (Completed && State == "Finished"), completed = Completed, state = State, runId = _runId, paused = _paused,
+                File.WriteAllText(fullPath, JsonUtility.ToJson(new Evidence { success = success || _evidenceSuccess, completed = Completed, finalReceived = Battle?.ArenaPhase == ArenaMatchPhase.Finished, receiveDrainCompleted = _battleReceiveComplete, state = State, runId = _runId, paused = _paused,
                     pauseCount = PauseCount, resumeCount = ResumeCount, resumeCompletedCount = ResumeCompletedCount, resumePending = _resumePending,
                     error = Error, playerId = PlayerId, matchId = MatchId, roomId = RoomId, nodeId = _match?.NodeId ?? "", bootEpoch = _match?.BootEpoch ?? "", reconnected = Reconnected, settlementConfirmed = SettlementConfirmed, backendReconnectCount = BackendReconnectCount, preparedInputs = PreparedInputs, maxAcknowledgementStallSeconds = MaxAcknowledgementStallSeconds, played = Profile?.Played ?? 0, lastTick = Battle?.LastReceivedTick.ToString() ?? "0", lastAcknowledgedSequence = Battle?.LastAcknowledgedSequence ?? 0 }, true));
                 return true;
             }
             catch (Exception exception) { Error = "evidence-write:" + exception.GetType().Name; return false; }
         }
-        [Serializable] private sealed class Evidence { public bool success, reconnected, settlementConfirmed, completed, paused, resumePending; public string error, playerId, matchId, roomId, nodeId, bootEpoch, lastTick, state, runId; public long played, preparedInputs; public uint lastAcknowledgedSequence; public int backendReconnectCount, pauseCount, resumeCount, resumeCompletedCount; public float maxAcknowledgementStallSeconds; }
+        [Serializable] private sealed class Evidence { public bool success, reconnected, settlementConfirmed, completed, paused, resumePending, finalReceived, receiveDrainCompleted; public string error, playerId, matchId, roomId, nodeId, bootEpoch, lastTick, state, runId; public long played, preparedInputs; public uint lastAcknowledgedSequence; public int backendReconnectCount, pauseCount, resumeCount, resumeCompletedCount; public float maxAcknowledgementStallSeconds; }
         private async void OnDestroy()
         {
             _disposed = true; _lifetime.Cancel(); _backend?.Dispose(); if (Battle != null) await Battle.DisposeAsync(); _lifetime.Dispose();
