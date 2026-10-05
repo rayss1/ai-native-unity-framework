@@ -59,7 +59,7 @@ function Assert-AiNativeNUnitReport {
 }
 
 function Get-AiNativeEditModeFixtureCounts {
-    param([ValidateSet('Baseline','Candidate')][string]$Profile)
+    param([ValidateSet('Baseline','Candidate','TerminalDelivery')][string]$Profile)
     $fixtures = @{
         'AiNative.Client.Application.Tests.BattleClientSessionTests'=32
         'AiNative.Client.Application.Tests.SimulationCadenceTests'=2
@@ -74,13 +74,19 @@ function Get-AiNativeEditModeFixtureCounts {
         'AiNative.Gameplay.Tests.GameplayClockContractTests'=1
         'AiNative.Realtime.Tests.TransportContractTests'=2
     }
-    if ($Profile -eq 'Candidate') {
+    if ($Profile -in @('Candidate','TerminalDelivery')) {
         $fixtures['AiNative.Client.Application.Tests.TopologyClientFlowRecoveryTests']=18
         $fixtures['AiNative.Client.Application.Tests.ArenaRemoteSessionTests']=2
         $fixtures['AiNative.Client.Prediction.Tests.ArenaPredictionSendTests']=8
         $fixtures['AiNative.Client.Prediction.Tests.ArenaRemotePresentationTests']=8
         $fixtures['AiNative.Client.Application.Tests.AndroidBattleClientBuildTests']=10
         $fixtures['AiNative.Client.Application.Tests.AndroidClientLaunchConfigurationTests']=11
+    }
+    if ($Profile -eq 'TerminalDelivery') {
+        $fixtures['AiNative.Client.Application.Tests.TopologyClientFlowRecoveryTests']=19
+        $fixtures['AiNative.Client.Application.Tests.TopologyTerminalReceiveTests']=6
+        $fixtures['AiNative.Client.Fantasy.Tests.TerminalReceiveTests']=3
+        $fixtures['AiNative.Client.Application.Tests.TerminalReceptionTests']=7
     }
     return $fixtures
 }

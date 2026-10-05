@@ -30,8 +30,12 @@ if($PlanOnly) {
 }
 . "$PSScriptRoot/common.ps1" -SdkPath $SdkPath -RunDirectory $RunDirectory
 if(-not $env:AINATIVE_TEST_POSTGRES){throw 'Isolated AINATIVE_TEST_POSTGRES required'}
+$databasePolicy=& "$PSScriptRoot/database-policy.ps1"
 if(-not $SkipBuild){& "$PSScriptRoot/build.ps1" -SdkPath $SdkPath -RunDirectory $RunDirectory -SkipAudit:$SkipAudit}
 if(-not (Test-Path -LiteralPath (Join-Path $Run 'bin'))){throw 'Qualification binaries missing'}
+$databasePolicyPath=Join-Path $Run 'database-policy.json'
+$databasePolicy | ConvertTo-Json | Set-Content -LiteralPath $databasePolicyPath -Encoding utf8
+$databasePolicyEvidence=@{Path=$databasePolicyPath;Sha256=(Get-FileHash -LiteralPath $databasePolicyPath -Algorithm SHA256).Hash;Policy=$databasePolicy}
 if(-not (Test-Path -LiteralPath (Join-Path $Run 'replay-identities.json'))){
  & "$PSScriptRoot/replay-identities.ps1" -RunDirectory $RunDirectory
 }
@@ -96,7 +100,7 @@ if($Profile -eq 'sweep' -and $highest) {
  $highest.Name='soak-highest-passing';$highest.DurationSeconds=3600
  $soak=Invoke-Stage $highest;$results+=,$soak;$passed=$soak.Passed
 }
-@{Passed=$passed;Profile=$Profile;Selected=$highest;Stages=$results;RecordedUtc=[datetime]::UtcNow.ToString('O');Qualification='Actual Arena topology only; Regional/Degraded wire and legacy 64-player budgets remain separate'} |
+@{Passed=$passed;Profile=$Profile;Selected=$highest;Stages=$results;DatabasePolicy=$databasePolicyEvidence;RecordedUtc=[datetime]::UtcNow.ToString('O');Qualification='Actual Arena topology only; Regional/Degraded wire and legacy 64-player budgets remain separate'} |
  ConvertTo-Json -Depth 15 | Set-Content -LiteralPath (Join-Path $Run 'qualification-summary.json') -Encoding utf8
 if(-not $passed){exit 1}
 exit 0

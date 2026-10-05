@@ -425,7 +425,8 @@ namespace AiNative.Client.Fantasy
 
                 Volatile.Write(ref _state, (int)TransportState.Closed);
                 FantasyClientSessionRouter.Remove(_sessionRuntimeId, this);
-                _inbound.Drain();
+                // Remote closure stops new admission, but accepted inbound still belongs to the reader.
+                // Only explicit Dispose releases unread packets. KCP ACK is not application consumption.
                 _outbound.Drain();
             }
         }

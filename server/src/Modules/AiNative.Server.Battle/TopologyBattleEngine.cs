@@ -43,6 +43,7 @@ internal sealed class TopologyBattleEngine(FantasyKcpGateway gateway, EntryTicke
     private enum PacketDropReason { Other, FutureInput, StaleInput, OtherInput, CommandQueueFull, FinishedRoom }
     private readonly long[] _packetDropReasons = new long[6];
     private long _createdRooms, _releasedRooms;
+    private long _terminalDelivered, _terminalDeliveryFailures, _terminalDeliveryTimeouts;
     private int _connectionCount;
     public BattleWorkerPool Pool { get; set; } = null!;
     public long DroppedPackets => Interlocked.Read(ref _drops);
@@ -55,6 +56,9 @@ internal sealed class TopologyBattleEngine(FantasyKcpGateway gateway, EntryTicke
         commandDepth = _rooms.Values.Sum(room => room.Commands.Count), eventDepth = _rooms.Values.Sum(room => room.Events.Count),
         commandCapacityPerRoom = 256, eventCapacityPerRoom = 256,
         droppedPackets = DroppedPackets, droppedEvents = DroppedEvents,
+        terminalDelivered = Interlocked.Read(ref _terminalDelivered),
+        terminalDeliveryFailures = Interlocked.Read(ref _terminalDeliveryFailures),
+        terminalDeliveryTimeouts = Interlocked.Read(ref _terminalDeliveryTimeouts),
         droppedPacketReasons = new
         {
             other = Interlocked.Read(ref _packetDropReasons[(int)PacketDropReason.Other]),
@@ -64,7 +68,8 @@ internal sealed class TopologyBattleEngine(FantasyKcpGateway gateway, EntryTicke
             commandQueueFull = Interlocked.Read(ref _packetDropReasons[(int)PacketDropReason.CommandQueueFull]),
             finishedRoom = Interlocked.Read(ref _packetDropReasons[(int)PacketDropReason.FinishedRoom])
         },
-        rooms = _rooms.Values.Select(room => new { roomId = room.Allocation.RoomId, room.Finished, room.Disposed }).ToArray()
+        rooms = _rooms.Values.Select(room => new { roomId = room.Allocation.RoomId, room.Finished, room.Disposed,
+            terminalDeliveryState = Volatile.Read(ref room.Terminal)?.State.ToString() }).ToArray()
     };
     public IWorkerRoom CreateRoom(RoomAllocation allocation)
     {
@@ -177,11 +182,22 @@ internal sealed class TopologyBattleEngine(FantasyKcpGateway gateway, EntryTicke
     }
     private void Publish(RuntimeRoom room)
     {
+        if (room.Terminal is not null) { PumpTerminal(room); return; }
         Frame? selected = ClaimLatest(room.Frames);
+        ulong? publishedTick = selected?.Tick;
         if (selected != null)
         {
             try
             {
+                if (selected.Phase == AiNative.Gameplay.ArenaMatchPhase.Finished)
+                {
+                    TerminalRoomDelivery terminal;
+                    try { terminal = CreateTerminal(room, selected); }
+                    catch { terminal = new(_clock, []); terminal.Fail(); }
+                    Volatile.Write(ref room.Terminal, terminal);
+                    PumpTerminal(room);
+                    return;
+                }
                 for (int p = 0; p < room.Roster.Length; p++)
                 {
                     var c = Volatile.Read(ref room.Owners[p]); if (c == null || c.Revoked || !c.Joined) continue;
@@ -191,15 +207,67 @@ internal sealed class TopologyBattleEngine(FantasyKcpGateway gateway, EntryTicke
                     if (response == 2) Send(c, MessageId.ReconnectResponse, new ReconnectResponse { ConnectionEpoch = c.Wire.ConnectionEpoch, ResumeTick = selected.Tick, Snapshot = snapshot });
                     Send(c, MessageId.Snapshot, snapshot);
                 }
-                if (selected.Phase == AiNative.Gameplay.ArenaMatchPhase.Finished) Volatile.Write(ref room.FinalSent, 1);
             }
             finally { Volatile.Write(ref selected.State, 0); }
         }
-        while (room.Events.TryRead(out var e))
+        while (publishedTick is { } tick && TryReadPublishedEvent(room.Events, tick, out var e))
         {
             var message = new ReliableEvent { RoomTick = e.Tick, Sequence = ++room.EventSequence, EventType = (uint)e.Kind, CombatEvent = new ArenaCombatEvent { EventType = (ArenaCombatEventType)(int)e.Kind, EventTick = e.Tick, SourceEntityId = e.SourceEntityId, TargetEntityId = e.TargetEntityId, WeaponId = (AiNative.Protocol.V1.ArenaWeaponId)(int)e.Weapon, Damage = (uint)Math.Max(0, e.Damage), PositionXMilli = e.PositionXMillimetres, PositionYMilli = e.PositionYMillimetres, PositionZMilli = e.PositionZMillimetres } };
             foreach (var c in room.Owners) if (c is { Joined: true }) Send(c, MessageId.ReliableEvent, message);
         }
+    }
+    private TerminalRoomDelivery CreateTerminal(RuntimeRoom room, Frame frame)
+    {
+        // The Worker publishes this terminal frame after enqueueing its final events.
+        // Copy a bounded batch once; transient send rejection must not lose it.
+        List<TerminalDatagram> events = [];
+        while (room.Events.TryRead(out var e))
+        {
+            var message = new ReliableEvent { RoomTick = e.Tick, Sequence = ++room.EventSequence, EventType = (uint)e.Kind, CombatEvent = new ArenaCombatEvent { EventType = (ArenaCombatEventType)(int)e.Kind, EventTick = e.Tick, SourceEntityId = e.SourceEntityId, TargetEntityId = e.TargetEntityId, WeaponId = (AiNative.Protocol.V1.ArenaWeaponId)(int)e.Weapon, Damage = (uint)Math.Max(0, e.Damage), PositionXMilli = e.PositionXMillimetres, PositionYMilli = e.PositionYMillimetres, PositionZMilli = e.PositionZMillimetres } };
+            events.Add(EncodeTerminal(MessageId.ReliableEvent, message));
+        }
+        List<TerminalRoomDelivery.Peer> peers = [];
+        for (int p = 0; p < room.Roster.Length; p++)
+        {
+            var c = Volatile.Read(ref room.Owners[p]);
+            if (c is null || c.Revoked || !c.Joined) continue;
+            Snapshot snapshot = SnapshotOf(frame, room.Entities[p]);
+            List<TerminalDatagram> packets = [];
+            int response = Interlocked.Exchange(ref c.Response, 0);
+            if (response == 1) packets.Add(EncodeTerminal(MessageId.JoinRoomResponse, new JoinRoomResponse { RoomId = Pool.GetLocalRoomId(room.Allocation.RoomId), EntityId = room.Entities[p], TickRate = 60 }));
+            if (response == 2) packets.Add(EncodeTerminal(MessageId.ReconnectResponse, new ReconnectResponse { ConnectionEpoch = c.Wire.ConnectionEpoch, ResumeTick = frame.Tick, Snapshot = snapshot }));
+            packets.Add(EncodeTerminal(MessageId.Snapshot, snapshot));
+            packets.AddRange(events);
+            peers.Add(new(c.Wire.Transport, packets.ToArray()));
+        }
+        return new(_clock, peers.ToArray());
+    }
+    internal static bool TryReadPublishedEvent(SpscRing<ArenaCombatEventRecord> events, ulong publishedTick, out ArenaCombatEventRecord item)
+    {
+        // A Worker may finish while this pump is publishing an older Active frame.
+        // Leave newer events for their frame, including the retained terminal batch.
+        if (events.TryPeek(out var next) && next.Tick <= publishedTick) return events.TryRead(out item);
+        item = default; return false;
+    }
+    private TerminalDatagram EncodeTerminal(MessageId id, IMessage message)
+    {
+        if (!RealtimeProtocolCodec.TryEncode(id, message, _send, out var channel, out int bytes))
+            throw new InvalidOperationException("terminal-frame-encode-failed");
+        return new(channel, _send.AsSpan(0, bytes).ToArray());
+    }
+    private void PumpTerminal(RuntimeRoom room)
+    {
+        room.Terminal!.Pump();
+        TerminalDeliveryState outcome = room.Terminal.State;
+        if (outcome == TerminalDeliveryState.Pending || room.TerminalRecorded) return;
+        if (outcome == TerminalDeliveryState.Drained) Interlocked.Increment(ref _terminalDelivered);
+        else
+        {
+            Interlocked.Increment(ref _terminalDeliveryFailures);
+            if (outcome == TerminalDeliveryState.TimedOut) Interlocked.Increment(ref _terminalDeliveryTimeouts);
+        }
+        // Release may run concurrently: publish statistics before authorizing capacity reuse.
+        Volatile.Write(ref room.TerminalRecorded, true);
     }
     private static Snapshot SnapshotOf(Frame f, uint entity)
     {
@@ -220,9 +288,12 @@ internal sealed class TopologyBattleEngine(FantasyKcpGateway gateway, EntryTicke
             foreach (var r in _rooms.Values)
             {
                 if (r.TimedOut) { await Pool.ReleaseAsync(r.Allocation.RoomId, r.Allocation.AllocationId, r.Allocation.BootEpoch, ct); continue; }
-                if (!r.Finished || Volatile.Read(ref r.FinalSent) == 0) continue;
+                TerminalRoomDelivery? terminal = Volatile.Read(ref r.Terminal);
+                if (!r.Finished || terminal is null) continue;
                 r.Result ??= r.BuildResult();
-                if (await _outbox.StoreAsync(r.Result, ct)) await Pool.ReleaseAsync(r.Allocation.RoomId, r.Allocation.AllocationId, r.Allocation.BootEpoch, ct);
+                if (!r.ResultStored) r.ResultStored = await _outbox.StoreAsync(r.Result, ct);
+                if (r.ResultStored && Volatile.Read(ref r.TerminalRecorded))
+                    await Pool.ReleaseAsync(r.Allocation.RoomId, r.Allocation.AllocationId, r.Allocation.BootEpoch, ct);
             }
         }
         finally { _flush.Release(); }
@@ -236,6 +307,7 @@ internal sealed class TopologyBattleEngine(FantasyKcpGateway gateway, EntryTicke
         private int _read, _write;
         public int Count => (Volatile.Read(ref _write) - Volatile.Read(ref _read) + _items.Length) % _items.Length;
         public bool TryWrite(T item) { int write = _write; int next = (write + 1) % _items.Length; if (next == Volatile.Read(ref _read)) return false; _items[write] = item; Volatile.Write(ref _write, next); return true; }
+        public bool TryPeek(out T item) { int read = _read; if (read == Volatile.Read(ref _write)) { item = default; return false; } item = _items[read]; return true; }
         public bool TryRead(out T item) { int read = _read; if (read == Volatile.Read(ref _write)) { item = default; return false; } item = _items[read]; _items[read] = default; Volatile.Write(ref _read, (read + 1) % _items.Length); return true; }
     }
     // A published slot is immutable until the reader releases it. The worker never waits for a reader.
@@ -262,7 +334,8 @@ internal sealed class TopologyBattleEngine(FantasyKcpGateway gateway, EntryTicke
         public readonly Frame[] Frames = { new(), new(), new() };
         public readonly SpscRing<Command> Commands = new(256);
         public readonly SpscRing<ArenaCombatEventRecord> Events = new(256);
-        public volatile bool Disposed, Finished, TimedOut; public long Clock; public int FinalSent; public uint EventSequence; public MatchResult? Result;
+        public volatile bool Disposed, Finished, TimedOut; public long Clock; public uint EventSequence; public MatchResult? Result;
+        public TerminalRoomDelivery? Terminal; public bool TerminalRecorded, ResultStored;
         private readonly ArenaPlayerState[] _final = new ArenaPlayerState[8]; private uint _leader;
         private long _observedEventDrops;
         public readonly ArenaReplayCapture? Replay;

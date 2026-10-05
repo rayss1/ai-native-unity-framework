@@ -276,6 +276,74 @@ public class TopologyBattleEngineTests
         var prior = f.Outbox.Pending[0]; await f.Outbox.ConfirmAsync(prior.MatchId, DurableResultOutbox.Hash(prior)); await f.Engine.FlushResultsAsync(); Assert.That(f.Pool.Inventory().Rooms, Is.Empty); Assert.That(f.Outbox.Pending.Count(r => r.MatchId == "match"), Is.EqualTo(1));
     }
     [Test]
+    public async Task RejectedFinalSnapshotDoesNotAuthorizeRoomRelease()
+    {
+        await using var f = await Fixture.Create(30);
+        var a = f.Connect(1); var b = f.Connect(2);
+        a.RejectFinalSnapshots = true;
+        a.Push(MessageId.LoginRequest, f.Login("p1")); b.Push(MessageId.LoginRequest, f.Login("p2"));
+        await f.Engine.PumpAsync();
+        a.Push(MessageId.JoinRoomRequest, new JoinRoomRequest { SessionId = a.Latest<LoginResponse>(MessageId.LoginResponse).SessionId });
+        b.Push(MessageId.JoinRoomRequest, new JoinRoomRequest { SessionId = b.Latest<LoginResponse>(MessageId.LoginResponse).SessionId });
+        await f.Until(() => a.RejectedFinalSnapshots > 0);
+        await f.Engine.FlushResultsAsync();
+        await f.Engine.PumpAsync();
+        Assert.That(f.Pool.Inventory().Rooms.Count, Is.EqualTo(1), "A rejected terminal frame must not be treated as delivered.");
+        Assert.That(a.State, Is.EqualTo(TransportState.Connected));
+    }
+    [Test]
+    public async Task DurableResultPrecedesDrainAndReleaseOccursExactlyOnceAfterAcknowledgement()
+    {
+        await using var f = await Fixture.Create(30);
+        var a = await JoinPlayer(f, "p1", 20); var b = await JoinPlayer(f, "p2", 21);
+        var barrier = new TaskCompletionSource<FantasySendDrainStatus>(TaskCreationOptions.RunContinuationsAsynchronously);
+        a.DrainCheck = barrier.Task;
+        await f.Until(() => a.Latest<Snapshot>(MessageId.Snapshot).MatchPhase == AiNative.Protocol.V1.ArenaMatchPhase.ArenaMatchFinished);
+        await f.Engine.FlushResultsAsync();
+        Assert.That(f.Outbox.Pending.Count, Is.EqualTo(1));
+        Assert.That(f.Pool.Inventory().Rooms.Count, Is.EqualTo(1));
+        Assert.That(a.DisposeCount, Is.Zero);
+        barrier.SetResult(FantasySendDrainStatus.Drained);
+        await f.Engine.PumpAsync(); await f.Engine.FlushResultsAsync(); await f.Engine.PumpAsync();
+        await f.Engine.FlushResultsAsync(); await f.Engine.PumpAsync();
+        Assert.That(f.Pool.Inventory().Rooms, Is.Empty);
+        Assert.That(f.Outbox.Pending.Count, Is.EqualTo(1));
+        Assert.That(a.DisposeCount, Is.EqualTo(1)); Assert.That(b.DisposeCount, Is.EqualTo(1));
+    }
+    [Test]
+    public async Task TerminalOutcomeCannotReleaseBeforeItsFailureCounterIsPublished()
+    {
+        await using var f = await Fixture.Create(30);
+        var a = await JoinPlayer(f, "p1", 20); await JoinPlayer(f, "p2", 21);
+        a.DrainCheck = new TaskCompletionSource<FantasySendDrainStatus>().Task;
+        await f.Until(() => a.Latest<Snapshot>(MessageId.Snapshot).MatchPhase == AiNative.Protocol.V1.ArenaMatchPhase.ArenaMatchFinished);
+        var terminal = (TerminalRoomDelivery)f.Room!.GetType().GetField("Terminal")!.GetValue(f.Room)!;
+        // Reproduce the interleaving after outcome publication but before PumpTerminal records it.
+        terminal.Fail();
+        await f.Engine.FlushResultsAsync();
+        Assert.That(f.Outbox.Pending.Count, Is.EqualTo(1));
+        Assert.That(f.Pool.Inventory().Rooms.Count, Is.EqualTo(1));
+        await f.Engine.PumpAsync(); await f.Engine.FlushResultsAsync();
+        Assert.That(f.Pool.Inventory().Rooms, Is.Empty);
+        Assert.That(JsonSerializer.SerializeToElement(f.Engine.Diagnostics()).GetProperty("terminalDeliveryFailures").GetInt64(), Is.EqualTo(1));
+    }
+    [Test]
+    public async Task AbsoluteDrainTimeoutPersistsSettlementThenReleasesAndRecordsFailure()
+    {
+        var clock = new Clock(); await using var f = await Fixture.Create(30, clock: clock);
+        var a = await JoinPlayer(f, "p1", 20); await JoinPlayer(f, "p2", 21);
+        a.DrainCheck = new TaskCompletionSource<FantasySendDrainStatus>().Task;
+        await f.Until(() => a.Latest<Snapshot>(MessageId.Snapshot).MatchPhase == AiNative.Protocol.V1.ArenaMatchPhase.ArenaMatchFinished);
+        await f.Engine.FlushResultsAsync(); clock.Advance(4); await f.Engine.PumpAsync(); await f.Engine.FlushResultsAsync();
+        Assert.That(f.Pool.Inventory().Rooms.Count, Is.EqualTo(1));
+        clock.Advance(1); await f.Engine.PumpAsync(); await f.Engine.FlushResultsAsync(); await f.Engine.PumpAsync();
+        Assert.That(f.Outbox.Pending.Count, Is.EqualTo(1)); Assert.That(f.Pool.Inventory().Rooms, Is.Empty);
+        var diagnostics = JsonSerializer.SerializeToElement(f.Engine.Diagnostics());
+        Assert.That(diagnostics.GetProperty("terminalDeliveryFailures").GetInt64(), Is.EqualTo(1));
+        Assert.That(diagnostics.GetProperty("terminalDeliveryTimeouts").GetInt64(), Is.EqualTo(1));
+        Assert.That(diagnostics.GetProperty("terminalDelivered").GetInt64(), Is.Zero);
+    }
+    [Test]
     public void SupersessionDropsUnconsumedInputWithoutAdvancingAckOrSequenceFloor()
     {
         var room = new AiNative.BattleHost.ArenaRoom(600); room.TryJoin(out uint entity);
@@ -343,15 +411,30 @@ public class TopologyBattleEngineTests
         public async Task Until(Func<bool> condition) { for (int i = 0; i < 600; i++) { await Engine.PumpAsync(); if (condition()) return; await Task.Delay(5); } Assert.Fail("runtime response timeout"); }
         public async ValueTask DisposeAsync() { await Pool.DisposeAsync(); await Engine.DisposeAsync(); Key.Dispose(); System.IO.Directory.Delete(DirectoryPath, true); }
     }
-    sealed class FakeTransport(uint epoch) : IRealtimeTransport
+    sealed class FakeTransport(uint epoch) : IRealtimeTransport, IFantasySendDrain
     {
+        public bool RejectFinalSnapshots;
+        public int RejectedFinalSnapshots;
+        public Task<FantasySendDrainStatus> DrainCheck = Task.FromResult(FantasySendDrainStatus.Drained);
+        public Task<FantasySendDrainStatus> CheckSendDrainAsync() => DrainCheck;
+        public int DisposeCount;
         public uint PacketEpoch = epoch;
         readonly Queue<(byte[] Bytes, TransportChannel Channel)> _input = new(); public readonly List<(MessageId Id, byte[] Payload)> Output = new(); public TransportState State { get; private set; } = TransportState.Connected;
         public void Push(MessageId id, IMessage m) { byte[] bytes = new byte[2 + m.CalculateSize()]; BinaryPrimitives.WriteUInt16LittleEndian(bytes, (ushort)id); m.WriteTo(bytes.AsSpan(2)); uint channel = id is MessageId.InputCommand or MessageId.InputBatch ? 2u : 0u; _input.Enqueue((bytes, new TransportChannel((byte)channel, channel == 2 ? TransportDelivery.Unreliable : TransportDelivery.Reliable, channel == 2 ? TransportOrdering.Sequenced : TransportOrdering.Ordered))); }
         public bool TryReceive(Span<byte> destination, out ReceivedPacket packet) { if (!_input.TryDequeue(out var item)) { packet = default; return false; } item.Bytes.CopyTo(destination); packet = new ReceivedPacket(item.Channel, item.Bytes.Length, item.Bytes.Length, 1, PacketEpoch); return true; }
-        public ValueTask<SendResult> SendAsync(TransportChannel c, ReadOnlyMemory<byte> payload, CancellationToken ct = default) { Output.Add(((MessageId)BinaryPrimitives.ReadUInt16LittleEndian(payload.Span), payload.Span[2..].ToArray())); return ValueTask.FromResult(new SendResult(SendStatus.Accepted, payload.Length)); }
+        public ValueTask<SendResult> SendAsync(TransportChannel c, ReadOnlyMemory<byte> payload, CancellationToken ct = default)
+        {
+            var id = (MessageId)BinaryPrimitives.ReadUInt16LittleEndian(payload.Span);
+            if (RejectFinalSnapshots && id == MessageId.Snapshot && Snapshot.Parser.ParseFrom(payload.Span[2..]).MatchPhase == AiNative.Protocol.V1.ArenaMatchPhase.ArenaMatchFinished)
+            {
+                RejectedFinalSnapshots++;
+                return ValueTask.FromResult(new SendResult(SendStatus.WouldBlock));
+            }
+            Output.Add((id, payload.Span[2..].ToArray()));
+            return ValueTask.FromResult(new SendResult(SendStatus.Accepted, payload.Length));
+        }
         public bool Has(MessageId id) => Output.Any(x => x.Id == id);
         public T Latest<T>(MessageId id) where T : IMessage<T>, new() => new MessageParser<T>(() => new T()).ParseFrom(Output.Last(x => x.Id == id).Payload);
-        public ValueTask DisposeAsync() { State = TransportState.Closed; return ValueTask.CompletedTask; }
+        public ValueTask DisposeAsync() { DisposeCount++; State = TransportState.Closed; return ValueTask.CompletedTask; }
     }
 }

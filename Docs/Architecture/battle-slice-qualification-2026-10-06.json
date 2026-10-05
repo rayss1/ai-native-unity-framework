@@ -1,0 +1,1005 @@
+{
+  "reportVersion": 1,
+  "date": "2026-10-06",
+  "scope": "Windows real Arena topology: compatibility plus 32/64/128-client qualification and 128-client 3600-second soak; not legacy 64-player-room or impaired-network qualification",
+  "passed": true,
+  "hardware": {
+    "cpu": [
+      "11th Gen Intel(R) Core(TM) i7-11800H @ 2.30GHz"
+    ],
+    "logicalProcessors": 16,
+    "physicalRamBytes": 33963081728,
+    "dedicatedHardware": false,
+    "repositoryLoadExclusive": true
+  },
+  "platform": "Windows; high-resolution input wait",
+  "configuration": {
+    "seed": 20261002,
+    "warmupSeconds": 60,
+    "ladderMeasuredSeconds": 300,
+    "soakMeasuredSeconds": 3600,
+    "inputHz": 60,
+    "playersPerRoom": 8,
+    "battleNodes": 2,
+    "workersPerNode": 2,
+    "inputDriverPriorityExplicit": "AboveNormal",
+    "inputDriverPriorityDefault": "Normal",
+    "processPriorityAtReport": "Normal",
+    "priorityScope": "Applied to owned load-input threads before start; dynamic OS priority was not sampled",
+    "poolingEnabled": true,
+    "diagnosticsEnabled": false,
+    "nodeReuse": false,
+    "sharedCompilation": false,
+    "packageVulnerabilityAuditSkipped": true
+  },
+  "methods": {
+    "tick": "nearest-rank over exact deduplicated measured Tick IDs",
+    "ack": "nearest-rank actual input-send to recipient-specific consumed ACK",
+    "host": "Win32_PerfFormattedData_PerfOS_Processor _Total and Win32_OperatingSystem, nominal 2-second polling",
+    "cpu": "nearest-rank P99 <=80%",
+    "memory": "maximum used physical memory <=80%",
+    "hostMaximumGapSeconds": 5,
+    "occupancyMinimum": 0.95,
+    "acceptedMeasuredInputMinimumFraction": 0.8
+  },
+  "compatibility": {
+    "Rooms": 8,
+    "Name": "compatibility",
+    "Players": 2,
+    "MatchTicks": 6000,
+    "WarmupSeconds": 3,
+    "Workers": 2,
+    "Mode": "bots",
+    "DurationSeconds": 10,
+    "InputHz": 20,
+    "Density": 2
+  },
+  "stages": [
+    {
+      "name": "capacity-1",
+      "passed": true,
+      "clients": 32,
+      "options": {
+        "RoomCount": 4,
+        "PlayersPerRoom": 8,
+        "WorkerCount": 2,
+        "RoomsPerWorker": 1,
+        "InputHz": 60,
+        "WarmupSeconds": 60,
+        "DurationSeconds": 300,
+        "Seed": 20261002,
+        "MatchTicks": 36000
+      },
+      "measurementStartUtc": "2026-10-05T14:28:44.5902412+00:00",
+      "measurementEndUtc": "2026-10-05T14:33:44.6382003+00:00",
+      "completedRooms": 26,
+      "occupancy": {
+        "ratio": 0.9792104888333333,
+        "minimumRatio": 0.95,
+        "expectedSlots": 4,
+        "activeRoomSeconds": 1175.0525866,
+        "expectedRoomSeconds": 1200,
+        "maximumReplacementSeconds": 1.9067522
+      },
+      "workers": [
+        {
+          "worker": "battle-1/worker-0",
+          "firstTick": 4230,
+          "lastTick": 22230,
+          "observedTicks": 18001,
+          "sampleCount": 18001,
+          "complete": true,
+          "steadyTicks": 17991,
+          "lifecycleTicks": 10,
+          "steadyCoverage": 0.9994444753069274,
+          "businessAllocatedBytes": 0,
+          "steadyAllocatedBytes": 0,
+          "lifecycleAllocatedBytes": 320,
+          "totalAllocatedBytes": 320,
+          "diagnosticCounterAllocatedBytes": 320,
+          "businessTickP99Micros": 61,
+          "businessTickScope": "All room.Tick calls on this worker, including replay/hash/frame; conservative bound for Gameplay+physics",
+          "p50Micros": 17,
+          "p95Micros": 32,
+          "p99Micros": 62,
+          "p999Micros": 210,
+          "maximumMicros": 5806,
+          "overBudgetTicks": 0,
+          "percentileMethod": "nearest-rank over exact deduplicated measured Tick IDs",
+          "passed": true
+        },
+        {
+          "worker": "battle-1/worker-1",
+          "firstTick": 4231,
+          "lastTick": 22228,
+          "observedTicks": 17998,
+          "sampleCount": 17998,
+          "complete": true,
+          "steadyTicks": 17988,
+          "lifecycleTicks": 10,
+          "steadyCoverage": 0.9994443827091899,
+          "businessAllocatedBytes": 0,
+          "steadyAllocatedBytes": 0,
+          "lifecycleAllocatedBytes": 320,
+          "totalAllocatedBytes": 320,
+          "diagnosticCounterAllocatedBytes": 320,
+          "businessTickP99Micros": 62,
+          "businessTickScope": "All room.Tick calls on this worker, including replay/hash/frame; conservative bound for Gameplay+physics",
+          "p50Micros": 17,
+          "p95Micros": 33,
+          "p99Micros": 63,
+          "p999Micros": 242,
+          "maximumMicros": 1046,
+          "overBudgetTicks": 0,
+          "percentileMethod": "nearest-rank over exact deduplicated measured Tick IDs",
+          "passed": true
+        },
+        {
+          "worker": "battle-2/worker-0",
+          "firstTick": 4227,
+          "lastTick": 22226,
+          "observedTicks": 18000,
+          "sampleCount": 18000,
+          "complete": true,
+          "steadyTicks": 17990,
+          "lifecycleTicks": 10,
+          "steadyCoverage": 0.9994444444444445,
+          "businessAllocatedBytes": 0,
+          "steadyAllocatedBytes": 0,
+          "lifecycleAllocatedBytes": 320,
+          "totalAllocatedBytes": 320,
+          "diagnosticCounterAllocatedBytes": 320,
+          "businessTickP99Micros": 63,
+          "businessTickScope": "All room.Tick calls on this worker, including replay/hash/frame; conservative bound for Gameplay+physics",
+          "p50Micros": 18,
+          "p95Micros": 34,
+          "p99Micros": 66,
+          "p999Micros": 262,
+          "maximumMicros": 11571,
+          "overBudgetTicks": 0,
+          "percentileMethod": "nearest-rank over exact deduplicated measured Tick IDs",
+          "passed": true
+        },
+        {
+          "worker": "battle-2/worker-1",
+          "firstTick": 4227,
+          "lastTick": 22225,
+          "observedTicks": 17999,
+          "sampleCount": 17999,
+          "complete": true,
+          "steadyTicks": 17990,
+          "lifecycleTicks": 9,
+          "steadyCoverage": 0.9994999722206789,
+          "businessAllocatedBytes": 0,
+          "steadyAllocatedBytes": 0,
+          "lifecycleAllocatedBytes": 288,
+          "totalAllocatedBytes": 288,
+          "diagnosticCounterAllocatedBytes": 288,
+          "businessTickP99Micros": 61,
+          "businessTickScope": "All room.Tick calls on this worker, including replay/hash/frame; conservative bound for Gameplay+physics",
+          "p50Micros": 17,
+          "p95Micros": 33,
+          "p99Micros": 63,
+          "p999Micros": 256,
+          "maximumMicros": 716,
+          "overBudgetTicks": 0,
+          "percentileMethod": "nearest-rank over exact deduplicated measured Tick IDs",
+          "passed": true
+        }
+      ],
+      "acknowledgement": {
+        "sampleCount": 188049,
+        "p50Milliseconds": 44.6846,
+        "p95Milliseconds": 72.2414,
+        "p99Milliseconds": 81.1822,
+        "maximumMilliseconds": 181.3093,
+        "percentileMethod": "nearest-rank; actual input-send to recipient-specific consumed ACK"
+      },
+      "inputAudit": {
+        "accepted_input_audit_passed": true,
+        "minimum_fraction": "0.8",
+        "measured_players": 184,
+        "excluded_zero_measurement_players": 24,
+        "measured_inputs": 563800,
+        "accepted_measured_inputs": 563601
+      },
+      "replay": {
+        "passed": true,
+        "complete": 26,
+        "incomplete": 0,
+        "verifierSha256": "CD7F973B97A1498DA02DF540D688CC760D75FD099B3A4C97B95B8DD6CF1EC579"
+      },
+      "terminalDelivery": [
+        {
+          "node": "battle-1",
+          "terminalDelivered": 13,
+          "terminalDeliveryFailures": 0,
+          "terminalDeliveryTimeouts": 0
+        },
+        {
+          "node": "battle-2",
+          "terminalDelivered": 13,
+          "terminalDeliveryFailures": 0,
+          "terminalDeliveryTimeouts": 0
+        }
+      ],
+      "host": {
+        "name": "capacity-1",
+        "nativePassed": true,
+        "measurementStartUtc": "2026-10-05T14:28:44.5902412+00:00",
+        "measurementEndUtc": "2026-10-05T14:33:44.6382003+00:00",
+        "roomCount": 4,
+        "sampleCount": 118,
+        "maximumSampleGapSeconds": 2.6171369552612305,
+        "cpuP99Percent": 26.0,
+        "memoryMaximumUsedPercent": 72.78467028985857,
+        "coveragePassed": true,
+        "passed": true
+      }
+    },
+    {
+      "name": "capacity-2",
+      "passed": true,
+      "clients": 64,
+      "options": {
+        "RoomCount": 8,
+        "PlayersPerRoom": 8,
+        "WorkerCount": 2,
+        "RoomsPerWorker": 2,
+        "InputHz": 60,
+        "WarmupSeconds": 60,
+        "DurationSeconds": 300,
+        "Seed": 20261002,
+        "MatchTicks": 36000
+      },
+      "measurementStartUtc": "2026-10-05T14:36:15.074837+00:00",
+      "measurementEndUtc": "2026-10-05T14:41:15.1144056+00:00",
+      "completedRooms": 53,
+      "occupancy": {
+        "ratio": 0.9784894979166666,
+        "minimumRatio": 0.95,
+        "expectedSlots": 8,
+        "activeRoomSeconds": 2348.374795,
+        "expectedRoomSeconds": 2400,
+        "maximumReplacementSeconds": 1.9110688
+      },
+      "workers": [
+        {
+          "worker": "battle-1/worker-0",
+          "firstTick": 4474,
+          "lastTick": 22475,
+          "observedTicks": 18002,
+          "sampleCount": 18002,
+          "complete": true,
+          "steadyTicks": 17982,
+          "lifecycleTicks": 20,
+          "steadyCoverage": 0.9988890123319631,
+          "businessAllocatedBytes": 0,
+          "steadyAllocatedBytes": 0,
+          "lifecycleAllocatedBytes": 640,
+          "totalAllocatedBytes": 640,
+          "diagnosticCounterAllocatedBytes": 640,
+          "businessTickP99Micros": 84,
+          "businessTickScope": "All room.Tick calls on this worker, including replay/hash/frame; conservative bound for Gameplay+physics",
+          "p50Micros": 29,
+          "p95Micros": 51,
+          "p99Micros": 85,
+          "p999Micros": 241,
+          "maximumMicros": 1494,
+          "overBudgetTicks": 0,
+          "percentileMethod": "nearest-rank over exact deduplicated measured Tick IDs",
+          "passed": true
+        },
+        {
+          "worker": "battle-1/worker-1",
+          "firstTick": 4474,
+          "lastTick": 22474,
+          "observedTicks": 18001,
+          "sampleCount": 18001,
+          "complete": true,
+          "steadyTicks": 17981,
+          "lifecycleTicks": 20,
+          "steadyCoverage": 0.9988889506138547,
+          "businessAllocatedBytes": 0,
+          "steadyAllocatedBytes": 0,
+          "lifecycleAllocatedBytes": 640,
+          "totalAllocatedBytes": 640,
+          "diagnosticCounterAllocatedBytes": 640,
+          "businessTickP99Micros": 76,
+          "businessTickScope": "All room.Tick calls on this worker, including replay/hash/frame; conservative bound for Gameplay+physics",
+          "p50Micros": 28,
+          "p95Micros": 49,
+          "p99Micros": 78,
+          "p999Micros": 212,
+          "maximumMicros": 11998,
+          "overBudgetTicks": 0,
+          "percentileMethod": "nearest-rank over exact deduplicated measured Tick IDs",
+          "passed": true
+        },
+        {
+          "worker": "battle-2/worker-0",
+          "firstTick": 4464,
+          "lastTick": 22464,
+          "observedTicks": 18001,
+          "sampleCount": 18001,
+          "complete": true,
+          "steadyTicks": 17981,
+          "lifecycleTicks": 20,
+          "steadyCoverage": 0.9988889506138547,
+          "businessAllocatedBytes": 0,
+          "steadyAllocatedBytes": 0,
+          "lifecycleAllocatedBytes": 640,
+          "totalAllocatedBytes": 640,
+          "diagnosticCounterAllocatedBytes": 640,
+          "businessTickP99Micros": 81,
+          "businessTickScope": "All room.Tick calls on this worker, including replay/hash/frame; conservative bound for Gameplay+physics",
+          "p50Micros": 29,
+          "p95Micros": 50,
+          "p99Micros": 84,
+          "p999Micros": 266,
+          "maximumMicros": 1801,
+          "overBudgetTicks": 0,
+          "percentileMethod": "nearest-rank over exact deduplicated measured Tick IDs",
+          "passed": true
+        },
+        {
+          "worker": "battle-2/worker-1",
+          "firstTick": 4464,
+          "lastTick": 22462,
+          "observedTicks": 17999,
+          "sampleCount": 17999,
+          "complete": true,
+          "steadyTicks": 17982,
+          "lifecycleTicks": 17,
+          "steadyCoverage": 0.9990555030835047,
+          "businessAllocatedBytes": 0,
+          "steadyAllocatedBytes": 0,
+          "lifecycleAllocatedBytes": 544,
+          "totalAllocatedBytes": 544,
+          "diagnosticCounterAllocatedBytes": 544,
+          "businessTickP99Micros": 75,
+          "businessTickScope": "All room.Tick calls on this worker, including replay/hash/frame; conservative bound for Gameplay+physics",
+          "p50Micros": 28,
+          "p95Micros": 49,
+          "p99Micros": 77,
+          "p999Micros": 218,
+          "maximumMicros": 1346,
+          "overBudgetTicks": 0,
+          "percentileMethod": "nearest-rank over exact deduplicated measured Tick IDs",
+          "passed": true
+        }
+      ],
+      "acknowledgement": {
+        "sampleCount": 375875,
+        "p50Milliseconds": 47.4316,
+        "p95Milliseconds": 78.6675,
+        "p99Milliseconds": 87.4855,
+        "maximumMilliseconds": 120.233,
+        "percentileMethod": "nearest-rank; actual input-send to recipient-specific consumed ACK"
+      },
+      "inputAudit": {
+        "accepted_input_audit_passed": true,
+        "minimum_fraction": "0.8",
+        "measured_players": 368,
+        "excluded_zero_measurement_players": 56,
+        "measured_inputs": 1127200,
+        "accepted_measured_inputs": 1126828
+      },
+      "replay": {
+        "passed": true,
+        "complete": 53,
+        "incomplete": 0,
+        "verifierSha256": "CD7F973B97A1498DA02DF540D688CC760D75FD099B3A4C97B95B8DD6CF1EC579"
+      },
+      "terminalDelivery": [
+        {
+          "node": "battle-1",
+          "terminalDelivered": 28,
+          "terminalDeliveryFailures": 0,
+          "terminalDeliveryTimeouts": 0
+        },
+        {
+          "node": "battle-2",
+          "terminalDelivered": 25,
+          "terminalDeliveryFailures": 0,
+          "terminalDeliveryTimeouts": 0
+        }
+      ],
+      "host": {
+        "name": "capacity-2",
+        "nativePassed": true,
+        "measurementStartUtc": "2026-10-05T14:36:15.074837+00:00",
+        "measurementEndUtc": "2026-10-05T14:41:15.1144056+00:00",
+        "roomCount": 8,
+        "sampleCount": 118,
+        "maximumSampleGapSeconds": 2.6330599784851074,
+        "cpuP99Percent": 30.0,
+        "memoryMaximumUsedPercent": 73.00465956114546,
+        "coveragePassed": true,
+        "passed": true
+      }
+    },
+    {
+      "name": "capacity-4",
+      "passed": true,
+      "clients": 128,
+      "options": {
+        "RoomCount": 16,
+        "PlayersPerRoom": 8,
+        "WorkerCount": 2,
+        "RoomsPerWorker": 4,
+        "InputHz": 60,
+        "WarmupSeconds": 60,
+        "DurationSeconds": 300,
+        "Seed": 20261002,
+        "MatchTicks": 36000
+      },
+      "measurementStartUtc": "2026-10-05T14:44:21.610631+00:00",
+      "measurementEndUtc": "2026-10-05T14:49:21.6539095+00:00",
+      "completedRooms": 107,
+      "occupancy": {
+        "ratio": 0.976478901,
+        "minimumRatio": 0.95,
+        "expectedSlots": 16,
+        "activeRoomSeconds": 4687.0987248,
+        "expectedRoomSeconds": 4800,
+        "maximumReplacementSeconds": 1.9832196
+      },
+      "workers": [
+        {
+          "worker": "battle-1/worker-0",
+          "firstTick": 4934,
+          "lastTick": 22935,
+          "observedTicks": 18002,
+          "sampleCount": 18002,
+          "complete": true,
+          "steadyTicks": 17963,
+          "lifecycleTicks": 39,
+          "steadyCoverage": 0.9978335740473281,
+          "businessAllocatedBytes": 0,
+          "steadyAllocatedBytes": 0,
+          "lifecycleAllocatedBytes": 1248,
+          "totalAllocatedBytes": 1248,
+          "diagnosticCounterAllocatedBytes": 1248,
+          "businessTickP99Micros": 120,
+          "businessTickScope": "All room.Tick calls on this worker, including replay/hash/frame; conservative bound for Gameplay+physics",
+          "p50Micros": 51,
+          "p95Micros": 83,
+          "p99Micros": 122,
+          "p999Micros": 737,
+          "maximumMicros": 4094,
+          "overBudgetTicks": 0,
+          "percentileMethod": "nearest-rank over exact deduplicated measured Tick IDs",
+          "passed": true
+        },
+        {
+          "worker": "battle-1/worker-1",
+          "firstTick": 4934,
+          "lastTick": 22935,
+          "observedTicks": 18002,
+          "sampleCount": 18002,
+          "complete": true,
+          "steadyTicks": 17964,
+          "lifecycleTicks": 38,
+          "steadyCoverage": 0.9978891234307299,
+          "businessAllocatedBytes": 0,
+          "steadyAllocatedBytes": 0,
+          "lifecycleAllocatedBytes": 1216,
+          "totalAllocatedBytes": 1216,
+          "diagnosticCounterAllocatedBytes": 1216,
+          "businessTickP99Micros": 124,
+          "businessTickScope": "All room.Tick calls on this worker, including replay/hash/frame; conservative bound for Gameplay+physics",
+          "p50Micros": 51,
+          "p95Micros": 83,
+          "p99Micros": 127,
+          "p999Micros": 717,
+          "maximumMicros": 1146,
+          "overBudgetTicks": 0,
+          "percentileMethod": "nearest-rank over exact deduplicated measured Tick IDs",
+          "passed": true
+        },
+        {
+          "worker": "battle-2/worker-0",
+          "firstTick": 4928,
+          "lastTick": 22928,
+          "observedTicks": 18001,
+          "sampleCount": 18001,
+          "complete": true,
+          "steadyTicks": 17960,
+          "lifecycleTicks": 41,
+          "steadyCoverage": 0.9977223487584023,
+          "businessAllocatedBytes": 0,
+          "steadyAllocatedBytes": 0,
+          "lifecycleAllocatedBytes": 1312,
+          "totalAllocatedBytes": 1312,
+          "diagnosticCounterAllocatedBytes": 1312,
+          "businessTickP99Micros": 122,
+          "businessTickScope": "All room.Tick calls on this worker, including replay/hash/frame; conservative bound for Gameplay+physics",
+          "p50Micros": 51,
+          "p95Micros": 82,
+          "p99Micros": 124,
+          "p999Micros": 636,
+          "maximumMicros": 1037,
+          "overBudgetTicks": 0,
+          "percentileMethod": "nearest-rank over exact deduplicated measured Tick IDs",
+          "passed": true
+        },
+        {
+          "worker": "battle-2/worker-1",
+          "firstTick": 4929,
+          "lastTick": 22928,
+          "observedTicks": 18000,
+          "sampleCount": 18000,
+          "complete": true,
+          "steadyTicks": 17962,
+          "lifecycleTicks": 38,
+          "steadyCoverage": 0.9978888888888889,
+          "businessAllocatedBytes": 0,
+          "steadyAllocatedBytes": 0,
+          "lifecycleAllocatedBytes": 1216,
+          "totalAllocatedBytes": 1216,
+          "diagnosticCounterAllocatedBytes": 1216,
+          "businessTickP99Micros": 117,
+          "businessTickScope": "All room.Tick calls on this worker, including replay/hash/frame; conservative bound for Gameplay+physics",
+          "p50Micros": 50,
+          "p95Micros": 81,
+          "p99Micros": 120,
+          "p999Micros": 719,
+          "maximumMicros": 1656,
+          "overBudgetTicks": 0,
+          "percentileMethod": "nearest-rank over exact deduplicated measured Tick IDs",
+          "passed": true
+        }
+      ],
+      "acknowledgement": {
+        "sampleCount": 750280,
+        "p50Milliseconds": 44.4884,
+        "p95Milliseconds": 67.4849,
+        "p99Milliseconds": 76.6844,
+        "maximumMilliseconds": 112.0278,
+        "percentileMethod": "nearest-rank; actual input-send to recipient-specific consumed ACK"
+      },
+      "inputAudit": {
+        "accepted_input_audit_passed": true,
+        "minimum_fraction": "0.8",
+        "measured_players": 736,
+        "excluded_zero_measurement_players": 120,
+        "measured_inputs": 2249888,
+        "accepted_measured_inputs": 2249060
+      },
+      "replay": {
+        "passed": true,
+        "complete": 107,
+        "incomplete": 0,
+        "verifierSha256": "CD7F973B97A1498DA02DF540D688CC760D75FD099B3A4C97B95B8DD6CF1EC579"
+      },
+      "terminalDelivery": [
+        {
+          "node": "battle-1",
+          "terminalDelivered": 52,
+          "terminalDeliveryFailures": 0,
+          "terminalDeliveryTimeouts": 0
+        },
+        {
+          "node": "battle-2",
+          "terminalDelivered": 55,
+          "terminalDeliveryFailures": 0,
+          "terminalDeliveryTimeouts": 0
+        }
+      ],
+      "host": {
+        "name": "capacity-4",
+        "nativePassed": true,
+        "measurementStartUtc": "2026-10-05T14:44:21.610631+00:00",
+        "measurementEndUtc": "2026-10-05T14:49:21.6539095+00:00",
+        "roomCount": 16,
+        "sampleCount": 116,
+        "maximumSampleGapSeconds": 2.878058910369873,
+        "cpuP99Percent": 51.0,
+        "memoryMaximumUsedPercent": 74.76360891911109,
+        "coveragePassed": true,
+        "passed": true
+      }
+    },
+    {
+      "name": "soak-highest-passing",
+      "passed": true,
+      "clients": 128,
+      "options": {
+        "RoomCount": 16,
+        "PlayersPerRoom": 8,
+        "WorkerCount": 2,
+        "RoomsPerWorker": 4,
+        "InputHz": 60,
+        "WarmupSeconds": 60,
+        "DurationSeconds": 3600,
+        "Seed": 20261002,
+        "MatchTicks": 36000
+      },
+      "measurementStartUtc": "2026-10-05T14:52:53.5866629+00:00",
+      "measurementEndUtc": "2026-10-05T15:52:53.6725706+00:00",
+      "completedRooms": 979,
+      "occupancy": {
+        "ratio": 0.9781297173611111,
+        "minimumRatio": 0.95,
+        "expectedSlots": 16,
+        "activeRoomSeconds": 56340.27172,
+        "expectedRoomSeconds": 57600,
+        "maximumReplacementSeconds": 2.1777165
+      },
+      "workers": [
+        {
+          "worker": "battle-1/worker-0",
+          "firstTick": 5038,
+          "lastTick": 221003,
+          "observedTicks": 215966,
+          "sampleCount": 215966,
+          "complete": true,
+          "steadyTicks": 215490,
+          "lifecycleTicks": 476,
+          "steadyCoverage": 0.9977959493623997,
+          "businessAllocatedBytes": 0,
+          "steadyAllocatedBytes": 0,
+          "lifecycleAllocatedBytes": 15232,
+          "totalAllocatedBytes": 15232,
+          "diagnosticCounterAllocatedBytes": 15232,
+          "businessTickP99Micros": 117,
+          "businessTickScope": "All room.Tick calls on this worker, including replay/hash/frame; conservative bound for Gameplay+physics",
+          "p50Micros": 50,
+          "p95Micros": 82,
+          "p99Micros": 120,
+          "p999Micros": 667,
+          "maximumMicros": 4601,
+          "overBudgetTicks": 0,
+          "percentileMethod": "nearest-rank over exact deduplicated measured Tick IDs",
+          "passed": true
+        },
+        {
+          "worker": "battle-1/worker-1",
+          "firstTick": 5038,
+          "lastTick": 221003,
+          "observedTicks": 215966,
+          "sampleCount": 215966,
+          "complete": true,
+          "steadyTicks": 215492,
+          "lifecycleTicks": 474,
+          "steadyCoverage": 0.9978052100793643,
+          "businessAllocatedBytes": 0,
+          "steadyAllocatedBytes": 0,
+          "lifecycleAllocatedBytes": 15168,
+          "totalAllocatedBytes": 15168,
+          "diagnosticCounterAllocatedBytes": 15168,
+          "businessTickP99Micros": 118,
+          "businessTickScope": "All room.Tick calls on this worker, including replay/hash/frame; conservative bound for Gameplay+physics",
+          "p50Micros": 51,
+          "p95Micros": 83,
+          "p99Micros": 121,
+          "p999Micros": 665,
+          "maximumMicros": 6419,
+          "overBudgetTicks": 0,
+          "percentileMethod": "nearest-rank over exact deduplicated measured Tick IDs",
+          "passed": true
+        },
+        {
+          "worker": "battle-2/worker-0",
+          "firstTick": 5032,
+          "lastTick": 220997,
+          "observedTicks": 215966,
+          "sampleCount": 215966,
+          "complete": true,
+          "steadyTicks": 215492,
+          "lifecycleTicks": 474,
+          "steadyCoverage": 0.9978052100793643,
+          "businessAllocatedBytes": 0,
+          "steadyAllocatedBytes": 0,
+          "lifecycleAllocatedBytes": 15168,
+          "totalAllocatedBytes": 15168,
+          "diagnosticCounterAllocatedBytes": 15168,
+          "businessTickP99Micros": 116,
+          "businessTickScope": "All room.Tick calls on this worker, including replay/hash/frame; conservative bound for Gameplay+physics",
+          "p50Micros": 50,
+          "p95Micros": 81,
+          "p99Micros": 117,
+          "p999Micros": 693,
+          "maximumMicros": 7319,
+          "overBudgetTicks": 0,
+          "percentileMethod": "nearest-rank over exact deduplicated measured Tick IDs",
+          "passed": true
+        },
+        {
+          "worker": "battle-2/worker-1",
+          "firstTick": 5032,
+          "lastTick": 220996,
+          "observedTicks": 215965,
+          "sampleCount": 215965,
+          "complete": true,
+          "steadyTicks": 215493,
+          "lifecycleTicks": 472,
+          "steadyCoverage": 0.9978144606764985,
+          "businessAllocatedBytes": 0,
+          "steadyAllocatedBytes": 0,
+          "lifecycleAllocatedBytes": 15104,
+          "totalAllocatedBytes": 15104,
+          "diagnosticCounterAllocatedBytes": 15104,
+          "businessTickP99Micros": 118,
+          "businessTickScope": "All room.Tick calls on this worker, including replay/hash/frame; conservative bound for Gameplay+physics",
+          "p50Micros": 51,
+          "p95Micros": 82,
+          "p99Micros": 121,
+          "p999Micros": 695,
+          "maximumMicros": 4029,
+          "overBudgetTicks": 0,
+          "percentileMethod": "nearest-rank over exact deduplicated measured Tick IDs",
+          "passed": true
+        }
+      ],
+      "acknowledgement": {
+        "sampleCount": 9015956,
+        "p50Milliseconds": 45.4801,
+        "p95Milliseconds": 75.2704,
+        "p99Milliseconds": 91.3639,
+        "maximumMilliseconds": 260.0353,
+        "percentileMethod": "nearest-rank; actual input-send to recipient-specific consumed ACK"
+      },
+      "inputAudit": {
+        "accepted_input_audit_passed": true,
+        "minimum_fraction": "0.8",
+        "measured_players": 7712,
+        "excluded_zero_measurement_players": 120,
+        "measured_inputs": 27036193,
+        "accepted_measured_inputs": 27026381
+      },
+      "replay": {
+        "passed": true,
+        "complete": 979,
+        "incomplete": 0,
+        "verifierSha256": "CD7F973B97A1498DA02DF540D688CC760D75FD099B3A4C97B95B8DD6CF1EC579"
+      },
+      "terminalDelivery": [
+        {
+          "node": "battle-1",
+          "terminalDelivered": 491,
+          "terminalDeliveryFailures": 0,
+          "terminalDeliveryTimeouts": 0
+        },
+        {
+          "node": "battle-2",
+          "terminalDelivered": 488,
+          "terminalDeliveryFailures": 0,
+          "terminalDeliveryTimeouts": 0
+        }
+      ],
+      "host": {
+        "name": "soak-highest-passing",
+        "nativePassed": true,
+        "measurementStartUtc": "2026-10-05T14:52:53.5866629+00:00",
+        "measurementEndUtc": "2026-10-05T15:52:53.6725706+00:00",
+        "roomCount": 16,
+        "sampleCount": 1392,
+        "maximumSampleGapSeconds": 3.470343828201294,
+        "cpuP99Percent": 53.0,
+        "memoryMaximumUsedPercent": 74.7395127311811,
+        "coveragePassed": true,
+        "passed": true
+      }
+    }
+  ],
+  "provenance": {
+    "head": "d149dfc73e4d10745a0a9899840c6a584414f6bc",
+    "fantasy": "df4ad5fe5418c8855932de784c7cea6286c4b082",
+    "sourceFiles": 562,
+    "sourceManifestSha256": "dbdff790ca4ad0e21f02ce2c4a28c2142640d819266f57cb24337aaff547be26",
+    "runtimeFiles": 1058,
+    "runtimeManifestSha256": "07b4bfb02dc958e98bbec1529a3be0cd1e6899dfa976d5505aaad2b5183a1b30",
+    "stageRuntimeComparedFiles": 281,
+    "replayIdentity": {
+      "Protocol": "sha256:CA7B13FE4B1685FEAA9B32FAADCB472ED2228688167859103270843F450A96D3",
+      "Fantasy": "df4ad5fe5418c8855932de784c7cea6286c4b082",
+      "Source": "d149dfc73e4d10745a0a9899840c6a584414f6bc+source-worktree-sha256:5BE920545FAE198EBDD4FFB300F82B0C65BCBA1E7BCEC219426E1387DCAF44F2",
+      "SourceManifestScope": "server/src,server/acceptance,shared,packages source/project/schema files"
+    },
+    "hostInputHashCount": 131
+  },
+  "functional": {
+    "dotnet": {
+      "passed": true,
+      "uniqueTests": 530,
+      "failed": 0,
+      "skipped": 0,
+      "requiredPostgresTests": [
+        "AiNative.Server.Backend.Tests.PostgresTests.Migrated_schema_initializes_with_only_runtime_DML_privileges",
+        "AiNative.Server.Backend.Tests.PostgresTests.Settlement_transaction_survives_store_restart_and_updates_once",
+        "AiNative.Server.Rooms.Tests.PostgresAllocationStoreTests.ExclusiveOwnerDurableReloadAndConflictingIdentityAreEnforcedByPostgres",
+        "AiNative.Server.Rooms.Tests.PostgresAllocationStoreTests.MigratedSchemaInitializesWithOnlyRuntimeDmlPrivileges",
+        "AiNative.Server.Rooms.Tests.PostgresAllocationStoreTests.TerminatedOwnershipConnectionCannotContinueAllocating"
+      ],
+      "architectureSha256": "a99f3942427ae63fe39aac797733fbf277f99756ddc81ae5f54590794cc25e20"
+    },
+    "unityInheritedFrom": "qualified-128-candidate-v3",
+    "editMode": {
+      "passed": 164,
+      "failed": 0,
+      "skipped": 0
+    },
+    "playMode": {
+      "passed": 3,
+      "failed": 0,
+      "skipped": 0
+    },
+    "windowsPlayers": "Inherited real dual-Player validation; original 3 complete replays remain independently verified",
+    "clientReplayCount": 3,
+    "inheritancePassed": true,
+    "acceptanceIncrementalPassed": 111
+  },
+  "cleanup": {
+    "passed": true,
+    "liveOwned": [],
+    "checked": 45
+  },
+  "priorAttemptsRetained": [
+    {
+      "path": "artifacts/battle-slice-20261004/qualified-capacity-sweep-01",
+      "outcome": "Earlier 128-client qualification failed; historical evidence retained."
+    },
+    {
+      "path": "artifacts\\battle-slice-20261005\\qualified-capacity-sweep-01",
+      "outcome": "Earlier candidate attempt retained; superseded, not evidence of this pass."
+    },
+    {
+      "path": "artifacts\\battle-slice-20261005\\qualified-capacity-sweep-02",
+      "outcome": "128-client soak interrupted around 34 minutes: Closed during input send; terminal transport drain fix followed."
+    },
+    {
+      "path": "artifacts\\battle-slice-20261005\\qualified-capacity-sweep-03",
+      "outcome": "32-client input-rate qualification failed; retained, not promoted."
+    },
+    {
+      "path": "artifacts\\battle-slice-20261005\\terminal-fixed-128-priority-diagnostic-01",
+      "outcome": "105-room native workload passed but physical-host CPU P99 failed (99%); summary absent after wrapper termination. Retained replay/input audits do not turn this into capacity pass."
+    },
+    {
+      "path": "artifacts\\battle-slice-20261005\\qualified-capacity-sweep-04\\final-capacity-audit.json",
+      "outcome": "Original final report comparison failed on 8 equivalent timestamp offset representations; retained unchanged. V2 compares only named time fields at exact 100ns precision; 13 tests passed."
+    }
+  ],
+  "auditCorrection": {
+    "originalFailureRetained": true,
+    "equivalentTimestampFields": 8,
+    "precision": "100ns exact UTC instants; timezone required; no other fields normalized",
+    "testsPassed": 13
+  },
+  "limits": [
+    "Results describe one non-dedicated Windows host; ambient software existed and was included in whole-host samples.",
+    "No guarantee for Linux/macOS, mobile, WebGL, consoles, IL2CPP/AOT, cross-region/degraded networks, or legacy 64-player rooms; these targets remain unverified by this run.",
+    "KCP terminal drain verifies transport completion, not an application-level acknowledgement or guarantee of a rendered final Unity frame.",
+    "Historical diagnostic failures and truncated/partial captures remain retained; they are not overwritten or counted as formal passes.",
+    "Formal evidence predates this report-only documentation addition; source hashes identify the measured candidate, not the later documentation commit.",
+    "Package vulnerability audit was skipped in this formal publish; no claim of a fresh vulnerability scan."
+  ],
+  "evidence": [
+    {
+      "path": "artifacts/battle-slice-20261005/qualified-capacity-sweep-04/host-metadata.json",
+      "sha256": "937d2a75bc248c8af10240a6398389e95398b73c3a4978b81a984884a06e832f"
+    },
+    {
+      "path": "artifacts/battle-slice-20261005/qualified-capacity-sweep-04/host-headroom-audit.json",
+      "sha256": "64679c0fc1c3e6ed0ec7b30edfce9c3e3e9cea319c33806547ffb7725a80ee55"
+    },
+    {
+      "path": "artifacts/battle-slice-20261005/qualified-capacity-sweep-04/qualification-summary.json",
+      "sha256": "a883a2aaa06bc9ab729a50c35de2709ef0f10252cc7dbaecd4a5f646ec495f3b"
+    },
+    {
+      "path": "artifacts/battle-slice-20261005/qualified-capacity-sweep-04/combined-qualification.json",
+      "sha256": "96483dd979042be69fe875d41240cb440af54314bf24138ec9cac2e48e6c2a60"
+    },
+    {
+      "path": "artifacts/battle-slice-20261005/qualified-capacity-sweep-04/final-provenance-audit.json",
+      "sha256": "3fe2bc79de1dd23fc0242121a6c52dc498b34ec3ad33808e33eb15918aee95ad"
+    },
+    {
+      "path": "artifacts/battle-slice-20261005/qualified-capacity-sweep-04/final-capacity-audit-v2.json",
+      "sha256": "2f8248c4dc3b7dedcdc30f55510bc57006265fcf03f267c8950d9a514f5d305a"
+    },
+    {
+      "path": "artifacts/battle-slice-20261005/qualified-capacity-sweep-04/final-capacity-v2-correction-evidence.json",
+      "sha256": "2fefa91f34ac1e329d31cdbea0595db3fbf613f565b2927662747fe30922f5b1"
+    },
+    {
+      "path": "artifacts/battle-slice-20261005/qualified-capacity-sweep-04/owned-process-cleanup.json",
+      "sha256": "188e5ee944f2e5f2d45d099b08a1c98554f31bc292e376ed48edda942878a1de"
+    },
+    {
+      "path": "artifacts/battle-slice-20261005/qualified-128-candidate-v4/formal-source-manifest.json",
+      "sha256": "dbdff790ca4ad0e21f02ce2c4a28c2142640d819266f57cb24337aaff547be26"
+    },
+    {
+      "path": "artifacts/battle-slice-20261005/qualified-capacity-sweep-04/runtime-freeze.json",
+      "sha256": "07b4bfb02dc958e98bbec1529a3be0cd1e6899dfa976d5505aaad2b5183a1b30"
+    },
+    {
+      "path": "artifacts/battle-slice-20261005/qualified-capacity-sweep-04/replay-identities.json",
+      "sha256": "9d81956e19e679a2118a82bf8d0feb7f1716efedc114de2e46815dc8a72a2ee2"
+    },
+    {
+      "path": "artifacts/battle-slice-20261005/qualified-128-candidate-v4/full-integration/integration-audit.json",
+      "sha256": "58f5672515e9330b61b0c35ed9bd6af6be5d421ccbae58723363cfa7f357793b"
+    },
+    {
+      "path": "artifacts/battle-slice-20261005/qualified-128-candidate-v4/inherited-functional-audit.json",
+      "sha256": "c58a3ead2dddab054ef7f8d5f4d68048ab0bb5f7dd7a11dc772bdcd54fa5bb72"
+    },
+    {
+      "path": "artifacts/battle-slice-20261005/qualified-128-candidate-v3/editmode-final-summary.json",
+      "sha256": "f3e9fa5eb45a4904a0a72d05596cc8fd67369243690d670fb5801d5d3bb45e1a"
+    },
+    {
+      "path": "artifacts/battle-slice-20261005/qualified-128-candidate-v3/independent-client-replays.json",
+      "sha256": "9697b950ae486277a42cb7840ce399bb2c34e6715e69c2a872a7607f5ad53b49"
+    },
+    {
+      "path": "artifacts/battle-slice-20261005/qualified-capacity-sweep-04/capacity-1/qualification-detail.json",
+      "sha256": "484d8d7896efbad6c268105f44086ba6751ee672afa5bd581ea7845cf30aa36a"
+    },
+    {
+      "path": "artifacts/battle-slice-20261005/qualified-capacity-sweep-04/capacity-1/capacity-input-audit.json",
+      "sha256": "0c2990b8a711b11131f21483cd4242a9345a816d31f1a7b3b28a02355c618f07"
+    },
+    {
+      "path": "artifacts/battle-slice-20261005/qualified-capacity-sweep-04/capacity-1/independent-completed-replays.json",
+      "sha256": "ec951fa4e50042c913d1daa393ee50a10dff247c44a77875ee24d120bde3760f"
+    },
+    {
+      "path": "artifacts/battle-slice-20261005/qualified-capacity-sweep-04/capacity-1/qualification-terminal-delivery.json",
+      "sha256": "b758ba85601b7fb17efeb9521e14b9cd0951c071236572b7c0880c88982435f4"
+    },
+    {
+      "path": "artifacts/battle-slice-20261005/qualified-capacity-sweep-04/capacity-2/qualification-detail.json",
+      "sha256": "af3d83a83256d6797720e94fd4db6218328a81320d452e01d91b0454a6a11842"
+    },
+    {
+      "path": "artifacts/battle-slice-20261005/qualified-capacity-sweep-04/capacity-2/capacity-input-audit.json",
+      "sha256": "84aea5aabbd662c73ea0eb56610df04b1630755dabd36a549f0f9f69bb4471f1"
+    },
+    {
+      "path": "artifacts/battle-slice-20261005/qualified-capacity-sweep-04/capacity-2/independent-completed-replays.json",
+      "sha256": "e443478aa77b257da9fb2f51d6b359b1e1fc3e3e5bf499e290540c851cf2caa4"
+    },
+    {
+      "path": "artifacts/battle-slice-20261005/qualified-capacity-sweep-04/capacity-2/qualification-terminal-delivery.json",
+      "sha256": "41c20e75419f9d993cad4a0488e0b0c8087aaed3773b32d2235036708da6f4b9"
+    },
+    {
+      "path": "artifacts/battle-slice-20261005/qualified-capacity-sweep-04/capacity-4/qualification-detail.json",
+      "sha256": "4ad2144d5e848cc70079287191287a2a5c6002a81fc16835b5f819b6d3661010"
+    },
+    {
+      "path": "artifacts/battle-slice-20261005/qualified-capacity-sweep-04/capacity-4/capacity-input-audit.json",
+      "sha256": "68ba5930d35c7c219d87df005b172870c5f09b108581e426f19241537f07287e"
+    },
+    {
+      "path": "artifacts/battle-slice-20261005/qualified-capacity-sweep-04/capacity-4/independent-completed-replays.json",
+      "sha256": "4fd05993e53ec249cb631795090463e04990cdb95bb5dcdfdcd3875d488b07e9"
+    },
+    {
+      "path": "artifacts/battle-slice-20261005/qualified-capacity-sweep-04/capacity-4/qualification-terminal-delivery.json",
+      "sha256": "6fb8637056d6ffe93a99b8891c035922db8b138db5734ad22d5d9034755dbda5"
+    },
+    {
+      "path": "artifacts/battle-slice-20261005/qualified-capacity-sweep-04/soak-highest-passing/qualification-detail.json",
+      "sha256": "38975e8e4139112a928249bc93b57e1f4451a08e67f50d54d791d05bca867a4d"
+    },
+    {
+      "path": "artifacts/battle-slice-20261005/qualified-capacity-sweep-04/soak-highest-passing/capacity-input-audit.json",
+      "sha256": "7f157cfe61ef6e86f185733a168283e1724d9bcd7e357c30ddad68ad5721f794"
+    },
+    {
+      "path": "artifacts/battle-slice-20261005/qualified-capacity-sweep-04/soak-highest-passing/independent-completed-replays.json",
+      "sha256": "da568ce591daf2f0f78533a6b0af58c89c0a8eafdc03f45e334b8e4a3dfdc528"
+    },
+    {
+      "path": "artifacts/battle-slice-20261005/qualified-capacity-sweep-04/soak-highest-passing/qualification-terminal-delivery.json",
+      "sha256": "ba283b296b35425480ca791ce1589a6d6c4cc24b2845dd84044b1f26b9d7a0b9"
+    }
+  ]
+}

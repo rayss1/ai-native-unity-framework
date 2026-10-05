@@ -552,6 +552,8 @@ namespace AiNative.Client.Application.Tests
         internal List<byte[]> SentFrames { get; } = new List<byte[]>();
 
         internal SendStatus NextSendStatus { get; set; } = SendStatus.Accepted;
+        internal Action BeforeSend { get; set; }
+        internal Action BeforeEmptyReceive { get; set; }
 
         public TransportState State { get; private set; } = TransportState.Connected;
 
@@ -572,6 +574,7 @@ namespace AiNative.Client.Application.Tests
             ReadOnlyMemory<byte> payload,
             CancellationToken cancellationToken = default)
         {
+            BeforeSend?.Invoke();
             if (State != TransportState.Connected)
             {
                 return new ValueTask<SendResult>(new SendResult(SendStatus.Closed));
@@ -588,6 +591,7 @@ namespace AiNative.Client.Application.Tests
         {
             if (_received.Count == 0)
             {
+                BeforeEmptyReceive?.Invoke();
                 packet = default;
                 return false;
             }

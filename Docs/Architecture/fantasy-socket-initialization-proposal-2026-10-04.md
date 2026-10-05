@@ -1,6 +1,6 @@
 # Fantasy socket initialization: evidence and proposed fork change
 
-Status: Implemented and adopted; [final local qualification](battle-slice-qualification-2026-10-05.md) passed at64 concurrent clients on2026-10-05. The128-client profile failed and remains unqualified.
+Status: Implemented and adopted. The earlier64-client result and128-client failure remain in the [2026-10-05 report](battle-slice-qualification-2026-10-05.md). The subsequent bounded terminal-delivery/pacing candidate passed the full Windows local128-client qualification on2026-10-06; see [the new report](battle-slice-qualification-2026-10-06.md). This combined result is not attributed solely to the Socket optimization.
 
 Current fork: `df4ad5fe5418c8855932de784c7cea6286c4b082`; versions Fantasy-Net `2026.1.1004-ainative.1`, Fantasy.Unity `2026.1.1002-ainative.1`. The measured parent candidate is `4c7e4929f559eb977dd0bac3e5f4821d6f3b1df2`; the owner authorized commits, branch publication and PR creation. Earlier proposal/candidate evidence below is historical. The implemented zero-step behavior is a no-op, as specified in the approved plan.
 

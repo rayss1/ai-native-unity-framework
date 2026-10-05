@@ -70,6 +70,31 @@ namespace AiNative.Client.Application.Tests
             finally { UnityEngine.Object.DestroyImmediate(owner); }
         }
 
+        [Test]
+        public async Task ActualReceiptBeforeTerminalDoesNotPreventLaterOrdinaryUpdateReception()
+        {
+            using var gate = new GatePeer();
+            using var backend = new GateBackendSession(await FantasyGateClient.ConnectAsync(gate.Options));
+            await backend.LoginAsync("original-user", "original-password");
+            var owner = new GameObject("ReceiptBeforeTerminal");
+            try
+            {
+                var flow = CreateFlow(owner, gate.Options, backend, false);
+                var transport = new FakeTransport(); var battle = ActiveBattle(transport, new FakeConnector(transport));
+                SetProperty(flow, "Battle", battle);
+                transport.Enqueue(TopologyTerminalReceiveTests.Frame(111), BattleClientProtocolV1.SnapshotChannel, 1); battle.Pump(0);
+                await Poll(flow);
+                Assert.That(flow.Completed && flow.SettlementConfirmed, Is.True, "The exact receipt confirms settlement independently of terminal reception.");
+                Assert.That(battle.ArenaPhase, Is.EqualTo(AiNative.Gameplay.ArenaMatchPhase.Active));
+                transport.Enqueue(TopologyTerminalReceiveTests.Frame(112, true), BattleClientProtocolV1.SnapshotChannel, 1);
+                transport.Close();
+                typeof(TopologyClientFlow).GetMethod("Update", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(flow, null);
+                Assert.That(battle.ArenaPhase, Is.EqualTo(AiNative.Gameplay.ArenaMatchPhase.Finished));
+                Assert.That(flow.Completed && flow.SettlementConfirmed, Is.True);
+                Assert.That(gate.SettlementMatches.ToArray(), Is.EqualTo(new[] { "original-match" }));
+            }
+            finally { UnityEngine.Object.DestroyImmediate(owner); }
+        }
         private static TopologyClientFlow CreateFlow(GameObject owner, GateConnectionOptions options, GateBackendSession backend, bool automated)
         {
             var flow = owner.AddComponent<TopologyClientFlow>();
