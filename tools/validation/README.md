@@ -1,13 +1,13 @@
 # Current-source validation
 
-Current project progress is maintained in [one status page](../../Docs/Architecture/current-status.md). For current source, select `-Profile Current -ExpectedDotnetPassed 532 -ExpectedEditModePassed 166`. The two executable entries obtain test inventories and Fantasy package pins from the same profile contract. Defaults remain historical for compatibility; select the profile explicitly.
+Current project progress is maintained in [one status page](../../Docs/Architecture/current-status.md). For current source, select `-Profile Current -ExpectedDotnetPassed 536 -ExpectedEditModePassed 166`. The two executable entries obtain test inventories and Fantasy package pins from the same profile contract. Defaults remain historical for compatibility; select the profile explicitly.
 
 | Profile | Unity EditMode | Source/dependency scope |
 | --- | ---: | --- |
 | Baseline | 95 | Clean `c9098be`, Fantasy `f8bed0d`; 333 .NET tests |
 | Candidate | 147 | Earlier socket/lifecycle source generation, Fantasy `df4ad5f`; explicit .NET count |
 | TerminalDelivery | 164 | October 6 terminal-receive tests, Fantasy `df4ad5f`; explicit .NET count (historically 530) |
-| Current | 166 | Legacy-health/additive-field regressions, Fantasy `df4ad5f`; 532 .NET tests |
+| Current | 166 | Legacy-health/additive-field regressions, Fantasy `df4ad5f`; 536 .NET tests (including four snapshot-fanout regressions) |
 
 Wrong totals, missing fixtures, failed/skipped cases and source changes fail the gate. Historical 128-test observations below remain evidence records, not a selectable current inventory.
 
@@ -21,7 +21,7 @@ For a clean current commit, start an isolated PostgreSQL 17.11, set `AINATIVE_TE
   -SdkPath (Get-Command dotnet).Source `
   -UnityEditorPath 'C:/Program Files/Unity/Hub/Editor/6000.3.23f1/Editor/Unity.exe' `
   -EvidenceDirectory ./artifacts/validation/new-current-run `
-  -Profile Current -ExpectedDotnetPassed 532 -ExpectedEditModePassed 166 `
+  -Profile Current -ExpectedDotnetPassed 536 -ExpectedEditModePassed 166 `
   -Phases Dotnet,Architecture,WindowsLegacy
 ```
 
@@ -40,7 +40,7 @@ $validationManifest = Get-AiNativeSourceManifest -Root $validationSource
   -SdkPath (Get-Command dotnet).Source `
   -UnityEditorPath 'C:/Program Files/Unity/Hub/Editor/6000.3.23f1/Editor/Unity.exe' `
   -EvidenceDirectory ./artifacts/validation/new-worktree-run `
-  -Profile Current -ExpectedDotnetPassed 532 -ExpectedEditModePassed 166 `
+  -Profile Current -ExpectedDotnetPassed 536 -ExpectedEditModePassed 166 `
   -SourceMode Worktree -ExpectedSourceManifestSha256 $validationManifest.sha256 `
   -Phases Dotnet,Architecture,WindowsLegacy
 ```

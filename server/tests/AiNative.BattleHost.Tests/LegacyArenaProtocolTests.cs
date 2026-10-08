@@ -29,27 +29,61 @@ public sealed class LegacyArenaProtocolTests
         Assert.That(f.Wire.Output.Any(m => m.Id == MessageId.ReliableEvent), Is.True);
         Assert.That(f.Game.DrainEvents(new ArenaCombatEventRecord[256]), Is.Zero);
     }
+    [Test]
+    public async Task LegacyFanoutKeepsRecipientAcknowledgementsAndRoomBodiesIsolatedAcrossTicks()
+    {
+        await using var f = new Fixture(BattleGameModeKind.Acceptance, 4, 2); f.Join();
+        uint[] sequences = { 1, 128, 16384, uint.MaxValue };
+        for (int index = 0; index < f.Wires.Length; index++)
+            f.Wires[index].Push(MessageId.InputCommand, new InputCommand { Sequence = sequences[index], RoomTick = 1, MoveXMilli = (index + 1) * 100 });
+        f.Service.PumpInbound(0); f.Rooms.TickAll(); f.Service.PublishSnapshots(3);
+        for (int index = 0; index < f.Wires.Length; index++)
+        {
+            Snapshot expected = f.Rooms[index % 2].CreateSnapshot(3);
+            expected.LastProcessedInputSequence = sequences[index];
+            Assert.That(f.Wires[index].Last<Snapshot>(MessageId.Snapshot), Is.EqualTo(expected));
+        }
+        Assert.That(f.Rooms[0].ComputeStateHash(), Is.Not.EqualTo(f.Rooms[1].ComputeStateHash()));
+        f.Wires[0].Push(MessageId.InputCommand, new InputCommand { Sequence = 2, RoomTick = 4, MoveYMilli = 500 });
+        f.Service.PumpInbound(3); f.Rooms.TickAll(); f.Service.PublishSnapshots(6);
+        sequences[0] = 2;
+        for (int index = 0; index < f.Wires.Length; index++)
+        {
+            Snapshot expected = f.Rooms[index % 2].CreateSnapshot(6);
+            expected.LastProcessedInputSequence = sequences[index];
+            Assert.That(f.Wires[index].Last<Snapshot>(MessageId.Snapshot), Is.EqualTo(expected));
+        }
+    }
     sealed class Fixture : IAsyncDisposable
     {
-        public readonly ArenaRoom Game = new(); public readonly Wire Wire = new();
+        public readonly ArenaRoom Game = new(); public Wire Wire => Wires[0];
+        public readonly Wire[] Wires; public readonly BattleRoomSet Rooms;
         public readonly RoomProtocolService Service;
         readonly BattleMetrics Metrics = new(); readonly IAsyncDisposable Gateway; readonly BattleReplayCapture Replay;
-        public Fixture()
+        public Fixture(BattleGameModeKind mode = BattleGameModeKind.Arena, int connections = 1, int roomCount = 1)
         {
-            var config = new ConfigurationBuilder().Build(); var settings = new BattleHostCapacitySettings(1);
+            var config = new ConfigurationBuilder().Build(); var settings = new BattleHostCapacitySettings(roomCount);
+            Rooms = new BattleRoomSet(settings); Wires = Enumerable.Range(0, connections).Select(_ => new Wire()).ToArray();
             Replay = new BattleReplayCapture(config, settings, Metrics);
             Type gatewayType = typeof(RoomProtocolService).GetConstructors().Single().GetParameters()[0].ParameterType;
-            Gateway = (IAsyncDisposable)Activator.CreateInstance(gatewayType, 262144, 64, 1150)!;
-            Service = (RoomProtocolService)Activator.CreateInstance(typeof(RoomProtocolService), Gateway, new BattleRoomSet(settings), Game, new BattleGameModeSettings(BattleGameModeKind.Arena), Metrics, Replay, NullLogger<RoomProtocolService>.Instance)!;
+            Gateway = (IAsyncDisposable)Activator.CreateInstance(gatewayType, 262144, settings.TotalBotCapacity, 1150)!;
+            Service = (RoomProtocolService)Activator.CreateInstance(typeof(RoomProtocolService), Gateway, Rooms, Game, new BattleGameModeSettings(mode), Metrics, Replay, NullLogger<RoomProtocolService>.Instance)!;
             object accepted = gatewayType.GetField("_accepted", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(Gateway)!;
             Type wireType = accepted.GetType().GetGenericArguments()[0];
-            object connection = Activator.CreateInstance(wireType, BindingFlags.Instance | BindingFlags.NonPublic, null, new object[] { 1L, 1u, Wire }, null)!;
-            accepted.GetType().GetMethod("Enqueue")!.Invoke(accepted, new[] { connection });
+            for (int index = 0; index < Wires.Length; index++)
+            {
+                object connection = Activator.CreateInstance(wireType, BindingFlags.Instance | BindingFlags.NonPublic, null, new object[] { (long)index + 1, 1u, Wires[index] }, null)!;
+                accepted.GetType().GetMethod("Enqueue")!.Invoke(accepted, new[] { connection });
+            }
         }
         public void Join()
         {
-            Wire.Push(MessageId.LoginRequest, new LoginRequest { ProtocolMajor = 1 }); Service.PumpInbound(0);
-            Wire.Push(MessageId.JoinRoomRequest, new JoinRoomRequest { SessionId = Wire.Last<LoginResponse>(MessageId.LoginResponse).SessionId }); Service.PumpInbound(0);
+            for (int index = 0; index < Wires.Length; index++)
+            {
+                Wire wire = Wires[index];
+                wire.Push(MessageId.LoginRequest, new LoginRequest { ProtocolMajor = 1 }); Service.PumpInbound(0);
+                wire.Push(MessageId.JoinRoomRequest, new JoinRoomRequest { SessionId = wire.Last<LoginResponse>(MessageId.LoginResponse).SessionId, RequestedRoom = (uint)(index % Rooms.RoomCount) + 1 }); Service.PumpInbound(0);
+            }
         }
         public async ValueTask DisposeAsync() { await Service.DisposeAsync(); await Replay.DisposeAsync(); await Gateway.DisposeAsync(); Metrics.Dispose(); }
     }
