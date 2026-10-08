@@ -8,7 +8,9 @@ param(
     [string] $SdkPath = 'dotnet',
     [ValidateRange(1, 1000000)]
     [int] $ExpectedEditModePassed = 95,
-    [ValidateSet('Baseline','Candidate')][string] $Profile = 'Baseline',
+    [ValidateSet('Baseline','Candidate','TerminalDelivery','Current')][string] $Profile = 'Baseline',
+    [ValidateSet('CleanCommit','Worktree')][string] $SourceMode = 'CleanCommit',
+    [ValidatePattern('^[0-9a-f]{64}$')][string] $ExpectedSourceManifestSha256,
     [ValidateRange(10,7200)]
     [int] $UnityTimeoutSeconds = 1800,
     [string] $HostAddress = '127.0.0.1',
@@ -25,6 +27,8 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . "$PSScriptRoot/validation/nunit-report.ps1"
+. "$PSScriptRoot/validation/source-identity.ps1"
+. "$PSScriptRoot/validation/unity-generated-state.ps1"
 $unityAllUsersProfile = [Environment]::GetEnvironmentVariable('ALLUSERSPROFILE')
 if ([string]::IsNullOrWhiteSpace($unityAllUsersProfile)) {
     $unityAllUsersProfile = [Environment]::GetEnvironmentVariable('ProgramData')
@@ -140,23 +144,39 @@ if (-not (Test-Path -LiteralPath $UnityEditorPath -PathType Leaf)) {
     throw "Unity Editor was not found at: $UnityEditorPath"
 }
 
-& git -C $repositoryRoot diff --quiet HEAD --
-$trackedDirty = $LASTEXITCODE -ne 0
-$unknown = @(& git -C $repositoryRoot ls-files --others --exclude-standard)
-if ($LASTEXITCODE -ne 0 -or $trackedDirty -or $unknown.Count -ne 0) {
-    throw 'The worktree is dirty. Commit, stash, or remove changes so the evidence identifies an exact revision.'
-}
-
 $commit = (& git -C $repositoryRoot rev-parse HEAD).Trim()
-if ($Profile -eq 'Baseline' -and ($commit -ne 'c9098be7e2a44efc42182a87aca2551648993705' -or $ExpectedEditModePassed -ne 95)) { throw 'Baseline Windows profile requires c9098be and 95 EditMode tests' }
-if ($Profile -eq 'Candidate' -and ($commit -eq 'c9098be7e2a44efc42182a87aca2551648993705' -or $ExpectedEditModePassed -ne 128)) { throw 'Candidate Windows profile requires a new source and the reviewed 128-test inventory' }
+$profileContract = Assert-AiNativeEditModeProfile -Profile $Profile -Commit $commit -ExpectedPassed $ExpectedEditModePassed
 $fantasyCommit = (& git -C $repositoryRoot rev-parse 'HEAD:server/vendor/Fantasy').Trim()
 if ($LASTEXITCODE -ne 0) {
     throw 'The pinned Fantasy gitlink could not be resolved.'
 }
-if ($fantasyCommit -ne 'df4ad5fe5418c8855932de784c7cea6286c4b082') {
-    throw "Expected Fantasy df4ad5fe5418c8855932de784c7cea6286c4b082, found: $fantasyCommit"
+if ($fantasyCommit -ne $profileContract.FantasyCommit) {
+    throw "Expected Fantasy $($profileContract.FantasyCommit), found: $fantasyCommit"
 }
+function Assert-WindowsSource {
+    $actualCommit = (& git -C $repositoryRoot rev-parse HEAD).Trim()
+    if ($LASTEXITCODE -ne 0 -or $actualCommit -ne $commit) { throw 'Windows source commit changed during validation' }
+    if ($SourceMode -eq 'Worktree') {
+        if (-not $ExpectedSourceManifestSha256 -or $Profile -eq 'Baseline') { throw 'Worktree requires a non-Baseline profile and explicit ExpectedSourceManifestSha256' }
+        [void](Assert-AiNativeSourceManifest -Root $repositoryRoot -ExpectedSha256 $ExpectedSourceManifestSha256)
+    } else {
+        if ($ExpectedSourceManifestSha256) { throw 'ExpectedSourceManifestSha256 is only valid with Worktree' }
+        & git -C $repositoryRoot diff --quiet HEAD --
+        $trackedDirty = $LASTEXITCODE -ne 0
+        $unknown = @(& git -C $repositoryRoot ls-files --others --exclude-standard)
+        if ($LASTEXITCODE -ne 0 -or $trackedDirty -or $unknown.Count -ne 0) {
+            throw 'The worktree is dirty. Commit, stash, or remove changes so the evidence identifies an exact revision.'
+        }
+    }
+    $fantasyCheckout = (& git -C (Join-Path $repositoryRoot 'server/vendor/Fantasy') rev-parse HEAD).Trim()
+    if ($LASTEXITCODE -ne 0 -or $fantasyCheckout -ne $fantasyCommit) { throw 'Fantasy checkout differs from its gitlink' }
+    & git -C (Join-Path $repositoryRoot 'server/vendor/Fantasy') diff --quiet HEAD --
+    if ($LASTEXITCODE -ne 0) { throw 'Fantasy checkout has modifications' }
+    $fantasyUnknown = @(& git -C (Join-Path $repositoryRoot 'server/vendor/Fantasy') ls-files --others --exclude-standard)
+    if ($LASTEXITCODE -ne 0 -or $fantasyUnknown.Count) { throw 'Fantasy checkout contains untracked files' }
+}
+Assert-WindowsSource
+$sourceManifest = if ($SourceMode -eq 'Worktree') { Get-AiNativeSourceManifest -Root $repositoryRoot } else { $null }
 
 $projectVersionPath = Join-Path $repositoryRoot 'client/UnityProject/ProjectSettings/ProjectVersion.txt'
 $projectVersion = Get-Content -LiteralPath $projectVersionPath -Raw
@@ -189,13 +209,15 @@ $clientFantasyPackage = Get-Content -LiteralPath $fantasyPackagePath -Raw | Conv
 if ($manifest.dependencies.'com.fantasy.unity' -ne $expectedFantasyLocalPath -or
     $packageLock.dependencies.'com.fantasy.unity'.version -ne $expectedFantasyLocalPath -or
     $packageLock.dependencies.'com.fantasy.unity'.source -ne 'local' -or
-    $clientFantasyPackage.dependencies.'com.fantasy.unity' -ne '2026.1.1002-ainative.1') {
+    $clientFantasyPackage.dependencies.'com.fantasy.unity' -ne $profileContract.FantasyUnityVersion) {
     throw 'The Fantasy.Unity manifest, package declaration, or UPM lock does not match the approved version and commit.'
 }
 $metadataPath = Join-Path $EvidenceDirectory 'metadata.txt'
 $metadata = [System.Collections.Generic.List[string]]::new()
 $metadata.Add("commit=$commit")
 $metadata.Add("fantasy_commit=$fantasyCommit")
+$metadata.Add("source_mode=$SourceMode")
+if ($sourceManifest) { $metadata.Add("source_manifest_sha256=$($sourceManifest.sha256)") }
 $metadata.Add("validated_at_utc=$([DateTime]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ssZ'))")
 $metadata.Add("host=$([System.Environment]::OSVersion.VersionString)")
 $dotnetSdk = (& $SdkPath --version).Trim()
@@ -222,6 +244,7 @@ $unityProject = Join-Path $repositoryRoot 'client/UnityProject'
 if (Test-Path -LiteralPath (Join-Path $unityProject 'Library/UnityLockfile')) { throw 'The validation project is open in an Editor; use an isolated checkout.' }
 $settingsPath = Join-Path $unityProject 'ProjectSettings/ProjectSettings.asset'
 $settingsSnapshot = [IO.File]::ReadAllBytes($settingsPath)
+$generatedSnapshot = Save-AiNativeUnityGeneratedState -ProjectRoot $unityProject
 $editModeXml = Join-Path $EvidenceDirectory 'editmode.xml'
 $editModeLog = Join-Path $EvidenceDirectory 'editmode.log'
 $playModeXml = Join-Path $EvidenceDirectory 'playmode.xml'
@@ -257,6 +280,7 @@ try {
         ASPNETCORE_URLS = "http://127.0.0.1:$HealthPort"
         AINATIVE_FANTASY_ENABLED = 'true'
         AINATIVE_FANTASY_OUTER_KCP_MTU = '1150'
+        AINATIVE_SERVER_TOPOLOGY = 'false'
         AINATIVE_SOURCE_COMMIT = $commit
         AINATIVE_FANTASY_COMMIT = $fantasyCommit
     }
@@ -419,17 +443,15 @@ finally {
             $hostProcess.WaitForExit()
         }
     }
+    @(Restore-AiNativeUnityGeneratedState -Snapshot $generatedSnapshot) |
+        ConvertTo-Json | Set-Content -LiteralPath (Join-Path $EvidenceDirectory 'restored-generated-files.json') -Encoding utf8
 }
 
-& git -C $repositoryRoot diff --quiet HEAD --
-$postTrackedDirty = $LASTEXITCODE -ne 0
-$postUnknown = @(& git -C $repositoryRoot ls-files --others --exclude-standard)
-if ($LASTEXITCODE -ne 0 -or $postTrackedDirty -or $postUnknown.Count -ne 0) {
-    throw 'Validation completed, but the worktree is no longer clean. Inspect Unity-generated changes before accepting the evidence.'
-}
+Assert-WindowsSource
 
 @{
     source=$commit; fantasy=$fantasyCommit; profile=$Profile
+    sourceMode=$SourceMode; sourceManifest=$sourceManifest; releaseQualified=$false
     tests=@($editMode,$playMode)
     artifacts=@(@($metadataPath,(Join-Path $EvidenceDirectory 'summary.txt'),$editModeXml,$playModeXml,$smokeJson,$playerPath,$playerNotice,$playerFantasyLicense,$editModeLog,$playModeLog,$buildLog) | ForEach-Object { Get-AiNativeEvidenceFile -Path $_ })
 } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $EvidenceDirectory 'reports.json') -Encoding utf8

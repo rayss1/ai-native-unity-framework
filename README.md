@@ -1,6 +1,10 @@
 # ai-native-unity-framework
 An AI-native full-stack Unity game development framework for autonomous AI agents, covering client, server, shared modules, development tools, testing, build pipelines, and automation.
 
+See [current progress and remaining gates](Docs/Architecture/current-status.md) for the single current status entry. Dated reports retain their original source/platform limits.
+
+The [2026-10-08 development validation](Docs/Architecture/validation-2026-10-08.json) passed 532 .NET tests (including real PostgreSQL), 166 Unity EditMode tests, three legacy KCP PlayMode tests, and Windows x64 Mono Player build/reconnect smoke. It binds an uncommitted source snapshot; release and other-platform gates remain separate.
+
 The repository contains the first production vertical-slice foundation: one Shared Gameplay source set compiled by Unity and .NET, a Unity-ready bounded client prediction/protocol adapter with presentation-only correction smoothing, a dedicated Fantasy KCP client transport and Battle Client composition candidate, project-owned realtime/protocol contracts, a .NET 10 Fantasy-backed Battle Host, cross-runtime vectors, deterministic replay/load evidence, a production container contract, and a manifest-derived architecture validator.
 
 The new [single-region server topology](Docs/ADR/0017-single-region-service-topology.md) adds independent Gate, Player, Lobby, Match and Room Coordinator processes, plus multiple Battle processes with fixed Worker groups. It includes PostgreSQL ownership/settlement storage, signed admission, bounded durable results, Arena replay and actual local multi-process acceptance. See [operations and launch commands](Docs/Architecture/server-topology-operations.md) and the [implementation/qualification ledger](Docs/Architecture/server-topology-plan.md). Local evidence does not qualify production room density, Linux/TLS deployment or Unity/IL2CPP clients.
@@ -60,13 +64,13 @@ tools/run-unity-manual-validation.sh
 
 The macOS script is the complete WS-26 through WS-28 desktop, real-client correction, and presentation-smoothing gate. It builds the exact-source Host with fixed .NET images, verifies exactly 44 EditMode and 2 real-KCP PlayMode tests, builds an ARM64 Mono Player, runs the reconnect smoke, applies the symmetric Regional network profile, measures correction percentiles for 60 seconds after warm-up, and retains the evidence bundle. The complete contracts are defined in [Unity macOS Validation](Docs/Architecture/unity-manual-validation.md), [Regional Real-Client Correction Validation](Docs/Architecture/regional-client-correction-validation.md), and [Presentation Correction Smoothing](Docs/Architecture/presentation-correction-smoothing.md).
 
-The Windows entry point remains available as a future supplemental platform gate, but it no longer blocks WS-26:
+For the current Windows source, select the reviewed 166-test profile; use the unified entry for .NET/PostgreSQL and Unity phases. Historical macOS commands above qualify only their recorded source. The default Windows mode requires a clean commit:
 
 ```powershell
-tools/run-unity-windows-validation.ps1
+tools/run-unity-windows-validation.ps1 -Profile Current -ExpectedEditModePassed 166
 ```
 
-Both scripts require a clean checkout so every result identifies one exact commit. A passing current macOS bundle includes the local Regional real-client correction profile, but does not imply Windows, Universal/x86_64, Android/iOS IL2CPP, production deployment, or a real Linux environment canary. Retain and review the generated bundle before updating milestone status.
+The formal paths require a clean checkout so every result identifies one exact commit. The Windows and unified entries also support explicitly hashed `Worktree` development validation; see the [entry contract](tools/validation/README.md). A historical passing macOS bundle does not imply current-source Windows, Universal/x86_64, Android/iOS IL2CPP, production deployment, or a real Linux environment canary. Retain and review the generated bundle before updating milestone status.
 
 The architecture-check command returns `0` for a valid repository, `1` for architecture violations, and `2` for invalid arguments, configuration, or unreadable inputs. Use `--format json` for machine-readable diagnostics.
 

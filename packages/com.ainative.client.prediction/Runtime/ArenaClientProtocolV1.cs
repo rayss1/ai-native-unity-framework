@@ -271,7 +271,8 @@ namespace AiNative.Client.Prediction
             while (offset < payload.Length)
             {
                 if (!TryReadKey(payload, ref offset, out int field, out int wire)) return false;
-                if (field >= 6) arenaFields = true;
+                // Health (field 6) belongs to the legacy protocol; unknown additions do not select Arena.
+                if (field >= 7 && field <= 14) arenaFields = true;
                 switch (field)
                 {
                     case 1 when wire == 0: if (!TryReadUInt32(payload, ref offset, out entityId)) return false; break;

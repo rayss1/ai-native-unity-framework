@@ -1,5 +1,7 @@
 # Topology release validation implementation plan
 
+**Current status — 2026-10-08:** use [current progress](current-status.md) for the latest implemented/verified/open split. Checklists and failures below retain their original candidate/date identities. The [2026-10-06 report](battle-slice-qualification-2026-10-06.md) closes Windows local 128-total-client capacity and soak; Android real-device and current-source external rollout remain open.
+
 > **For agentic workers:** Use `superpowers:executing-plans` for the primary's integration and validation, with the repository-authorized delegates below. Checklist items require actual evidence, not completion declarations.
 
 **Goal:** Complete the owner's next-plan items 1–4: one reproducible current-source validation entry, complete topology acceptance, representative Arena capacity/soak, and Android IL2CPP/device lifecycle validation.

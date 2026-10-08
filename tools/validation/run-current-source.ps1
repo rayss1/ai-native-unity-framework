@@ -7,7 +7,9 @@ param(
     [string] $UnityEditorPath = $env:UNITY_EDITOR_PATH,
     [ValidateSet('Dotnet','Architecture','EditMode','WindowsLegacy','TopologyPublish','TopologyAcceptance','TopologyPlayMode')]
     [string[]] $Phases = @('Dotnet','Architecture','EditMode'),
-    [ValidateSet('Baseline','Candidate')][string] $Profile = 'Baseline',
+    [ValidateSet('Baseline','Candidate','TerminalDelivery','Current')][string] $Profile = 'Baseline',
+    [ValidateSet('CleanCommit','Worktree')][string] $SourceMode = 'CleanCommit',
+    [ValidatePattern('^[0-9a-f]{64}$')][string] $ExpectedSourceManifestSha256,
     [ValidateRange(1,1000000)][int] $ExpectedDotnetPassed = 333,
     [ValidateRange(1,1000000)][int] $ExpectedEditModePassed = 95,
     [string] $TopologyRunDirectory = 'artifacts/qualified-topology'
@@ -15,6 +17,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . "$PSScriptRoot/nunit-report.ps1"
+. "$PSScriptRoot/source-identity.ps1"
 $SourceRoot = [IO.Path]::GetFullPath($SourceRoot)
 $EvidenceDirectory = [IO.Path]::GetFullPath($EvidenceDirectory)
 $SdkPath = [IO.Path]::GetFullPath($SdkPath)
@@ -25,10 +28,14 @@ function Invoke-Checked([string] $File, [string[]] $Arguments, [string] $Log) {
 function Assert-Source {
     $actual = (& git -C $SourceRoot rev-parse HEAD).Trim()
     if ($LASTEXITCODE -ne 0 -or $actual -ne $ExpectedCommit) { throw "Source identity mismatch: expected $ExpectedCommit, found $actual" }
-    & git -C $SourceRoot diff --quiet --ignore-submodules=none HEAD --
-    if ($LASTEXITCODE -ne 0) { throw 'Source has tracked modifications' }
-    $unknown = @(& git -C $SourceRoot ls-files --others --exclude-standard)
-    if ($LASTEXITCODE -ne 0 -or $unknown.Count -ne 0) { throw 'Source contains untracked files' }
+    if ($SourceMode -eq 'CleanCommit') {
+        & git -C $SourceRoot diff --quiet --ignore-submodules=none HEAD --
+        if ($LASTEXITCODE -ne 0) { throw 'Source has tracked modifications' }
+        $unknown = @(& git -C $SourceRoot ls-files --others --exclude-standard)
+        if ($LASTEXITCODE -ne 0 -or $unknown.Count -ne 0) { throw 'Source contains untracked files' }
+    } else {
+        [void](Assert-AiNativeSourceManifest -Root $SourceRoot -ExpectedSha256 $ExpectedSourceManifestSha256)
+    }
     $pin = (& git -C $SourceRoot rev-parse 'HEAD:server/vendor/Fantasy').Trim()
     $checkout = (& git -C (Join-Path $SourceRoot 'server/vendor/Fantasy') rev-parse HEAD).Trim()
     if ($LASTEXITCODE -ne 0 -or $pin -ne $checkout) { throw 'Fantasy checkout differs from its gitlink' }
@@ -69,12 +76,19 @@ function Assert-TopologyPublication {
 }
 if ($null -eq $Phases -or $Phases.Count -eq 0) { throw 'At least one validation phase is required' }
 if (@($Phases | Select-Object -Unique).Count -ne $Phases.Count) { throw 'Duplicate phases are not allowed' }
+$profileContract = Get-AiNativeValidationProfile -Profile $Profile
+if ($SourceMode -eq 'Worktree') {
+    if (-not $ExpectedSourceManifestSha256) { throw 'Worktree requires an explicit ExpectedSourceManifestSha256' }
+    if ($Profile -eq 'Baseline') { throw 'Historical Baseline requires CleanCommit' }
+    if (@($Phases | Where-Object { $_ -like 'Topology*' }).Count) { throw 'Topology qualification requires CleanCommit' }
+} elseif ($ExpectedSourceManifestSha256) { throw 'ExpectedSourceManifestSha256 is only valid with Worktree' }
 if ($Profile -eq 'Baseline') {
     if ($ExpectedCommit -ne 'c9098be7e2a44efc42182a87aca2551648993705' -or $ExpectedDotnetPassed -ne 333 -or $ExpectedEditModePassed -ne 95) { throw 'Baseline profile requires c9098be, 333 .NET and 95 EditMode tests' }
 } else {
     if ($ExpectedCommit -eq 'c9098be7e2a44efc42182a87aca2551648993705') { throw 'Candidate profile cannot qualify the historical baseline' }
-    if (-not $PSBoundParameters.ContainsKey('ExpectedDotnetPassed') -or -not $PSBoundParameters.ContainsKey('ExpectedEditModePassed') -or $ExpectedEditModePassed -ne 147) { throw 'Candidate requires explicit .NET count and the reviewed 147-test EditMode inventory' }
+    if (-not $PSBoundParameters.ContainsKey('ExpectedDotnetPassed') -or -not $PSBoundParameters.ContainsKey('ExpectedEditModePassed') -or $ExpectedEditModePassed -ne $profileContract.EditModePassed) { throw "$Profile requires explicit .NET count and the reviewed $($profileContract.EditModePassed)-test EditMode inventory" }
 }
+$profileContract = Assert-AiNativeEditModeProfile -Profile $Profile -Commit $ExpectedCommit -ExpectedPassed $ExpectedEditModePassed
 $fantasy = Assert-Source
 if ((& $SdkPath --version).Trim() -ne '10.0.202' -or $LASTEXITCODE -ne 0) { throw 'Fixed .NET SDK 10.0.202 is required' }
 if (Test-Path -LiteralPath $EvidenceDirectory) { throw 'Use a new evidence directory; old reports cannot qualify a new run' }
@@ -84,6 +98,8 @@ $report = [ordered]@{
     startedUtc = [DateTime]::UtcNow.ToString('O'); status = 'Running'; phases = @()
     requestedPhases = $Phases
     profile = $Profile; expectedDotnetPassed = $ExpectedDotnetPassed; expectedEditModePassed = $ExpectedEditModePassed
+    sourceMode = $SourceMode; releaseQualified = $false
+    sourceManifest = if ($SourceMode -eq 'Worktree') { Get-AiNativeSourceManifest -Root $SourceRoot } else { $null }
     runnerSha256 = (Get-FileHash -LiteralPath $PSCommandPath).Hash.ToLowerInvariant()
     nunitGateSha256 = (Get-FileHash -LiteralPath "$PSScriptRoot/nunit-report.ps1").Hash.ToLowerInvariant()
     windowsRunnerSha256 = (Get-FileHash -LiteralPath "$PSScriptRoot/../run-unity-windows-validation.ps1").Hash.ToLowerInvariant()
@@ -104,7 +120,7 @@ try {
             Dotnet {
                 if (-not $env:AINATIVE_TEST_POSTGRES) { throw 'Dotnet requires an isolated real PostgreSQL via AINATIVE_TEST_POSTGRES' }
                 Invoke-Checked $SdkPath @('build','AiNative.sln','-c','Release','--nologo') (Join-Path $phaseDirectory 'build.log')
-                if ($Profile -eq 'Candidate') {
+                if ($Profile -ne 'Baseline') {
                     # A separate invocation creates a new testhost. Running this inside the
                     # solution testhost can inherit Gateway's vendor-global KCP settings.
                     $probeDirectory = Join-Path $phaseDirectory 'fresh-probe'
@@ -135,10 +151,13 @@ try {
             WindowsLegacy {
                 if (-not (Test-Path -LiteralPath $UnityEditorPath -PathType Leaf)) { throw 'UnityEditorPath is required' }
                 $windowsDirectory = Join-Path $phaseDirectory 'windows'
-                & "$PSScriptRoot/../run-unity-windows-validation.ps1" -UnityEditorPath $UnityEditorPath -SdkPath $SdkPath -Profile $Profile -ExpectedEditModePassed $ExpectedEditModePassed -EvidenceDirectory $windowsDirectory
+                $windowsOptions = @{UnityEditorPath=$UnityEditorPath;SdkPath=$SdkPath;Profile=$Profile;ExpectedEditModePassed=$ExpectedEditModePassed;EvidenceDirectory=$windowsDirectory;SourceMode=$SourceMode}
+                if ($SourceMode -eq 'Worktree') { $windowsOptions.ExpectedSourceManifestSha256=$ExpectedSourceManifestSha256 }
+                & "$PSScriptRoot/../run-unity-windows-validation.ps1" @windowsOptions
                 $windowsReportPath = Join-Path $windowsDirectory 'reports.json'
                 $windows = Get-Content -LiteralPath $windowsReportPath -Raw | ConvertFrom-Json
-                if ($windows.source -ne $ExpectedCommit -or $windows.profile -ne $Profile) { throw 'Windows report source/profile mismatch' }
+                if ($windows.source -ne $ExpectedCommit -or $windows.profile -ne $Profile -or $windows.sourceMode -ne $SourceMode) { throw 'Windows report source/profile mismatch' }
+                if ($SourceMode -eq 'Worktree' -and $windows.sourceManifest.sha256 -ne $ExpectedSourceManifestSha256) { throw 'Windows worktree source identity mismatch' }
                 foreach ($artifact in $windows.artifacts) {
                     $identity = Get-AiNativeEvidenceFile -Path $artifact.Path
                     if (-not $identity.Path.StartsWith($windowsDirectory + [IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase) -or $identity.Sha256 -ne $artifact.Sha256) { throw 'Windows evidence identity mismatch' }

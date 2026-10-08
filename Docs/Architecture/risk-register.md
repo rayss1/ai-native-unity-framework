@@ -1,9 +1,11 @@
 # Architecture Risk Register
 
 Status: Active for the first vertical slice
-Last updated: 2026-09-03
+Last updated: 2026-10-08
 
 Scale: likelihood and impact are Low/Medium/High. “Tripwire” is the earliest objective signal that forces action. Owners are roles until modules have maintainers.
+
+Current implemented/verified/open status is in [current progress](current-status.md). The 2026-10-06 Windows Arena 128-total-client result uses eight players per room and does not retire mobile, weak-network, single-room-64-player or production deployment risks. Older WS evidence in the table remains bound to its recorded source.
 
 | ID | Risk | Likelihood | Impact | Owner | Tripwire / validation | Mitigation and migration | Rollback / containment |
 | --- | --- | --- | --- | --- | --- | --- | --- |

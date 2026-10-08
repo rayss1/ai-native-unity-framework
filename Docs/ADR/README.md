@@ -2,6 +2,8 @@
 
 This directory is the decision log for the first vertical slice. An accepted ADR is authoritative for its subject; the architecture baseline summarizes the set but does not override it.
 
+Implementation/evidence status as of 2026-10-08 is summarized in [current progress](../Architecture/current-status.md). Updating this index does not change accepted decisions or extend historical evidence to new binaries/platforms.
+
 ## Status model
 
 - **Proposed**: review is still required; implementations must not depend on it as a stable contract.
@@ -16,24 +18,23 @@ Changing an accepted contract requires a superseding ADR that records compatibil
 | ADR | Status | Decision | Frozen invariant | Evidence still required |
 | --- | --- | --- | --- | --- |
 | [0001](0001-fantasy-server-foundation.md) | Accepted | Fantasy server foundation | Fantasy stays behind adapters; product gameplay stays outside the fork | Fork pin, legal review, vertical-slice gates |
-| [0002](0002-repository-layout-and-module-dependencies.md) | Accepted | Repository layout and dependencies | Six layers, manifest-derived dependency graph, build-time plugins | First architecture-check implementation |
+| [0002](0002-repository-layout-and-module-dependencies.md) | Accepted | Repository layout and dependencies | Six layers, manifest-derived dependency graph, build-time plugins | Validator implemented and tested; continue boundary checks for each change |
 | [0003](0003-shared-gameplay-dual-compilation.md) | Accepted | Shared gameplay dual compilation | One source set, Unity and `netstandard2.1`, identical golden vectors | Unity Batch Mode proof and state-hash corpus |
 | [0004](0004-server-runtime-policy.md) | Superseded | Former .NET runtime policy | Historical `net8.0`/`net9.0` baseline | Replaced by ADR-0012 |
 | [0005](0005-authoritative-simulation-and-reconciliation.md) | Accepted | 60 Hz authority model | Server authority, fixed Tick, prediction/reconciliation, no lockstep | WS-28 macOS presentation gate passed; representative visual/physics and mobile IL2CPP remain |
 | [0006](0006-realtime-transport-and-replication.md) | Accepted | Realtime transport and replication | Fantasy KCP adapter first; AOI/delta/backpressure are mandatory | Exact-main replay-enabled two-room/128-client capacity passed; environment canary/rollback still gates production density |
 | [0007](0007-physics-and-navigation-boundaries.md) | Accepted | Physics and navigation boundaries | Jolt/Recast candidates behind Shared-owned ports | Binding, prediction and path-job benchmarks |
 | [0008](0008-client-content-and-hot-update.md) | Accepted | Content and hot update | Project-owned atomic content pipeline; HybridCLR optional | Manifest format Spike and per-release iOS policy review |
-| [0009](0009-protocol-evolution-and-code-generation.md) | Accepted | Protocol evolution | Protobuf-first, additive compatibility, reproducible generation | High-frequency codec threshold and compatibility harness |
+| [0009](0009-protocol-evolution-and-code-generation.md) | Accepted | Protocol evolution | Protobuf-first, additive compatibility, reproducible generation | Compatibility tests/codegen drift gate implemented; high-frequency codec decision remains measured |
 | [0010](0010-observability-and-deployment.md) | Accepted | Observability and deployment | OTel boundary, self-hosted/cloud-neutral deployment, immutable attested image publication | Exact-main telemetry/soak and two-room sizing passed; environment canary/rollback remains |
-| [0011](0011-agent-engineering-and-architecture-enforcement.md) | Accepted | Agent engineering | Repository-owned context plus automated boundary checks | First validator and drift-repair workflow |
+| [0011](0011-agent-engineering-and-architecture-enforcement.md) | Accepted | Agent engineering | Repository-owned context plus automated boundary checks | Validator/CI implemented; keep context and drift-repair evidence current |
 | [0012](0012-server-runtime-successor.md) | Accepted | .NET 10 Server runtime | One `net10.0` product lane; Fantasy stays pinned behind the Server adapter/composition boundary | Ongoing release provenance, canary, and rollback discipline |
 | [0013](0013-passive-async-shared-contracts.md) | Accepted | Passive async Shared boundary types | `shared/realtime` may expose cancellation/value-task contracts but may not schedule work or perform I/O | Unity/.NET compilation and architecture checks |
 | [0014](0014-temporary-manual-unity-validation.md) | Accepted; editor pin superseded by ADR-0016 | Temporary manual Unity validation | Exact-commit Unity evidence is mandatory while credentialed CI is unavailable | Historical WS-28 evidence retained; new editor/platform combinations need fresh qualification |
 | [0015](0015-room-aware-replay-format.md) | Accepted | Room-aware replay format | New captures use v2 room identity; the reader retains v1 one-room compatibility and fails closed | Exact-main replay-enabled evidence passed; environment canary/rollback remains |
 | [0016](0016-unity-6000-3-23-and-urp.md) | Accepted | Unity 6000.3.23f1 and URP | Owner-requested editor patch and client rendering baseline | URP 17.3.0; fresh Windows development validation, separate platform/release gates |
-
-| [0017](0017-single-region-service-topology.md) | Accepted | Six independent single-region services and fixed Battle Workers | Hosts remain independent composition roots; durable allocation, signed entry and idempotent settlement | Cross-process Fantasy routing, recovery/fault tests and representative capacity evidence |
-| [0018](0018-arena-dead-input-consumption.md) | Accepted | Consume dead-player commands as no-ops | At most one consumed input per player per Tick; no actions from dead inputs; no invented ACKs | Fresh deterministic replay and unchanged full capacity qualification |
+| [0017](0017-single-region-service-topology.md) | Accepted | Six independent single-region services and fixed Battle Workers | Hosts remain independent composition roots; durable allocation, signed entry and idempotent settlement | Local routing/recovery and Windows capacity passed for recorded sources; current-source external rollout/device gates remain |
+| [0018](0018-arena-dead-input-consumption.md) | Accepted | Consume dead-player commands as no-ops | At most one consumed input per player per Tick; no actions from dead inputs; no invented ACKs | [Windows 128-total-client replay/soak passed](../Architecture/battle-slice-qualification-2026-10-06.md); other platforms remain separate |
 
 ## Open decision gates
 

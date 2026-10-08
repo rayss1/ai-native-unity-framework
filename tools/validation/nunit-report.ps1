@@ -59,7 +59,7 @@ function Assert-AiNativeNUnitReport {
 }
 
 function Get-AiNativeEditModeFixtureCounts {
-    param([ValidateSet('Baseline','Candidate','TerminalDelivery')][string]$Profile)
+    param([ValidateSet('Baseline','Candidate','TerminalDelivery','Current')][string]$Profile)
     $fixtures = @{
         'AiNative.Client.Application.Tests.BattleClientSessionTests'=32
         'AiNative.Client.Application.Tests.SimulationCadenceTests'=2
@@ -74,7 +74,7 @@ function Get-AiNativeEditModeFixtureCounts {
         'AiNative.Gameplay.Tests.GameplayClockContractTests'=1
         'AiNative.Realtime.Tests.TransportContractTests'=2
     }
-    if ($Profile -in @('Candidate','TerminalDelivery')) {
+    if ($Profile -in @('Candidate','TerminalDelivery','Current')) {
         $fixtures['AiNative.Client.Application.Tests.TopologyClientFlowRecoveryTests']=18
         $fixtures['AiNative.Client.Application.Tests.ArenaRemoteSessionTests']=2
         $fixtures['AiNative.Client.Prediction.Tests.ArenaPredictionSendTests']=8
@@ -82,11 +82,14 @@ function Get-AiNativeEditModeFixtureCounts {
         $fixtures['AiNative.Client.Application.Tests.AndroidBattleClientBuildTests']=10
         $fixtures['AiNative.Client.Application.Tests.AndroidClientLaunchConfigurationTests']=11
     }
-    if ($Profile -eq 'TerminalDelivery') {
+    if ($Profile -in @('TerminalDelivery','Current')) {
         $fixtures['AiNative.Client.Application.Tests.TopologyClientFlowRecoveryTests']=19
         $fixtures['AiNative.Client.Application.Tests.TopologyTerminalReceiveTests']=6
         $fixtures['AiNative.Client.Fantasy.Tests.TerminalReceiveTests']=3
         $fixtures['AiNative.Client.Application.Tests.TerminalReceptionTests']=7
+    }
+    if ($Profile -eq 'Current') {
+        $fixtures['AiNative.Client.Prediction.Tests.ArenaRemotePresentationTests']=10
     }
     return $fixtures
 }
@@ -95,6 +98,29 @@ function Get-AiNativeEvidenceFile {
     param([Parameter(Mandatory)][string]$Path)
     if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { throw "Missing evidence file: $Path" }
     return [pscustomobject]@{Path=[IO.Path]::GetFullPath($Path);Sha256=(Get-FileHash -LiteralPath $Path).Hash.ToLowerInvariant()}
+}
+
+function Get-AiNativeValidationProfile {
+    param([ValidateSet('Baseline','Candidate','TerminalDelivery','Current')][string]$Profile)
+    $fixtures = Get-AiNativeEditModeFixtureCounts -Profile $Profile
+    return [pscustomobject]@{
+        EditModePassed = [int](($fixtures.Values | Measure-Object -Sum).Sum)
+        FixtureCounts = $fixtures
+        BaselineCommit = 'c9098be7e2a44efc42182a87aca2551648993705'
+        FantasyCommit = if ($Profile -eq 'Baseline') { 'f8bed0d464924f159d46498f1311206ea0694be8' } else { 'df4ad5fe5418c8855932de784c7cea6286c4b082' }
+        FantasyUnityVersion = if ($Profile -eq 'Baseline') { '2026.1.1001' } else { '2026.1.1002-ainative.1' }
+    }
+}
+
+function Assert-AiNativeEditModeProfile {
+    param([ValidateSet('Baseline','Candidate','TerminalDelivery','Current')][string]$Profile,[string]$Commit,[int]$ExpectedPassed)
+    $contract = Get-AiNativeValidationProfile -Profile $Profile
+    if ($ExpectedPassed -ne $contract.EditModePassed -or
+        ($Profile -eq 'Baseline' -and $Commit -ne $contract.BaselineCommit) -or
+        ($Profile -ne 'Baseline' -and $Commit -eq $contract.BaselineCommit)) {
+        throw "$Profile profile requires its reviewed $($contract.EditModePassed)-test inventory and matching source generation"
+    }
+    return $contract
 }
 
 function Assert-AiNativeTrxReport {

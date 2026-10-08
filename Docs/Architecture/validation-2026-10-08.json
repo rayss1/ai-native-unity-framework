@@ -1,0 +1,344 @@
+{
+  "date": "2026-10-08",
+  "status": "Passed",
+  "scope": "Local development validation of uncommitted source; no release, capacity, mobile or deployment qualification",
+  "source": {
+    "baseCommit": "c5f8f93c59a6da5e57d8b33ec7b5a3645e393f8f",
+    "fantasyCommit": "df4ad5fe5418c8855932de784c7cea6286c4b082",
+    "mode": "Worktree",
+    "profile": "Current",
+    "manifestAlgorithm": "sha256-path-tab-filehash-lf-v1",
+    "manifestSha256": "fbe11a660c7b934e7d412f740111b318606ffaea4da7c3ac18d462460de90cba",
+    "fileCount": 570,
+    "postRunManifestUnchanged": true,
+    "runtimeAndToolsMatchMainCheckout": true,
+    "originalCheckoutLineEndingDifferences": [
+      "client/UnityProject/.vsconfig",
+      "client/UnityProject/Directory.Build.props",
+      "client/UnityProject/ProjectSettings/ShaderGraphSettings.asset",
+      "client/UnityProject/ProjectSettings/URPProjectSettings.asset"
+    ],
+    "documentsUpdatedAfterRun": [
+      "Docs/Architecture/current-status.md",
+      "README.md"
+    ],
+    "summaryWrittenAfterRun": true,
+    "releaseQualified": false
+  },
+  "startedUtc": "2026-10-08T08:27:30.0840541Z",
+  "finishedUtc": "2026-10-08T08:29:51.5189637Z",
+  "environment": {
+    "os": "Microsoft Windows NT 10.0.19044.0",
+    "dotnetSdk": "10.0.202",
+    "unityEditor": "6000.3.23f1",
+    "unityRevision": "09d2ecc7fb28",
+    "unityCli": "1.0.0-beta.11",
+    "playerTarget": "StandaloneWindows64",
+    "playerBackend": "Mono",
+    "postgres": "17.11",
+    "postgresPort": 25438,
+    "postgresBinarySource": "https://www.enterprisedb.com/download-postgresql-binaries",
+    "postgresArchiveSha256": "80379b2c04d51c30225532e0ae04509899141e9957ed096fe749d7fd9df8f82f",
+    "postgresArchiveVerification": "TLS download and locally computed SHA256; no independent publisher checksum",
+    "databaseOwnership": "Disposable loopback-only instance, stopped after run"
+  },
+  "command": "./tools/validation/run-current-source.ps1 -SourceRoot ./artifacts/status-sync-20261008/source -ExpectedCommit c5f8f93c59a6da5e57d8b33ec7b5a3645e393f8f -SdkPath \"C:/Program Files/dotnet/dotnet.exe\" -UnityEditorPath \"C:/Program Files/Unity/Hub/Editor/6000.3.23f1/Editor/Unity.exe\" -EvidenceDirectory ./artifacts/status-sync-20261008/run-03 -Profile Current -ExpectedDotnetPassed 532 -ExpectedEditModePassed 166 -SourceMode Worktree -ExpectedSourceManifestSha256 fbe11a660c7b934e7d412f740111b318606ffaea4da7c3ac18d462460de90cba -Phases Dotnet,Architecture,WindowsLegacy",
+  "checks": {
+    "build": {
+      "status": "Passed",
+      "warnings": 0,
+      "errors": 0
+    },
+    "dotnet": {
+      "assemblies": 13,
+      "passed": 532,
+      "failed": 0,
+      "skipped": 0
+    },
+    "postgresRequiredCases": {
+      "passed": 5,
+      "reportGate": "Passed",
+      "reports": 2,
+      "gateCommand": "python tools/validation/verify-postgres-tests.py artifacts/status-sync-20261008/run-03/PostgresGate",
+      "reportsAreByteIdenticalCopiesOfThisRunsBackendAndRoomsTrx": true
+    },
+    "freshKcpInitialization": {
+      "passed": 1,
+      "separateTestProcess": true
+    },
+    "architecture": "Passed",
+    "unityEditMode": {
+      "passed": 166,
+      "failed": 0,
+      "skipped": 0
+    },
+    "unityLegacyPlayMode": {
+      "passed": 3,
+      "failed": 0,
+      "skipped": 0
+    },
+    "playerBuild": "Passed",
+    "playerSmoke": {
+      "success": true,
+      "error": "",
+      "sessionId": "4",
+      "initialEpoch": 5,
+      "reconnectedEpoch": 6,
+      "lastAcknowledgedSequence": 32,
+      "preReconnectAcknowledgedSequence": 31,
+      "lastReceivedTick": "6567",
+      "droppedInputFrames": 0
+    },
+    "licenseFileHashes": "Matched approved Fantasy source",
+    "toolRegressionScriptsPassed": [
+      "test-nunit-report",
+      "test-validation-contracts",
+      "test-entry-boundaries",
+      "test-source-profiles",
+      "test-worktree-entry",
+      "test-unity-generated-state",
+      "test-windows-process-cleanup"
+    ],
+    "postgresGateRegressionTestsPassed": 8,
+    "powerShellSyntaxFilesPassed": 9,
+    "legacyRegression": {
+      "beforeFixFailed": 2,
+      "afterFixPassed": 2,
+      "sessionFixture": "64 legacy entities including health"
+    },
+    "documentLinks": {
+      "missingHistoricalLocalArtifacts": 12,
+      "sourceLinkStatus": "Passed",
+      "historicalArtifactStatus": "Missing local files explicitly retained as unavailable, not treated as verified",
+      "documents": 9,
+      "localLinks": 100,
+      "brokenSourceLinks": 0
+    }
+  },
+  "observations": [
+    {
+      "run": "run-01",
+      "status": "Failed",
+      "sourceManifestSha256": "3e68650a61a9a3e3f8989e5660fce37c00e43167e7f5566b595857afb4137e1a",
+      "error": "Unity PlayMode validation failed with Unity exit code 2.",
+      "report": {
+        "path": "artifacts/status-sync-20261008/run-01/validation.json",
+        "sha256": "d7341cc7dee32f41ef3542173de387ee1593d011ce29a34db1b2c99b65313a02"
+      }
+    },
+    {
+      "run": "run-02",
+      "status": "Failed",
+      "sourceManifestSha256": "ab0602578f9e7d14562eca2b4c9f1c41b385fb39bfb81fe52e0ec02c1327af47",
+      "error": "Worktree source manifest mismatch; source changed or wrong snapshot supplied",
+      "report": {
+        "path": "artifacts/status-sync-20261008/run-02/validation.json",
+        "sha256": "697f209c86a1f20a51b5cb4650a11280ba70698be365a9a03a7c1faddc80dd79"
+      }
+    },
+    {
+      "run": "run-03",
+      "status": "Passed",
+      "sourceManifestSha256": "fbe11a660c7b934e7d412f740111b318606ffaea4da7c3ac18d462460de90cba",
+      "error": null,
+      "report": {
+        "path": "artifacts/status-sync-20261008/run-03/validation.json",
+        "sha256": "4a4c62ceecc98067d0ada8c0858a08246bac6d70fec05bf7516c1f42e6838f2b"
+      }
+    }
+  ],
+  "notValidated": [
+    "Clean-commit release validation",
+    "Current Android/iOS devices and IL2CPP",
+    "Current Linux/TLS deployment, canary and rollback",
+    "Current Arena weak-network capacity",
+    "Single Arena room with 64 players",
+    "New capacity/soak/performance qualification"
+  ],
+  "evidence": [
+    {
+      "path": "artifacts/status-sync-20261008/run-03/validation.json",
+      "sha256": "4a4c62ceecc98067d0ada8c0858a08246bac6d70fec05bf7516c1f42e6838f2b"
+    },
+    {
+      "path": "artifacts/status-sync-20261008/frozen-source-03.json",
+      "sha256": "a520c2bb2da5989ffda312e6accb0210ccf96ad9a67c11f0a6a6aa1f2620fe52"
+    },
+    {
+      "path": "artifacts/status-sync-20261008/run-03/WindowsLegacy/windows/reports.json",
+      "sha256": "a1205766d1ed89f6a8a2cda91a172c6ed7b8c2aaa13115ab7955b0c2dcf22ad1"
+    },
+    {
+      "path": "artifacts/status-sync-20261008/run-03/WindowsLegacy/windows/restored-generated-files.json",
+      "sha256": "49c8dc73bb732272bba869a71f792ad05e48431ea33ff8374de92bc1be2bffdf"
+    },
+    {
+      "path": "artifacts/status-sync-20261008/run-03/PostgresGate/gate.log",
+      "sha256": "9c4551ec71eb6662fee0dd01cef199f439247ae53900b2cddb6cd7f8654c4410"
+    },
+    {
+      "path": "artifacts/status-sync-20261008/tool-regressions.log",
+      "sha256": "9516da33f6c22fc55cb72286f08082267874ff88a0867c150e534e082ef1ba0a"
+    },
+    {
+      "path": "artifacts/status-sync-20261008/postgres-gate-regressions.log",
+      "sha256": "6d53f47c1cd970761a0f7f72b62df04ac97727f0c6312a03d0cebe16b2264137"
+    },
+    {
+      "path": "artifacts/status-sync-20261008/regressions/legacy-snapshot-red.trx",
+      "sha256": "ff3e2e59b6acc729f9808f16254f431c1a17dfc0511ebbf25f0d3ecafdb32fd4"
+    },
+    {
+      "path": "artifacts/status-sync-20261008/regressions/legacy-snapshot-green.trx",
+      "sha256": "e8d67d4aea8e50869519aafd25f71c5f548df4a11af6843f9a761c860292ad18"
+    },
+    {
+      "path": "artifacts/status-sync-20261008/postgresql/cleanup-03.json",
+      "sha256": "e5e6693b476a14bd716be3a47135e09bb2eeee8a029475a4b4c749930b8fa72f"
+    },
+    {
+      "path": "artifacts/status-sync-20261008/postgresql/download.json",
+      "sha256": "c7cba57480b7963db39e505351104cf4d08c0501fb48e76a5875efdef7872470"
+    },
+    {
+      "path": "artifacts/status-sync-20261008/main-checkout-comparison.json",
+      "sha256": "371632b8675580e950ff2ce5d0b5b8b9ae4ee6caaebd5ba928811b03a7ae0053"
+    },
+    {
+      "path": "artifacts/status-sync-20261008/run-03/Dotnet/build.log",
+      "sha256": "71f3a042b56017fbb5987499b59b3858b012c6ea0561f6dafed0449d40b5aea4"
+    },
+    {
+      "path": "artifacts/status-sync-20261008/run-03/Dotnet/test.log",
+      "sha256": "d0f4e93929589b0e752b904b1f6b871da4772b03adf18e11fbd1608f7d667bef"
+    },
+    {
+      "path": "artifacts/status-sync-20261008/run-03/Dotnet/fresh-probe/test.log",
+      "sha256": "cc3b1bc4d432a234d6146b217e3ef2c39c154560a4b0a4e117365e6d196120f8"
+    },
+    {
+      "path": "artifacts/status-sync-20261008/run-03/Architecture/architecture.log",
+      "sha256": "a99f3942427ae63fe39aac797733fbf277f99756ddc81ae5f54590794cc25e20"
+    },
+    {
+      "path": "artifacts/status-sync-20261008/run-03/WindowsLegacy/windows/battle-host.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "artifacts/status-sync-20261008/run-03/WindowsLegacy/windows/battle-host.stdout.log",
+      "sha256": "e21a3497009187ed431588c0ed961c92206bd05338576d9dc42d00bbd37f0cd8"
+    },
+    {
+      "path": "artifacts/status-sync-20261008/run-03/WindowsLegacy/windows/editmode.log",
+      "sha256": "526049116468459fd53483b7d99558a893bfa94bb1f82938c64e4306530f349b"
+    },
+    {
+      "path": "artifacts/status-sync-20261008/run-03/WindowsLegacy/windows/player-build.log",
+      "sha256": "4c830231a22e65b251b9c6dd627b0d35da7f4974c9dfe8638f6c6c525bccc7b6"
+    },
+    {
+      "path": "artifacts/status-sync-20261008/run-03/WindowsLegacy/windows/player.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "artifacts/status-sync-20261008/run-03/WindowsLegacy/windows/player.stdout.log",
+      "sha256": "f0a15049d54f08d7723e1623acd594b1bffdbe1837aedb5e7b95b688ba9a2261"
+    },
+    {
+      "path": "artifacts/status-sync-20261008/run-03/WindowsLegacy/windows/playmode.log",
+      "sha256": "c15db836af322ea43bfb38b885bacb64f9cf345d6db7f2a61d5ea5c4e6c78c66"
+    },
+    {
+      "path": "artifacts/status-sync-20261008/run-03/Dotnet/wepie_DESKTOP-NOCTAVG_2026-10-08_16_27_39.trx",
+      "sha256": "daa37c46d038e2063a5f0ab20dd1aa3be10c062adf3eb6fb645a47292322235b"
+    },
+    {
+      "path": "artifacts/status-sync-20261008/run-03/Dotnet/wepie_DESKTOP-NOCTAVG_2026-10-08_16_27_39[1].trx",
+      "sha256": "461a55ec85146a000cacb395d0d35158e659976010cd4b66d3672853ec58f8e6"
+    },
+    {
+      "path": "artifacts/status-sync-20261008/run-03/Dotnet/wepie_DESKTOP-NOCTAVG_2026-10-08_16_27_39[2].trx",
+      "sha256": "66f81f8257bcea758385816adda1af2b9e510ac6c7acb13eccad0aa67b2f5873"
+    },
+    {
+      "path": "artifacts/status-sync-20261008/run-03/Dotnet/wepie_DESKTOP-NOCTAVG_2026-10-08_16_27_39[3].trx",
+      "sha256": "4e1be0374f4dcbea9d891e63cc746f712c856108c550249875665401d5c982ba"
+    },
+    {
+      "path": "artifacts/status-sync-20261008/run-03/Dotnet/wepie_DESKTOP-NOCTAVG_2026-10-08_16_27_39[4].trx",
+      "sha256": "f49ba6e62dd9f0ae322c7468a811361e3abb22c333b098c2e0373266c484b7d3"
+    },
+    {
+      "path": "artifacts/status-sync-20261008/run-03/Dotnet/wepie_DESKTOP-NOCTAVG_2026-10-08_16_27_39[5].trx",
+      "sha256": "159ca1618782d4f4072d107517aac3fe24ea84f5382db0777d91a2a4446c4115"
+    },
+    {
+      "path": "artifacts/status-sync-20261008/run-03/Dotnet/wepie_DESKTOP-NOCTAVG_2026-10-08_16_27_39[6].trx",
+      "sha256": "7714f2a5188b690318a5b133a53762c31f601bb35d9424d69ba8af2ce23ebb49"
+    },
+    {
+      "path": "artifacts/status-sync-20261008/run-03/Dotnet/wepie_DESKTOP-NOCTAVG_2026-10-08_16_27_39[7].trx",
+      "sha256": "8443ce51293221510f61b3764ed66c9517197598d973cdf94b2002f511bae34d"
+    },
+    {
+      "path": "artifacts/status-sync-20261008/run-03/Dotnet/wepie_DESKTOP-NOCTAVG_2026-10-08_16_27_39[8].trx",
+      "sha256": "6fe9621b495bd89196d674a634eaaa24e28fba2153ada1f7dcf64e611c02a453"
+    },
+    {
+      "path": "artifacts/status-sync-20261008/run-03/Dotnet/wepie_DESKTOP-NOCTAVG_2026-10-08_16_27_39[9].trx",
+      "sha256": "e1273347682ba95c48848c590d968d44ae5aa1fa749f7f8174ea8f6004e9d98b"
+    },
+    {
+      "path": "artifacts/status-sync-20261008/run-03/Dotnet/wepie_DESKTOP-NOCTAVG_2026-10-08_16_27_40.trx",
+      "sha256": "14efab481335de7be093c580466c0669c172caedcf0ff580a05cdfec392a9691"
+    },
+    {
+      "path": "artifacts/status-sync-20261008/run-03/Dotnet/wepie_DESKTOP-NOCTAVG_2026-10-08_16_27_40[1].trx",
+      "sha256": "4b9076b1d004f6b3c677d29a35755dc916713660c36543c82ee70831e36a5caa"
+    },
+    {
+      "path": "artifacts/status-sync-20261008/run-03/Dotnet/wepie_DESKTOP-NOCTAVG_2026-10-08_16_27_40[2].trx",
+      "sha256": "f6f7545dae20602ff38cffa832109627a011350851b41d4d92d68c5cbff805da"
+    },
+    {
+      "path": "artifacts/status-sync-20261008/run-03/Dotnet/fresh-probe/wepie_DESKTOP-NOCTAVG_2026-10-08_16_27_37.trx",
+      "sha256": "58488f48bcca5bc5c04e19dc91bd54600cc1d3979f832729efffd47f03ab24b5"
+    },
+    {
+      "path": "artifacts/status-sync-20261008/run-03/WindowsLegacy/windows/metadata.txt",
+      "sha256": "0c47abdbb8b60ff38619235ec1c5c7f077f612e7a3af897f9e77fa91d2b06331"
+    },
+    {
+      "path": "artifacts/status-sync-20261008/run-03/WindowsLegacy/windows/summary.txt",
+      "sha256": "8c9a597f52b0135084902f800c43caf7d7e443d01f8165e8f791fb5ac33662d2"
+    },
+    {
+      "path": "artifacts/status-sync-20261008/run-03/WindowsLegacy/windows/editmode.xml",
+      "sha256": "e8303b53703ce396fba0b2ffc408cc7901935225a3a34504366c27542e065adc"
+    },
+    {
+      "path": "artifacts/status-sync-20261008/run-03/WindowsLegacy/windows/playmode.xml",
+      "sha256": "719fc6cc8d7db041dba3f74dd2898c003709b28b0bc4f4e734ae6d1247f2d6ba"
+    },
+    {
+      "path": "artifacts/status-sync-20261008/run-03/WindowsLegacy/windows/smoke.json",
+      "sha256": "c4c80a8c50f31f825d0d1c1a72653daa8593a3d8b3ee5edc04c7db284d61a83b"
+    },
+    {
+      "path": "artifacts/status-sync-20261008/run-03/WindowsLegacy/windows/player/AiNative.BattleClient.exe",
+      "sha256": "56c28afba054092826b7a8a80ba3767daa87967f182c0c562eb2f98799175b7a"
+    },
+    {
+      "path": "artifacts/status-sync-20261008/run-03/WindowsLegacy/windows/player/THIRD-PARTY-NOTICES.md",
+      "sha256": "79bb8424fd1cb91c23acd8e53fc99f3dd32875dbd4b75219ac95492d7f10cc13"
+    },
+    {
+      "path": "artifacts/status-sync-20261008/run-03/WindowsLegacy/windows/player/Fantasy-LICENSE.txt",
+      "sha256": "a60fa798a272cedfc2be76737c6a81a0135b416ad2967d11eb16bfdd2e763b98"
+    },
+    {
+      "sha256": "639fc788d29ce0a145d8f99fd63cb3ff5e82b6c963614dfb03e098b6b025f0ef",
+      "path": "artifacts/status-sync-20261008/document-links.json"
+    }
+  ]
+}

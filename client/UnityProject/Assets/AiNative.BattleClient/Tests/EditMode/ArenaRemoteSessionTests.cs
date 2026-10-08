@@ -55,8 +55,10 @@ namespace AiNative.Client.Application.Tests
                 session.Start(); session.Pump(0);
                 transport.Enqueue(TestFrames.Login(42, 1), BattleClientProtocolV1.ControlChannel, 1);
                 transport.Enqueue(TestFrames.Join(1, 7, 60), BattleClientProtocolV1.ControlChannel, 1);
-                var frame = new List<byte>(TestFrames.Snapshot(7, 100, 42));
-                for (byte id = 8; id <= 16; id++) frame.AddRange(new byte[] { 0x22, 2, 0x08, id });
+                // Match the real legacy Host: 64 entities all carry the original health field.
+                var frame = new List<byte> { 0x4d, 0x04, 0x08, 1, 0x11, 100, 0, 0, 0, 0, 0, 0, 0 };
+                for (byte id = 1; id <= 64; id++) frame.AddRange(new byte[] { 0x22, 4, 0x08, id, 0x30, 100 });
+                frame.AddRange(new byte[] { 0x30, 42 });
                 transport.Enqueue(frame.ToArray(), BattleClientProtocolV1.SnapshotChannel, 1); session.Pump(0);
                 Assert.That(session.IsPredictionInitialized, Is.True);
                 Assert.That(session.LastReceivedTick, Is.EqualTo(100));
