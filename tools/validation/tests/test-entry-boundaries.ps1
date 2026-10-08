@@ -7,6 +7,7 @@ New-Item -ItemType Directory -Path $fixture | Out-Null
 $SourceRoot=Join-Path $fixture 'source'; $TopologyRunDirectory='artifacts/run'
 New-Item -ItemType Directory -Path (Join-Path $SourceRoot 'server/vendor/Fantasy') -Force | Out-Null
 $ExpectedCommit='bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'; $fantasy='aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+$SourceMode='CleanCommit'
 $gitFailure=''
 function git {
     param([Parameter(ValueFromRemainingArguments)][string[]]$Arguments)

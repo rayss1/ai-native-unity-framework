@@ -2,6 +2,8 @@
 
 Authority: [ADR-0017](../ADR/0017-single-region-service-topology.md) and the owner's implementation request. Existing [module boundaries](dependency-matrix.md), [public ports](public-api-contracts.md) and [performance budgets](performance-budgets.md) remain applicable.
 
+**Current status — 2026-10-08:** this page retains the 2026-10-02 implementation ledger. The later [2026-10-06 Windows report](battle-slice-qualification-2026-10-06.md) passed 32/64/128 total clients and a 128-client one-hour soak, with eight players per room. The earlier open Task 8 statements below are historical, not the current Windows result. Current platform/device/deployment gaps are in [current progress](current-status.md); historical cloud evidence does not qualify the changed source.
+
 ## Frozen integration boundary
 
 Shared control messages are generated from `shared/schemas/ainative/v1/backend.proto`. The Server topology domain consumes these messages without Fantasy types. The Fantasy adapter exposes a request/response port with method, correlation ID and Protobuf body, a peer identity and cancellation. It provides bounded requests, timeouts and explicit unavailable errors. Internal caller identity comes from the authenticated transport, never a client-supplied role. Hosts configure exactly one service role; a Gate client cannot invoke Coordinator, Battle creation or settlement operations.

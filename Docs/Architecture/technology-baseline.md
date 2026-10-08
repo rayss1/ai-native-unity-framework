@@ -1,10 +1,12 @@
 # Architecture and Technology Baseline
 
 Status: Baseline for the first vertical slice
-Last updated: 2026-09-03
+Last updated: 2026-10-08
 Decision source: WS-9 architecture discussion
 
 This document consolidates the current architecture decisions for the AI-Native Unity Framework. Later Architecture Decision Records (ADRs) may supersede individual decisions. When that happens, the ADR is authoritative and this document must be updated.
+
+Implementation and platform status are maintained in [current progress](current-status.md). Candidate ports and technologies below describe intended boundaries, not proof that each adapter/content feature exists.
 
 ## 1. Product constraints
 
@@ -19,7 +21,7 @@ The initial framework is optimized for the following target:
 - The game server is independent of the Unity runtime. Physics and navigation are integrated separately.
 - The server foundation is the exact, project-maintained [rayss1/Fantasy fork](https://github.com/rayss1/Fantasy), consumed through the Server adapter/Battle Host boundary; its Unity client package is consumed only through the dedicated `com.ainative.client.fantasy` transport adapter.
 - Client and server reuse the same Unity-independent gameplay simulation source code.
-- Client asset building, delivery, update, and cache management are implemented by this project rather than Addressables.
+- Client asset building, delivery, update, and cache management must be owned by this project rather than Addressables; the atomic content pipeline is still a planned capability.
 - HybridCLR is a candidate for client code hot update.
 - Infrastructure is fully self-hosted and cloud-provider-neutral.
 - Client and server capabilities are build-time composable plugins. An unused plugin should not be installed or referenced.
@@ -180,21 +182,21 @@ See [ADR-0001: Use Fantasy as the server foundation](../ADR/0001-fantasy-server-
 
 ### 6.3 Process model
 
-The first topology uses the smallest Fantasy-based composition that supports a modular backend and a separately deployable Battle Host:
+The implemented topology follows [ADR-0017](../ADR/0017-single-region-service-topology.md): independent Gate, Player, Lobby, Match, Room Coordinator and Battle processes in one region. Backend roles initially have one active instance; Battle nodes own fixed dedicated Worker groups:
 
 - Fantasy provides network sessions, Gate/routing, Scene/Entity lifecycle, and server-to-server communication.
-- ASP.NET Core modules may handle login, account, configuration, matchmaking, room allocation, and administrative APIs where its HTTP stack is the better fit.
+- Backend domain operations use project-owned service ports behind Fantasy RPC. ASP.NET Core supplies Host health/operational endpoints; it is not the gameplay scheduler.
 - A Battle process/Scene owns the real-time loop. It does not run the 60 Hz simulation on ASP.NET request threads or a shared slow-operation scheduler.
 - A Host references only the modules needed for that deployment.
 - Modules own their public contracts, configuration, tests, and persistence migrations.
 - Modules do not share internal database tables or implementation types.
 - Cross-module communication uses public contracts or events.
 
-Fantasy's distributed capabilities do not require the project to pre-split every backend concern into a microservice. The initial deployment remains intentionally small and expands only when the vertical slice or operations demonstrate a need.
+These six independent roles are the owner's accepted deployment choice. Automatic backend takeover, live Battle migration and dynamic node agents remain outside this release.
 
 ### 6.4 Persistence
 
-- PostgreSQL with EF Core is the default durable persistence candidate for backend services.
+- PostgreSQL 17.11 is the topology persistence baseline. The implementation uses pinned Npgsql 10.0.3 directly, with owned Player/Coordinator schemas and explicit SQL migrations; EF Core is not a current runtime dependency.
 - Fantasy's optional MongoDB integration does not make MongoDB a mandatory project dependency; persistence remains behind module-owned interfaces.
 - Redis is added only for a validated cache, presence, short-lived state, coordination, or locking use case.
 - A message broker is not a baseline dependency.

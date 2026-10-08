@@ -1,5 +1,58 @@
 # Current-source validation
 
+Current project progress is maintained in [one status page](../../Docs/Architecture/current-status.md). For current source, select `-Profile Current -ExpectedDotnetPassed 536 -ExpectedEditModePassed 166`. The two executable entries obtain test inventories and Fantasy package pins from the same profile contract. Defaults remain historical for compatibility; select the profile explicitly.
+
+| Profile | Unity EditMode | Source/dependency scope |
+| --- | ---: | --- |
+| Baseline | 95 | Clean `c9098be`, Fantasy `f8bed0d`; 333 .NET tests |
+| Candidate | 147 | Earlier socket/lifecycle source generation, Fantasy `df4ad5f`; explicit .NET count |
+| TerminalDelivery | 164 | October 6 terminal-receive tests, Fantasy `df4ad5f`; explicit .NET count (historically 530) |
+| Current | 166 | Legacy-health/additive-field regressions, Fantasy `df4ad5f`; 536 .NET tests (including four snapshot-fanout regressions) |
+
+Wrong totals, missing fixtures, failed/skipped cases and source changes fail the gate. Historical 128-test observations below remain evidence records, not a selectable current inventory.
+
+## Current commands
+
+For a clean current commit, start an isolated PostgreSQL 17.11, set `AINATIVE_TEST_POSTGRES` in the invoking process without saving/logging credentials, then run:
+
+```powershell
+./tools/validation/run-current-source.ps1 `
+  -SourceRoot . -ExpectedCommit (git rev-parse HEAD) `
+  -SdkPath (Get-Command dotnet).Source `
+  -UnityEditorPath 'C:/Program Files/Unity/Hub/Editor/6000.3.23f1/Editor/Unity.exe' `
+  -EvidenceDirectory ./artifacts/validation/new-current-run `
+  -Profile Current -ExpectedDotnetPassed 536 -ExpectedEditModePassed 166 `
+  -Phases Dotnet,Architecture,WindowsLegacy
+```
+
+`WindowsLegacy` includes all 166 EditMode tests, three real-host legacy KCP PlayMode tests, Windows Player build and reconnect smoke; a separate `EditMode` phase is optional, not necessary to duplicate this run. SDK 10.0.202 is required. The caller owns the database; the runner owns its test Host/Player. Use an isolated checkout when another Editor is open.
+
+## Explicit worktree development validation
+
+Default `-SourceMode CleanCommit` still rejects tracked changes and nonignored untracked files. To validate an uncommitted change, copy the intended source into an isolated Git checkout, retain the exact vendor gitlink, and freeze its full tracked/nonignored source inventory before execution:
+
+```powershell
+. ./tools/validation/source-identity.ps1
+$validationSource = [IO.Path]::GetFullPath('./artifacts/validation/source')
+$validationManifest = Get-AiNativeSourceManifest -Root $validationSource
+./tools/validation/run-current-source.ps1 `
+  -SourceRoot $validationSource -ExpectedCommit (git -C $validationSource rev-parse HEAD) `
+  -SdkPath (Get-Command dotnet).Source `
+  -UnityEditorPath 'C:/Program Files/Unity/Hub/Editor/6000.3.23f1/Editor/Unity.exe' `
+  -EvidenceDirectory ./artifacts/validation/new-worktree-run `
+  -Profile Current -ExpectedDotnetPassed 536 -ExpectedEditModePassed 166 `
+  -SourceMode Worktree -ExpectedSourceManifestSha256 $validationManifest.sha256 `
+  -Phases Dotnet,Architecture,WindowsLegacy
+```
+
+The manifest hashes exact file bytes and inventories tracked and nonignored untracked files (including new sources). Missing files, additions and modifications after freezing fail verification. Ignored build caches/evidence are outside the source identity; the vendor must remain clean and pinned. `validation.json` retains the manifest, mode and identities; Windows receives and rechecks the same hash. Worktree mode is development evidence, not release qualification, and cannot run topology publication/qualification phases. Historical Baseline is clean-commit-only. Do not hide unknown changes or weaken the default clean-source gate to run a worktree.
+
+The Windows entry restores the original generated solution/project bytes and newline-only changes to the four named shader/render settings assets after its owned Editor exits. It removes only newly generated Fantasy project files with the Unity generation marker. Substantive settings changes and unknown files remain visible and fail source verification.
+
+Run `tests/test-source-profiles.ps1`, `tests/test-worktree-entry.ps1` and `tests/test-unity-generated-state.ps1` alongside the existing report/boundary/cleanup regressions. It covers all four inventories, stale Windows counts and real byte/inventory hash drift.
+
+## Historical validation observations
+
 `run-current-source.ps1` validates an explicit clean checkout and the pinned Fantasy submodule. Every invocation needs a new evidence directory. Reports identify the source, runner, SDK, selected phases, results and retained artifacts; a failure stops the run. Import-only line-ending/stat changes are accepted only when Git's content comparison remains clean.
 
 `-Profile Baseline` binds the merged baseline `c9098be7e2a44efc42182a87aca2551648993705` to 333 .NET tests across 13 assemblies and the named 95-test Unity EditMode inventory. `-Profile Candidate` requires a different explicit clean commit, explicit `-ExpectedDotnetPassed` and `-ExpectedEditModePassed 147`. Its named inventory contains the reviewed Android/lifecycle, remote-player and prediction-send additions. A future Unity source that changes that inventory requires a reviewed profile change; overriding the total alone cannot bypass discovery. Skipped tests, incomplete inventory, missing fixtures and stale reports fail validation.

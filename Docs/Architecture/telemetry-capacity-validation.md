@@ -1,7 +1,7 @@
 # Battle Host Telemetry and One-Room Capacity Validation
 
-Status: Exact-`main` one-room telemetry and soak evidence qualified
-Last updated: 2026-08-25
+Status: Historical exact-`main` evidence retained; PR #36 correction awaiting Linux validation
+Last updated: 2026-10-08
 
 This validation implements the exporter-outage and bounded-cardinality gates in [ADR-0010](../ADR/0010-observability-and-deployment.md) for the first vertical-slice workload. It is a one-room process baseline, not evidence that more than one 64-player room fits in a process.
 
@@ -60,7 +60,41 @@ diagnostics are not qualification evidence. Rollback reverts the exporter
 retry policy and its additive diagnostic counter without changing protocol,
 room behavior, dependencies, or acceptance thresholds.
 
-## Qualified exact-main evidence
+## 2026-10-08 repeated outage failure and snapshot fanout correction
+
+[PR #36 run 37755371798](https://github.com/rayss1/ai-native-unity-framework/actions/runs/37755371798)
+failed the same outage-increment gate twice on source `9f3053173063aaac305c62130cab83cd8a178679`.
+The first attempt measured baseline/outage Tick P99 `0.4397/0.8879 ms`
+(`0.4482 ms` increment); the rerun measured `0.2421/0.7262 ms`
+(`0.4841 ms` increment). Both used the pinned .NET `10.0.4` Linux image,
+four processors, 64 legacy KCP clients, ten warm-up seconds and 300 measured
+seconds per profile. Later production gates were skipped. Export retries
+already used backoff; another rerun alone does not address the repeated failure.
+
+The legacy Host built one room Snapshot but encoded its identical 64-player
+body separately for every recipient. `PreparedLegacySnapshot` now encodes the
+common room frame once per snapshot Tick and appends each recipient's protobuf
+field-6 input acknowledgement. The cache is Host-owned and cleared after every
+publication; different rooms have different frames. Total datagram bounds are
+checked before copying, including the recipient acknowledgement. Arena,
+reconnect, schema, dependencies, exporter policy and acceptance limits remain
+unchanged. Reverting the two Host files restores the previous send path.
+
+Four new regression tests cover all uint32 acknowledgement widths, additive
+unknown fields, oversized/short destinations, failed preparation without stale
+data, zero-allocation recipient copies, and multiple recipients/rooms across
+Ticks. The full Battle Host suite passes 61 tests.
+
+A Windows encoding-only diagnostic on an Intel i7-13700K (24 logical
+processors), .NET `10.0.12`, Release x64, seed `0x5eed`, 600 room warm-up Ticks,
+2,000 paired encoding warm-up rounds and 10,000 measured paired rounds
+(`0.6022384 s`, nearest-rank percentiles) measured 64-recipient encoding P99
+`0.0803 ms` before / `0.0020 ms` after. Order alternated between rounds.
+This excludes transport, room Tick and telemetry; it confirms reduced duplicate
+encoding work, not the sole cause of outage latency or a Linux qualification.
+The unchanged Linux `< 0.25 ms` gate must still pass on the new commit.
+
+## Historical qualified exact-main evidence
 
 [Battle Host production validation run 32883119254](https://github.com/rayss1/ai-native-unity-framework/actions/runs/32883119254) completed successfully on 2026-08-25. The repository-owned `tools/release/verify-battle-host-qualification.sh` independently accepted the downloaded `runtime-acceptance-provenance`, `runtime-acceptance-soak`, and `runtime-telemetry-capacity` artifacts against an exact checkout of the source commit. The run reported no failed job or gate; `runtime-acceptance-evidence` also retained the qualified impairment, replay, and backpressure inputs.
 

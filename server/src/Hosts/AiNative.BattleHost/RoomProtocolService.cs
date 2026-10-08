@@ -19,7 +19,8 @@ internal sealed class RoomProtocolService(
     private const ulong ReconnectRetentionTicks = 60 * 30;
     private readonly byte[] _receiveBuffer = new byte[RealtimeProtocolCodec.MaxDatagramBytes];
     private readonly byte[] _sendBuffer = new byte[RealtimeProtocolCodec.MaxDatagramBytes];
-    private readonly Snapshot?[] _snapshotCache = new Snapshot?[rooms.RoomCount];
+    private readonly PreparedLegacySnapshot[] _snapshotFrames =
+        Enumerable.Range(0, rooms.RoomCount).Select(_ => new PreparedLegacySnapshot()).ToArray();
     private readonly List<ConnectionState> _connections = new(rooms.Settings.TotalBotCapacity);
     private readonly Dictionary<ulong, LogicalSession> _sessions = new(rooms.Settings.TotalBotCapacity);
     private ulong _nextSessionId;
@@ -84,20 +85,25 @@ internal sealed class RoomProtocolService(
             {
                 if (connection.Session is { Joined: true } session)
                 {
-                    Snapshot snapshot = gameMode.IsArena
-                        ? CreateArenaSnapshot(session, roomTick)
-                        : _snapshotCache[session.RoomIndex] ??=
-                            rooms[session.RoomIndex].CreateSnapshot(roomTick);
-                    // Send encodes synchronously before returning, so the room snapshot can carry
-                    // one recipient-specific acknowledgement without cloning its 64-player state.
-                    if (!gameMode.IsArena) snapshot.LastProcessedInputSequence = session.LastInputSequence;
-                    Send(connection, MessageId.Snapshot, snapshot);
+                    if (gameMode.IsArena)
+                    {
+                        Send(connection, MessageId.Snapshot, CreateArenaSnapshot(session, roomTick));
+                        continue;
+                    }
+                    PreparedLegacySnapshot frame = _snapshotFrames[session.RoomIndex];
+                    if ((!frame.IsPrepared && !frame.TryPrepare(rooms[session.RoomIndex].CreateSnapshot(roomTick))) ||
+                        !frame.TryWriteRecipient(session.LastInputSequence, _sendBuffer, out int writtenBytes))
+                    {
+                        metrics.RecordDroppedDiagnostic();
+                        continue;
+                    }
+                    SendEncoded(connection, frame.Channel, writtenBytes);
                 }
             }
         }
         finally
         {
-            Array.Clear(_snapshotCache);
+            foreach (PreparedLegacySnapshot frame in _snapshotFrames) frame.Reset();
         }
     }
 
@@ -382,6 +388,11 @@ internal sealed class RoomProtocolService(
             return;
         }
 
+        SendEncoded(connection, channel, writtenBytes);
+    }
+
+    private void SendEncoded(ConnectionState connection, TransportChannel channel, int writtenBytes)
+    {
         SendResult result = connection.Connection.Transport
             .SendAsync(channel, _sendBuffer.AsMemory(0, writtenBytes))
             .GetAwaiter()

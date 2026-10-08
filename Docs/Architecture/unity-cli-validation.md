@@ -4,11 +4,11 @@ Project: `client/UnityProject`; Unity **6000.3.23f1**, revision **09d2ecc7fb28**
 
 ## Configuration
 
-Unity CLI **1.0.0-beta.12** is installed on the current workstation and its update check confirmed that version. Its default editor is 6000.3.23f1 at `D:\Program Files\Unity\Hub\Editor\6000.3.23f1\Editor\Unity.exe`; the existing client is registered in the local Hub project list. Project version selection comes from `ProjectSettings/ProjectVersion.txt`, independently of the machine default. Other workstations can register their installed editor with Unity CLI; no machine-specific editor path is committed.
+Project version selection comes from `ProjectSettings/ProjectVersion.txt`, independently of machine defaults. Check `unity --version` and select the installed editor explicitly; workstation-specific paths and CLI versions in the dated evidence below are historical. On 2026-10-08 this workstation has CLI 1.0.0-beta.11 and Unity 6000.3.23f1 under `C:\Program Files\Unity\Hub\Editor\6000.3.23f1\Editor\Unity.exe`. No CLI upgrade is implied by running the project tests.
 
-[`ProjectSettings/UnityCliConfig.json`](../../client/UnityProject/ProjectSettings/UnityCliConfig.json) supplies EditMode by default, both NUnit/JUnit reports, and 600-second test/build timeouts. Explicit CLI flags override the project defaults. The existing `com.unity.pipeline` package remains pinned to `0.6.0-exp.1`; no additional Unity package was added.
+[`ProjectSettings/UnityCliConfig.json`](../../client/UnityProject/ProjectSettings/UnityCliConfig.json) supplies EditMode by default, both NUnit/JUnit reports, and 600-second test/build timeouts. Explicit CLI flags override the project defaults. `Packages/manifest.json` pins `com.unity.pipeline` to `0.8.0-exp.1`.
 
-The workstation's missing standard Windows `ALLUSERSPROFILE` variable was set for the current user to `C:\ProgramData`. Without it, Unity Package Manager exited with `The "path" argument must be of type string. Received undefined` before loading tests. Existing terminal processes may still need the process-only fallback below; new terminals load the persisted user setting.
+Earlier runs encountered a missing Windows `ALLUSERSPROFILE` variable, causing Unity Package Manager to fail before loading tests. The entries now supply the process-only ProgramData fallback to their owned Unity processes; they do not require changing persistent user environment settings.
 
 ## Commands
 
@@ -44,7 +44,7 @@ $output = [IO.Path]::GetFullPath('artifacts/unity-cli/player/AiNative.BattleClie
 unity run client/UnityProject --timeout 600 --log-file artifacts/unity-cli/player-build.log -- -nographics -executeMethod AiNative.Client.Editor.BattleClientBuild.BuildWindowsSmoke --ainative-build-output $output
 ```
 
-The method validates URP, selects Windows x64 Mono and copies the approved Fantasy notices. The checked-in Windows qualification runner still manages the complete Host/test/build/reconnect-smoke lifecycle, requires a clean checkout and SDK 10.0.202, and now expects the current 56 EditMode tests. Do not describe an uncommitted-source run or a different SDK as that exact-commit qualification.
+The method validates URP, selects Windows x64 Mono and copies the approved Fantasy notices. The Windows runner manages the complete Host/test/build/reconnect-smoke lifecycle with SDK 10.0.202. Current source selects `-Profile Current -ExpectedEditModePassed 166`; historical `Baseline`/`Candidate`/`TerminalDelivery` inventories remain 95/147/164. Default `CleanCommit` requires a clean checkout; explicit `Worktree` mode requires a frozen source hash and reports development evidence. See [the unified entry](../../tools/validation/README.md) and [current progress](current-status.md). Worktree results are not exact-commit release qualification.
 
 ## Executed development evidence — 2026-10-02
 

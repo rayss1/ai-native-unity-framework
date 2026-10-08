@@ -7,6 +7,22 @@ namespace AiNative.Client.Prediction.Tests
     public sealed class ArenaRemotePresentationTests
     {
         [Test]
+        public void LegacyHealthFieldDoesNotSelectArenaDecoding()
+        {
+            byte[] frame = Frame(100, new byte[] { 0x08, 1, 0x30, 100 });
+            Assert.That(ArenaClientProtocolV1.TryDecodeSnapshot(frame, 1, out var decoded), Is.True);
+            Assert.That(decoded.HasArenaData, Is.False, "Health is legacy field 6, not an Arena extension.");
+        }
+
+        [Test]
+        public void UnknownAdditivePlayerFieldDoesNotSelectArenaDecoding()
+        {
+            byte[] frame = Frame(100, new byte[] { 0x08, 1, 0x30, 100, 0xa0, 1, 7 });
+            Assert.That(ArenaClientProtocolV1.TryDecodeSnapshot(frame, 1, out var decoded), Is.True);
+            Assert.That(decoded.HasArenaData, Is.False, "Unknown additive field 20 must be skipped without changing the protocol path.");
+        }
+
+        [Test]
         public void InterpolatesDelayedPositionAndShortestYawAndHoldsOnStarvation()
         {
             var view = new ArenaRemotePresentation();
