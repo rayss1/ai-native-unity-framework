@@ -1,0 +1,32 @@
+{
+  "profiles": {
+    "AiNative.BattleHost": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "applicationUrl": "https://localhost:58242;http://localhost:58243"
+    },
+    "Local Debug battle-1": {
+      "commandName": "Project",
+      "launchBrowser": false,
+      "workingDirectory": "../../../../",
+      "commandLineArgs": "--pid 100 -m Release",
+      "environmentVariables": {
+        "AINATIVE_LOCAL_DEBUG_PROFILE": "artifacts/manual-test/vs-debug.json",
+        "AINATIVE_LOCAL_DEBUG_SERVICE": "battle-1"
+      }
+    },
+    "Local Debug battle-2": {
+      "commandName": "Project",
+      "launchBrowser": false,
+      "workingDirectory": "../../../../",
+      "commandLineArgs": "--pid 101 -m Release",
+      "environmentVariables": {
+        "AINATIVE_LOCAL_DEBUG_PROFILE": "artifacts/manual-test/vs-debug.json",
+        "AINATIVE_LOCAL_DEBUG_SERVICE": "battle-2"
+      }
+    }
+  }
+}

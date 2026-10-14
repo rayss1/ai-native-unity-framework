@@ -43,6 +43,11 @@ git add server/vendor/Fantasy
 
 ## Validate
 
+Windows interactive testing and Visual Studio single-service debugging:
+[本机双／四客户端与 VS F5 操作指南](tools/topology/README-local-debug.md).
+
+For manual testing on Windows, run `./tools/topology/start-manual.ps1` in PowerShell 7 or double-click `tools/topology/start-manual.cmd`. It starts an isolated local database and all seven server processes; Ctrl+C stops them. See [startup requirements and client connection](Docs/Architecture/server-topology-operations.md#windows-local-acceptance).
+
 For local Unity CLI setup, project defaults and EditMode/real-KCP PlayMode commands, see [Unity CLI validation](Docs/Architecture/unity-cli-validation.md). The CLI development path accepts the current worktree; exact-commit qualification remains separate.
 
 The [current-source validation entry](tools/validation/README.md) combines explicit clean-source .NET, architecture, Unity, Windows and topology publication/acceptance phases with retained provenance. The [release validation plan and evidence ledger](Docs/Architecture/release-validation-2026-10-03.md) tracks complete-match, capacity/soak and Android build/device gates separately.

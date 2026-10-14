@@ -7,6 +7,13 @@ This catalog defines ownership and semantics before implementation. Names and in
 
 ## Common conventions
 
+Developer-only local testing: Server Hosting owns `LocalDebugBootstrap`, an explicit Debug-build
+configuration handoff selected by `AINATIVE_LOCAL_DEBUG_PROFILE` and `AINATIVE_LOCAL_DEBUG_SERVICE`.
+It validates supervisor/service/file identities before applying process-local settings. It is not
+a Shared port, wire protocol, or production configuration source. Release builds reject an explicit
+handoff request; ordinary launches retain their existing configuration. See the
+[Windows local testing guide](../../tools/topology/README-local-debug.md).
+
 - Namespace: `AiNative.Gameplay` for Shared simulation contracts; client-only content contracts use `AiNative.Client.Assets`; transport boundary contracts use `AiNative.Realtime` outside Shared gameplay.
 - Tick-path methods are synchronous, non-blocking, and allocation-free in steady state. Work that can block uses an asynchronous service outside the Tick path.
 - Value types use explicit units (`Tick`, seconds, metres) and invariant numeric representations. No `DateTime.Now`, global RNG, or implicit frame time.

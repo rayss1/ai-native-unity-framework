@@ -1,0 +1,22 @@
+{
+  "profiles": {
+    "AiNative.PlayerHost": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "applicationUrl": "https://localhost:58253;http://localhost:58254"
+    },
+    "Local Debug player": {
+      "commandName": "Project",
+      "launchBrowser": false,
+      "workingDirectory": "../../../../",
+      "commandLineArgs": "--pid 2 -m Release",
+      "environmentVariables": {
+        "AINATIVE_LOCAL_DEBUG_PROFILE": "artifacts/manual-test/vs-debug.json",
+        "AINATIVE_LOCAL_DEBUG_SERVICE": "player"
+      }
+    }
+  }
+}

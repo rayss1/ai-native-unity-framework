@@ -120,7 +120,7 @@ namespace AiNative.Client.Application.Tests
             {
                 var flow = CreateFlow(owner, gate.Options, backend, true);
                 gate.RejectNextProfile = true;
-                typeof(TopologyClientFlow).GetMethod("Run", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(flow, new object[] { new Func<Task>(() => Poll(flow)) });
+                typeof(TopologyClientFlow).GetMethod("Run", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(flow, new object[] { new Func<Task>(() => Poll(flow)), false });
                 while ((bool)typeof(TopologyClientFlow).GetField("_busy", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(flow)) await Task.Yield();
 
                 Assert.That(flow.Completed, Is.False, "An expired server credential must not end the automated battle.");
@@ -418,6 +418,166 @@ namespace AiNative.Client.Application.Tests
             }
             finally { UnityEngine.Object.DestroyImmediate(owner); }
         }
+        [Test]
+        public async Task CompletedReturn_UsesClearedAuthoritativePartyWithoutQueryingPrunedMatch()
+        {
+            using var gate = new GatePeer { PartyQueueRequest = "", MatchExpired = true };
+            using var backend = new GateBackendSession(await FantasyGateClient.ConnectAsync(gate.Options));
+            await backend.LoginAsync("original-user", "original-password");
+            var owner = new GameObject("CompletedReturnWithPrunedMatch");
+            try
+            {
+                var flow = CreateFinishedFlow(owner, gate, backend);
+                SetProperty(flow, "PreparedInputs", 400L); SetProperty(flow, "Reconnected", true);
+                SetField(flow, "_resumePending", true); SetField(flow, "_baselinePlayed", 0L);
+                await Return(flow);
+                Assert.That(flow.State, Is.EqualTo("Lobby"));
+                Assert.That(flow.Battle, Is.Null);
+                Assert.That(flow.MatchId, Is.Empty); Assert.That(flow.RoomId, Is.Empty);
+                Assert.That(flow.Completed || flow.SettlementConfirmed || flow.Reconnected, Is.False);
+                Assert.That(flow.PreparedInputs, Is.Zero);
+                Assert.That(GetField(flow, "_requestId"), Is.EqualTo(""));
+                Assert.That(GetField(flow, "_resumePending"), Is.EqualTo(false));
+                Assert.That(GetField(flow, "_baselinePlayed"), Is.EqualTo(flow.Profile.Played));
+                Assert.That(flow.Profile.Played, Is.EqualTo(1));
+                Assert.That(GetField(flow, "_backend"), Is.SameAs(backend));
+                Assert.That(backend.IsAuthenticated, Is.True);
+                Assert.That(flow.PlayerId, Is.EqualTo("original-player"));
+                Assert.That(flow.Party.PartyId, Is.EqualTo("original-party"));
+                Assert.That(flow.Party.QueueRequestId, Is.Empty);
+                Assert.That(flow.Party.Members[0].Ready, Is.False);
+                Assert.That(gate.MatchRequests, Is.Empty, "A pruned Match record must not prevent returning after Lobby has released its queue.");
+                Assert.That(gate.Methods.ToArray(), Does.Not.Contain("match.cancel"));
+            }
+            finally { UnityEngine.Object.DestroyImmediate(owner); }
+        }
+
+        [TestCase("original-request", "match-still-active")]
+        [TestCase("another-request", "state-changed")]
+        public async Task CompletedReturn_RefusesPartyWithLiveOrDifferentQueue(string queue, string error)
+        {
+            using var gate = new GatePeer { PartyQueueRequest = queue };
+            using var backend = new GateBackendSession(await FantasyGateClient.ConnectAsync(gate.Options));
+            await backend.LoginAsync("original-user", "original-password");
+            var owner = new GameObject("CompletedReturnWithActiveQueue");
+            try
+            {
+                var flow = CreateFinishedFlow(owner, gate, backend);
+                BattleClientSession battle = flow.Battle;
+                GateCallException rejection = null;
+                try { await Return(flow); } catch (GateCallException exception) { rejection = exception; }
+                Assert.That(rejection?.Code, Is.EqualTo(error));
+                Assert.That(flow.State, Is.EqualTo("Finished"));
+                Assert.That(flow.Completed && flow.SettlementConfirmed, Is.True);
+                Assert.That(flow.Battle, Is.SameAs(battle));
+                Assert.That(flow.MatchId, Is.EqualTo("original-match"));
+                Assert.That(GetField(flow, "_requestId"), Is.EqualTo("original-request"));
+                if (queue != "original-request") Assert.That(gate.MatchRequests, Is.Empty);
+            }
+            finally { UnityEngine.Object.DestroyImmediate(owner); }
+        }
+
+        [Test]
+        public async Task CompletedReauthentication_KeepsFinishedScreenAndOriginalReceipt()
+        {
+            using var gate = new GatePeer();
+            using var backend = new GateBackendSession(await FantasyGateClient.ConnectAsync(gate.Options));
+            await backend.LoginAsync("original-user", "original-password");
+            var owner = new GameObject("CompletedReauthentication");
+            try
+            {
+                var flow = CreateFinishedFlow(owner, gate, backend);
+                BattleClientSession battle = flow.Battle;
+                SetProperty(backend, "ExpiresUnixSeconds", DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+                flow.Authenticate(false, "original_user", "original-password", gate.Options.Host, gate.Options.Port.ToString(), false, "");
+                DateTime deadline = DateTime.UtcNow.AddSeconds(3);
+                while (flow.UiBusy && DateTime.UtcNow < deadline) await Task.Yield();
+                Assert.That(flow.UiBusy, Is.False); Assert.That(flow.Error, Is.Empty);
+                Assert.That(flow.AuthenticationRequired, Is.False);
+                Assert.That(flow.State, Is.EqualTo("Finished"));
+                Assert.That(flow.Completed && flow.SettlementConfirmed, Is.True);
+                Assert.That(flow.Battle, Is.SameAs(battle));
+                Assert.That(flow.MatchId, Is.EqualTo("original-match"));
+                Assert.That(flow.BackendReconnectCount, Is.EqualTo(1));
+            }
+            finally { UnityEngine.Object.DestroyImmediate(owner); }
+        }
+
+        private static TopologyClientFlow CreateFinishedFlow(GameObject owner, GatePeer gate, GateBackendSession backend)
+        {
+            var flow = CreateFlow(owner, gate.Options, backend, false);
+            var party = new GateParty(); SetProperty(party, "PartyId", "original-party");
+            SetProperty(party, "QueueRequestId", "original-request"); SetField(flow, "_party", party);
+            SetProperty(flow, "Completed", true); SetProperty(flow, "SettlementConfirmed", true); SetProperty(flow, "State", "Finished");
+            return flow;
+        }
+
+        [Test]
+        public async Task DestroyAfterSuccessfulMatchResponse_DoesNotStartOrphanedBattleFromLateContinuation()
+        {
+            using var gate = new GatePeer { PauseMatch = true };
+            using var backend = new GateBackendSession(await FantasyGateClient.ConnectAsync(gate.Options));
+            await backend.LoginAsync("original-user", "original-password");
+            var owner = new GameObject("LateMatchContinuation");
+            var held = new HeldContinuationContext();
+            TopologyClientFlow flow = null;
+            try
+            {
+                flow = owner.AddComponent<TopologyClientFlow>();
+                flow.Initialize(gate.Options, false);
+                SetField(flow, "_backend", backend); SetField(flow, "_requestId", "original-request");
+                SetProperty(flow, "State", "Queued");
+                Task polling;
+                SynchronizationContext original = SynchronizationContext.Current;
+                try
+                {
+                    // Hold only this operation's main-thread continuation, not the test runner.
+                    SynchronizationContext.SetSynchronizationContext(held);
+                    polling = (Task)typeof(TopologyClientFlow).GetMethod("PollCoreAsync", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(flow, null);
+                }
+                finally { SynchronizationContext.SetSynchronizationContext(original); }
+                await Task.WhenAny(gate.MatchBlocked.Task, Task.Delay(2500));
+                Assert.That(gate.MatchBlocked.Task.IsCompleted, Is.True);
+                gate.ReleaseMatch.TrySetResult(true);
+                await Task.WhenAny(held.Posted.Task, Task.Delay(2500));
+                Assert.That(held.Posted.Task.IsCompleted, Is.True, "The successful match response must have reached the captured main-thread continuation.");
+                Assert.That(polling.IsCompleted, Is.False);
+
+                // EditMode requires explicit lifecycle invocation. The network response has
+                // already succeeded, so cancelling the token alone cannot undo this result.
+                typeof(TopologyClientFlow).GetMethod("OnDestroy", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(flow, null);
+                for (int attempt = 0; attempt < 250 && !polling.IsCompleted; attempt++)
+                {
+                    held.Drain();
+                    if (!polling.IsCompleted) await Task.Delay(10);
+                }
+                Assert.That(polling.IsCompleted, Is.True, "The released continuation must finish without hanging the test runner.");
+                await polling;
+                Assert.That(flow.Battle, Is.Null, "A late match response must not create a connection after its owner is destroyed.");
+                Assert.That(flow.State, Is.EqualTo("Queued"), "The disposed flow must not enter Battle.");
+            }
+            finally
+            {
+                gate.ReleaseMatch.TrySetResult(true);
+                held.Drain();
+                if (flow != null && flow.Battle != null) await flow.Battle.DisposeAsync();
+                UnityEngine.Object.DestroyImmediate(owner);
+            }
+        }
+
+        private sealed class HeldContinuationContext : SynchronizationContext
+        {
+            private readonly ConcurrentQueue<Action> _callbacks = new ConcurrentQueue<Action>();
+            internal readonly TaskCompletionSource<bool> Posted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            public override void Post(SendOrPostCallback callback, object state)
+            {
+                _callbacks.Enqueue(() => callback(state));
+                Posted.TrySetResult(true);
+            }
+            internal void Drain() { while (_callbacks.TryDequeue(out Action callback)) callback(); }
+        }
+        private static Task Return(TopologyClientFlow flow) => (Task)typeof(TopologyClientFlow).GetMethod("ReturnToLobbyAsync", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(flow, null);
+        private static object GetField(object target, string field) => target.GetType().GetField(field, BindingFlags.Instance | BindingFlags.NonPublic).GetValue(target);
         private static void Pause(TopologyClientFlow flow, bool paused) => typeof(TopologyClientFlow).GetMethod("OnApplicationPause", BindingFlags.Instance | BindingFlags.NonPublic)?.Invoke(flow, new object[] { paused });
         private static Task Poll(TopologyClientFlow flow) => (Task)typeof(TopologyClientFlow).GetMethod("PollAsync", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(flow, null);
         private static void SetField(object target, string field, object value) => target.GetType().GetField(field, BindingFlags.Instance | BindingFlags.NonPublic).SetValue(target, value);
@@ -436,6 +596,11 @@ namespace AiNative.Client.Application.Tests
             internal readonly ConcurrentQueue<string> Methods = new ConcurrentQueue<string>();
             internal bool SettlementConfirmed = true;
             internal bool AllocationLost;
+            internal bool MatchExpired;
+            internal bool PauseMatch;
+            internal readonly TaskCompletionSource<bool> MatchBlocked = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            internal readonly TaskCompletionSource<bool> ReleaseMatch = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            internal string PartyQueueRequest = "original-request";
             internal string ReceiptMatch = "original-match";
             internal string ChangedAllocation = "";
             internal bool RejectNextProfile;
@@ -473,12 +638,15 @@ namespace AiNative.Client.Application.Tests
                             reply = Join(Field(1, LoginPlayer), Field(2, "renewed-credential"), Number(3, (ulong)DateTimeOffset.UtcNow.AddMinutes(10).ToUnixTimeSeconds()));
                         }
                         else if (method == "player.profile") { reply = Join(Field(1, "original-player"), Number(3, 1)); if (RejectNextProfile) { RejectNextProfile = false; error = "invalid_session"; reply = Array.Empty<byte>(); } }
+                        else if (method == "lobby.get") { reply = Join(Field(1, "original-party"), Field(2, "original-player"), Number(3, 2), Bytes(4, Field(1, "original-player")), Field(5, PartyQueueRequest)); }
                         else if (method == "player.settlement-status") { SettlementMatches.Enqueue(Text(body, 1)); reply = Join(Field(1, ReceiptMatch), Number(3, SettlementConfirmed ? 1UL : 0UL)); }
                         else if (method == "match.status")
                         {
                             MatchRequests.Enqueue(Text(body, 1));
+                            if (PauseMatch) { MatchBlocked.TrySetResult(true); await ReleaseMatch.Task.ConfigureAwait(false); }
                             reply = AllocationLost ? Bytes(1, Join(Field(1, "original-request"), Field(2, "Failed"), Field(5, "queue_lost"))) : Join(Bytes(1, Join(Field(1, "original-request"), Field(2, "Allocated"), Field(3, ChangedAllocation == "match" ? "other-match" : "original-match"),
                                 Bytes(4, Join(Field(3, ChangedAllocation == "room" ? "other-room" : "original-room"), Field(4, ChangedAllocation == "node" ? "other-node" : "original-node"), Field(5, ChangedAllocation == "boot" ? "other-boot" : "original-boot"), Field(6, "127.0.0.1:22000"))))), Field(2, "renewed-ticket"));
+                            if (MatchExpired) { error = "queue_expired"; reply = Array.Empty<byte>(); }
                         }
                         else throw new InvalidDataException("Unexpected method: " + method);
                         byte[] response = Bytes(2, Join(Field(1, correlation), Bytes(2, reply), Field(3, error)));
@@ -489,7 +657,7 @@ namespace AiNative.Client.Application.Tests
                 }
                 catch (IOException) { } catch (ObjectDisposedException) { } catch (OperationCanceledException) { }
             }
-            public void Dispose() { ReleaseLogin.TrySetResult(true); _stop.Cancel(); _listener.Stop(); foreach (TcpClient peer in _peers) peer.Dispose(); }
+            public void Dispose() { ReleaseLogin.TrySetResult(true); ReleaseMatch.TrySetResult(true); _stop.Cancel(); _listener.Stop(); foreach (TcpClient peer in _peers) peer.Dispose(); }
             private static async Task Read(Stream stream, byte[] buffer, CancellationToken token)
             {
                 int offset = 0; while (offset < buffer.Length) { int count = await stream.ReadAsync(buffer, offset, buffer.Length - offset, token).ConfigureAwait(false); if (count == 0) throw new EndOfStreamException(); offset += count; }

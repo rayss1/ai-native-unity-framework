@@ -1,0 +1,22 @@
+{
+  "profiles": {
+    "AiNative.LobbyHost": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "applicationUrl": "https://localhost:58258;http://localhost:58260"
+    },
+    "Local Debug lobby": {
+      "commandName": "Project",
+      "launchBrowser": false,
+      "workingDirectory": "../../../../",
+      "commandLineArgs": "--pid 3 -m Release",
+      "environmentVariables": {
+        "AINATIVE_LOCAL_DEBUG_PROFILE": "artifacts/manual-test/vs-debug.json",
+        "AINATIVE_LOCAL_DEBUG_SERVICE": "lobby"
+      }
+    }
+  }
+}

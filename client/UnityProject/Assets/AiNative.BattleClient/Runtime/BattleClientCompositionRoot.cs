@@ -9,6 +9,10 @@ namespace AiNative.Client.Application
     [DisallowMultipleComponent]
     public sealed class BattleClientCompositionRoot : MonoBehaviour
     {
+#if UNITY_EDITOR
+        [SerializeField, Tooltip("Open the local Gate login flow in the Editor only.")]
+        private bool editorLocalTopology;
+#endif
         private const int MoveScaleMilli = 1000;
         private const float SmokeTimeoutSeconds = 30f;
         private const float RegionalWarmupSeconds = 10f;
@@ -62,6 +66,14 @@ namespace AiNative.Client.Application
                 _topology = gameObject.AddComponent<TopologyClientFlow>();
                 return;
             }
+#if UNITY_EDITOR
+            if (editorLocalTopology)
+            {
+                _topology = gameObject.AddComponent<TopologyClientFlow>();
+                _topology.Initialize(new AiNative.Client.Fantasy.GateConnectionOptions("127.0.0.1", 23001, false, ""));
+                return;
+            }
+#endif
             _launch = BattleClientLaunchOptions.Parse(arguments);
             _session = new BattleClientSession(
                 _launch.Host,
@@ -102,6 +114,7 @@ namespace AiNative.Client.Application
 
         private void OnGUI()
         {
+            if (_topology != null) return; // Interactive topology owns its UGUI, including the HUD.
             if (_topology == null && !_launch.Smoke && !_launch.RegionalCorrection && GUI.Button(new Rect(740, 16, 180, 32), "登录大厅与匹配")) SwitchToTopology();
             BattleClientSession session = Session;
             if (session is null) return;
