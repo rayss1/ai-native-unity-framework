@@ -1,0 +1,7 @@
+{
+  "name": "AiNative.CharacterDemo.PlayModeTests",
+  "rootNamespace": "AiNative.CharacterDemo.Tests",
+  "references": ["AiNative.Client.Character"],
+  "optionalUnityReferences": ["TestAssemblies"],
+  "autoReferenced": false
+}

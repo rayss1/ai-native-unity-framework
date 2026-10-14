@@ -1,0 +1,5 @@
+{
+  "name": "AiNative.Client.Character.Editor",
+  "references": ["AiNative.Client.Character", "Unity.InputSystem"],
+  "includePlatforms": ["Editor"]
+}

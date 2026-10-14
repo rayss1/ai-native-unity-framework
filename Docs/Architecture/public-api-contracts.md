@@ -267,6 +267,28 @@ Behavior, failure recovery and local evidence are recorded in the [implementatio
 
 ## Supporting boundary contracts
 
+### Local character presentation prototype
+
+`AiNative.Client.Character` (UPM `com.ainative.client.character`, version 0.1.0) owns
+client-only `CharacterInputFrame`, `CharacterMotionState`, `CharacterConfiguration` and
+the `CharacterInputReader`, `CharacterMotor`, `CharacterOrbitCamera`, `CharacterAnimationDriver`
+components. These Unity-bearing types are not Shared ports and may not be referenced by Server
+or Shared. Explicit `Configure` methods wire references before Awake. All calls are main-thread only.
+
+`CharacterInputReader.ConsumeFrame()` consumes action edges once and samples continuous input;
+disable/focus loss clears input. Each reader owns/disposes its Input System asset. `CharacterMotor.State`
+returns a value snapshot, while `Configuration` is an instance-owned mutable tuning object.
+`Simulate(frame, cameraYawDegrees, deltaSeconds)` performs one local collision-constrained step
+(metres/seconds, delta capped at .05 s); callers must not combine manual steps with automatic Update.
+`CanStand` tests clearance, `Respawn` resets local motion and `CharacterOrbitCamera.Snap` resets
+presentation smoothing. Runtime input, physics and animation remain isolated from network state.
+`CharacterAnimationDriver.ConfigureAimPose` accepts an application-calibrated hand-local weapon
+position/rotation; it blends from the configured hip pose when aiming, without changing physics.
+
+The 0.1 prototype has no network/serialized-wire compatibility promise. Breaking changes must
+update its application builder and tests together. See [local 3C design](character-3c-demo.md)
+and the [package usage/lifecycle contract](../../packages/com.ainative.client.character/README.md).
+
 The first slice also requires, but does not yet freeze method shapes for:
 
 | Contract | Owner | Gate before signature acceptance |
