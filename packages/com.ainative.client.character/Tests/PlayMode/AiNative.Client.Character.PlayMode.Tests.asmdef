@@ -1,0 +1,8 @@
+{
+  "name": "AiNative.Client.Character.PlayMode.Tests",
+  "rootNamespace": "AiNative.Client.Character.Tests",
+  "references": ["AiNative.Client.Character", "Unity.InputSystem", "Unity.InputSystem.TestFramework"],
+  "autoReferenced": false,
+  "defineConstraints": ["UNITY_INCLUDE_TESTS"],
+  "optionalUnityReferences": ["TestAssemblies"]
+}

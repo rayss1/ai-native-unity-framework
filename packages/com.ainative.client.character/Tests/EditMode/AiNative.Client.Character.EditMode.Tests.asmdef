@@ -1,0 +1,9 @@
+{
+  "name": "AiNative.Client.Character.EditMode.Tests",
+  "rootNamespace": "AiNative.Client.Character.Tests",
+  "references": ["AiNative.Client.Character", "Unity.InputSystem"],
+  "includePlatforms": ["Editor"],
+  "autoReferenced": false,
+  "defineConstraints": ["UNITY_INCLUDE_TESTS"],
+  "optionalUnityReferences": ["TestAssemblies"]
+}

@@ -1,0 +1,6 @@
+{
+  "name": "AiNative.Client.Character",
+  "rootNamespace": "AiNative.Client.Character",
+  "references": ["Unity.InputSystem", "UnityEngine.UI"],
+  "autoReferenced": true
+}

@@ -1,0 +1,7 @@
+{
+  "name": "AiNative.CharacterDemo.Editor",
+  "rootNamespace": "AiNative.CharacterDemo.Editor",
+  "references": ["AiNative.Client.Character", "Unity.InputSystem", "UnityEngine.UI"],
+  "includePlatforms": ["Editor"],
+  "autoReferenced": true
+}

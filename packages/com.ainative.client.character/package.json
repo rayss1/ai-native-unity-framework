@@ -1,0 +1,15 @@
+{
+  "name": "com.ainative.client.character",
+  "version": "0.1.0",
+  "displayName": "AI-Native Character 3C",
+  "description": "Local-only character movement, Input System controls, animation and orbit camera.",
+  "unity": "6000.3",
+  "dependencies": {
+    "com.unity.inputsystem": "1.20.1",
+    "com.unity.modules.physics": "1.0.0",
+    "com.unity.modules.animation": "1.0.0",
+    "com.unity.modules.imgui": "1.0.0",
+    "com.unity.ugui": "2.0.0"
+  },
+  "author": { "name": "AI-Native Unity Framework" }
+}

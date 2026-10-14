@@ -1,0 +1,4 @@
+{
+  "name": "AiNative.CharacterDemo",
+  "references": ["AiNative.Client.Character", "Unity.InputSystem", "UnityEngine.UI"]
+}
