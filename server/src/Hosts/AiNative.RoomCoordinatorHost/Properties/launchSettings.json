@@ -1,0 +1,22 @@
+{
+  "profiles": {
+    "AiNative.RoomCoordinatorHost": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "applicationUrl": "https://localhost:58257;http://localhost:58259"
+    },
+    "Local Debug coordinator": {
+      "commandName": "Project",
+      "launchBrowser": false,
+      "workingDirectory": "../../../../",
+      "commandLineArgs": "--pid 5 -m Release",
+      "environmentVariables": {
+        "AINATIVE_LOCAL_DEBUG_PROFILE": "artifacts/manual-test/vs-debug.json",
+        "AINATIVE_LOCAL_DEBUG_SERVICE": "coordinator"
+      }
+    }
+  }
+}

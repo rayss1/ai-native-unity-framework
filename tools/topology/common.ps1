@@ -15,14 +15,7 @@ $Services = @(
  @{Id='battle-2'; Role='Battle'; ProcessId=101; SceneId=1107; Host='BattleHost'; Health=24107; Address='127.0.0.1:22001'},
  @{Id='acceptance'; Role='Client'; ProcessId=99; SceneId=1099; Host='TopologyAcceptance'; Health=24199}
 )
-function Start-OwnedChild($Service, [hashtable]$Extra = @{}) {
- $directoryId=if($Service.DirectoryId){$Service.DirectoryId}else{$Service.Id}
- $directory = Join-Path $Run ('bin/' + $directoryId)
- $exe = Join-Path $directory ('AiNative.' + $Service.Host + '.exe')
- if (-not (Test-Path $exe)) { throw "Build missing: $exe" }
- $psi = [Diagnostics.ProcessStartInfo]::new($exe)
- $psi.UseShellExecute = $false; $psi.CreateNoWindow = $true; $psi.WorkingDirectory = $directory
- $psi.ArgumentList.Add('--pid'); $psi.ArgumentList.Add([string]$Service.ProcessId); $psi.ArgumentList.Add('-m'); $psi.ArgumentList.Add('Release')
+function Get-ServiceEnvironment($Service, [hashtable]$Extra = @{}) {
  $variables = @{
  AINATIVE_SERVICE_ID=$Service.Id; AINATIVE_PEERS_FILE=(Join-Path $Run 'peers.json'); AINATIVE_SERVICE_PRIVATE_KEY_FILE=(Join-Path $Run ($Service.Id + '.private.pem'));
  AINATIVE_PLAYER_SIGNING_KEY_FILE=(Join-Path $Run 'player-ticket.private.pem'); AINATIVE_PLAYER_PUBLIC_KEY_FILE=(Join-Path $Run 'player-ticket.public.pem');
@@ -49,17 +42,38 @@ function Start-OwnedChild($Service, [hashtable]$Extra = @{}) {
   $variables.AINATIVE_CONFIGURATION_IDENTITY='sha256:'+$configurationHash
   @{Source=$identity.Source;Fantasy=$identity.Fantasy;Protocol=$identity.Protocol;Configuration=('sha256:'+$configurationHash)} | ConvertTo-Json | Set-Content (Join-Path $Run ($Service.Id+'.replay-identity.json'))
  }
+ return $variables
+}
+function Start-OwnedChild($Service, [hashtable]$Extra = @{}) {
+ $directoryId=if($Service.DirectoryId){$Service.DirectoryId}else{$Service.Id}
+ $directory = Join-Path $Run ('bin/' + $directoryId)
+ $exe = Join-Path $directory ('AiNative.' + $Service.Host + '.exe')
+ if (-not (Test-Path $exe)) { throw "Build missing: $exe" }
+ $psi = [Diagnostics.ProcessStartInfo]::new($exe)
+ $psi.UseShellExecute = $false; $psi.CreateNoWindow = $true; $psi.WorkingDirectory = $directory
+ $psi.ArgumentList.Add('--pid'); $psi.ArgumentList.Add([string]$Service.ProcessId); $psi.ArgumentList.Add('-m'); $psi.ArgumentList.Add('Release')
+ $variables = Get-ServiceEnvironment $Service $Extra
  foreach ($key in $variables.Keys) { if ($null -ne $variables[$key]) { $psi.Environment[$key] = [string]$variables[$key] } }
  # Child owns its own log files; no shell quoting or inherited global environment mutation.
  $psi.RedirectStandardOutput=$true; $psi.RedirectStandardError=$true
- $process = [Diagnostics.Process]::Start($psi)
- $stdout = [IO.FileStream]::new((Join-Path $Run ($Service.Id + '.stdout.log')), [IO.FileMode]::Create, [IO.FileAccess]::Write, [IO.FileShare]::ReadWrite)
- $stderr = [IO.FileStream]::new((Join-Path $Run ($Service.Id + '.stderr.log')), [IO.FileMode]::Create, [IO.FileAccess]::Write, [IO.FileShare]::ReadWrite)
- $outCopy = $process.StandardOutput.BaseStream.CopyToAsync($stdout)
- $errCopy = $process.StandardError.BaseStream.CopyToAsync($stderr)
- $record = @{Id=$Service.Id; Pid=$process.Id; StartUtc=$process.StartTime.ToUniversalTime().ToString('O'); Executable=$exe}
- $record | ConvertTo-Json | Set-Content (Join-Path $Run ($Service.Id + '.pid.json'))
- return @{Process=$process; Stdout=$stdout; Stderr=$stderr; OutCopy=$outCopy; ErrCopy=$errCopy}
+ $process = $null; $stdout = $null; $stderr = $null; $outCopy = $null; $errCopy = $null
+ try {
+  $stdout = [IO.FileStream]::new((Join-Path $Run ($Service.Id + '.stdout.log')), [IO.FileMode]::Create, [IO.FileAccess]::Write, [IO.FileShare]::ReadWrite)
+  $stderr = [IO.FileStream]::new((Join-Path $Run ($Service.Id + '.stderr.log')), [IO.FileMode]::Create, [IO.FileAccess]::Write, [IO.FileShare]::ReadWrite)
+  $process = [Diagnostics.Process]::Start($psi)
+  $outCopy = $process.StandardOutput.BaseStream.CopyToAsync($stdout)
+  $errCopy = $process.StandardError.BaseStream.CopyToAsync($stderr)
+  $record = @{Id=$Service.Id; Pid=$process.Id; StartUtc=$process.StartTime.ToUniversalTime().ToString('O'); Executable=$exe}
+  $record | ConvertTo-Json | Set-Content (Join-Path $Run ($Service.Id + '.pid.json'))
+  return @{Process=$process; Stdout=$stdout; Stderr=$stderr; OutCopy=$outCopy; ErrCopy=$errCopy}
+ } catch {
+  # Until the caller receives the handle, this function owns failed-start cleanup.
+  if ($process) { if (-not $process.HasExited) { $process.Kill() }; $process.WaitForExit() }
+  foreach ($copy in @($outCopy, $errCopy)) { if ($copy) { try { [void]$copy.GetAwaiter().GetResult() } catch { } } }
+  if ($stdout) { $stdout.Dispose() }; if ($stderr) { $stderr.Dispose() }
+  if ($process) { $process.Dispose() }
+  throw
+ }
 }
 function Wait-Child($child) {
  $child.Process.WaitForExit(); [void]$child.OutCopy.GetAwaiter().GetResult(); [void]$child.ErrCopy.GetAwaiter().GetResult(); $child.Stdout.Dispose(); $child.Stderr.Dispose()

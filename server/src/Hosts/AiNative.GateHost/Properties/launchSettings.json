@@ -1,0 +1,22 @@
+{
+  "profiles": {
+    "AiNative.GateHost": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "applicationUrl": "https://localhost:58252;http://localhost:58255"
+    },
+    "Local Debug gate": {
+      "commandName": "Project",
+      "launchBrowser": false,
+      "workingDirectory": "../../../../",
+      "commandLineArgs": "--pid 1 -m Release",
+      "environmentVariables": {
+        "AINATIVE_LOCAL_DEBUG_PROFILE": "artifacts/manual-test/vs-debug.json",
+        "AINATIVE_LOCAL_DEBUG_SERVICE": "gate"
+      }
+    }
+  }
+}

@@ -5,7 +5,16 @@ $identityRun=[IO.Path]::GetFullPath((Join-Path $identityRepo $RunDirectory))
 if(-not $identityRun.StartsWith((Join-Path $identityRepo 'artifacts')+[IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase)){throw 'Identity output must remain inside workspace artifacts'}
 $head=& git -C $identityRepo rev-parse HEAD
 $fantasy=& git -C (Join-Path $identityRepo 'server/vendor/Fantasy') rev-parse HEAD
-$files=@(& rg --files (Join-Path $identityRepo 'server/src') (Join-Path $identityRepo 'server/acceptance') (Join-Path $identityRepo 'shared') (Join-Path $identityRepo 'packages') -g '*.cs' -g '*.csproj' -g '*.proto' -g '*.props' -g '*.targets' -g '*.asmdef')
+if (Get-Command rg -ErrorAction SilentlyContinue) {
+ $files=@(& rg --files (Join-Path $identityRepo 'server/src') (Join-Path $identityRepo 'server/acceptance') (Join-Path $identityRepo 'shared') (Join-Path $identityRepo 'packages') -g '*.cs' -g '*.csproj' -g '*.proto' -g '*.props' -g '*.targets' -g '*.asmdef')
+ if($LASTEXITCODE){throw 'Source inventory failed'}
+} else {
+ # Explorer does not inherit Codex tool paths. Git supplies the same nonignored source inventory.
+ $relativeFiles=@(& git -C $identityRepo ls-files --cached --others --exclude-standard -- server/src server/acceptance shared packages)
+ if($LASTEXITCODE){throw 'Source inventory failed'}
+ $extensions=@('.cs','.csproj','.proto','.props','.targets','.asmdef')
+ $files=@($relativeFiles | Where-Object { [IO.Path]::GetExtension($_) -in $extensions } | ForEach-Object { Join-Path $identityRepo $_ })
+}
 $manifest=($files | Sort-Object | ForEach-Object { $_.Substring($identityRepo.Length+1).Replace('\','/')+':'+(Get-FileHash -LiteralPath $_ -Algorithm SHA256).Hash }) -join "`n"
 $sourceHash=[Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($manifest)))
 $protocol=(@(Get-ChildItem (Join-Path $identityRepo 'shared/schemas/ainative/v1') -Filter '*.proto' | Sort-Object Name | ForEach-Object {(Get-FileHash $_.FullName -Algorithm SHA256).Hash}) -join '|')

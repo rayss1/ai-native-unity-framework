@@ -6,6 +6,8 @@ using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 
+args = AiNative.Server.Hosting.LocalDebugBootstrap.Apply(AiNative.Server.Control.ServiceRole.Battle, args);
+
 if (string.Equals(Environment.GetEnvironmentVariable("AINATIVE_SERVER_TOPOLOGY"), "true", StringComparison.OrdinalIgnoreCase))
 {
     await BattleTopologyComposition.RunAsync(args);

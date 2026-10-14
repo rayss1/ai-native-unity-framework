@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Net.Sockets;
 using System.Threading;
@@ -12,16 +13,26 @@ namespace AiNative.Client.Application
     /// <summary>Product composition for Gate account/party/match and direct authoritative Battle gameplay.</summary>
     public sealed class TopologyClientFlow : MonoBehaviour
     {
+#if UNITY_EDITOR
+        // Supplied by the Editor assembly: MPPM virtual players report Application.isFocused
+        // even when their OS window is inactive. Runtime never references UnityEditor.
+        public static Func<bool> EditorHasGameFocus { get; set; }
+#endif
         private GateBackendSession _backend;
         private GateConnectionOptions _options;
         private readonly CancellationTokenSource _lifetime = new CancellationTokenSource();
         private GateParty _party;
         private GateParty[] _invitations = Array.Empty<GateParty>();
         private GateMatch _match;
-        private string _requestId = "", _username = "", _password = "", _invitePlayer = "";
+        private string _requestId = "", _username = "", _password = "";
         private string _host = "127.0.0.1", _port = "23001", _pin = "", _resultPath = "";
         private bool _tls, _busy, _automated, _started, _disposed, _reconnectRequested, _observedReconnecting;
         private bool _paused, _resumePending, _skipElapsedFrame;
+        private bool _textInputFocused;
+        private bool _pointerOverUi, _uiBusy;
+        private Func<Task> _pendingAction;
+        private TopologyClientView _view;
+        private float _queueStarted;
         private int _pauseGeneration;
         private bool _battleReceiveComplete, _successExitPending, _evidenceSuccess;
         private float _successExitElapsed;
@@ -55,6 +66,68 @@ namespace AiNative.Client.Application
         public int PauseCount { get; private set; }
         public int ResumeCount { get; private set; }
         public int ResumeCompletedCount { get; private set; }
+        public bool UiBusy => _uiBusy;
+        public GateParty Party => _party;
+        public IReadOnlyList<GateParty> Invitations => _invitations;
+        public string ConnectionHost => _host;
+        public string ConnectionPort => _port;
+        public bool ConnectionTls => _tls;
+        public string ConnectionPin => _pin;
+        public string DisplayError => ErrorMessage(Error);
+        public float QueueElapsedSeconds => State == "Queued" ? Math.Max(0, Time.unscaledTime - _queueStarted) : 0;
+
+        public void SetUiInputBlocked(bool keyboard, bool pointer) { _textInputFocused = keyboard; _pointerOverUi = pointer; }
+
+        public void Authenticate(bool register, string username, string password, string host, string port, bool tls, string pin)
+        {
+            Submit(async () =>
+            {
+                if (!AuthenticationRequired) return;
+                string normalized = (username ?? "").Trim().ToLowerInvariant();
+                if (normalized.Length < 3 || normalized.Length > 32 || string.IsNullOrEmpty(password) || password.Length < 12 || password.Length > 128)
+                    throw new GateCallException("invalid_credentials");
+                foreach (char c in normalized)
+                    if (!(c >= 'a' && c <= 'z') && !(c >= '0' && c <= '9') && c != '_') throw new GateCallException("invalid_credentials");
+                if (string.IsNullOrWhiteSpace(host) || !int.TryParse(port, out int number) || number < 1 || number > 65535)
+                    throw new GateCallException("invalid-address");
+                _username = normalized; _password = password; _host = host.Trim(); _port = port; _tls = tls; _pin = pin ?? "";
+                await ConnectAccountAsync(register);
+            });
+        }
+        public void CreateParty() => Submit(async () => { RequireLobby(); if (_party == null) _party = await _backend.CreatePartyAsync(_lifetime.Token); });
+        public void InvitePlayer(string playerId) => Submit(async () => { RequireLobby(); if (_party != null) _party = await _backend.InviteAsync(_party, (playerId ?? "").Trim(), _lifetime.Token); });
+        public void AcceptInvitation(string partyId) => Submit(async () =>
+        {
+            RequireLobby();
+            if (_party != null) return;
+            foreach (GateParty invitation in _invitations)
+                if (invitation.PartyId == partyId) { _party = await _backend.AcceptAsync(invitation, _lifetime.Token); return; }
+            throw new GateCallException("invitation_expired");
+        });
+        public void SetReady(bool ready) => Submit(async () => { RequireLobby(); if (_party != null) _party = await _backend.ReadyAsync(_party, ready, _lifetime.Token); });
+        public void StartMatch() => Submit(async () => { RequireLobby(); if (_party != null) await QueueAsync(); });
+        public void CancelMatch() => Submit(async () =>
+        {
+            if (State != "Queued") return;
+            await _backend.CancelQueueAsync(_requestId, _lifetime.Token);
+            _requestId = ""; State = "Lobby";
+            if (_party != null) _party = await _backend.GetPartyAsync(_party.PartyId, _lifetime.Token);
+        });
+        public void LeaveParty() => Submit(async () => { RequireLobby(); if (_party != null) { await _backend.LeaveAsync(_party, _lifetime.Token); _party = null; } });
+        public void ReconnectBattle() => Submit(() => { if (Battle != null && !Completed) { _resumePending = true; _nextPoll = 0; } return Task.CompletedTask; });
+        public void ReturnToLobby() => Submit(ReturnToLobbyAsync);
+
+        private void RequireLobby()
+        {
+            if (State != "Lobby" || AuthenticationRequired || Battle != null) throw new GateCallException("state-changed");
+        }
+        private void Submit(Func<Task> action)
+        {
+            if (_disposed || _uiBusy) return;
+            _uiBusy = true; Error = "";
+            if (_busy) { _pendingAction = action; return; }
+            Run(action, foreground: true);
+        }
 
         public void Initialize(GateConnectionOptions options, bool automated = false, float deadlineSeconds = 120, string resultPath = "", string runId = "")
         {
@@ -70,6 +143,12 @@ namespace AiNative.Client.Application
             global::UnityEngine.Application.runInBackground = true;
             if (_options == null) ConfigureFromArguments(Environment.GetCommandLineArgs());
             _started = true;
+            if (!_automated)
+            {
+                var prefab = Resources.Load<TopologyClientView>("TopologyClientUI");
+                if (prefab == null) { Debug.LogError("Missing Resources/TopologyClientUI prefab."); }
+                else { _view = Instantiate(prefab); _view.Bind(this); }
+            }
             if (_automated) Run(async () =>
             {
                 _username = "unity_" + Guid.NewGuid().ToString("N").Substring(0, 16); _password = Guid.NewGuid().ToString("N");
@@ -111,7 +190,7 @@ namespace AiNative.Client.Application
                     if (previousPlayer != candidate.PlayerId) { _baselinePlayed = profile.Played; _party = null; _requestId = ""; State = "Lobby"; }
                     else State = previousState == "Queued" && _requestId.Length > 0 ? "Queued" : "Lobby";
                 }
-                else State = previousState == "Settling" ? "Settling" : "Battle";
+                else State = Completed ? "Finished" : previousState == "Settling" ? "Settling" : "Battle";
                 Error = ""; BackendStatus = "";
             }
             catch { candidate.Dispose(); throw; }
@@ -120,7 +199,58 @@ namespace AiNative.Client.Application
         private async Task QueueAsync()
         {
             _requestId = Guid.NewGuid().ToString("N");
-            await _backend.QueueAsync(_party, _requestId, _lifetime.Token); State = "Queued";
+            State = "Queued"; _queueStarted = Time.unscaledTime;
+            try { await _backend.QueueAsync(_party, _requestId, _lifetime.Token); }
+            catch (GateCallException exception) when (exception.Code == "party_not_ready" || exception.Code == "leader_required" ||
+                exception.Code == "version_conflict" || exception.Code == "party_not_found" || exception.Code == "invalid_request" ||
+                exception.Code == "invalid_queue" || exception.Code == "player_busy" || exception.Code == "queue_capacity")
+            {
+                _requestId = ""; State = "Lobby"; throw;
+            }
+            // Timeout or unknown outcome retains this request ID for status/cancel reconciliation.
+        }
+
+        private async Task ReturnToLobbyAsync()
+        {
+            if (_automated || !Completed || !SettlementConfirmed || Battle == null) throw new GateCallException("state-changed");
+            // Gate may already have observed the terminal status and cleared the party queue.
+            // Ask Lobby first: querying a pruned Match entry again would otherwise strand this UI.
+            GateParty refreshedParty = null;
+            if (_party != null)
+            {
+                try { refreshedParty = await _backend.GetPartyAsync(_party.PartyId, _lifetime.Token); }
+                catch (GateCallException exception) when (exception.Code == "party_not_found" || exception.Code == "forbidden") { }
+                if (refreshedParty != null && refreshedParty.QueueRequestId.Length > 0)
+                {
+                    if (refreshedParty.QueueRequestId != _requestId) throw new GateCallException("state-changed");
+                    try
+                    {
+                        GateMatch terminal = await _backend.MatchAsync(_requestId, _lifetime.Token);
+                        if (terminal.State != "failed" && terminal.State != "cancelled") throw new GateCallException("match-still-active");
+                    }
+                    catch (GateCallException exception) when (exception.Code == "queue_expired" || exception.Code == "queue_not_found")
+                    {
+                        // Existing abort fencing releases an expired queue with its original roster.
+                        await _backend.CancelQueueAsync(_requestId, _lifetime.Token);
+                    }
+                    refreshedParty = await _backend.GetPartyAsync(_party.PartyId, _lifetime.Token);
+                    if (refreshedParty.QueueRequestId.Length > 0) throw new GateCallException("match-still-active");
+                }
+            }
+            GateProfile profile = await _backend.ProfileAsync(_lifetime.Token);
+            _lifetime.Token.ThrowIfCancellationRequested();
+            BattleClientSession finished = Battle;
+            await finished.DisposeAsync();
+            _lifetime.Token.ThrowIfCancellationRequested();
+            Battle = null; _match = null; _requestId = ""; _party = refreshedParty;
+            Profile = profile; _baselinePlayed = profile.Played;
+            Completed = SettlementConfirmed = Reconnected = false;
+            _resumePending = _reconnectRequested = _observedReconnecting = false;
+            _battleReceiveComplete = _successExitPending = _evidenceSuccess = false;
+            _successExitElapsed = _elapsed = _acknowledgementStall = 0;
+            _inputTick = _priorSession = 0; _priorEntity = _priorAcknowledgement = _observedAcknowledgement = 0;
+            PreparedInputs = 0; MaxAcknowledgementStallSeconds = 0; BackendReconnectCount = 0;
+            _nextPoll = 0; State = "Lobby"; Error = ""; BackendStatus = "请重新准备后开始下一局。";
         }
 
         private void Update()
@@ -130,7 +260,16 @@ namespace AiNative.Client.Application
             {
                 if (!_battleReceiveComplete && Battle != null) _battleReceiveComplete = Battle.DrainAcceptedPackets();
                 AdvanceTerminalCompletion(Time.unscaledDeltaTime);
-                if (Completed) return;
+                if (Completed)
+                {
+                    // Keep the account connection alive while the player reads the result screen.
+                    if (!_automated && !_busy && _backend != null && _backend.IsAuthenticated && Time.unscaledTime >= _nextPoll)
+                    {
+                        _nextPoll = Time.unscaledTime + 5;
+                        Run(async () => Profile = await _backend.ProfileAsync(_lifetime.Token));
+                    }
+                    return;
+                }
             }
             float elapsed = _skipElapsedFrame ? 0 : Time.unscaledDeltaTime; _skipElapsedFrame = false;
             _elapsed += elapsed;
@@ -174,12 +313,17 @@ namespace AiNative.Client.Application
 
         private void FixedUpdate()
         {
+            _view?.RefreshInputBlock();
             if (_paused || _resumePending || Completed || State == "Settling" || State == "AwaitingResult" || Battle == null || Battle.ArenaPhase == ArenaMatchPhase.Finished || Battle.State != BattleClientState.Active || !Battle.IsPredictionInitialized) return;
             // Authoritative room time prevents backlog after network stalls from scheduling far-future inputs.
             _inputTick = Math.Max(_inputTick + 1, Battle.LastReceivedTick + 1);
-            int x = _automated ? ((_inputTick / 60) % 2 == 0 ? 1000 : -1000) : (Input.GetKey(KeyCode.D) ? 1000 : 0) - (Input.GetKey(KeyCode.A) ? 1000 : 0);
-            int z = _automated ? 0 : (Input.GetKey(KeyCode.W) ? 1000 : 0) - (Input.GetKey(KeyCode.S) ? 1000 : 0);
-            var prepared = Battle.TryGetArenaState(out _) ? Battle.PredictAndQueueArenaInput(_inputTick, x, z, 0, 0, Input.GetMouseButton(0) ? ArenaButtons.Fire : ArenaButtons.None, ArenaWeaponId.Machinegun) : Battle.PredictAndQueueInput(_inputTick, x, z);
+            bool acceptInput = global::UnityEngine.Application.isFocused && !_textInputFocused;
+#if UNITY_EDITOR
+            acceptInput = (EditorHasGameFocus?.Invoke() ?? false) && !_textInputFocused;
+#endif
+            int x = _automated ? ((_inputTick / 60) % 2 == 0 ? 1000 : -1000) : acceptInput ? (Input.GetKey(KeyCode.D) ? 1000 : 0) - (Input.GetKey(KeyCode.A) ? 1000 : 0) : 0;
+            int z = !_automated && acceptInput ? (Input.GetKey(KeyCode.W) ? 1000 : 0) - (Input.GetKey(KeyCode.S) ? 1000 : 0) : 0;
+            var prepared = Battle.TryGetArenaState(out _) ? Battle.PredictAndQueueArenaInput(_inputTick, x, z, 0, 0, !_automated && acceptInput && !_pointerOverUi && Input.GetMouseButton(0) ? ArenaButtons.Fire : ArenaButtons.None, ArenaWeaponId.Machinegun) : Battle.PredictAndQueueInput(_inputTick, x, z);
             if (prepared == AiNative.Client.Prediction.PredictionPrepareStatus.Prepared) PreparedInputs++;
         }
 
@@ -246,6 +390,8 @@ namespace AiNative.Client.Application
             if (State == "Queued")
             {
                 _match = await _backend.MatchAsync(_requestId, _lifetime.Token);
+                // A completed response may resume after OnDestroy has already released this flow.
+                if (_disposed) return;
                 if (_match.Failure.Length > 0)
                 {
                     State = "Lobby"; _requestId = "";
@@ -268,7 +414,7 @@ namespace AiNative.Client.Application
                 if (_party != null)
                 {
                     _party = await _backend.GetPartyAsync(_party.PartyId, _lifetime.Token);
-                    if (_party.QueueRequestId.Length > 0) { _requestId = _party.QueueRequestId; State = "Queued"; }
+                    if (_party.QueueRequestId.Length > 0) { _requestId = _party.QueueRequestId; State = "Queued"; _queueStarted = Time.unscaledTime; }
                 }
             }
         }
@@ -318,14 +464,19 @@ namespace AiNative.Client.Application
             WriteCheckpoint();
         }
 
-        private async void Run(Func<Task> action)
+        private async void Run(Func<Task> action, bool foreground = false)
         {
             if (_busy || _disposed) return; _busy = true;
             try { await action(); }
             catch (OperationCanceledException)
             {
                 if (!_disposed && Battle != null) { BackendStatus = "后台请求超时；当前对局继续。"; _nextPoll = Time.unscaledTime + 1; }
-                else if (!_disposed) Error = "操作超时，请重试。";
+                else if (!_disposed)
+                {
+                    if (foreground) Error = "操作超时，请重试。";
+                    else BackendStatus = "后台请求超时，正在重试。";
+                    if (State == "Authenticating") State = "Disconnected";
+                }
             }
             catch (Exception exception)
             {
@@ -349,63 +500,51 @@ namespace AiNative.Client.Application
                 {
                     _requestId = ""; State = "Lobby"; BackendStatus = "匹配状态已重置，请重新确认队伍和准备状态。"; return;
                 }
-                if (Battle != null && (exception is IOException || exception is SocketException || exception is TimeoutException || code == "timeout" || code == "unavailable" || code == "authority_unavailable" || code == "allocation_uncertain" || code == "queue_expired" || code == "queue_not_found"))
+                if (!foreground && Battle != null && (exception is IOException || exception is SocketException || exception is TimeoutException || code == "timeout" || code == "unavailable" || code == "authority_unavailable" || code == "allocation_uncertain" || code == "queue_expired" || code == "queue_not_found"))
                 {
                     BackendStatus = "后台暂时不可用；当前对局继续，结算会重试。"; _nextPoll = Time.unscaledTime + 1; return;
                 }
                 if (_automated) Fail(code);
-                else { Error = code; if (Battle == null) State = _backend?.PlayerId.Length > 0 ? "Lobby" : "Disconnected"; }
+                else
+                {
+                    if (foreground) Error = code;
+                    else BackendStatus = "后台刷新失败：" + ErrorMessage(code);
+                    // A failed cancel/queue request must not pretend the server released the queue.
+                    if (State == "Authenticating") State = _backend?.IsAuthenticated == true ? "Lobby" : "Disconnected";
+                }
             }
-            finally { _busy = false; }
+            finally
+            {
+                _busy = false;
+                if (foreground) _uiBusy = false;
+                if (!_disposed && _pendingAction != null)
+                {
+                    var pending = _pendingAction; _pendingAction = null;
+                    Run(pending, foreground: true);
+                }
+            }
         }
         private void Fail(string error) { Error = error; State = "Failed"; if (_automated) { Completed = true; WriteEvidence(false); } }
 
-        private void OnGUI()
+        private static string ErrorMessage(string code)
         {
-            GUILayout.BeginArea(new Rect(16, 115, 600, Math.Max(450, Screen.height - 130)), GUI.skin.box);
-            GUILayout.Label("在线对战  ·  " + State);
-            if (Error.Length > 0) GUILayout.Label(Error);
-            if (BackendStatus.Length > 0) GUILayout.Label(BackendStatus);
-            GUI.enabled = !_busy && !Completed;
-            if (AuthenticationRequired)
+            switch (code)
             {
-                GUILayout.Label("接入地址"); _host = GUILayout.TextField(_host); _port = GUILayout.TextField(_port); _tls = GUILayout.Toggle(_tls, "使用 TLS");
-                if (_tls) { GUILayout.Label("测试证书 SHA256（正式证书可留空）"); _pin = GUILayout.TextField(_pin); }
-                GUILayout.Label("账号"); _username = GUILayout.TextField(_username, 64); GUILayout.Label("密码"); _password = GUILayout.PasswordField(_password, '*', 256);
-                if (Battle == null && GUILayout.Button("注册并登录")) Run(() => ConnectAccountAsync(true));
-                if (GUILayout.Button("登录 / 恢复后台连接")) Run(() => ConnectAccountAsync(false));
+                case "invalid_credentials": return "账号或密码不符合要求，或登录信息不正确。账号须为 3–32 位英文字母、数字或下划线；密码须为 12–128 位。";
+                case "username_exists": return "账号已存在，请使用“登录 / 恢复后台连接”，或换一个账号注册。";
+                case "unavailable": case "authority_unavailable": return "服务暂时不可用，请确认服务器全部就绪后重试。";
+                case "SocketException": case "IOException": return "连接失败，请检查服务器是否启动，以及地址、端口和 TLS 设置。";
+                case "timeout": case "TimeoutException": return "请求超时，请检查服务器是否就绪或停在 VS 断点，然后重试。";
+                case "invalid-address": return "请输入有效的服务器地址和端口（1–65535）。";
+                case "version_conflict": return "队伍状态刚刚发生变化，请稍后重试。";
+                case "leader_required": return "这项操作需要队长执行。";
+                case "party_not_ready": return "请等待所有队员准备。";
+                case "allocation_claimed": return "服务器正在分配房间，暂时无法取消，请等待结果。";
+                case "invitation_expired": return "邀请已失效，请对方重新邀请。";
+                case "state-changed": return "当前状态已变化，请按界面提示操作。";
+                case "match-still-active": return "服务器尚未结束原对局，请稍后再返回大厅。";
+                default: return code;
             }
-            else
-            {
-                GUILayout.Label("玩家 ID（邀请时使用）"); GUILayout.TextField(PlayerId);
-                if (Profile != null) GUILayout.Label($"已完成 {Profile.Played} 局 · 胜利 {Profile.Won} · 击杀 {Profile.Kills}");
-                if (State == "Lobby")
-                {
-                    if (_party == null)
-                    {
-                        if (GUILayout.Button("创建队伍")) Run(async () => _party = await _backend.CreatePartyAsync(_lifetime.Token));
-                        foreach (GateParty invitation in _invitations) if (GUILayout.Button("接受邀请：" + invitation.LeaderId)) Run(async () => _party = await _backend.AcceptAsync(invitation, _lifetime.Token));
-                    }
-                    else
-                    {
-                        GUILayout.Label("队伍：" + _party.PartyId);
-                        foreach (GatePartyMember member in _party.Members) GUILayout.Label(member.PlayerId + (member.Ready ? " 已准备" : " 未准备"));
-                        _invitePlayer = GUILayout.TextField(_invitePlayer);
-                        if (GUILayout.Button("邀请玩家")) Run(async () => _party = await _backend.InviteAsync(_party, _invitePlayer, _lifetime.Token));
-                        if (GUILayout.Button("准备")) Run(async () => _party = await _backend.ReadyAsync(_party, true, _lifetime.Token));
-                        if (GUILayout.Button("取消准备")) Run(async () => _party = await _backend.ReadyAsync(_party, false, _lifetime.Token));
-                        if (GUILayout.Button("开始匹配")) Run(QueueAsync);
-                        if (GUILayout.Button("退出队伍")) Run(async () => { await _backend.LeaveAsync(_party, _lifetime.Token); _party = null; });
-                    }
-                }
-                if (State == "Queued" && GUILayout.Button("取消匹配")) Run(async () => { await _backend.CancelQueueAsync(_requestId, _lifetime.Token); _requestId = ""; State = "Lobby"; });
-                if (Battle != null)
-                {
-                    GUILayout.Label("房间：" + RoomId);
-                    if (GUILayout.Button("重新连接战斗")) { _resumePending = true; _nextPoll = 0; }
-                }
-            }
-            GUI.enabled = true; GUILayout.EndArea();
         }
 
         private void AdvanceTerminalCompletion(float elapsedSeconds)
@@ -456,7 +595,12 @@ namespace AiNative.Client.Application
         [Serializable] private sealed class Evidence { public bool success, reconnected, settlementConfirmed, completed, paused, resumePending, finalReceived, receiveDrainCompleted; public string error, playerId, matchId, roomId, nodeId, bootEpoch, lastTick, state, runId; public long played, preparedInputs; public uint lastAcknowledgedSequence; public int backendReconnectCount, pauseCount, resumeCount, resumeCompletedCount; public float maxAcknowledgementStallSeconds; }
         private async void OnDestroy()
         {
-            _disposed = true; _lifetime.Cancel(); _backend?.Dispose(); if (Battle != null) await Battle.DisposeAsync(); _lifetime.Dispose();
+            if (_disposed) return;
+            _disposed = true; _pendingAction = null; _password = "";
+            if (_view != null) Destroy(_view.gameObject);
+            _lifetime.Cancel(); _backend?.Dispose();
+            try { if (Battle != null) await Battle.DisposeAsync(); }
+            finally { _lifetime.Dispose(); }
         }
     }
 }

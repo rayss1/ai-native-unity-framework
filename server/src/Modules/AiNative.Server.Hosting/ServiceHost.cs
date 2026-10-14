@@ -67,6 +67,7 @@ public static class ServiceHost
     }
     public static async Task RunAsync(ServiceRole role, string[] args)
     {
+        args = LocalDebugBootstrap.Apply(role, args);
         HostSettings settings = HostSettings.Load(role, args);
         await using FantasyServiceRuntime runtime = new(settings.SceneId, role, settings.Authentication);
         WebApplicationBuilder builder = CreateBuilder();
