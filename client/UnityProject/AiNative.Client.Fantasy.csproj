@@ -47,11 +47,14 @@
     <Analyzer Include="C:\Program Files\Unity\Hub\Editor\6000.3.23f1\Editor\Data\Tools\BuildPipeline\Unity.SourceGenerators\Unity.SourceGenerators.dll" />
     <Analyzer Include="C:\Program Files\Unity\Hub\Editor\6000.3.23f1\Editor\Data\Tools\BuildPipeline\Unity.SourceGenerators\Unity.Properties.SourceGenerator.dll" />
     <Analyzer Include="C:\Program Files\Unity\Hub\Editor\6000.3.23f1\Editor\Data\Tools\BuildPipeline\Unity.SourceGenerators\Unity.UIToolkit.SourceGenerator.dll" />
-    <Analyzer Include="C:\work\github\ai-native-unity-framework\client\UnityProject\Library\PackageCache\com.fantasy.unity@a8e15534ab43\RoslynAnalyzers\Fantasy.SourceGenerator.dll" />
+    <Analyzer Include="C:\work\github\ai-native-unity-framework\server\vendor\Fantasy\Fantasy.Packages\Fantasy.Unity\RoslynAnalyzers\Fantasy.SourceGenerator.dll" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="C:\work\github\ai-native-unity-framework\packages\com.ainative.client.fantasy\Runtime\FantasyClientSession.cs">
       <Link>Runtime\FantasyClientSession.cs</Link>
+    </Compile>
+    <Compile Include="C:\work\github\ai-native-unity-framework\packages\com.ainative.client.fantasy\Runtime\GateTlsTrust.cs">
+      <Link>Runtime\GateTlsTrust.cs</Link>
     </Compile>
     <Compile Include="C:\work\github\ai-native-unity-framework\packages\com.ainative.client.fantasy\Runtime\AssemblyInfo.cs">
       <Link>Runtime\AssemblyInfo.cs</Link>
@@ -59,14 +62,26 @@
     <Compile Include="C:\work\github\ai-native-unity-framework\packages\com.ainative.client.fantasy\Runtime\FantasyKcpTransportContracts.cs">
       <Link>Runtime\FantasyKcpTransportContracts.cs</Link>
     </Compile>
+    <Compile Include="C:\work\github\ai-native-unity-framework\packages\com.ainative.client.fantasy\Runtime\GateBackendSession.cs">
+      <Link>Runtime\GateBackendSession.cs</Link>
+    </Compile>
     <Compile Include="C:\work\github\ai-native-unity-framework\packages\com.ainative.client.fantasy\Runtime\BoundedPacketQueue.cs">
       <Link>Runtime\BoundedPacketQueue.cs</Link>
     </Compile>
     <Compile Include="C:\work\github\ai-native-unity-framework\packages\com.ainative.client.fantasy\Runtime\FantasyKcpRealtimeTransport.cs">
       <Link>Runtime\FantasyKcpRealtimeTransport.cs</Link>
     </Compile>
+    <Compile Include="C:\work\github\ai-native-unity-framework\packages\com.ainative.client.fantasy\Runtime\GateClient.cs">
+      <Link>Runtime\GateClient.cs</Link>
+    </Compile>
     <Compile Include="C:\work\github\ai-native-unity-framework\packages\com.ainative.client.fantasy\Runtime\FantasyRealtimeEnvelope.cs">
       <Link>Runtime\FantasyRealtimeEnvelope.cs</Link>
+    </Compile>
+    <Compile Include="C:\work\github\ai-native-unity-framework\packages\com.ainative.client.fantasy\Runtime\GateModels.cs">
+      <Link>Runtime\GateModels.cs</Link>
+    </Compile>
+    <Compile Include="C:\work\github\ai-native-unity-framework\packages\com.ainative.client.fantasy\Runtime\GateWire.cs">
+      <Link>Runtime\GateWire.cs</Link>
     </Compile>
   </ItemGroup>
   <ItemGroup>
@@ -81,6 +96,10 @@
     </Reference>
     <Reference Include="UnityEngine.ARModule">
       <HintPath>C:\Program Files\Unity\Hub\Editor\6000.3.23f1\Editor\Data\Managed\UnityEngine\UnityEngine.ARModule.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="UnityEngine.AndroidJNIModule">
+      <HintPath>C:\Program Files\Unity\Hub\Editor\6000.3.23f1\Editor\Data\Managed\UnityEngine\UnityEngine.AndroidJNIModule.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="UnityEngine.AssetBundleModule">
@@ -548,15 +567,19 @@
       <Private>False</Private>
     </Reference>
     <Reference Include="MemoryPack.Core">
-      <HintPath>Library\PackageCache\com.fantasy.unity@a8e15534ab43\Runtime\Plugins\MemoryPack\MemoryPack.Core.dll</HintPath>
+      <HintPath>C:\work\github\ai-native-unity-framework\server\vendor\Fantasy\Fantasy.Packages\Fantasy.Unity\Runtime\Plugins\MemoryPack\MemoryPack.Core.dll</HintPath>
       <Private>False</Private>
     </Reference>
-    <Reference Include="Microsoft.CodeAnalysis.CSharp">
-      <HintPath>Library\PackageCache\com.unity.pipeline@9bb4172c603c\Runtime\Plugins\CodeAnalysis\Microsoft.CodeAnalysis.CSharp.dll</HintPath>
+    <Reference Include="UnityPipeline.Microsoft.CodeAnalysis.CSharp">
+      <HintPath>Library\PackageCache\com.unity.pipeline@62c08c808737\Runtime\Plugins\CodeAnalysis\UnityPipeline.Microsoft.CodeAnalysis.CSharp.dll</HintPath>
       <Private>False</Private>
     </Reference>
-    <Reference Include="System.Runtime.CompilerServices.Unsafe">
-      <HintPath>Library\PackageCache\com.fantasy.unity@a8e15534ab43\Runtime\Plugins\Other\System.Runtime.CompilerServices.Unsafe.dll</HintPath>
+    <Reference Include="UnityPipeline.System.Runtime.CompilerServices.Unsafe">
+      <HintPath>Library\PackageCache\com.unity.pipeline@62c08c808737\Runtime\Plugins\CodeAnalysis\UnityPipeline.System.Runtime.CompilerServices.Unsafe.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="UnityPipeline.System.Collections.Immutable">
+      <HintPath>Library\PackageCache\com.unity.pipeline@62c08c808737\Runtime\Plugins\CodeAnalysis\UnityPipeline.System.Collections.Immutable.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="Newtonsoft.Json">
@@ -567,20 +590,24 @@
       <HintPath>Library\PackageCache\com.unity.nuget.mono-cecil@ecb9724e46ff\Mono.Cecil.dll</HintPath>
       <Private>False</Private>
     </Reference>
-    <Reference Include="System.IO.Pipelines">
-      <HintPath>Library\PackageCache\com.fantasy.unity@a8e15534ab43\Runtime\Plugins\Other\System.IO.Pipelines.dll</HintPath>
+    <Reference Include="System.Runtime.CompilerServices.Unsafe">
+      <HintPath>C:\work\github\ai-native-unity-framework\server\vendor\Fantasy\Fantasy.Packages\Fantasy.Unity\Runtime\Plugins\Other\System.Runtime.CompilerServices.Unsafe.dll</HintPath>
       <Private>False</Private>
     </Reference>
-    <Reference Include="System.Reflection.Metadata">
-      <HintPath>Library\PackageCache\com.unity.pipeline@9bb4172c603c\Runtime\Plugins\CodeAnalysis\System.Reflection.Metadata.dll</HintPath>
+    <Reference Include="System.IO.Pipelines">
+      <HintPath>C:\work\github\ai-native-unity-framework\server\vendor\Fantasy\Fantasy.Packages\Fantasy.Unity\Runtime\Plugins\Other\System.IO.Pipelines.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="System.Collections.Immutable">
-      <HintPath>Library\PackageCache\com.unity.pipeline@9bb4172c603c\Runtime\Plugins\CodeAnalysis\System.Collections.Immutable.dll</HintPath>
+      <HintPath>C:\work\github\ai-native-unity-framework\server\vendor\Fantasy\Fantasy.Packages\Fantasy.Unity\Runtime\Plugins\Other\System.Collections.Immutable.dll</HintPath>
       <Private>False</Private>
     </Reference>
-    <Reference Include="Microsoft.CodeAnalysis">
-      <HintPath>Library\PackageCache\com.unity.pipeline@9bb4172c603c\Runtime\Plugins\CodeAnalysis\Microsoft.CodeAnalysis.dll</HintPath>
+    <Reference Include="UnityPipeline.System.Reflection.Metadata">
+      <HintPath>Library\PackageCache\com.unity.pipeline@62c08c808737\Runtime\Plugins\CodeAnalysis\UnityPipeline.System.Reflection.Metadata.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="UnityPipeline.Microsoft.CodeAnalysis">
+      <HintPath>Library\PackageCache\com.unity.pipeline@62c08c808737\Runtime\Plugins\CodeAnalysis\UnityPipeline.Microsoft.CodeAnalysis.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="UnityEditor.iOS.Extensions.Xcode">
@@ -1091,10 +1118,6 @@
       <HintPath>C:\Program Files\Unity\Hub\Editor\6000.3.23f1\Editor\Data\NetStandard\compat\2.1.0\shims\netfx\System.Xml.Serialization.dll</HintPath>
       <Private>False</Private>
     </Reference>
-    <Reference Include="Fantasy.Unity">
-      <HintPath>Library\ScriptAssemblies\Fantasy.Unity.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
     <Reference Include="UnityEditor.UI">
       <HintPath>Library\ScriptAssemblies\UnityEditor.UI.dll</HintPath>
       <Private>False</Private>
@@ -1106,6 +1129,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="AiNative.Realtime.csproj" />
+    <ProjectReference Include="Fantasy.Unity.csproj" />
   </ItemGroup>
   <Import Project="Sdk.targets" Sdk="Microsoft.NET.Sdk" />
   <ItemGroup>

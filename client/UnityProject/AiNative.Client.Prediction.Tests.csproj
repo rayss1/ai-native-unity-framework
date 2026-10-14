@@ -49,6 +49,12 @@
     <Analyzer Include="C:\Program Files\Unity\Hub\Editor\6000.3.23f1\Editor\Data\Tools\BuildPipeline\Unity.SourceGenerators\Unity.UIToolkit.SourceGenerator.dll" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="C:\work\github\ai-native-unity-framework\packages\com.ainative.client.prediction\Tests\EditMode\ArenaPredictionSendTests.cs">
+      <Link>Tests\EditMode\ArenaPredictionSendTests.cs</Link>
+    </Compile>
+    <Compile Include="C:\work\github\ai-native-unity-framework\packages\com.ainative.client.prediction\Tests\EditMode\ArenaRemotePresentationTests.cs">
+      <Link>Tests\EditMode\ArenaRemotePresentationTests.cs</Link>
+    </Compile>
     <Compile Include="C:\work\github\ai-native-unity-framework\packages\com.ainative.client.prediction\Tests\EditMode\ProtocolFrameFixtures.cs">
       <Link>Tests\EditMode\ProtocolFrameFixtures.cs</Link>
     </Compile>

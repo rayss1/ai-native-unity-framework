@@ -61,6 +61,9 @@
     <Compile Include="C:\work\github\ai-native-unity-framework\packages\com.ainative.client.prediction\Runtime\ClientPredictionProtocolV1.cs">
       <Link>Runtime\ClientPredictionProtocolV1.cs</Link>
     </Compile>
+    <Compile Include="C:\work\github\ai-native-unity-framework\packages\com.ainative.client.prediction\Runtime\ArenaRemotePresentation.cs">
+      <Link>Runtime\ArenaRemotePresentation.cs</Link>
+    </Compile>
     <Compile Include="C:\work\github\ai-native-unity-framework\packages\com.ainative.client.prediction\Runtime\PresentationCorrectionSmoother.cs">
       <Link>Runtime\PresentationCorrectionSmoother.cs</Link>
     </Compile>
@@ -80,15 +83,19 @@
       <Private>False</Private>
     </Reference>
     <Reference Include="MemoryPack.Core">
-      <HintPath>Library\PackageCache\com.fantasy.unity@a8e15534ab43\Runtime\Plugins\MemoryPack\MemoryPack.Core.dll</HintPath>
+      <HintPath>C:\work\github\ai-native-unity-framework\server\vendor\Fantasy\Fantasy.Packages\Fantasy.Unity\Runtime\Plugins\MemoryPack\MemoryPack.Core.dll</HintPath>
       <Private>False</Private>
     </Reference>
-    <Reference Include="Microsoft.CodeAnalysis.CSharp">
-      <HintPath>Library\PackageCache\com.unity.pipeline@9bb4172c603c\Runtime\Plugins\CodeAnalysis\Microsoft.CodeAnalysis.CSharp.dll</HintPath>
+    <Reference Include="UnityPipeline.Microsoft.CodeAnalysis.CSharp">
+      <HintPath>Library\PackageCache\com.unity.pipeline@62c08c808737\Runtime\Plugins\CodeAnalysis\UnityPipeline.Microsoft.CodeAnalysis.CSharp.dll</HintPath>
       <Private>False</Private>
     </Reference>
-    <Reference Include="System.Runtime.CompilerServices.Unsafe">
-      <HintPath>Library\PackageCache\com.fantasy.unity@a8e15534ab43\Runtime\Plugins\Other\System.Runtime.CompilerServices.Unsafe.dll</HintPath>
+    <Reference Include="UnityPipeline.System.Runtime.CompilerServices.Unsafe">
+      <HintPath>Library\PackageCache\com.unity.pipeline@62c08c808737\Runtime\Plugins\CodeAnalysis\UnityPipeline.System.Runtime.CompilerServices.Unsafe.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="UnityPipeline.System.Collections.Immutable">
+      <HintPath>Library\PackageCache\com.unity.pipeline@62c08c808737\Runtime\Plugins\CodeAnalysis\UnityPipeline.System.Collections.Immutable.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="Newtonsoft.Json">
@@ -99,20 +106,24 @@
       <HintPath>Library\PackageCache\com.unity.nuget.mono-cecil@ecb9724e46ff\Mono.Cecil.dll</HintPath>
       <Private>False</Private>
     </Reference>
-    <Reference Include="System.IO.Pipelines">
-      <HintPath>Library\PackageCache\com.fantasy.unity@a8e15534ab43\Runtime\Plugins\Other\System.IO.Pipelines.dll</HintPath>
+    <Reference Include="System.Runtime.CompilerServices.Unsafe">
+      <HintPath>C:\work\github\ai-native-unity-framework\server\vendor\Fantasy\Fantasy.Packages\Fantasy.Unity\Runtime\Plugins\Other\System.Runtime.CompilerServices.Unsafe.dll</HintPath>
       <Private>False</Private>
     </Reference>
-    <Reference Include="System.Reflection.Metadata">
-      <HintPath>Library\PackageCache\com.unity.pipeline@9bb4172c603c\Runtime\Plugins\CodeAnalysis\System.Reflection.Metadata.dll</HintPath>
+    <Reference Include="System.IO.Pipelines">
+      <HintPath>C:\work\github\ai-native-unity-framework\server\vendor\Fantasy\Fantasy.Packages\Fantasy.Unity\Runtime\Plugins\Other\System.IO.Pipelines.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="System.Collections.Immutable">
-      <HintPath>Library\PackageCache\com.unity.pipeline@9bb4172c603c\Runtime\Plugins\CodeAnalysis\System.Collections.Immutable.dll</HintPath>
+      <HintPath>C:\work\github\ai-native-unity-framework\server\vendor\Fantasy\Fantasy.Packages\Fantasy.Unity\Runtime\Plugins\Other\System.Collections.Immutable.dll</HintPath>
       <Private>False</Private>
     </Reference>
-    <Reference Include="Microsoft.CodeAnalysis">
-      <HintPath>Library\PackageCache\com.unity.pipeline@9bb4172c603c\Runtime\Plugins\CodeAnalysis\Microsoft.CodeAnalysis.dll</HintPath>
+    <Reference Include="UnityPipeline.System.Reflection.Metadata">
+      <HintPath>Library\PackageCache\com.unity.pipeline@62c08c808737\Runtime\Plugins\CodeAnalysis\UnityPipeline.System.Reflection.Metadata.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="UnityPipeline.Microsoft.CodeAnalysis">
+      <HintPath>Library\PackageCache\com.unity.pipeline@62c08c808737\Runtime\Plugins\CodeAnalysis\UnityPipeline.Microsoft.CodeAnalysis.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="UnityEditor.iOS.Extensions.Xcode">
