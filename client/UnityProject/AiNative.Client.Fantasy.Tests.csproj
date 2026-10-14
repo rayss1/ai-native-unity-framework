@@ -47,9 +47,12 @@
     <Analyzer Include="C:\Program Files\Unity\Hub\Editor\6000.3.23f1\Editor\Data\Tools\BuildPipeline\Unity.SourceGenerators\Unity.SourceGenerators.dll" />
     <Analyzer Include="C:\Program Files\Unity\Hub\Editor\6000.3.23f1\Editor\Data\Tools\BuildPipeline\Unity.SourceGenerators\Unity.Properties.SourceGenerator.dll" />
     <Analyzer Include="C:\Program Files\Unity\Hub\Editor\6000.3.23f1\Editor\Data\Tools\BuildPipeline\Unity.SourceGenerators\Unity.UIToolkit.SourceGenerator.dll" />
-    <Analyzer Include="C:\work\github\ai-native-unity-framework\client\UnityProject\Library\PackageCache\com.fantasy.unity@a8e15534ab43\RoslynAnalyzers\Fantasy.SourceGenerator.dll" />
+    <Analyzer Include="C:\work\github\ai-native-unity-framework\server\vendor\Fantasy\Fantasy.Packages\Fantasy.Unity\RoslynAnalyzers\Fantasy.SourceGenerator.dll" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="C:\work\github\ai-native-unity-framework\packages\com.ainative.client.fantasy\Tests\EditMode\TerminalReceiveTests.cs">
+      <Link>Tests\EditMode\TerminalReceiveTests.cs</Link>
+    </Compile>
     <Compile Include="C:\work\github\ai-native-unity-framework\packages\com.ainative.client.fantasy\Tests\EditMode\FantasyKcpRealtimeTransportTests.cs">
       <Link>Tests\EditMode\FantasyKcpRealtimeTransportTests.cs</Link>
     </Compile>
@@ -1144,10 +1147,6 @@
       <HintPath>C:\Program Files\Unity\Hub\Editor\6000.3.23f1\Editor\Data\UnityReferenceAssemblies\unity-4.8-api\Facades\System.Xml.XPath.XDocument.dll</HintPath>
       <Private>False</Private>
     </Reference>
-    <Reference Include="Fantasy.Unity">
-      <HintPath>Library\ScriptAssemblies\Fantasy.Unity.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
     <Reference Include="UnityEngine.TestRunner">
       <HintPath>Library\ScriptAssemblies\UnityEngine.TestRunner.dll</HintPath>
       <Private>False</Private>
@@ -1168,6 +1167,7 @@
   <ItemGroup>
     <ProjectReference Include="AiNative.Client.Fantasy.csproj" />
     <ProjectReference Include="AiNative.Realtime.csproj" />
+    <ProjectReference Include="Fantasy.Unity.csproj" />
   </ItemGroup>
   <Import Project="Sdk.targets" Sdk="Microsoft.NET.Sdk" />
   <ItemGroup>

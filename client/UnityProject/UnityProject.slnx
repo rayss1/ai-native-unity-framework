@@ -1,14 +1,16 @@
 ﻿<Solution>
+  <Project Path="Fantasy.Unity.csproj" />
   <Project Path="AiNative.Client.Fantasy.csproj" />
   <Project Path="AiNative.Client.Application.csproj" />
+  <Project Path="AiNative.Client.Application.Tests.csproj" />
+  <Project Path="Fantasy.Editor.csproj" />
   <Project Path="AiNative.Gameplay.Tests.csproj" />
   <Project Path="AiNative.Realtime.csproj" />
-  <Project Path="AiNative.Gameplay.csproj" />
-  <Project Path="AiNative.Client.Application.Tests.csproj" />
-  <Project Path="AiNative.Client.Prediction.csproj" />
   <Project Path="AiNative.Client.Application.PlayModeTests.csproj" />
+  <Project Path="AiNative.Client.Fantasy.Tests.csproj" />
+  <Project Path="AiNative.Gameplay.csproj" />
+  <Project Path="AiNative.Client.Prediction.Tests.csproj" />
+  <Project Path="AiNative.Client.Prediction.csproj" />
   <Project Path="AiNative.Realtime.Tests.csproj" />
   <Project Path="AiNative.Client.Application.Editor.csproj" />
-  <Project Path="AiNative.Client.Fantasy.Tests.csproj" />
-  <Project Path="AiNative.Client.Prediction.Tests.csproj" />
 </Solution>
