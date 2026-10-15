@@ -2,9 +2,11 @@
 import json
 from pathlib import Path
 import subprocess
+import shutil
 import unittest
 
 
+@unittest.skipUnless(shutil.which("pwsh"), "PowerShell 7 required")
 class QualificationPlanTests(unittest.TestCase):
     script = Path(__file__).parents[1] / "qualify-capacity.ps1"
 

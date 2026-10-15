@@ -59,7 +59,7 @@ function Assert-AiNativeNUnitReport {
 }
 
 function Get-AiNativeEditModeFixtureCounts {
-    param([ValidateSet('Baseline','Candidate','TerminalDelivery','Current')][string]$Profile)
+    param([ValidateSet('Baseline','Candidate','TerminalDelivery','Current','Development')][string]$Profile)
     $fixtures = @{
         'AiNative.Client.Application.Tests.BattleClientSessionTests'=32
         'AiNative.Client.Application.Tests.SimulationCadenceTests'=2
@@ -74,7 +74,7 @@ function Get-AiNativeEditModeFixtureCounts {
         'AiNative.Gameplay.Tests.GameplayClockContractTests'=1
         'AiNative.Realtime.Tests.TransportContractTests'=2
     }
-    if ($Profile -in @('Candidate','TerminalDelivery','Current')) {
+    if ($Profile -in @('Candidate','TerminalDelivery','Current','Development')) {
         $fixtures['AiNative.Client.Application.Tests.TopologyClientFlowRecoveryTests']=18
         $fixtures['AiNative.Client.Application.Tests.ArenaRemoteSessionTests']=2
         $fixtures['AiNative.Client.Prediction.Tests.ArenaPredictionSendTests']=8
@@ -82,14 +82,21 @@ function Get-AiNativeEditModeFixtureCounts {
         $fixtures['AiNative.Client.Application.Tests.AndroidBattleClientBuildTests']=10
         $fixtures['AiNative.Client.Application.Tests.AndroidClientLaunchConfigurationTests']=11
     }
-    if ($Profile -in @('TerminalDelivery','Current')) {
+    if ($Profile -in @('TerminalDelivery','Current','Development')) {
         $fixtures['AiNative.Client.Application.Tests.TopologyClientFlowRecoveryTests']=19
         $fixtures['AiNative.Client.Application.Tests.TopologyTerminalReceiveTests']=6
         $fixtures['AiNative.Client.Fantasy.Tests.TerminalReceiveTests']=3
         $fixtures['AiNative.Client.Application.Tests.TerminalReceptionTests']=7
     }
-    if ($Profile -eq 'Current') {
+    if ($Profile -in @('Current','Development')) {
         $fixtures['AiNative.Client.Prediction.Tests.ArenaRemotePresentationTests']=10
+    }
+    if ($Profile -eq 'Development') {
+        $fixtures['AiNative.Client.Application.Tests.TopologyClientFlowRecoveryTests']=24
+        $fixtures['AiNative.Client.Application.Tests.TopologyUiFlowTests']=17
+        $fixtures['AiNative.Client.Application.Tests.LocalMultiplayerTests']=3
+        $fixtures['AiNative.Client.Character.Tests.CharacterActionContractTests']=1
+        $fixtures['AiNative.Client.Application.Tests.AndroidBattleClientBuildTests']=16
     }
     return $fixtures
 }
@@ -101,7 +108,7 @@ function Get-AiNativeEvidenceFile {
 }
 
 function Get-AiNativeValidationProfile {
-    param([ValidateSet('Baseline','Candidate','TerminalDelivery','Current')][string]$Profile)
+    param([ValidateSet('Baseline','Candidate','TerminalDelivery','Current','Development')][string]$Profile)
     $fixtures = Get-AiNativeEditModeFixtureCounts -Profile $Profile
     return [pscustomobject]@{
         EditModePassed = [int](($fixtures.Values | Measure-Object -Sum).Sum)
@@ -113,7 +120,7 @@ function Get-AiNativeValidationProfile {
 }
 
 function Assert-AiNativeEditModeProfile {
-    param([ValidateSet('Baseline','Candidate','TerminalDelivery','Current')][string]$Profile,[string]$Commit,[int]$ExpectedPassed)
+    param([ValidateSet('Baseline','Candidate','TerminalDelivery','Current','Development')][string]$Profile,[string]$Commit,[int]$ExpectedPassed)
     $contract = Get-AiNativeValidationProfile -Profile $Profile
     if ($ExpectedPassed -ne $contract.EditModePassed -or
         ($Profile -eq 'Baseline' -and $Commit -ne $contract.BaselineCommit) -or

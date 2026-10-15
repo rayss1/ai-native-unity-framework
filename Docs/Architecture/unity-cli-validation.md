@@ -44,7 +44,7 @@ $output = [IO.Path]::GetFullPath('artifacts/unity-cli/player/AiNative.BattleClie
 unity run client/UnityProject --timeout 600 --log-file artifacts/unity-cli/player-build.log -- -nographics -executeMethod AiNative.Client.Editor.BattleClientBuild.BuildWindowsSmoke --ainative-build-output $output
 ```
 
-The method validates URP, selects Windows x64 Mono and copies the approved Fantasy notices. The Windows runner manages the complete Host/test/build/reconnect-smoke lifecycle with SDK 10.0.202. Current source selects `-Profile Current -ExpectedEditModePassed 166`; historical `Baseline`/`Candidate`/`TerminalDelivery` inventories remain 95/147/164. Default `CleanCommit` requires a clean checkout; explicit `Worktree` mode requires a frozen source hash and reports development evidence. See [the unified entry](../../tools/validation/README.md) and [current progress](current-status.md). Worktree results are not exact-commit release qualification.
+The method validates URP, selects Windows x64 Mono and copies the approved Fantasy notices. The Windows runner manages the complete Host/test/build/reconnect-smoke lifecycle with SDK 10.0.202. Current source selects `-Profile Development -ExpectedEditModePassed 198`; historical `Baseline`/`Candidate`/`TerminalDelivery`/`Current` inventories remain 95/147/164/166. Default `CleanCommit` requires a clean checkout; explicit `Worktree` mode requires a frozen source hash and reports development evidence. See [the unified entry](../../tools/validation/README.md) and [current progress](current-status.md). Worktree results are not exact-commit release qualification.
 
 ## Executed development evidence — 2026-10-02
 

@@ -72,8 +72,10 @@ smoke and exit with 0 on success (1 on a failed assertion). For CI-style verific
 `-batchmode -nographics --character-demo-smoke -logFile <absolute-path>`; require both exit 0
 and `CHARACTER_DEMO_SMOKE_PASS` in the log. This does not validate Player rendering.
 
-The existing battle application still uses legacy input and is not made New-Only compatible
-by this package. Open the demo alone. No Shared/Server contracts or global timestep change.
+The battle application's keyboard, mouse and UI paths also use Input System as of
+2026-10-15. The character demo remains a separate local scene; open it alone.
+Its motor, projectiles and HP are not connected to the authoritative Arena simulation.
+No Shared/Server contracts or global timestep change.
 Input System 1.20.1 is pinned in package.json; its license is the Unity Companion License
 (see the installed package LICENSE.md). Upgrades require regenerating the wrapper and
 rerunning input lifecycle tests; rollback restores the previous dependency pin and wrapper.

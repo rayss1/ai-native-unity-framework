@@ -121,7 +121,7 @@ class ManualTests(unittest.TestCase):
             listener.bind(("127.0.0.1", 0))
             listener.listen()
             with self.assertRaisesRegex(runtime.ManualError, "occupied"):
-                runtime.assert_free_ports(listener.getsockname()[1])
+                runtime.assert_ports_available([listener.getsockname()[1]], [])
 
     @unittest.skipIf(os.name == "nt", "Windows uses exclusive bind instead of Unix reuseaddr")
     def test_closed_listener_time_wait_does_not_block_restart(self):
@@ -132,12 +132,24 @@ class ManualTests(unittest.TestCase):
             listener.listen()
             # A live REUSEADDR listener must still be rejected.
             with self.assertRaisesRegex(runtime.ManualError, "occupied"):
-                runtime.assert_free_ports(port)
+                runtime.assert_ports_available([port], [])
             with socket.create_connection(("127.0.0.1", port)) as client:
                 accepted, _ = listener.accept()
                 accepted.close()  # server actively closes; its endpoint enters TIME_WAIT
                 self.assertEqual(client.recv(1), b"")
-        runtime.assert_free_ports(port)
+        runtime.assert_ports_available([port], [])
+
+    def test_topology_port_inventory_is_preserved(self):
+        with patch.object(runtime, "assert_ports_available") as probe:
+            runtime.assert_free_ports(25439)
+        probe.assert_called_once_with(
+            [23001, *range(24101, 24108), *range(23101, 23108), 25439], [22000, 22001])
+
+    def test_occupied_udp_port_rejected(self):
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as listener:
+            listener.bind(("127.0.0.1", 0))
+            with self.assertRaisesRegex(runtime.ManualError, "occupied"):
+                runtime.assert_ports_available([], [listener.getsockname()[1]])
 
     def test_postgres_requires_exact_version_and_complete_tools(self):
         directory = self.root / "pg tools"

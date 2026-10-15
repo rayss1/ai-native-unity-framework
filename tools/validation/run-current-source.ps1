@@ -7,7 +7,7 @@ param(
     [string] $UnityEditorPath = $env:UNITY_EDITOR_PATH,
     [ValidateSet('Dotnet','Architecture','EditMode','WindowsLegacy','TopologyPublish','TopologyAcceptance','TopologyPlayMode')]
     [string[]] $Phases = @('Dotnet','Architecture','EditMode'),
-    [ValidateSet('Baseline','Candidate','TerminalDelivery','Current')][string] $Profile = 'Baseline',
+    [ValidateSet('Baseline','Candidate','TerminalDelivery','Current','Development')][string] $Profile = 'Baseline',
     [ValidateSet('CleanCommit','Worktree')][string] $SourceMode = 'CleanCommit',
     [ValidatePattern('^[0-9a-f]{64}$')][string] $ExpectedSourceManifestSha256,
     [ValidateRange(1,1000000)][int] $ExpectedDotnetPassed = 333,
