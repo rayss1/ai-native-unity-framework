@@ -1,5 +1,7 @@
 using AiNative.Gameplay;
 using UnityEngine;
+using UnityEngine.InputSystem;
+using Gyroscope = UnityEngine.InputSystem.Gyroscope;
 using UnityEngine.UI;
 
 namespace AiNative.Client.Application
@@ -16,6 +18,7 @@ namespace AiNative.Client.Application
         private Vector2 _move;
         private Vector2 _look;
         private int _weapon = 1;
+        private Gyroscope _ownedGyro;
 
         public void SetMove(Vector2 value) => _move = Vector2.ClampMagnitude(value, 1f);
         public void SetLook(Vector2 value) => _look = value;
@@ -30,18 +33,32 @@ namespace AiNative.Client.Application
             if (playerCamera is not null) playerCamera.fieldOfView = 90f;
         }
 
+        private void OnDisable() => ReleaseGyro();
+
+        private void ReleaseGyro()
+        {
+            if (_ownedGyro != null && _ownedGyro.added) InputSystem.DisableDevice(_ownedGyro);
+            _ownedGyro = null;
+        }
+
         private void Update()
         {
             Vector2 move = _move;
             if (move == Vector2.zero)
             {
-                move = new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical"));
+                Keyboard keyboard = Keyboard.current;
+                move = keyboard == null ? Vector2.zero : new Vector2(
+                    (keyboard.dKey.isPressed || keyboard.rightArrowKey.isPressed ? 1 : 0) - (keyboard.aKey.isPressed || keyboard.leftArrowKey.isPressed ? 1 : 0),
+                    (keyboard.wKey.isPressed || keyboard.upArrowKey.isPressed ? 1 : 0) - (keyboard.sKey.isPressed || keyboard.downArrowKey.isPressed ? 1 : 0));
                 move = Vector2.ClampMagnitude(move, 1f);
             }
             Vector2 look = _look;
-            if (enableGyro && SystemInfo.supportsGyroscope)
+            Gyroscope sensor = enableGyro ? Gyroscope.current : null;
+            if (_ownedGyro != null && _ownedGyro != sensor) ReleaseGyro();
+            if (sensor != null)
             {
-                Vector3 gyro = Input.gyro.rotationRateUnbiased;
+                if (!sensor.enabled) { InputSystem.EnableDevice(sensor); _ownedGyro = sensor; }
+                Vector3 gyro = sensor.angularVelocity.ReadValue();
                 look += new Vector2(gyro.x, gyro.y) * 0.15f;
             }
             _state.YawMillidegrees += Mathf.RoundToInt(look.x * lookSensitivity * 1000f);

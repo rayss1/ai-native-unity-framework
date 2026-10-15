@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using AiNative.Client.Fantasy;
 using AiNative.Gameplay;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 namespace AiNative.Client.Application
 {
@@ -253,9 +254,29 @@ namespace AiNative.Client.Application
             _nextPoll = 0; State = "Lobby"; Error = ""; BackendStatus = "请重新准备后开始下一局。";
         }
 
+        // Sample devices in Update (Input System dynamic update). Fixed ticks consume
+        // the snapshot without querying devices from the wrong input-update phase.
+        private Vector2Int _manualMove;
+        private bool _manualFire;
+
+        private void SampleManualInput()
+        {
+            Keyboard keyboard = Keyboard.current;
+            _manualMove = keyboard == null ? Vector2Int.zero : new Vector2Int(
+                (keyboard.dKey.isPressed ? 1000 : 0) - (keyboard.aKey.isPressed ? 1000 : 0),
+                (keyboard.wKey.isPressed ? 1000 : 0) - (keyboard.sKey.isPressed ? 1000 : 0));
+            _manualFire = Mouse.current != null && Mouse.current.leftButton.isPressed;
+        }
+
+        private void OnApplicationFocus(bool focused)
+        {
+            if (!focused) { _manualMove = Vector2Int.zero; _manualFire = false; }
+        }
+
         private void Update()
         {
             if (_disposed || _paused) return;
+            SampleManualInput();
             if (Completed || State == "Settling" || State == "AwaitingResult")
             {
                 if (!_battleReceiveComplete && Battle != null) _battleReceiveComplete = Battle.DrainAcceptedPackets();
@@ -321,9 +342,9 @@ namespace AiNative.Client.Application
 #if UNITY_EDITOR
             acceptInput = (EditorHasGameFocus?.Invoke() ?? false) && !_textInputFocused;
 #endif
-            int x = _automated ? ((_inputTick / 60) % 2 == 0 ? 1000 : -1000) : acceptInput ? (Input.GetKey(KeyCode.D) ? 1000 : 0) - (Input.GetKey(KeyCode.A) ? 1000 : 0) : 0;
-            int z = !_automated && acceptInput ? (Input.GetKey(KeyCode.W) ? 1000 : 0) - (Input.GetKey(KeyCode.S) ? 1000 : 0) : 0;
-            var prepared = Battle.TryGetArenaState(out _) ? Battle.PredictAndQueueArenaInput(_inputTick, x, z, 0, 0, !_automated && acceptInput && !_pointerOverUi && Input.GetMouseButton(0) ? ArenaButtons.Fire : ArenaButtons.None, ArenaWeaponId.Machinegun) : Battle.PredictAndQueueInput(_inputTick, x, z);
+            int x = _automated ? ((_inputTick / 60) % 2 == 0 ? 1000 : -1000) : acceptInput ? _manualMove.x : 0;
+            int z = !_automated && acceptInput ? _manualMove.y : 0;
+            var prepared = Battle.TryGetArenaState(out _) ? Battle.PredictAndQueueArenaInput(_inputTick, x, z, 0, 0, !_automated && acceptInput && !_pointerOverUi && _manualFire ? ArenaButtons.Fire : ArenaButtons.None, ArenaWeaponId.Machinegun) : Battle.PredictAndQueueInput(_inputTick, x, z);
             if (prepared == AiNative.Client.Prediction.PredictionPrepareStatus.Prepared) PreparedInputs++;
         }
 
@@ -454,7 +475,7 @@ namespace AiNative.Client.Application
         {
             if (_disposed || Completed || paused == _paused) return; // Initial false and duplicate callbacks have no effect.
             _paused = paused;
-            if (paused) { PauseCount++; _pauseGeneration++; }
+            if (paused) { PauseCount++; _pauseGeneration++; _manualMove = Vector2Int.zero; _manualFire = false; }
             else
             {
                 ResumeCount++; _skipElapsedFrame = true;

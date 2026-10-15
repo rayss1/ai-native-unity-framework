@@ -6,7 +6,7 @@ using AiNative.Server.Control;
 
 namespace AiNative.Server.Hosting;
 
-/// <summary>Explicit, Debug-only handoff from the local supervisor to a VS-owned process.</summary>
+/// <summary>Explicit, Debug-only handoff from the local supervisor to an IDE-owned process.</summary>
 public static class LocalDebugBootstrap
 {
     public const string ProfileVariable = "AINATIVE_LOCAL_DEBUG_PROFILE";
@@ -91,7 +91,7 @@ public static class LocalDebugBootstrap
     }
 
 #if DEBUG
-    private static InvalidDataException Invalid(string reason) => new("local-debug-" + reason + "; rerun start-manual.ps1 -DebugService and choose the matching VS profile.");
+    private static InvalidDataException Invalid(string reason) => new("local-debug-" + reason + "; rerun manual.py start --debug-service and choose the matching Rider/VS profile.");
     private sealed record Profile(int Version, string ServiceId, int ProcessId, string Host,
         Dictionary<string, string>? Environment, Dictionary<string, string>? RequiredFiles, int SupervisorPid, DateTime SupervisorStartUtc);
 #endif
