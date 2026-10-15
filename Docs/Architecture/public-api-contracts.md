@@ -7,6 +7,23 @@ This catalog defines ownership and semantics before implementation. Names and in
 
 ## Common conventions
 
+### Local character rifle prototype
+
+Owner: `com.ainative.client.character`. Unity main thread only; no Shared or wire changes.
+`CharacterMotor.ShotFired` emits once per accepted grounded shooter attack, after action
+exclusion checks. Consumers subscribe/unsubscribe with their enabled lifecycle; respawn
+does not emit a shot. `CharacterRifle.Configure` injects the motor, camera, muzzle and
+tracer material. `Launch(origin, direction)` and `Advance(seconds)` are local test/adapter
+entry points; automatic LateUpdate must not also advance a manually driven instance.
+The camera chooses an aim point; actual projectiles originate at the muzzle and stop at
+the nearest non-owner collider. A 32-slot pool bounds active tracers; full capacity rejects
+additional projectiles. Physics queries currently allocate and are outside the fixed Tick.
+`CharacterHealth.ApplyDamage` rejects invalid/nonpositive values and already-dead targets,
+clamps HP to zero and returns whether damage was accepted; `ResetHealth` restores maximum.
+These local values must never be trusted as multiplayer authority. Disabling the rifle
+unsubscribes and clears queued/in-flight shots; destruction releases tracer objects.
+
+
 Developer-only local testing: Server Hosting owns `LocalDebugBootstrap`, an explicit Debug-build
 configuration handoff selected by `AINATIVE_LOCAL_DEBUG_PROFILE` and `AINATIVE_LOCAL_DEBUG_SERVICE`.
 It validates supervisor/service/file identities before applying process-local settings. It is not

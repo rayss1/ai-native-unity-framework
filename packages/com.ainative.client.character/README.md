@@ -1,7 +1,7 @@
 # Local character 3C
 
 Unity 6000.3 / Input System 1.20.1. A local-only PhysX prototype for keyboard and mouse;
-this package does not implement server authority, prediction, damage or networking.
+this package does not implement server authority, prediction or networking.
 The package contains reusable components; the application owns art and scene composition.
 
 ## Try it
@@ -22,8 +22,10 @@ or create a separate variant if you need changes to survive rebuilding.
 | Escape | Release cursor; click outside UI and release to resume |
 
 The course contains a 30-degree ramp, 20-cm steps, 1.25-m low ceiling, walls and jump
-platforms. Falling below -12 m respawns the character. Rifle shots and melee are animation
-demonstrations only. No ammo, hits, damage, combos, locking-on or invulnerability is implied.
+platforms and three training targets. Falling below -12 m respawns the character. Rifle
+shots launch visible local projectiles (70 m/s, 100 m range, 25 damage). Targets have 100 HP
+and reset three seconds after defeat. Press 2, aim with RMB and click LMB once per shot.
+Walls block projectiles. Ammunition is unlimited; melee remains animation-only.
 
 ## Composition and lifecycle
 

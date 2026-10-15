@@ -35,13 +35,23 @@ namespace AiNative.CharacterDemo
             motor.Simulate(new CharacterInputFrame { Jump = true }, 0, 1f / 60);
             if (motor.State.Grounded) { Fail("Jump did not leave ground"); yield break; }
             for (int i = 0; i < 90; i++) { motor.Simulate(default, 0, 1f / 60); yield return null; }
+            var rifle = motor.GetComponent<CharacterRifle>();
+            var target = FindFirstObjectByType<CharacterHealth>();
+            if (rifle == null || target == null) { Fail("Missing rifle or training targets"); yield break; }
+            var camera = Camera.main;
+            camera.GetComponent<CharacterOrbitCamera>().enabled = false;
+            camera.transform.position = motor.transform.position + Vector3.up * 1.5f - Vector3.forward * 3;
+            camera.transform.LookAt(target.transform.position);
             motor.Simulate(new CharacterInputFrame { ChangeMode = true, Mode = CharacterMode.Shooter, Aim = true, Attack = true }, 0, 1f / 60);
             if (motor.State.ShotSequence != 1) { Fail("Rifle action did not fire"); yield break; }
-            for (int i = 0; i < 30; i++) { motor.Simulate(new CharacterInputFrame { Aim = true }, 0, 1f / 60); yield return null; }
+            float deadline = Time.realtimeSinceStartup + 3;
+            while (target.Current == target.Maximum && Time.realtimeSinceStartup < deadline)
+            { motor.Simulate(new CharacterInputFrame { Aim = true }, 0, 1f / 60); yield return null; }
+            if (rifle.Shots != 1 || target.Current != 75) { Fail("Accepted rifle shot did not deal exactly 25 damage: " + rifle.LastHit); yield break; }
             motor.Simulate(new CharacterInputFrame { ChangeMode = true, Mode = CharacterMode.Melee, Attack = true }, 0, 1f / 60);
             if (!motor.State.Melee) { Fail("Melee action did not start"); yield break; }
             for (int i = 0; i < 70; i++) { motor.Simulate(default, 0, 1f / 60); yield return null; }
-            Debug.Log("CHARACTER_DEMO_SMOKE_PASS: composition, grounded movement, jump, rifle and melee");
+            Debug.Log("CHARACTER_DEMO_SMOKE_PASS: composition, grounded movement, jump, rifle projectile damage and melee animation");
             Application.Quit(0);
         }
 

@@ -42,6 +42,33 @@ art, battle scenes and network state are unaffected.
 
 ## Local behavior
 
+Rifle mode now fires visible projectiles at 70 m/s (100 m maximum range), with unlimited
+ammunition and 25 damage per click. Camera-centre aiming selects the destination; muzzle
+segment casts enforce walls and exclude the owner. An overlap check prevents shooting
+out of a wall enclosing the muzzle. Three 100 HP training targets at the far end of the
+course flash on hit, show HP, turn gray on defeat and reset after three seconds.
+The HUD shows shot/hit counts and the last impact. Melee remains animation-only.
+This is local PhysX damage, not a server-authoritative combat implementation.
+
+### Rifle validation (2026-10-15)
+
+- Character package PlayMode: 24/24 passed, including six rifle/action tests for thin
+  colliders, wall obstruction, muzzle overlap, owner exclusion, damage/death/reset,
+  disable cleanup and grounded action gating.
+- Real Invector rig animation regression: 1/1 passed. ArchitectureCheck passed.
+- Windows Development Player: smoke exited 0 and logged `CHARACTER_DEMO_SMOKE_PASS`;
+  it drives an accepted motor shot through the configured camera/muzzle into a real
+  scene target and asserts exactly 25 HP damage, alongside movement/jump/melee animation.
+- Evidence: `artifacts/character-demo/rifle-playmode-results.json`,
+  `rifle-animation-results.json`, `rifle-build-result.json`, `rifle-player-smoke.log`
+  and `rifle-player-exit.txt`. These are local worktree checks, not clean release evidence.
+- BattleHost publication succeeded, but automatic approval review blocked starting
+  the local host process with only `blocked by policy` supplied as the reason.
+  No new live network test result is claimed. Character projectiles/HP are not wired
+  to the authoritative arena protocol; network combat remains separate integration work.
+- Visual tracer readability, final weapon pose and interactive aiming feel still require
+  human acceptance; the Player smoke uses `-nographics`.
+
 The Input System 1.20.1 Gameplay/UI maps share a per-reader action asset. Gameplay is
 disabled on cursor release/focus loss; edges clear immediately. Recapture waits until
 the UI click is released. Mouse delta is sampled once per render update. One local player

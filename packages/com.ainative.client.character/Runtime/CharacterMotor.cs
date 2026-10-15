@@ -16,6 +16,7 @@ namespace AiNative.Client.Character
         private float rollRemaining, meleeRemaining;
         private readonly Collider[] overlaps = new Collider[16];
         public CharacterMotionState State => state;
+        public event System.Action ShotFired;
         public CharacterConfiguration Configuration => configuration;
         public void Configure(CharacterInputReader reader, CharacterOrbitCamera orbit) { input = reader; cameraRig = orbit; }
 
@@ -65,7 +66,7 @@ namespace AiNative.Client.Character
             else if (!wasBusy && grounded && frame.Attack)
             {
                 if (state.Mode == CharacterMode.Melee) meleeRemaining = c.MeleeDuration;
-                if (state.Mode == CharacterMode.Shooter) state.ShotSequence++;
+                if (state.Mode == CharacterMode.Shooter) { state.ShotSequence++; ShotFired?.Invoke(); }
             }
             state.Rolling = rollRemaining > 0;
             state.Melee = meleeRemaining > 0;
