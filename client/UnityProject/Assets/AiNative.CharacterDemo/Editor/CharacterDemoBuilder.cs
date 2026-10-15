@@ -96,6 +96,13 @@ namespace AiNative.CharacterDemo.Editor
                 animation.Configure(motor, animator, rifle, grip);
                 animation.ConfigureAimPose(new Vector3(-7.19209f, 17.92332f, -0.16308f),
                     Quaternion.Euler(270.6801f, 292.9626f, 155.0211f));
+                var muzzle = new GameObject("Muzzle").transform;
+                muzzle.SetParent(rifle.transform, false);
+                // Centre of the imported barrel's front rim (mesh-local metres).
+                muzzle.localPosition = new Vector3(0, .0546f, .43f);
+                var tracer = CourseMaterial("Tracer", new Color(1, .8f, .15f));
+                tracer.EnableKeyword("_EMISSION"); tracer.SetColor("_EmissionColor", new Color(3, 2, .2f));
+                player.AddComponent<CharacterRifle>().Configure(motor, cameraObject.GetComponent<Camera>(), muzzle, tracer);
                 player.AddComponent<CharacterDemoHud>().Configure(motor, input);
                 PrefabUtility.SaveAsPrefabAssetAndConnect(rig, Generated + "/CharacterDemoRig.prefab", InteractionMode.AutomatedAction);
                 var events = new GameObject("EventSystem", typeof(EventSystem));
@@ -184,6 +191,12 @@ namespace AiNative.CharacterDemo.Editor
             Box("Camera corner", new Vector3(6, 1.7f, -5), new Vector3(4.5f, 3.4f, 0.5f), obstacles);
             Box("Jump platform 0.6m", new Vector3(2, 0.3f, 9), new Vector3(2, 0.6f, 2), obstacles);
             Box("Jump platform 1.2m", new Vector3(5, 0.6f, 9), new Vector3(2, 1.2f, 2), obstacles);
+            for (int i = 0; i < 3; i++)
+            {
+                var target = Box("Training target " + (i + 1), new Vector3(-4 + i * 4, 1, 13), new Vector3(1, 2, .4f), obstacles);
+                target.AddComponent<CharacterHealth>();
+                target.AddComponent<TrainingTarget>();
+            }
             var light = new GameObject("Sun", typeof(Light)).GetComponent<Light>();
             light.type = LightType.Directional; light.intensity = 1.5f; light.shadows = LightShadows.Soft;
             light.transform.rotation = Quaternion.Euler(50, -30, 0);
