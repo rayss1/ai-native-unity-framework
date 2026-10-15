@@ -6,7 +6,8 @@
     "AiNative.Client.Prediction",
     "AiNative.Gameplay",
     "AiNative.Realtime",
-    "UnityEngine.UI"
+    "UnityEngine.UI",
+    "Unity.InputSystem"
   ],
   "autoReferenced": true
 }

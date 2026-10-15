@@ -1,46 +1,51 @@
-# Windows 本机对战与 Visual Studio 调试
+# Windows／macOS 本机对战与 Rider／Visual Studio 调试
 
-本文用于日常开发：本机启动服务器，用 Unity 的两个或四个窗口测试，也可以让 VS 单独调试一个服务。不是压力测试或发布验收。
+本文用于日常开发：本机启动服务器，用 Unity 的两个或四个窗口测试，也可以让 Rider／VS 单独调试一个服务。不是压力测试或发布验收。
 
 ## 1. 准备环境
 
-- PowerShell 7、仓库 `global.json` 支持的 .NET 10 SDK。
-- PostgreSQL 17.11。脚本优先寻找仓库已有便携版，其次系统安装；也可通过 `-PostgresBinDirectory` 指定其 `bin` 目录。
+- Python 3.11+、Git、仓库根目录 `global.json` 支持的 .NET 10 SDK。原生 Python／shell／cmd 入口不需要 PowerShell；仅旧 `.ps1` 包装需要 PowerShell 7。
+- PostgreSQL **17.11** 的完整工具目录。通过 `--postgres-bin-directory` 指定，或先从仓库 `artifacts/postgresql/17.11/bin`、再从 PATH／平台常见目录发现。Mac 检查 `/opt/homebrew/opt/postgresql@17/bin`、`/usr/local/opt/postgresql@17/bin`、`/Library/PostgreSQL/17/bin`；Windows 检查既有仓库便携版与 Program Files。工具不会自动安装或接受其他版本。
 - Unity 6000.3.23f1；工程已固定 Multiplayer Play Mode 2.0.2，不需要升级到 3.0。
-- 调试使用支持 .NET 10 的 Visual Studio；打开仓库根目录 `AiNative.sln`，不是 Unity 自动生成的解决方案。
+- 调试使用支持项目 .NET 10 目标的 Rider（Mac／Windows）或 Visual Studio（Windows）；打开仓库根目录 `AiNative.sln`，不是 Unity 自动生成的解决方案。
 - 初始化仓库固定的 Fantasy 子模块。
 
 以下命令从仓库根目录运行。无需 Docker、云账号或 Unity 网络服务。
 
 ## 2. 启动和关闭服务器
 
-双击 `tools/topology/start-manual.cmd`，或在 PowerShell 7 执行：
+Mac 从终端执行：
 
-```powershell
-./tools/topology/start-manual.ps1
+```sh
+./tools/topology/start-manual.sh
+# 等价入口；参数均由同一 Python 实现处理
+python3 tools/topology/manual.py start --players-per-room 4 --match-ticks 7200
 ```
 
-脚本编译当前源码，准备独立数据库，启动 Gate、Player、Lobby、Match、Coordinator 和两个 Battle。看到“服务器已就绪”再操作客户端。默认两人一局、每局十分钟。
+Windows 双击 `tools/topology/start-manual.cmd`，或执行：
 
-快速测试两分钟一局：
-
-```powershell
-./tools/topology/start-manual.ps1 -PlayersPerRoom 2 -MatchTicks 7200
+```bat
+py -3 tools/topology/manual.py start
 ```
 
-四人同房：先关闭原服务，再执行：
+原 `./tools/topology/start-manual.ps1 -PlayersPerRoom 4 -MatchTicks 7200` 继续有效，仅转发至 Python。`.cmd` 也保留 `-PlayersPerRoom` 等旧参数拼写。两平台执行同一套构建、配置、数据库和进程管理逻辑，不会运行另一套 PowerShell 初始化流程。
 
-```powershell
-./tools/topology/start-manual.ps1 -PlayersPerRoom 4 -MatchTicks 7200
+启动器编译当前源码，准备独立数据库，启动 Gate、Player、Lobby、Match、Coordinator 和两个 Battle。看到“服务器已就绪”再操作客户端。默认两人一局、每局十分钟；`--match-ticks 7200` 为两分钟，`--players-per-room 4` 为四人同房。修改配置前先停止原环境。
+
+保持启动窗口打开。按 Ctrl+C 停止；也可在另一终端执行：
+
+```sh
+python3 tools/topology/manual.py status
+python3 tools/topology/manual.py stop
+# Mac 停止包装：./tools/topology/stop-manual.sh
+# Windows 将 python3 换为 py -3；旧 stop-manual.ps1 也继续有效
 ```
 
-保持启动窗口打开。关闭时按 Ctrl+C；也可在另一个 PowerShell 窗口运行：
+停止命令请求监督器清理并立即返回，需等待原启动窗口完成退出。服务先收到退出信号，超时后仅终止本次拥有的进程；数据库通过 `pg_ctl` 关闭。账号保存在 `artifacts/manual-test/postgres`，下次可继续登录；密钥、录像和未结算结果也保留。不会接管已有数据库或按进程名批量杀进程。不要强制结束监督器，否则不能保证执行清理。
 
-```powershell
-./tools/topology/stop-manual.ps1
-```
+参数 `--sdk-path` 指定 dotnet 可执行文件，`--postgres-bin-directory` 指定数据库工具目录，`--postgres-port` 默认 25439，`--run-directory` 必须位于仓库 artifacts 下。路径带空格或中文时用引号包裹。IDE 模式固定使用默认运行目录。
 
-后者请求启动脚本自行清理，不按进程名批量杀进程。等待启动窗口完成退出。账号和数据库保留在 `artifacts/manual-test/postgres`，下次可继续登录。不要直接关闭终端或结束监督进程，否则无法保证执行清理；不要删除数据库、未结算结果或未知进程。
+SDK 检查和发布命令统一在仓库根目录执行。根 `global.json` 要求 10.0.202（允许其策略内向前选择），10.0.200 不满足要求；`server/global.json` 的局部覆盖不会改变入口预检。若在 server 目录能编译而启动器报错，请在根目录运行 `dotnet --version` 核对，不能把该局部覆盖当作全仓库 SDK 已满足。
 
 ## 3. Unity 双客户端／四客户端
 
@@ -59,7 +64,28 @@
 
 可编辑界面资产：`Assets/AiNative.BattleClient/Resources/TopologyClientUI.prefab`。应用流程在 `TopologyClientFlow.cs`，界面显示和按钮绑定在 `TopologyClientView.cs`。菜单 `AI Native > Local Test > Rebuild UGUI Prefab` 根据 `TopologyUiPrefabBuilder.cs` 重新生成默认界面，会覆盖对该 Prefab 的手工修改；通常只需直接编辑 Prefab。
 
-## 4. 用 VS 按 F5 调试一个服务
+## 4. Rider 单服务断点调试（Mac／Windows）
+
+以 Player 为例：
+
+```sh
+python3 tools/topology/manual.py start --debug-service player --match-ticks 7200
+```
+
+1. Rider 打开根目录 `AiNative.sln`，选择 Debug 构建。
+2. 在 Run/Debug Configurations 中选择／创建 **.NET Launch Settings Profile**，项目为 `AiNative.PlayerHost`，Profile 为 `Local Debug player`。不要选择普通 Web Profile。
+3. 核对工作目录为仓库根目录、参数为 `--pid 2 -m Release`，环境变量为 `AINATIVE_LOCAL_DEBUG_PROFILE=artifacts/manual-test/vs-debug.json`、`AINATIVE_LOCAL_DEBUG_SERVICE=player`。
+4. 若 IDE 未导入 launch profile，可创建 .NET Project 配置并显式填写同样的项目、Debug 构建、工作目录、参数和两个环境变量；无需复制生成文件中的全部配置。
+5. 在 `PlayerService.HandleAsync` 设置断点，启动 Debug，等待监督器显示全部服务就绪，再从 Unity 登录。
+6. 停止 Rider 调试时，其他六个服务和数据库继续运行。修改代码、再次 Debug 后可重新登录；监督器会持续显示就绪状态。
+
+七种调试目标与下一节表格相同。Battle 参数为 `--pid 100 -m Release`（battle-1）或 `--pid 101 -m Release`（battle-2）；其余 PID 为 Gate 1、Player 2、Lobby 3、Match 4、Coordinator 5。一次只交接一个服务。
+
+生成文件沿用 `vs-debug.json` 名称以兼容 Windows，内容为 IDE 无关配置。文件哈希或监督进程身份不匹配时拒绝启动，Release 构建也拒绝交接。脚本不会终止 Rider 启动的进程，停止整套环境前先停止 IDE 调试。Battle 停顿可能超时判失联；重启后的旧房间终止，应重新匹配，不修改生产超时规避该行为。
+
+以下 VS 流程继续适用于 Windows。
+
+## 5. 用 VS 按 F5 调试一个服务
 
 例如调试登录和结算的 Player 服务：
 
@@ -98,16 +124,16 @@
 
 关闭整套环境前先在 VS 停止调试，再停止脚本。脚本不会接管或结束 VS 启动的服务。
 
-## 5. 附加正在运行的服务
+## 6. 附加正在运行的服务
 
 无需调启动代码时，也可以普通脚本启动全部服务，然后在 VS 选择“调试 > 附加到进程”，附加目标 `AiNative.*Host.exe`。
 
 两个 Battle 名字相同，查看 `artifacts/manual-test/battle-1.pid.json` 或 `battle-2.pid.json` 中的 PID 区分。脚本默认发布 Release，优化可能影响变量和单步查看；需要稳定单步调试时使用上一节的 F5 方式。
 
-## 6. 日志和常见问题
+## 7. 日志和常见问题
 
 - 脚本编译日志：`artifacts/manual-test/build.log`。
-- 各脚本服务日志：`<service>.stdout.log`、`<service>.stderr.log`；VS 服务查看 VS 输出／控制台。
+- 各脚本服务日志：`<service>.stdout.log`、`<service>.stderr.log`；IDE 服务查看 Rider／VS 输出／控制台。
 - 数据库日志：`postgres/server.log`；VS 交接配置：`vs-debug.json`。
 - 客户端日志：主 Unity Console 与各克隆窗口日志。不要把密码或入场凭证写入日志。
 - 端口占用：先检查现有脚本或 VS 服务是否仍运行，不启动第二套固定端口服务。
@@ -118,7 +144,47 @@
 - VS 提示信任 ASP.NET Core SSL 证书：检查是否误选原 Web Profile；本机调试应选择表中的 `Local Debug …`，这条路径不需要 HTTPS 证书。
 - 重启 Battle 后旧房间不能恢复：这是既有故障语义，重新匹配。
 
-## 验证记录
+## 2026-10-15：统一 Python 入口的初次实现验证
+
+初次实现阶段在 macOS ARM64 执行，Python 3.14.7；当时没有安装或升级系统依赖，也没有修改已有 `server/global.json` 或 Fantasy 子模块状态。
+
+- Python 启动器回归 **34 项通过**，含跨进程目录锁、真实 Unix 子进程正常停止、失败清理、过期身份拒绝、模拟七服务监督及 IDE 排除；模拟监督测试不替代真实服务器验收。
+- `LocalDebugBootstrapTests`：Debug **18 项**、Release **10 项**通过，包含 Python 实际生成的交接配置与文件篡改拒绝。
+- .NET 辅助工具编译通过，实际进程身份连续读取一致、RSA 密钥重复初始化保留原密钥。
+- 架构检查、shell 语法和 `git diff --check` 通过。
+- 初次预检按预期拒绝本机 10.0.200（要求 10.0.202）；未发现 PostgreSQL 17.11。**七服务真实启停、账号保留、Unity 双客户端、Rider Player／Battle 断点与再次启动均未执行**。无 Windows 执行环境，`.cmd`／PowerShell 实机回归也未执行。
+
+上述 .NET 测试在 `server` 目录使用已有局部配置选择的 SDK 10.0.200；辅助工具和架构检查通过显式调用已安装 10.0.200 的 MSBuild 编译。这只是诊断验证，不代表根目录 SDK 要求已经满足。测试结果位于 `server/tests/AiNative.BattleHost.Tests/TestResults/python-local-debug-{debug,release}.trx`；辅助工具诊断产物位于忽略目录 `artifacts/manual-helper-validation`。
+
+依赖齐全后，从根目录复现自动检查：
+
+```sh
+python3 -m unittest discover -s tools/topology/tests -p test_manual.py -v
+dotnet test server/tests/AiNative.BattleHost.Tests/AiNative.BattleHost.Tests.csproj -c Debug --filter FullyQualifiedName~LocalDebugBootstrapTests
+dotnet test server/tests/AiNative.BattleHost.Tests/AiNative.BattleHost.Tests.csproj -c Release --filter FullyQualifiedName~LocalDebugBootstrapTests
+dotnet run --project tools/ArchitectureCheck -- --root .
+```
+
+随后执行本指南的原生启动、Unity 流程和 Rider 调试步骤，停止并重启后用同一账号登录。Windows 使用 `py -3` 替代 `python3`，再验证旧入口及参数转发。停止请求发出后必须等待原启动窗口退出再检查端口释放。
+
+## 2026-10-15：授权安装后的 macOS 原生验收
+
+项目负责人随后授权安装依赖。SDK **10.0.202** 已安装到 `artifacts/dotnet`，附带 .NET／ASP.NET Core 10.0.6；PostgreSQL **17.11** 已安装到 `artifacts/postgresql/17.11`。两者均由启动器自动发现，未修改系统 SDK、系统数据库服务、根版本约束或已有 `server/global.json`。
+
+PostgreSQL 来自[官方 17.11 源码](https://ftp.postgresql.org/pub/source/v17.11/)，下载 SHA-256 已核验：`dd27f2b3c59e73ed14aa3324901242bf69a032a6347805f274e6260322d42979`。使用 macOS 原生编译器构建，配置为 `--without-icu --without-readline`，用于现有 C locale 本机测试数据库。许可证保留在 `artifacts/postgres-install/postgresql-17.11/COPYRIGHT`；来源、版本、配置和回滚说明记录在 `artifacts/postgres-install/installation.json`。升级仍需显式变更版本与重新验证；切换安装可用 `--postgres-bin-directory`，先停止所属环境，保留数据库、密钥、录像及未结算结果。
+
+本次实测结果：
+
+- 原生七服务启动成功，七个 `/health/ready` 均返回 200。
+- 20 秒短对局（`--match-ticks 1200`）的真实 .NET 客户端验收通过：TCP 注册／登录／组队／匹配、授权检查、KCP 输入确认、重连、错误房间票据拒绝、连续输入、完成对局及 PostgreSQL 结算，共 8 个场景；报告为 `artifacts/manual-test/acceptance.json`。
+- `manual.py stop` 完成清理；默认十分钟配置再次启动成功。重启前后两个测试账号及战绩摘要一致，见 `artifacts/postgres-install/before-restart.json`、`after-restart.json`。这验证数据保留，没有额外声称重启后用原密码登录已测试。
+- 修复了 Unix TCP `TIME_WAIT` 被预检误判为监听端口占用的问题；仅 TCP 探针使用 `SO_REUSEADDR`，仍通过 bind/listen 拒绝真实监听者，不启用 `SO_REUSEPORT`。立即重启验证通过。
+- 向经身份核对的监督器发送 Ctrl+C 等价 SIGINT 后，监督器正常退出，七服务全部退出、数据库停止、TCP／UDP 端口可用，见 `artifacts/postgres-install/shutdown.json`。验收结束后没有保留运行中的测试服务器。
+- Python 回归 **36 项通过**；使用仓库 SDK 10.0.202 重跑调试交接测试，Debug **18 项**、Release **10 项**通过；架构检查通过。日志保存在 `artifacts/postgres-install`，TRX 文件名为 `native-sdk-10.0.202-{debug,release}.trx`。
+
+仍未执行：Mac Unity 双客户端实机流程、Rider Player／Battle 实际断点及编辑后再次调试、Windows 兼容入口实机回归。本轮 .NET 客户端结果不能替代这些验收，也不作为性能或生产部署证据。
+
+## 历史验证记录（不代表 Python／macOS 新入口已验收）
 
 2026-10-13，Windows 本机实际执行：
 

@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using AiNative.Client.Fantasy;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.UI;
 using UnityEngine.UI;
 
 namespace AiNative.Client.Application
@@ -43,6 +45,8 @@ namespace AiNative.Client.Application
         private Selectable[] _loginNavigation;
         private Graphic[] _pointerSurfaces;
         private Canvas _canvas;
+        private Vector2 _pointerPosition;
+        private bool _hasPointer;
 
         public void Bind(TopologyClientFlow flow)
         {
@@ -54,7 +58,15 @@ namespace AiNative.Client.Application
             _font = Font.CreateDynamicFontFromOSFont(new[] { "Microsoft YaHei", "Microsoft YaHei UI", "Arial" }, 20);
             foreach (Text text in GetComponentsInChildren<Text>(true)) text.font = _font;
             if (EventSystem.current == null)
-                _ownedEventSystem = new GameObject("Local UI EventSystem", typeof(EventSystem), typeof(StandaloneInputModule));
+                _ownedEventSystem = new GameObject("Local UI EventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule));
+            else
+            {
+                // A scene may supply its own EventSystem. Keep its ownership, but do not
+                // leave a legacy module polling an input backend disabled by this project.
+                foreach (StandaloneInputModule legacy in EventSystem.current.GetComponents<StandaloneInputModule>()) legacy.enabled = false;
+                if (EventSystem.current.GetComponent<InputSystemUIInputModule>() == null)
+                    EventSystem.current.gameObject.AddComponent<InputSystemUIInputModule>();
+            }
             Host.text = flow.ConnectionHost; Port.text = flow.ConnectionPort; Pin.text = flow.ConnectionPin; Tls.isOn = flow.ConnectionTls;
             Login.onClick.AddListener(() => Authenticate(false));
             Register.onClick.AddListener(() => Authenticate(true));
@@ -80,17 +92,21 @@ namespace AiNative.Client.Application
         {
             if (_flow == null) return;
             Render();
+            Pointer pointer = Pointer.current;
+            _hasPointer = pointer != null;
+            if (_hasPointer) _pointerPosition = pointer.position.ReadValue();
             RefreshInputBlock();
+            Keyboard keyboard = Keyboard.current;
             GameObject selected = EventSystem.current != null ? EventSystem.current.currentSelectedGameObject : null;
-            if (_page == 0 && !_flow.UiBusy)
+            if (_page == 0 && !_flow.UiBusy && keyboard != null)
             {
                 if ((selected == Username.gameObject || selected == Password.gameObject) &&
-                    (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter))) Authenticate(false);
-                if (Input.GetKeyDown(KeyCode.Tab))
+                    (keyboard.enterKey.wasPressedThisFrame || keyboard.numpadEnterKey.wasPressedThisFrame)) Authenticate(false);
+                if (keyboard.tabKey.wasPressedThisFrame)
                 {
                     int current = -1;
                     for (int i = 0; i < _loginNavigation.Length; i++) if (_loginNavigation[i].gameObject == selected) current = i;
-                    int direction = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift) ? -1 : 1;
+                    int direction = keyboard.leftShiftKey.isPressed || keyboard.rightShiftKey.isPressed ? -1 : 1;
                     for (int step = 1; step <= _loginNavigation.Length; step++)
                     {
                         int index = (current + direction * step + _loginNavigation.Length * 2) % _loginNavigation.Length;
@@ -117,7 +133,7 @@ namespace AiNative.Client.Application
             }
         }
 
-        /// <summary>Current-position UI guard. Reuses cached graphics; safe before a fixed input tick.</summary>
+        /// <summary>UI guard using the last render-frame pointer sample; safe before a fixed input tick.</summary>
         public void RefreshInputBlock()
         {
             if (_flow == null) return;
@@ -125,10 +141,10 @@ namespace AiNative.Client.Application
             InputField focused = selected != null ? selected.GetComponent<InputField>() : null;
             bool typing = focused != null && focused.isFocused;
             bool pointer = false;
-            if (_page == 3) foreach (Graphic surface in _pointerSurfaces)
+            if (_page == 3 && _hasPointer) foreach (Graphic surface in _pointerSurfaces)
             {
                 if (surface != null && surface.isActiveAndEnabled && surface.raycastTarget &&
-                    RectTransformUtility.RectangleContainsScreenPoint(surface.rectTransform, Input.mousePosition))
+                    RectTransformUtility.RectangleContainsScreenPoint(surface.rectTransform, _pointerPosition))
                 { pointer = true; break; }
             }
             _flow.SetUiInputBlocked(typing || _page != 3, pointer || _page != 3);

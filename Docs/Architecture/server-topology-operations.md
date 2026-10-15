@@ -4,40 +4,35 @@ ADR-0017 fixes Gate, Player, Lobby, Match, RoomCoordinator and Battle roles. The
 
 ## Windows local acceptance
 
-For the interactive two/four-window Unity workflow and single-service Visual Studio F5 debugging,
-see the [Windows local testing guide](../../tools/topology/README-local-debug.md).
-`start-manual.ps1 -DebugService player` leaves that service to VS while supervising the other six.
-Local Debug profiles are Debug-only, use the same generated service environment, and retain the
-existing Fantasy `--pid ... -m Release` startup contract. No production timeout is relaxed.
+The native interactive entry now supports Windows and macOS through one Python 3.11+
+implementation: `tools/topology/manual.py start|stop|status`. macOS shell and Windows
+cmd/PowerShell launchers only forward arguments. See the [local testing and Rider/VS
+guide](../../tools/topology/README-local-debug.md). The section anchor is retained for
+existing links; Windows acceptance history does not qualify the new macOS path.
 
-For interactive local Unity testing, run this from the repository root in PowerShell 7:
+Use the SDK selected by repository-root `global.json`, Git, and PostgreSQL **17.11**.
+The entry does not install dependencies. `--postgres-bin-directory` overrides discovery;
+`--sdk-path` selects dotnet without relaxing root SDK policy. The local server/global.json
+override does not satisfy a failed root SDK check.
 
-```powershell
-./tools/topology/start-manual.ps1
-```
+The entry publishes current sources, initializes service keys and a dedicated PostgreSQL
+cluster, starts seven processes, and checks readiness. Defaults remain two players,
+ten-minute matches, Gate `127.0.0.1:23001` without TLS, PostgreSQL port `25439`, and
+`artifacts/manual-test`. The cluster uses loopback-only trust authentication and does not
+reuse `AINATIVE_TEST_POSTGRES`. Data, keys, replays and outboxes survive shutdown.
 
-Or double-click `tools/topology/start-manual.cmd`. The launcher finds PowerShell
-7 on PATH, in standard system/user installation directories, WinGet links or
-the current user's bundled Codex runtime; a PATH entry is not required.
-Source identity generation uses Git's nonignored file inventory when ripgrep
-is unavailable, so desktop users do not need a separate ripgrep installation.
-The entry publishes current
-sources, initializes keys and a dedicated PostgreSQL cluster, starts seven
-server processes, and checks every readiness endpoint before announcing success.
-Defaults are two players per match and ten-minute matches. Unity connects to
-Gate `127.0.0.1:23001` with TLS disabled for this loopback test. Keep the window
-open; Ctrl+C stops the owned services and database. Account data, keys, replay
-and outbox files remain under `artifacts/manual-test` for subsequent runs.
+`start --debug-service player` leaves Player to Rider/VS while supervising the other six.
+Existing Debug-only launch profiles and the `vs-debug.json` handoff retain file and
+supervisor identity checks and Fantasy `--pid ... -m Release` arguments. No production
+timeouts change. IDE-owned processes are never stopped by the supervisor.
 
-The script discovers PostgreSQL **17.11** binaries from the existing local
-validation download, `Program Files/PostgreSQL/17/bin`, or PATH; override with
-`-PostgresBinDirectory`. It does not download/install PostgreSQL. Its separate
-cluster uses loopback-only trust authentication and port **25439** by default
-(`-PostgresPort` overrides it). It neither reuses `AINATIVE_TEST_POSTGRES` nor
-stops an existing database. Occupied ports or another owned instance fail before
-build/start. `-RunDirectory` must be inside repository artifacts; use
-`-MatchTicks 36000 -PlayersPerRoom 2` to state the defaults explicitly. This is
-manual development tooling, not production deployment or qualification.
+Keep the startup terminal open. Ctrl+C, macOS SIGTERM, or a session-bound `stop` request
+runs bounded owned-child cleanup followed by `pg_ctl` database shutdown. The directory
+lock and PID/path/creation-time checks prevent duplicate supervision and stale PID reuse.
+An already running database is never adopted. This is development tooling, not a
+production deployment or capacity qualification.
+
+The following automatic acceptance/capacity tools retain their existing PowerShell implementation:
 
 Use PowerShell 7 and the SDK pinned in global.json. Every wrapper accepts `-SdkPath` and `-RunDirectory`; run directories must remain inside repository artifacts.
 

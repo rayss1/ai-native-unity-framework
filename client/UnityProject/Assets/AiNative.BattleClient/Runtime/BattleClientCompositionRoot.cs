@@ -3,6 +3,7 @@ using System.IO;
 using AiNative.Gameplay;
 using AiNative.Client.Prediction;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 namespace AiNative.Client.Application
 {
@@ -168,9 +169,29 @@ namespace AiNative.Client.Application
             return material;
         }
 
+        // Sample devices in Update (Input System dynamic update). Fixed ticks consume
+        // the snapshot without querying devices from the wrong input-update phase.
+        private Vector2Int _manualMove;
+        private bool _manualFire;
+
+        private void SampleManualInput()
+        {
+            Keyboard keyboard = Keyboard.current;
+            _manualMove = keyboard == null ? Vector2Int.zero : new Vector2Int(
+                (keyboard.dKey.isPressed ? 1000 : 0) - (keyboard.aKey.isPressed ? 1000 : 0),
+                (keyboard.wKey.isPressed ? 1000 : 0) - (keyboard.sKey.isPressed ? 1000 : 0));
+            _manualFire = Mouse.current != null && Mouse.current.leftButton.isPressed;
+        }
+
+        private void OnApplicationFocus(bool focused)
+        {
+            if (!focused) { _manualMove = Vector2Int.zero; _manualFire = false; }
+        }
+
         private void Update()
         {
             if (_topology != null || _session == null) return;
+            SampleManualInput();
             _session.Pump(Time.unscaledDeltaTime);
             if (_finished) return;
 
@@ -229,10 +250,8 @@ namespace AiNative.Client.Application
             }
             else
             {
-                moveX = (Input.GetKey(KeyCode.D) ? MoveScaleMilli : 0) -
-                        (Input.GetKey(KeyCode.A) ? MoveScaleMilli : 0);
-                moveZ = (Input.GetKey(KeyCode.W) ? MoveScaleMilli : 0) -
-                        (Input.GetKey(KeyCode.S) ? MoveScaleMilli : 0);
+                moveX = global::UnityEngine.Application.isFocused ? _manualMove.x : 0;
+                moveZ = global::UnityEngine.Application.isFocused ? _manualMove.y : 0;
             }
 
             if (!_session.TryGetArenaState(out _))
@@ -241,7 +260,7 @@ namespace AiNative.Client.Application
                 return;
             }
 
-            ArenaButtons buttons = Input.GetMouseButton(0) ? ArenaButtons.Fire : ArenaButtons.None;
+            ArenaButtons buttons = global::UnityEngine.Application.isFocused && _manualFire ? ArenaButtons.Fire : ArenaButtons.None;
             _session.PredictAndQueueArenaInput(
                 _roomTick,
                 moveX,

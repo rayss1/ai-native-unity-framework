@@ -132,6 +132,45 @@ public sealed class LocalDebugBootstrapTests
     }
 #endif
 
+    [TestCase(false)]
+    [TestCase(true)]
+    public void PythonGeneratedProfilePreservesHandoffContract(bool corruptFile)
+    {
+        string[] args = CreateProfile("player", ServiceRole.Player, 2, "PlayerHost");
+        string path = Environment.GetEnvironmentVariable(LocalDebugBootstrap.ProfileVariable)!;
+        string python = Environment.GetEnvironmentVariable("AINATIVE_TEST_PYTHON")
+            ?? (OperatingSystem.IsWindows() ? "python" : "python3");
+        ProcessStartInfo start = new(python)
+        {
+            WorkingDirectory = root, UseShellExecute = false,
+            RedirectStandardOutput = true, RedirectStandardError = true
+        };
+        start.ArgumentList.Add("-c");
+        start.ArgumentList.Add("import sys; from pathlib import Path; sys.path.insert(0, 'tools/topology'); " +
+            "from manual_runtime import read_json, write_json, debug_profile, SERVICES; " +
+            "p=Path(sys.argv[1]); old=read_json(p); " +
+            "write_json(p, debug_profile(SERVICES[1], old['Environment'], " +
+            "{'Pid':old['SupervisorPid'],'StartUtc':old['SupervisorStartUtc']}))");
+        start.ArgumentList.Add(path);
+        using Process process = Process.Start(start)!;
+        Task<string> stdout = process.StandardOutput.ReadToEndAsync();
+        Task<string> stderr = process.StandardError.ReadToEndAsync();
+        if (!process.WaitForExit(30000))
+        {
+            process.Kill(entireProcessTree: true);
+            Assert.Fail("Python profile writer timed out.");
+        }
+        Assert.That(process.ExitCode, Is.Zero, stderr.GetAwaiter().GetResult());
+        _ = stdout.GetAwaiter().GetResult();
+        if (corruptFile) File.AppendAllText(Path.Combine(directory, "key.pem"), "changed");
+#if DEBUG
+        if (corruptFile) Assert.Throws<InvalidDataException>(() => LocalDebugBootstrap.Apply(ServiceRole.Player, args));
+        else Assert.That(LocalDebugBootstrap.Apply(ServiceRole.Player, args), Is.EqualTo(args));
+#else
+        Assert.Throws<InvalidOperationException>(() => LocalDebugBootstrap.Apply(ServiceRole.Player, args));
+#endif
+    }
+
     [Test]
     public void OrdinaryLaunchArgumentsAreUntouched()
     {

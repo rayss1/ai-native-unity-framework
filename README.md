@@ -43,10 +43,10 @@ git add server/vendor/Fantasy
 
 ## Validate
 
-Windows interactive testing and Visual Studio single-service debugging:
-[本机双／四客户端与 VS F5 操作指南](tools/topology/README-local-debug.md).
+Windows/macOS native interactive testing and Rider/Visual Studio single-service debugging:
+[本机双／四客户端与 IDE 调试指南](tools/topology/README-local-debug.md).
 
-For manual testing on Windows, run `./tools/topology/start-manual.ps1` in PowerShell 7 or double-click `tools/topology/start-manual.cmd`. It starts an isolated local database and all seven server processes; Ctrl+C stops them. See [startup requirements and client connection](Docs/Architecture/server-topology-operations.md#windows-local-acceptance).
+Use Python 3.11+, the root-pinned .NET SDK and PostgreSQL 17.11. On macOS run `./tools/topology/start-manual.sh`; on Windows run `py -3 tools/topology/manual.py start` or double-click `tools/topology/start-manual.cmd`. Both use the same Python lifecycle. It starts an isolated local database and seven server processes; Ctrl+C requests cleanup. Use `manual.py stop` from another terminal, or `start --debug-service player` for Rider/VS handoff. The existing PowerShell wrappers remain compatible. See [startup requirements and client connection](Docs/Architecture/server-topology-operations.md#windows-local-acceptance).
 
 For local Unity CLI setup, project defaults and EditMode/real-KCP PlayMode commands, see [Unity CLI validation](Docs/Architecture/unity-cli-validation.md). The CLI development path accepts the current worktree; exact-commit qualification remains separate.
 

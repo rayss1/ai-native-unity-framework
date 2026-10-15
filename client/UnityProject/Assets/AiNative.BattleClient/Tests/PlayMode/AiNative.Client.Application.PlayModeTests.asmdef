@@ -5,7 +5,10 @@
     "AiNative.Client.Application",
     "AiNative.Client.Prediction",
     "AiNative.Gameplay",
-    "AiNative.Client.Fantasy"
+    "AiNative.Client.Fantasy",
+    "Unity.InputSystem",
+    "Unity.InputSystem.TestFramework",
+    "UnityEngine.UI"
   ],
   "optionalUnityReferences": [
     "TestAssemblies"
