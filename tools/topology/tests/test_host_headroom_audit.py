@@ -17,7 +17,7 @@ class HostAuditTests(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
-        self.root = Path(self.directory.name)
+        self.root = Path(self.directory.name).resolve()
         self.options = dict(RoomCount=4, PlayersPerRoom=8, WorkerCount=2, RoomsPerWorker=1,
                             InputHz=60, WarmupSeconds=60, DurationSeconds=300)
         self.identity = dict(Source="c9098be7e2a44efc42182a87aca2551648993705+source-worktree-sha256:"+"A"*64,

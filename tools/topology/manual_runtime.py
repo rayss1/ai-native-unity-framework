@@ -202,7 +202,12 @@ def assert_free_ports(postgres_port):
     tcp = [23001, *range(24101, 24108), *range(23101, 23108), postgres_port]
     if len(set(tcp)) != len(tcp):
         raise ManualError("PostgreSQL port conflicts with a topology port.")
-    for kind, ports in ((socket.SOCK_STREAM, tcp), (socket.SOCK_DGRAM, [22000, 22001])):
+    assert_ports_available(tcp, [22000, 22001])
+
+
+def assert_ports_available(tcp, udp):
+    """Probe explicit port sets so socket tests need not touch running topology services."""
+    for kind, ports in ((socket.SOCK_STREAM, tcp), (socket.SOCK_DGRAM, udp)):
         for port in ports:
             with socket.socket(socket.AF_INET, kind) as probe:
                 if WINDOWS:

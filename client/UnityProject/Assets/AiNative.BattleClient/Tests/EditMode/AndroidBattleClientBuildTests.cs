@@ -11,6 +11,55 @@ namespace AiNative.Client.Application.Tests
 {
     public sealed class AndroidBattleClientBuildTests
     {
+        [TestCase(UnityEngine.RuntimePlatform.WindowsEditor, "Editor/Data", "Editor/Data/PlaybackEngines/AndroidPlayer")]
+        [TestCase(UnityEngine.RuntimePlatform.OSXEditor, "Unity.app/Contents", "PlaybackEngines/AndroidPlayer")]
+        [TestCase(UnityEngine.RuntimePlatform.LinuxEditor, "Editor/Data", "Editor/Data/PlaybackEngines/AndroidPlayer")]
+        public void BundledToolchainRoot_UsesHostInstallationLayout(UnityEngine.RuntimePlatform platform, string contents, string expected)
+        {
+            string root = Path.GetTempPath();
+            var actual = Builder().GetMethod("BundledToolchainRoot", BindingFlags.Static | BindingFlags.NonPublic)
+                .Invoke(null, new object[] { Path.Combine(root, contents), platform });
+            Assert.That(actual, Is.EqualTo(Path.GetFullPath(Path.Combine(root, expected))));
+        }
+
+        [TestCase(UnityEngine.RuntimePlatform.WindowsEditor, "windows-x86_64", ".exe")]
+        [TestCase(UnityEngine.RuntimePlatform.OSXEditor, "darwin-x86_64", "")]
+        [TestCase(UnityEngine.RuntimePlatform.LinuxEditor, "linux-x86_64", "")]
+        public void ToolchainValidation_RequiresHostBinariesAndPinnedVersions(UnityEngine.RuntimePlatform platform, string host, string suffix)
+        {
+            string root = Path.Combine(Path.GetTempPath(), "ainative-toolchain-" + Guid.NewGuid().ToString("N"));
+            var files = new[] {
+                "SDK/platforms/android-35/android.jar", "SDK/platform-tools/adb" + suffix,
+                "NDK/toolchains/llvm/prebuilt/" + host + "/bin/clang" + suffix,
+                "OpenJDK/bin/java" + suffix, "NDK/source.properties", "OpenJDK/release"
+            };
+            var validate = Builder().GetMethod("ValidateToolchain", BindingFlags.Static | BindingFlags.NonPublic);
+            Action invoke = () => validate.Invoke(null, new object[] { root, platform });
+            try
+            {
+                foreach (string file in files) {
+                    string path = Path.Combine(root, file); Directory.CreateDirectory(Path.GetDirectoryName(path));
+                    File.WriteAllText(path, "fixture");
+                }
+                File.WriteAllText(Path.Combine(root, "NDK/source.properties"), "Pkg.Revision = 27.2.12479018");
+                File.WriteAllText(Path.Combine(root, "OpenJDK/release"), "JAVA_VERSION=\"17.0.18\"");
+                Assert.DoesNotThrow(() => invoke());
+                foreach (string file in files) {
+                    string path = Path.Combine(root, file), content = File.ReadAllText(path);
+                    File.Delete(path);
+                    Assert.That(Assert.Throws<TargetInvocationException>(() => invoke()).InnerException, Is.TypeOf<InvalidOperationException>());
+                    File.WriteAllText(path, content);
+                }
+                foreach (string file in new[] { "NDK/source.properties", "OpenJDK/release" }) {
+                    string path = Path.Combine(root, file), content = File.ReadAllText(path);
+                    File.WriteAllText(path, "wrong-version");
+                    Assert.That(Assert.Throws<TargetInvocationException>(() => invoke()).InnerException, Is.TypeOf<InvalidOperationException>());
+                    File.WriteAllText(path, content);
+                }
+            }
+            finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
+        }
+
         [Test]
         public void ReleasePlan_BuildsOnlyBattleSceneAsNonDevelopmentArm64Apk()
         {
@@ -53,7 +102,8 @@ namespace AiNative.Client.Application.Tests
                 Assert.That(PlayerSettings.GetScriptingDefineSymbols(android).Split(';'), Does.Contain("FANTASY_UNITY"));
                 Assert.That(PlayerSettings.GetApplicationIdentifier(android), Is.EqualTo("com.ainative.battleclient.validation"));
                 Assert.That(EditorUserBuildSettings.buildAppBundle, Is.False);
-                string bundled = Path.Combine(EditorApplication.applicationContentsPath, "PlaybackEngines", "AndroidPlayer");
+                string bundled = Path.GetFullPath(Path.Combine(EditorApplication.applicationContentsPath,
+                    UnityEngine.Application.platform == UnityEngine.RuntimePlatform.OSXEditor ? "../.." : ".", "PlaybackEngines", "AndroidPlayer"));
                 Assert.That(Path.GetFullPath(Tool(tools, "sdkRootPath")), Is.EqualTo(Path.GetFullPath(Path.Combine(bundled, "SDK"))));
                 Assert.That(Path.GetFullPath(Tool(tools, "ndkRootPath")), Is.EqualTo(Path.GetFullPath(Path.Combine(bundled, "NDK"))));
                 Assert.That(Path.GetFullPath(Tool(tools, "jdkRootPath")), Is.EqualTo(Path.GetFullPath(Path.Combine(bundled, "OpenJDK"))));

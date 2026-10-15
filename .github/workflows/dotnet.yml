@@ -70,6 +70,12 @@ jobs:
         with:
           dotnet-version: 10.0.202
 
+      - name: Test topology validation tools
+        shell: bash
+        run: |
+          command -v pwsh
+          python3 -m unittest discover -s tools/topology/tests -v
+
       - name: Restore
         run: dotnet restore AiNative.sln
 

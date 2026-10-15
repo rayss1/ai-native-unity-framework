@@ -45,7 +45,16 @@ python3 tools/topology/manual.py stop
 
 参数 `--sdk-path` 指定 dotnet 可执行文件，`--postgres-bin-directory` 指定数据库工具目录，`--postgres-port` 默认 25439，`--run-directory` 必须位于仓库 artifacts 下。路径带空格或中文时用引号包裹。IDE 模式固定使用默认运行目录。
 
-SDK 检查和发布命令统一在仓库根目录执行。根 `global.json` 要求 10.0.202（允许其策略内向前选择），10.0.200 不满足要求；`server/global.json` 的局部覆盖不会改变入口预检。若在 server 目录能编译而启动器报错，请在根目录运行 `dotnet --version` 核对，不能把该局部覆盖当作全仓库 SDK 已满足。
+SDK 检查和发布命令统一在仓库根目录执行。根 `global.json` 要求 10.0.202（允许其策略内向前选择），10.0.200 不满足要求。不要在 server 目录创建放宽版本要求的 `global.json`。
+
+启动器优先使用 `artifacts/dotnet/dotnet`（Windows 为 `dotnet.exe`），也可通过 `--sdk-path` 指定。若系统 PATH 的 `dotnet --version` 失败，先检查仓库已有 SDK：
+
+```sh
+./artifacts/dotnet/dotnet --version
+./artifacts/dotnet/dotnet build AiNative.sln -c Release
+```
+
+该目录是可选的本地工具缓存，干净克隆不会自带 SDK。IDE 也应选择同一兼容 SDK，避免终端和 IDE 使用不同工具链。
 
 ## 3. Unity 双客户端／四客户端
 

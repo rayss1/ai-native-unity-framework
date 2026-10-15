@@ -81,8 +81,8 @@ namespace AiNative.Client.Editor
             var toolPreferences = new ToolchainPreferences();
             string settingsPath = Path.GetFullPath(Path.Combine(global::UnityEngine.Application.dataPath, "..", "ProjectSettings", "ProjectSettings.asset"));
             byte[] settings = File.ReadAllBytes(settingsPath);
-            string bundled = Path.Combine(EditorApplication.applicationContentsPath, "PlaybackEngines", "AndroidPlayer");
-            ValidateToolchain(bundled);
+            string bundled = BundledToolchainRoot(EditorApplication.applicationContentsPath, global::UnityEngine.Application.platform);
+            ValidateToolchain(bundled, global::UnityEngine.Application.platform);
             try
             {
                 PlayerSettings.SetScriptingBackend(target, ScriptingImplementation.IL2CPP);
@@ -127,12 +127,25 @@ namespace AiNative.Client.Editor
             }
         }
 
-        private static void ValidateToolchain(string bundled)
+        private static string BundledToolchainRoot(string contents, RuntimePlatform platform) =>
+            Path.GetFullPath(Path.Combine(contents, platform == RuntimePlatform.OSXEditor ? "../.." : ".", "PlaybackEngines", "AndroidPlayer"));
+
+        private static void ValidateToolchain(string bundled, RuntimePlatform platform)
         {
+            string suffix, host;
+            switch (platform)
+            {
+                case RuntimePlatform.WindowsEditor: suffix = ".exe"; host = "windows-x86_64"; break;
+                case RuntimePlatform.OSXEditor: suffix = ""; host = "darwin-x86_64"; break;
+                case RuntimePlatform.LinuxEditor: suffix = ""; host = "linux-x86_64"; break;
+                default: throw new InvalidOperationException("Unsupported Android build host platform.");
+            }
             if (!File.Exists(Path.Combine(bundled, "SDK", "platforms", "android-35", "android.jar")) ||
-                !File.Exists(Path.Combine(bundled, "SDK", "platform-tools", "adb.exe")) ||
-                !File.Exists(Path.Combine(bundled, "NDK", "toolchains", "llvm", "prebuilt", "windows-x86_64", "bin", "clang.exe")) ||
-                !File.Exists(Path.Combine(bundled, "OpenJDK", "bin", "java.exe")))
+                !File.Exists(Path.Combine(bundled, "SDK", "platform-tools", "adb" + suffix)) ||
+                !File.Exists(Path.Combine(bundled, "NDK", "toolchains", "llvm", "prebuilt", host, "bin", "clang" + suffix)) ||
+                !File.Exists(Path.Combine(bundled, "OpenJDK", "bin", "java" + suffix)) ||
+                !File.Exists(Path.Combine(bundled, "NDK", "source.properties")) ||
+                !File.Exists(Path.Combine(bundled, "OpenJDK", "release")))
                 throw new InvalidOperationException("The current Unity Editor's bundled Android API35/SDK/NDK/JDK toolchain is incomplete.");
             if (!File.ReadAllText(Path.Combine(bundled, "NDK", "source.properties")).Contains("27.2.12479018") ||
                 !File.ReadAllText(Path.Combine(bundled, "OpenJDK", "release")).Contains("JAVA_VERSION=\"17."))
