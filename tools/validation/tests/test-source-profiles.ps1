@@ -7,7 +7,7 @@ function Must-Reject([scriptblock]$Action,[string]$Message) {
     throw "Accepted invalid source/profile: $Message"
 }
 $current='bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
-foreach ($item in @(@('Baseline',95),@('Candidate',147),@('TerminalDelivery',164),@('Current',166),@('Development',198))) {
+foreach ($item in @(@('Baseline',95),@('Candidate',147),@('TerminalDelivery',164),@('Current',166),@('Development',221))) {
     $commit=if($item[0] -eq 'Baseline'){'c9098be7e2a44efc42182a87aca2551648993705'}else{$current}
     $profile=Assert-AiNativeEditModeProfile -Profile $item[0] -Commit $commit -ExpectedPassed $item[1]
     if($profile.EditModePassed -ne $item[1]){throw 'Profile total differs from named inventory'}

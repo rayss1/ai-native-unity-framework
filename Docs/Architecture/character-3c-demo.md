@@ -125,3 +125,7 @@ Local evidence: `artifacts/character-demo/playmode-results.json`, `build-summary
 qualification. No performance budget claim is made; no mobile/IL2CPP, full network suite or
 interactive Player graphics qualification was run. Sustained animation/foot sliding and feel
 across frame rates still need human playtesting; frame-rate checks above are automated motor tests.
+
+## 联网接入（2026-10-16）
+
+P1 已新增独立联网表现 Prefab 与状态适配，见 [P1 接入说明](p1-network-character.md)。本页描述的 CharacterController、步枪碰撞和本地 HP 仍只用于单机演示；联网场景使用服务端 Arena 规则。

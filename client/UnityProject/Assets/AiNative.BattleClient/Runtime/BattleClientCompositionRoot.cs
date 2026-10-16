@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using AiNative.Gameplay;
+using AiNative.Client.Character;
 using AiNative.Client.Prediction;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -31,6 +32,12 @@ namespace AiNative.Client.Application
         private bool _regionalMeasurementStarted;
         private bool _finished;
         private GameObject _playerVisual;
+        private NetworkCharacterPresenter _character;
+        private CharacterOrbitCamera _orbitCamera;
+        private uint _visualEpoch;
+        private readonly ArenaPresentationEvent[] _combatEvents = new ArenaPresentationEvent[256];
+        private string _combatFeedback = "";
+        private float _feedbackUntil;
         private GameObject _floorVisual;
         private Camera _playerCamera;
         private Light _arenaLight;
@@ -88,22 +95,24 @@ namespace AiNative.Client.Application
         private void OnEnable()
         {
             // Resource material references retain the URP shaders in standalone builds.
-            _playerVisual = GameObject.CreatePrimitive(PrimitiveType.Capsule);
-            _playerVisual.name = "LocalPlayerGreybox";
-            _playerVisual.transform.SetParent(transform, false);
-            _playerVisual.transform.localPosition = Vector3.up;
-            Renderer renderer = _playerVisual.GetComponent<Renderer>();
-            renderer.sharedMaterial = LoadGreyboxMaterial("Player");
-            _remoteVisuals = new ArenaRemoteVisualPool(renderer.sharedMaterial);
+            GameObject prefab = Resources.Load<GameObject>("BattleClient/NetworkCharacter");
+            if (prefab == null) throw new InvalidOperationException("Missing NetworkCharacter prefab; run AiNative/Battle Client/Build Network Character.");
+            _playerVisual = Instantiate(prefab, transform);
+            _playerVisual.name = "LocalNetworkCharacter";
+            _playerVisual.transform.localPosition = Vector3.zero;
+            _character = _playerVisual.GetComponent<NetworkCharacterPresenter>();
+            _remoteVisuals = new ArenaRemoteVisualPool(LoadGreyboxMaterial("Player"), prefab);
             GameObject cameraObject = new GameObject("LocalPlayerCamera");
-            cameraObject.transform.SetParent(_playerVisual.transform, false);
-            cameraObject.transform.localPosition = new Vector3(0f, 0.65f, -4f);
-            cameraObject.transform.localRotation = Quaternion.Euler(8f, 0f, 0f);
             _playerCamera = cameraObject.AddComponent<Camera>();
+            _playerCamera.nearClipPlane = .1f;
+            _playerCamera.farClipPlane = 250f;
             _playerCamera.tag = "MainCamera";
+            _orbitCamera = cameraObject.AddComponent<CharacterOrbitCamera>();
+            _orbitCamera.ConfigurePresentation(transform);
+            if (_topology != null) _topology.CharacterCamera = _orbitCamera;
             _floorVisual = GameObject.CreatePrimitive(PrimitiveType.Plane);
             _floorVisual.name = "ArenaGreyboxFloor";
-            _floorVisual.transform.localScale = Vector3.one * 4f;
+            _floorVisual.transform.localScale = Vector3.one * 13f;
             _floorVisual.GetComponent<Renderer>().sharedMaterial = LoadGreyboxMaterial("Floor");
             GameObject lightObject = new GameObject("ArenaGreyboxLight");
             _arenaLight = lightObject.AddComponent<Light>();
@@ -115,6 +124,7 @@ namespace AiNative.Client.Application
 
         private void OnGUI()
         {
+            DrawCharacterHud();
             if (_topology != null) return; // Interactive topology owns its UGUI, including the HUD.
             if (_topology == null && !_launch.Smoke && !_launch.RegionalCorrection && GUI.Button(new Rect(740, 16, 180, 32), "登录大厅与匹配")) SwitchToTopology();
             BattleClientSession session = Session;
@@ -144,13 +154,15 @@ namespace AiNative.Client.Application
             BattleClientSession previous = _session;
             _session = null;
             _topology = gameObject.AddComponent<TopologyClientFlow>();
+            _topology.CharacterCamera = _orbitCamera;
             if (previous != null) await previous.DisposeAsync();
         }
 
         private void OnDisable()
         {
             // Unity may have already destroyed native objects during Player shutdown.
-            // The camera is a child of the player and is destroyed with it.
+            // The orbit camera has independent world-space rotation.
+            if (_playerCamera != null) Destroy(_playerCamera.gameObject);
             _remoteVisuals?.Dispose();
             _remoteVisuals = null;
             if (_playerVisual != null) Destroy(_playerVisual);
@@ -276,7 +288,20 @@ namespace AiNative.Client.Application
             BattleClientSession session = Session;
             int remoteCount = session?.AdvanceRemotePresentation(Time.unscaledDeltaTime, _remotePoses) ?? 0;
             _remoteVisuals?.Apply(_remotePoses, remoteCount);
-            if (session is null) return;
+            if (session is null)
+            {
+                if (_playerVisual != null) _playerVisual.SetActive(false);
+                _visualEpoch = 0;
+                return;
+            }
+            if (_visualEpoch != session.ConnectionEpoch)
+            {
+                _visualEpoch = session.ConnectionEpoch;
+                _orbitCamera?.Snap();
+                _combatFeedback = "";
+            }
+            int eventCount = session.DrainCombatEvents(_combatEvents);
+            for (int i = 0; i < eventCount; i++) PresentCombatEvent(_combatEvents[i], session.EntityId);
             if (session.TryAdvancePresentation(
                     Time.unscaledDeltaTime,
                     out PresentationPosition position))
@@ -294,7 +319,40 @@ namespace AiNative.Client.Application
                 transform.position = new Vector3(current.x, arenaState.PositionYMillimetres / 1000f, current.z);
                 _playerVisual.transform.localRotation =
                     Quaternion.Euler(0f, arenaState.YawMillidegrees / 1000f, 0f);
+                _character.Apply(arenaState, _topology == null || _topology.IsCharacterAiming);
+                _orbitCamera.SetPresentationState(_character.MotionState);
             }
+        }
+
+        private void PresentCombatEvent(ArenaPresentationEvent item, uint localId)
+        {
+            if (item.Kind == ArenaPresentationEventKind.Fire)
+            {
+                NetworkCharacterPresenter shooter = item.SourceEntityId == localId ? _character :
+                    _remoteVisuals?.GetVisual(item.SourceEntityId)?.GetComponent<NetworkCharacterPresenter>();
+                shooter?.NotifyShot();
+            }
+            if (item.Kind == ArenaPresentationEventKind.Hit && (item.SourceEntityId == localId || item.TargetEntityId == localId))
+                _combatFeedback = item.TargetEntityId == localId ? $"受到伤害 {item.Damage}" : $"命中 {item.Damage}";
+            else if (item.Kind == ArenaPresentationEventKind.Kill)
+                _combatFeedback = item.TargetEntityId == localId ? "已阵亡" : $"玩家 {item.SourceEntityId} 击败 {item.TargetEntityId}";
+            else if (item.Kind == ArenaPresentationEventKind.Respawn && item.SourceEntityId == localId)
+            { _combatFeedback = "已重生"; _orbitCamera?.Snap(); }
+            else return;
+            _feedbackUntil = Time.unscaledTime + 2;
+        }
+
+        private void DrawCharacterHud()
+        {
+            var session = Session;
+            if (session == null || !session.TryGetArenaState(out var state) || session.ArenaPhase == ArenaMatchPhase.Finished) return;
+            if (_topology != null) GUI.Label(new Rect(16, Screen.height - 50, 1000, 24), "WASD 移动  |  按住右键转向/瞄准  |  左键开火  |  Space 跳跃  |  1/2/3 武器");
+            if (Time.unscaledTime < _feedbackUntil) GUI.Label(new Rect(Screen.width / 2 - 100, Screen.height / 2 + 35, 260, 30), _combatFeedback);
+            // Display the server ray direction from its defined +0.6m origin. No local hit or damage query.
+            var origin = new Vector3(state.PositionXMillimetres, state.PositionYMillimetres + 600, state.PositionZMillimetres) / 1000f;
+            var forward = Quaternion.Euler(-state.PitchMillidegrees / 1000f, state.YawMillidegrees / 1000f, 0) * Vector3.forward;
+            Vector3 point = _playerCamera.WorldToScreenPoint(origin + forward * 30);
+            if (point.z > 0) GUI.Label(new Rect(point.x - 6, Screen.height - point.y - 10, 24, 24), "+");
         }
 
         private async void OnDestroy()

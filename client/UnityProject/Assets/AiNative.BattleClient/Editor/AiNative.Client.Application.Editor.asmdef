@@ -6,7 +6,8 @@
     "AiNative.Client.Fantasy",
     "UnityEngine.UI",
     "Unity.RenderPipelines.Core.Runtime",
-    "Unity.RenderPipelines.Universal.Runtime"
+    "Unity.RenderPipelines.Universal.Runtime",
+    "AiNative.Client.Character"
   ],
   "includePlatforms": [
     "Editor"

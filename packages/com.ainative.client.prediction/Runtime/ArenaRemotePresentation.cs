@@ -11,13 +11,18 @@ namespace AiNative.Client.Prediction
     public readonly struct ArenaRemotePose
     {
         public ArenaRemotePose(uint entityId, double x, double y, double z, double yaw, bool alive)
-        { EntityId = entityId; XMillimetres = x; YMillimetres = y; ZMillimetres = z; YawMillidegrees = yaw; Alive = alive; }
+            : this(entityId, x, y, z, yaw, new ArenaPlayerState(0, (int)x, (int)y, (int)z)
+            { YawMillidegrees = (int)yaw, Alive = alive }) { }
+        public ArenaRemotePose(uint entityId, double x, double y, double z, double yaw, ArenaPlayerState state)
+        { EntityId = entityId; XMillimetres = x; YMillimetres = y; ZMillimetres = z; YawMillidegrees = yaw; State = state; }
         public uint EntityId { get; }
         public double XMillimetres { get; }
         public double YMillimetres { get; }
         public double ZMillimetres { get; }
         public double YawMillidegrees { get; }
-        public bool Alive { get; }
+        public bool Alive => State.Alive;
+        /// <summary>Presentation sample only; never feed interpolated state back into simulation.</summary>
+        public ArenaPlayerState State { get; }
     }
     /// <summary>Owner-thread only. Bounded remote render history; never changes local prediction.</summary>
     public sealed class ArenaRemotePresentation
@@ -95,10 +100,21 @@ namespace AiNative.Client.Prediction
                 if (yawDelta < -180000) yawDelta += 360000;
                 double yaw = (before.YawMillidegrees + yawDelta * t) % 360000;
                 if (yaw < 0) yaw += 360000;
-                output[written++] = new ArenaRemotePose(_ids[slot],
-                    Lerp(before.PositionXMillimetres, after.PositionXMillimetres, t),
-                    Lerp(before.PositionYMillimetres, after.PositionYMillimetres, t),
-                    Lerp(before.PositionZMillimetres, after.PositionZMillimetres, t), yaw, after.Alive);
+                double x = Lerp(before.PositionXMillimetres, after.PositionXMillimetres, t);
+                double y = Lerp(before.PositionYMillimetres, after.PositionYMillimetres, t);
+                double z = Lerp(before.PositionZMillimetres, after.PositionZMillimetres, t);
+                // Do not expose future weapon, health or grounded transitions before their render tick.
+                // Lifecycle changes already reset history, so death/respawn still snap immediately.
+                ArenaPlayerState sample = t >= 1 ? after : before;
+                sample.PositionXMillimetres = (int)Math.Round(x);
+                sample.PositionYMillimetres = (int)Math.Round(y);
+                sample.PositionZMillimetres = (int)Math.Round(z);
+                sample.YawMillidegrees = (int)Math.Round(yaw) % 360000;
+                sample.PitchMillidegrees = (int)Math.Round(Lerp(before.PitchMillidegrees, after.PitchMillidegrees, t));
+                sample.VelocityXMillimetresPerSecond = (int)Math.Round(Lerp(before.VelocityXMillimetresPerSecond, after.VelocityXMillimetresPerSecond, t));
+                sample.VelocityYMillimetresPerSecond = (int)Math.Round(Lerp(before.VelocityYMillimetresPerSecond, after.VelocityYMillimetresPerSecond, t));
+                sample.VelocityZMillimetresPerSecond = (int)Math.Round(Lerp(before.VelocityZMillimetresPerSecond, after.VelocityZMillimetresPerSecond, t));
+                output[written++] = new ArenaRemotePose(_ids[slot], x, y, z, yaw, sample);
             }
             return written;
         }

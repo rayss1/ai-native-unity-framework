@@ -100,6 +100,7 @@ namespace AiNative.Client.Application
         public const uint TickRate = 60;
         public const int PhaseTimeoutMilliseconds = 5000;
         public const int DefaultInputRingCapacity = 256;
+        public const int CombatEventCapacity = 256;
 
         private static readonly float[] ReconnectDelaySeconds = { 0.25f, 0.5f, 1.0f };
 
@@ -140,6 +141,49 @@ namespace AiNative.Client.Application
         private uint _arenaRemainingTicks;
         private uint _arenaLeaderEntityId;
         private bool _hasArenaState;
+        private readonly ArenaPresentationEvent[] _combatEvents = new ArenaPresentationEvent[CombatEventCapacity];
+        private int _combatEventHead, _combatEventCount;
+        private uint _lastCombatSequence;
+        private ulong _lastCombatTick;
+        private bool _hasCombatSequence;
+        public long DroppedCombatEvents { get; private set; }
+
+        /// <summary>Drains authority feedback on the Pump thread. Overflow discards the oldest feedback.</summary>
+        public int DrainCombatEvents(Span<ArenaPresentationEvent> output)
+        {
+            int count = Math.Min(output.Length, _combatEventCount);
+            for (int i = 0; i < count; i++)
+            {
+                output[i] = _combatEvents[_combatEventHead];
+                _combatEvents[_combatEventHead] = default;
+                _combatEventHead = (_combatEventHead + 1) % CombatEventCapacity;
+            }
+            _combatEventCount -= count;
+            return count;
+        }
+
+        private void ClearCombatEvents()
+        {
+            Array.Clear(_combatEvents, 0, _combatEvents.Length);
+            _combatEventHead = _combatEventCount = 0;
+            // The room owns the sequence. Preserve its watermark across same-allocation reconnects.
+        }
+
+        private void ApplyCombatEvent(ReadOnlySpan<byte> frame, in ReceivedPacket packet)
+        {
+            if (packet.ConnectionEpoch != _connectionEpoch ||
+                !packet.Channel.Equals(ArenaCombatEventProtocolV1.EventChannel) ||
+                !ArenaCombatEventProtocolV1.TryDecode(frame, out var item) ||
+                (_hasCombatSequence && (unchecked((int)(item.Sequence - _lastCombatSequence)) <= 0 || item.Tick < _lastCombatTick))) return;
+            _hasCombatSequence = true; _lastCombatSequence = item.Sequence; _lastCombatTick = item.Tick;
+            if (_combatEventCount == CombatEventCapacity)
+            {
+                _combatEventHead = (_combatEventHead + 1) % CombatEventCapacity;
+                _combatEventCount--; DroppedCombatEvents++;
+            }
+            _combatEvents[(_combatEventHead + _combatEventCount) % CombatEventCapacity] = item;
+            _combatEventCount++;
+        }
 
         public BattleClientSession(
             string host,
@@ -435,6 +479,7 @@ namespace AiNative.Client.Application
             _sendFailed = false;
             _presentation.ResetState();
             _remotePresentation.Reset();
+            ClearCombatEvents();
             _topologyReconnecting = true;
             // Unsent commands from the suspended owner must never cross the new authenticated connection.
             _inputRing.Clear();
@@ -468,6 +513,7 @@ namespace AiNative.Client.Application
             if (_disposed) return;
             _disposed = true;
             State = BattleClientState.Disposed;
+            ClearCombatEvents();
             _remotePresentation.Reset();
             _connectCancellation?.Cancel();
             Task<BattleTransportConnection> pendingConnect = _connectTask;
@@ -628,6 +674,9 @@ namespace AiNative.Client.Application
                     if (_prediction != null && (State is BattleClientState.Active or BattleClientState.Faulted) &&
                         messageId == BattleClientProtocolV1.SnapshotMessageId)
                         ApplySnapshot(frame, packet);
+                    else if (_prediction != null && (State is BattleClientState.Active or BattleClientState.Faulted) &&
+                             messageId == ArenaCombatEventProtocolV1.MessageId)
+                        ApplyCombatEvent(frame, packet);
                     continue;
                 }
                 if (State == BattleClientState.LoggingIn &&
@@ -648,6 +697,10 @@ namespace AiNative.Client.Application
                          messageId == BattleClientProtocolV1.ReconnectResponseMessageId)
                 {
                     HandleReconnect(frame, packet);
+                }
+                else if (State == BattleClientState.Active && messageId == ArenaCombatEventProtocolV1.MessageId)
+                {
+                    ApplyCombatEvent(frame, packet);
                 }
                 else if (State == BattleClientState.Active &&
                          messageId == BattleClientProtocolV1.SnapshotMessageId)
@@ -874,6 +927,7 @@ namespace AiNative.Client.Application
             _sendFailed = false;
             _presentation.ResetState();
             _remotePresentation.Reset();
+            ClearCombatEvents();
             _awaitingReconnectResponse = false;
             _reconnectAttempts = 1;
             _retryDelayRemainingSeconds = ReconnectDelaySeconds[0];
