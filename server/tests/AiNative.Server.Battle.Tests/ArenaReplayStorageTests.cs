@@ -40,7 +40,9 @@ public sealed class ArenaReplayStorageTests
         Assert.That(root, Is.Not.Null);
         byte[] arena = System.Text.Encoding.UTF8.GetBytes(File.ReadAllText(Path.Combine(root!, "server/src/Modules/AiNative.Server.Battle/ArenaRoom.cs")).ReplaceLineEndings("\n"));
         byte[] shared = System.Text.Encoding.UTF8.GetBytes(File.ReadAllText(Path.Combine(root!, "shared/gameplay/Runtime/ArenaGameplay.cs")).ReplaceLineEndings("\n"));
-        string fingerprint = Convert.ToHexString(SHA256.HashData(arena.Concat(shared).ToArray())).ToLowerInvariant();
+        byte[] geometry = System.Text.Encoding.UTF8.GetBytes(File.ReadAllText(Path.Combine(root!, "shared/gameplay/Runtime/ArenaHitGeometry.cs")).ReplaceLineEndings("\n"));
+        byte[] map = System.Text.Encoding.UTF8.GetBytes(File.ReadAllText(Path.Combine(root!, "shared/gameplay/Runtime/ArenaTrainingMap.cs")).ReplaceLineEndings("\n"));
+        string fingerprint = Convert.ToHexString(SHA256.HashData(arena.Concat(shared).Concat(geometry).Concat(map).ToArray())).ToLowerInvariant();
         Assert.That(ArenaReplayVerifier.GameplayFingerprint, Is.EqualTo(fingerprint), "Update the build gameplay/map fingerprint when rule sources change.");
     }
     [Test]

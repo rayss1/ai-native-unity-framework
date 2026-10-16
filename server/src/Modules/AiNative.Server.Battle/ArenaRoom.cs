@@ -35,23 +35,16 @@ internal sealed class ArenaRoom
     public const int LagCompensationTicks = ArenaMovement.TickRate / 4;
     private const int HistoryCapacity = LagCompensationTicks + 1;
 
-    private const int PlayerHitRadiusMillimetres = 450;
+    public const int ReloadTicks = 120;
     private const int RocketSpeedMillimetresPerSecond = 25000;
     private const int RocketLifetimeTicks = 180;
     private const int RocketCollisionRadiusMillimetres = 300;
-    private const int MillimetresPerTick = 1000 / ArenaMovement.TickRate;
-    private static readonly (int X, int Y, int Z)[] SpawnPoints =
-    {
-        (-48000, 0, -48000), (0, 0, -48000), (48000, 0, -48000),
-        (-48000, 0, 48000), (0, 0, 48000), (48000, 0, 48000),
-        (-48000, 6000, 0), (48000, 6000, 0),
-    };
     private static readonly (ArenaPickupType Type, int X, int Y, int Z)[] PickupSpawns =
     {
-        (ArenaPickupType.Health, -16000, 0, 0),
-        (ArenaPickupType.Health, 16000, 0, 0),
-        (ArenaPickupType.Armor, 0, 6000, -18000),
-        (ArenaPickupType.Armor, 0, 6000, 18000),
+        (ArenaPickupType.Health, -15000, 0, 0),
+        (ArenaPickupType.Health, 15000, 0, 0),
+        (ArenaPickupType.Armor, 0, 0, -14000),
+        (ArenaPickupType.Armor, 0, 0, 14000),
     };
 
     private readonly ArenaPlayerState[] _players = new ArenaPlayerState[MaxPlayers];
@@ -73,6 +66,7 @@ internal sealed class ArenaRoom
     private readonly ulong[] _deathTicks = new ulong[MaxPlayers];
     private readonly ulong[] _protectedUntilTicks = new ulong[MaxPlayers];
     private readonly ulong[] _lastFireTicks = new ulong[MaxPlayers];
+    private readonly ulong[,] _reloadUntil = new ulong[MaxPlayers, 3];
     private readonly int[,] _ammo = new int[MaxPlayers, 3];
     private readonly ArenaPickupRuntime[] _pickups = new ArenaPickupRuntime[PickupSpawns.Length];
     private readonly List<ArenaProjectile> _projectiles = new(64);
@@ -136,7 +130,11 @@ internal sealed class ArenaRoom
             WriteHashValue(canonical, ref offset, (long)_protectedUntilTicks[index]);
             WriteHashValue(canonical, ref offset, (long)_lastFireTicks[index]);
             WriteHashValue(canonical, ref offset, (long)_lifetimes[index]);
-            for (int weapon = 0; weapon < 3; weapon++) WriteHashValue(canonical, ref offset, _ammo[index, weapon]);
+            for (int weapon = 0; weapon < 3; weapon++)
+            {
+                WriteHashValue(canonical, ref offset, _ammo[index, weapon]);
+                WriteHashValue(canonical, ref offset, (long)_reloadUntil[index, weapon]);
+            }
             WriteHashValue(canonical, ref offset, _inputCounts[index]);
             for (int pending = 0; pending < _inputCounts[index]; pending++)
             {
@@ -198,7 +196,7 @@ internal sealed class ArenaRoom
                 continue;
             }
 
-            (int x, int y, int z) = SpawnPoints[index];
+            ArenaTrainingMap.GetSpawn(index, out int x, out int y, out int z);
             _players[index] = new ArenaPlayerState(checked((long)Tick), x, y, z);
             _inputHeads[index] = 0;
             _inputCounts[index] = 0;
@@ -211,6 +209,7 @@ internal sealed class ArenaRoom
             _ammo[index, 0] = ArenaWeaponRules.Machinegun.MagazineSize;
             _ammo[index, 1] = ArenaWeaponRules.Shotgun.MagazineSize;
             _ammo[index, 2] = ArenaWeaponRules.Rocket.MagazineSize;
+            for (int weapon = 0; weapon < 3; weapon++) _reloadUntil[index, weapon] = 0;
             _connectedCount++;
             entityId = checked((uint)index + 1);
             if (Phase == ArenaMatchPhase.Waiting && _connectedCount >= 2)
@@ -317,6 +316,8 @@ internal sealed class ArenaRoom
                 SwitchWeapon(index, input.Weapon);
             }
 
+            UpdateReloads(index);
+            if ((input.Buttons & ArenaButtons.Reload) != 0) BeginReload(index);
             if ((input.Buttons & ArenaButtons.Fire) != 0)
             {
                 Fire(index, input);
@@ -417,13 +418,33 @@ internal sealed class ArenaRoom
         }
     }
 
+    private void BeginReload(int index)
+    {
+        int weapon = (int)_players[index].Weapon - 1;
+        if ((uint)weapon >= 3u || _reloadUntil[index, weapon] != 0 ||
+            _ammo[index, weapon] == ArenaWeaponRules.Get(_players[index].Weapon).MagazineSize) return;
+        _reloadUntil[index, weapon] = Tick + ReloadTicks;
+    }
+
+    private void UpdateReloads(int index)
+    {
+        for (int weapon = 0; weapon < 3; weapon++)
+        {
+            if (_reloadUntil[index, weapon] == 0 || Tick < _reloadUntil[index, weapon]) continue;
+            _ammo[index, weapon] = ArenaWeaponRules.Get((ArenaWeaponId)(weapon + 1)).MagazineSize;
+            _reloadUntil[index, weapon] = 0;
+        }
+    }
+
     private void Fire(int shooterIndex, in ArenaInput input)
     {
         ArenaWeaponId weapon = _players[shooterIndex].Weapon;
         ArenaWeaponDefinition definition = ArenaWeaponRules.Get(weapon);
         int weaponIndex = checked((int)weapon - 1);
-        if ((uint)weaponIndex >= 3u || _ammo[shooterIndex, weaponIndex] <= 0)
+        if ((uint)weaponIndex >= 3u || _reloadUntil[shooterIndex, weaponIndex] != 0) return;
+        if (_ammo[shooterIndex, weaponIndex] <= 0)
         {
+            BeginReload(shooterIndex);
             return;
         }
 
@@ -479,7 +500,7 @@ internal sealed class ArenaRoom
 
         int pellets = weapon == ArenaWeaponId.Shotgun ? 10 : 1;
         int damage = checked(definition.Damage * pellets);
-        if (TryFindRayTarget(shooterIndex, historicalFrame, input.ClientTick, definition.RangeMillimetres, weapon == ArenaWeaponId.Shotgun ? 7000 : 1500, out int targetIndex, out int hitX, out int hitY, out int hitZ))
+        if (TryFindRayTarget(shooterIndex, historicalFrame, input.ClientTick, definition.RangeMillimetres, weapon == ArenaWeaponId.Shotgun ? 7000 : 0, out int targetIndex, out int hitX, out int hitY, out int hitZ))
         {
             ApplyDamage(shooterIndex, targetIndex, damage, weapon, hitX, hitY, hitZ);
         }
@@ -490,22 +511,33 @@ internal sealed class ArenaRoom
         for (int index = _projectiles.Count - 1; index >= 0; index--)
         {
             ArenaProjectile projectile = _projectiles[index];
-            projectile.X = checked(projectile.X + projectile.VelocityX / ArenaMovement.TickRate);
-            projectile.Y = checked(projectile.Y + projectile.VelocityY / ArenaMovement.TickRate);
-            projectile.Z = checked(projectile.Z + projectile.VelocityZ / ArenaMovement.TickRate);
+            double stepX = projectile.VelocityX / ArenaMovement.TickRate;
+            double stepY = projectile.VelocityY / ArenaMovement.TickRate;
+            double stepZ = projectile.VelocityZ / ArenaMovement.TickRate;
+            double length = Math.Sqrt(stepX * stepX + stepY * stepY + stepZ * stepZ);
+            double dx = stepX / length, dy = stepY / length, dz = stepZ / length;
+            bool impact = ArenaTrainingMap.Raycast(projectile.X, projectile.Y, projectile.Z,
+                dx, dy, dz, length, out double nearest, RocketCollisionRadiusMillimetres);
+            for (int target = 0; target < MaxPlayers; target++)
+            {
+                if (!_occupied[target] || !_players[target].Alive || (uint)(target + 1) == projectile.SourceEntityId) continue;
+                var player = _players[target];
+                if (ArenaHitGeometry.RayCapsule(projectile.X - player.PositionXMillimetres,
+                    projectile.Y - player.PositionYMillimetres, projectile.Z - player.PositionZMillimetres,
+                    dx, dy, dz, Math.Min(length, nearest), out double hit, RocketCollisionRadiusMillimetres))
+                { nearest = hit; impact = true; }
+            }
+            double travel = impact ? Math.Max(0, nearest - 1) : length;
+            projectile.X += (int)Math.Round(dx * travel);
+            projectile.Y += (int)Math.Round(dy * travel);
+            projectile.Z += (int)Math.Round(dz * travel);
             projectile.RemainingTicks--;
-
-            int sourceIndex = checked((int)projectile.SourceEntityId - 1);
-            int targetIndex = FindProjectileTarget(sourceIndex, projectile.X, projectile.Y, projectile.Z);
-            if (targetIndex >= 0 || projectile.RemainingTicks <= 0 || projectile.Y <= 0)
+            if (impact || projectile.RemainingTicks <= 0)
             {
                 Explode(projectile.SourceEntityId, projectile.X, projectile.Y, projectile.Z);
                 _projectiles.RemoveAt(index);
             }
-            else
-            {
-                _projectiles[index] = projectile;
-            }
+            else _projectiles[index] = projectile;
         }
     }
 
@@ -525,32 +557,13 @@ internal sealed class ArenaRoom
             int damage = ArenaCombatRules.RocketDamageAtDistance(
                 distance,
                 targetIndex == sourceIndex);
-            if (damage > 0)
+            if (damage > 0 && Tick >= _protectedUntilTicks[targetIndex] &&
+                !ArenaTrainingMap.Occluded(x, y, z, _players[targetIndex].PositionXMillimetres,
+                    _players[targetIndex].PositionYMillimetres + ArenaHitGeometry.ShotHeight, _players[targetIndex].PositionZMillimetres))
             {
                 ApplyDamage(sourceIndex, targetIndex, damage, ArenaWeaponId.Rocket, x, y, z);
             }
         }
-    }
-
-    private int FindProjectileTarget(int sourceIndex, int x, int y, int z)
-    {
-        for (int targetIndex = 0; targetIndex < MaxPlayers; targetIndex++)
-        {
-            if (targetIndex == sourceIndex || !_occupied[targetIndex] || !_players[targetIndex].Alive)
-            {
-                continue;
-            }
-
-            int distance = DistanceMillimetres(_players[targetIndex].PositionXMillimetres - x,
-                _players[targetIndex].PositionYMillimetres + 600 - y,
-                _players[targetIndex].PositionZMillimetres - z);
-            if (distance <= RocketCollisionRadiusMillimetres)
-            {
-                return targetIndex;
-            }
-        }
-
-        return -1;
     }
 
     private bool TryFindRayTarget(
@@ -571,6 +584,8 @@ internal sealed class ArenaRoom
         double forwardX = ForwardX(shooter.YawMillidegrees, shooter.PitchMillidegrees) / 1000000d;
         double forwardY = ForwardY(shooter.PitchMillidegrees) / 1000000d;
         double forwardZ = ForwardZ(shooter.YawMillidegrees, shooter.PitchMillidegrees) / 1000000d;
+        double length = Math.Sqrt(forwardX * forwardX + forwardY * forwardY + forwardZ * forwardZ);
+        forwardX /= length; forwardY /= length; forwardZ /= length;
         double minimumDistance = double.MaxValue;
         targetIndex = -1;
         hitX = hitY = hitZ = 0;
@@ -593,23 +608,31 @@ internal sealed class ArenaRoom
             double x = target.X - origin.X;
             double y = target.Y - origin.Y;
             double z = target.Z - origin.Z;
-            double distance = Math.Sqrt((x * x) + (y * y) + (z * z));
-            if (distance <= 0 || distance > rangeMillimetres)
+            bool intersects = ArenaHitGeometry.RayCapsule(-x, ArenaHitGeometry.ShotHeight - y, -z,
+                forwardX, forwardY, forwardZ, rangeMillimetres, out double distance);
+            if (!intersects)
             {
-                continue;
+                // Preserve the shotgun's existing aim-assist cone, measured to torso height.
+                if (coneMillidegrees == 0) continue;
+                y += (ArenaHitGeometry.LowerCenter + ArenaHitGeometry.UpperCenter) / 2d - ArenaHitGeometry.ShotHeight;
+                distance = Math.Sqrt(x * x + y * y + z * z);
+                if (distance <= 0 || distance > rangeMillimetres ||
+                    (x * forwardX + y * forwardY + z * forwardZ) / distance < minimumDot) continue;
             }
-
-            double dot = ((x * forwardX) + (y * forwardY) + (z * forwardZ)) / distance;
-            if (dot < minimumDot || distance >= minimumDistance)
-            {
-                continue;
-            }
-
+            double endX = origin.X + forwardX * distance;
+            double endY = origin.Y + ArenaHitGeometry.ShotHeight + forwardY * distance;
+            double endZ = origin.Z + forwardZ * distance;
+            if (ArenaTrainingMap.Raycast(origin.X, origin.Y + ArenaHitGeometry.ShotHeight, origin.Z,
+                forwardX, forwardY, forwardZ, distance, out _)) continue;
+            // Shotgun assist must never select a centre hidden behind a different wall than its aim ray.
+            if (!intersects && ArenaTrainingMap.Occluded(origin.X, origin.Y + ArenaHitGeometry.ShotHeight, origin.Z,
+                target.X, target.Y + 900, target.Z)) continue;
+            if (distance >= minimumDistance) continue;
             minimumDistance = distance;
             targetIndex = candidate;
-            hitX = target.X;
-            hitY = target.Y;
-            hitZ = target.Z;
+            hitX = (int)Math.Round(endX);
+            hitY = (int)Math.Round(endY);
+            hitZ = (int)Math.Round(endZ);
         }
 
         return targetIndex >= 0;
@@ -653,7 +676,7 @@ internal sealed class ArenaRoom
     private void Respawn(int index)
     {
         int spawnIndex = ChooseSpawnPoint(index);
-        (int x, int y, int z) = SpawnPoints[spawnIndex];
+        ArenaTrainingMap.GetSpawn(spawnIndex, out int x, out int y, out int z);
         ArenaCombatRules.Respawn(ref _players[index], x, y, z);
         _lifetimes[index]++;
         _players[index].Tick = checked((long)Tick);
@@ -661,6 +684,7 @@ internal sealed class ArenaRoom
         _ammo[index, 0] = ArenaWeaponRules.Machinegun.MagazineSize;
         _ammo[index, 1] = ArenaWeaponRules.Shotgun.MagazineSize;
         _ammo[index, 2] = ArenaWeaponRules.Rocket.MagazineSize;
+        for (int weapon = 0; weapon < 3; weapon++) _reloadUntil[index, weapon] = 0;
         AddEvent(new ArenaCombatEventRecord(
             ArenaCombatEventKind.Respawn,
             Tick,
@@ -675,11 +699,11 @@ internal sealed class ArenaRoom
 
     private int ChooseSpawnPoint(int playerIndex)
     {
-        int bestIndex = playerIndex % SpawnPoints.Length;
+        int bestIndex = playerIndex % MaxPlayers;
         double bestDistance = double.MinValue;
-        for (int spawnIndex = 0; spawnIndex < SpawnPoints.Length; spawnIndex++)
+        for (int spawnIndex = 0; spawnIndex < MaxPlayers; spawnIndex++)
         {
-            (int x, int y, int z) = SpawnPoints[spawnIndex];
+            ArenaTrainingMap.GetSpawn(spawnIndex, out int x, out int y, out int z);
             double nearest = double.MaxValue;
             for (int candidate = 0; candidate < MaxPlayers; candidate++)
             {

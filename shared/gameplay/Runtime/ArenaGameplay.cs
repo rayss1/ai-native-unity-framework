@@ -191,7 +191,7 @@ namespace AiNative.Gameplay
         public const int GroundFrictionMillimetresPerSecondSquared = 8000;
         public const int JumpSpeedMillimetresPerSecond = 5500;
         public const int GravityMillimetresPerSecondSquared = 15000;
-        public const int ArenaHalfExtentMillimetres = 64000;
+        public const int ArenaHalfExtentMillimetres = ArenaTrainingMap.HalfExtent;
         public const int MaximumPitchMillidegrees = 89000;
 
         public static ArenaPlayerState Step(in ArenaPlayerState state, in ArenaInput input)
@@ -270,6 +270,7 @@ namespace AiNative.Gameplay
                 next.Grounded = true;
             }
 
+            ArenaTrainingMap.ResolveMovement(state, ref next);
             return next;
         }
 

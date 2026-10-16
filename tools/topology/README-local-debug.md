@@ -38,8 +38,19 @@ py -3 tools/topology/manual.py start
 python3 tools/topology/manual.py status
 python3 tools/topology/manual.py stop
 # Mac 停止包装：./tools/topology/stop-manual.sh
-# Windows 将 python3 换为 py -3；旧 stop-manual.ps1 也继续有效
+# Windows 将 python3 换为 py -3；PowerShell 7 可使用 stop-manual.ps1
 ```
+
+Windows CMD、PowerShell 5.1 或 PowerShell 7 均可直接执行配套停止脚本：
+
+```powershell
+.\tools\topology\stop-manual.cmd
+# 自定义运行目录（与启动参数一致）
+.\tools\topology\stop-manual.cmd --run-directory artifacts/manual-test
+```
+
+停止脚本自动查找 `py`、`python`、`python3`，未配置 PATH 时也检查用户目录下的
+`anaconda3` / `miniconda3`；使用 UTF-8 输出，不依赖 PowerShell 7。
 
 停止命令请求监督器清理并立即返回，需等待原启动窗口完成退出。服务先收到退出信号，超时后仅终止本次拥有的进程；数据库通过 `pg_ctl` 关闭。账号保存在 `artifacts/manual-test/postgres`，下次可继续登录；密钥、录像和未结算结果也保留。不会接管已有数据库或按进程名批量杀进程。不要强制结束监督器，否则不能保证执行清理。
 
@@ -62,7 +73,7 @@ SDK 检查和发布命令统一在仓库根目录执行。根 `global.json` 要�
 2. 选择菜单 `AI Native > Local Test > Open Two Clients`；四人测试选 `Open Four Clients`。
 3. 在 Unity Play Mode 下拉菜单选择对应的 `LocalTwoClients` 或 `LocalFourClients`，按 Play。菜单打开专用场景并选中配置资产；仍需选择 Play Mode 配置。
 4. 主窗口与克隆窗口均应显示登录界面：地址 `127.0.0.1`、端口 `23001`、TLS 关闭。
-5. 各窗口使用不同账号。首次点“注册新账号”（成功后自动登录）；账号名使用 3–32 位字母、数字或下划线，密码 12–128 位。后续使用“登录”，不重复注册。密码不会保存到场景或配置。连接地址在“连接设置”中展开；Tab 切换输入，账号／密码框按 Enter 登录。
+5. 各窗口使用不同账号。首次点“注册新账号”（成功后自动登录）；账号名使用 3–32 位字母、数字或下划线，密码 6–32 位。后续使用“登录”，不重复注册。密码不会保存到场景或配置。连接地址在“连接设置”中展开；Tab 切换输入，账号／密码框按 Enter 登录。
 6. 玩家一创建队伍，玩家二点“复制完整 ID”，玩家一粘贴到邀请框并发送；玩家二接受邀请，双方准备，由队长匹配。界面上的 ID 是缩略显示，不要手抄缩略值。四人测试邀请齐四人并全部准备。
 7. 检查房间 ID 相同，用 WASD 移动、鼠标左键触发现有机枪开火。切换窗口查看对方移动；后台窗口保持网络运行，非焦点窗口不继续操作。
 8. 点击“重新连接”检查恢复；等对局结束，结果页显示“已保存”后点“返回大厅”。双方重新准备，再次匹配，无需停止 Play。结算确认前返回按钮不可用。

@@ -6384,7 +6384,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\u5BC6\u7801 \xB7 12\u2013128 \u4F4D"
+  m_Text: "\u5BC6\u7801 \xB7 6\u201332 \u4F4D"
 --- !u!114 &5861761060539437253
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -10176,7 +10176,7 @@ MonoBehaviour:
   m_LineType: 0
   m_HideMobileInput: 0
   m_CharacterValidation: 0
-  m_CharacterLimit: 128
+  m_CharacterLimit: 32
   m_OnSubmit:
     m_PersistentCalls:
       m_Calls: []

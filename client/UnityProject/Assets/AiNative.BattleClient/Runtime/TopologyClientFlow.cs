@@ -92,7 +92,7 @@ namespace AiNative.Client.Application
             {
                 if (!AuthenticationRequired) return;
                 string normalized = (username ?? "").Trim().ToLowerInvariant();
-                if (normalized.Length < 3 || normalized.Length > 32 || string.IsNullOrEmpty(password) || password.Length < 12 || password.Length > 128)
+                if (normalized.Length < 3 || normalized.Length > 32 || string.IsNullOrEmpty(password) || password.Length < 6 || password.Length > 32)
                     throw new GateCallException("invalid_credentials");
                 foreach (char c in normalized)
                     if (!(c >= 'a' && c <= 'z') && !(c >= '0' && c <= '9') && c != '_') throw new GateCallException("invalid_credentials");
@@ -304,7 +304,8 @@ namespace AiNative.Client.Application
             _characterInput.Sample(keyboard != null && keyboard.spaceKey.wasPressedThisFrame,
                 keyboard != null && keyboard.digit1Key.wasPressedThisFrame ? ArenaWeaponId.Machinegun :
                 keyboard != null && keyboard.digit2Key.wasPressedThisFrame ? ArenaWeaponId.Shotgun :
-                keyboard != null && keyboard.digit3Key.wasPressedThisFrame ? ArenaWeaponId.Rocket : ArenaWeaponId.None);
+                keyboard != null && keyboard.digit3Key.wasPressedThisFrame ? ArenaWeaponId.Rocket : ArenaWeaponId.None,
+                keyboard != null && keyboard.rKey.wasPressedThisFrame);
         }
 
         private void OnApplicationFocus(bool focused)
@@ -390,7 +391,12 @@ namespace AiNative.Client.Application
                 {
                     Vector2Int move = NetworkCharacterInput.RotateMove(new Vector2Int(x, z), CharacterCamera.Yaw);
                     x = move.x; z = move.y;
-                    if (!_pointerOverUi) NetworkCharacterInput.LookDelta(state, CharacterCamera.Yaw, CharacterCamera.Pitch, out yaw, out pitch);
+                    if (!_pointerOverUi)
+                    {
+                        var presentation = GetComponent<BattleClientCompositionRoot>();
+                        if (presentation != null) NetworkCharacterInput.AimDelta(state, presentation.GetAimPoint(), out yaw, out pitch);
+                        else NetworkCharacterInput.LookDelta(state, CharacterCamera.Yaw, CharacterCamera.Pitch, out yaw, out pitch);
+                    }
                 }
                 ArenaButtons buttons = !_automated && acceptInput && !_pointerOverUi
                     ? _characterInput.Buttons(_manualFire) : ArenaButtons.None;
@@ -608,7 +614,7 @@ namespace AiNative.Client.Application
         {
             switch (code)
             {
-                case "invalid_credentials": return "账号或密码不符合要求，或登录信息不正确。账号须为 3–32 位英文字母、数字或下划线；密码须为 12–128 位。";
+                case "invalid_credentials": return "账号或密码不符合要求，或登录信息不正确。账号须为 3–32 位英文字母、数字或下划线；密码须为 6–32 位。";
                 case "username_exists": return "账号已存在，请使用“登录 / 恢复后台连接”，或换一个账号注册。";
                 case "unavailable": case "authority_unavailable": return "服务暂时不可用，请确认服务器全部就绪后重试。";
                 case "SocketException": case "IOException": return "连接失败，请检查服务器是否启动，以及地址、端口和 TLS 设置。";

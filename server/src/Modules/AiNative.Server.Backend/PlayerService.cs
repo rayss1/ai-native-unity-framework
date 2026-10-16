@@ -42,7 +42,7 @@ public sealed class PlayerService : IServiceHandler
                     if (context.Caller != ServiceRole.Gate) return ServiceReply.Reject("forbidden");
                     var request = AccountRequest.Parser.ParseFrom(payload.Span);
                     var username = request.Username.Trim().ToLowerInvariant();
-                    if (username.Length is < 3 or > 32 || !username.All(c => char.IsAsciiLetterOrDigit(c) || c == '_') || request.Password.Length is < 12 or > 128) return ServiceReply.Reject("invalid_credentials");
+                    if (username.Length is < 3 or > 32 || !username.All(c => char.IsAsciiLetterOrDigit(c) || c == '_') || request.Password.Length is < 6 or > 32) return ServiceReply.Reject("invalid_credentials");
                     PlayerAccount? account;
                     if (method == ServiceMethods.RegisterAccount)
                     {

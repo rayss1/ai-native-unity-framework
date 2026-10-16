@@ -1,6 +1,6 @@
 # Current-source validation
 
-Current project progress is maintained in [one status page](../../Docs/Architecture/current-status.md). For the October 16 P1 source, select `-Profile Development -ExpectedDotnetPassed 563 -ExpectedEditModePassed 221` on Windows. The .NET total is the October 15 discovered inventory (546) plus 17 new prediction/parser cases, not a claim of a full P1 Windows rerun. The P1 targeted prediction suite passed 56 cases; the historical P0 macOS full run passed 541 and skipped five Windows-only tests. Strict release gates still reject skips. The two executable entries obtain Unity inventories and Fantasy package pins from the same profile contract. Defaults remain historical for compatibility; select the profile explicitly.
+Current project progress is maintained in [one status page](../../Docs/Architecture/current-status.md). For the October 16 P1 source, select `-Profile Development -ExpectedDotnetPassed 607 -ExpectedEditModePassed 241` on Windows. The local Windows solution run discovered 607 .NET cases: 602 passed and five PostgreSQL cases were skipped without AINATIVE_TEST_POSTGRES. The full gate expects all 607 to pass with the database configured; this local run is not a full release qualification claim. The P1 targeted prediction suite passed 56 cases; the historical P0 macOS full run passed 541 and skipped five Windows-only tests. Strict release gates still reject skips. The two executable entries obtain Unity inventories and Fantasy package pins from the same profile contract. Defaults remain historical for compatibility; select the profile explicitly.
 
 | Profile | Unity EditMode | Source/dependency scope |
 | --- | ---: | --- |
@@ -8,7 +8,7 @@ Current project progress is maintained in [one status page](../../Docs/Architect
 | Candidate | 147 | Earlier socket/lifecycle source generation, Fantasy `df4ad5f`; explicit .NET count |
 | TerminalDelivery | 164 | October 6 terminal-receive tests, Fantasy `df4ad5f`; explicit .NET count (historically 530) |
 | Current | 166 | Legacy-health/additive-field regressions, Fantasy `df4ad5f`; 536 .NET tests (including four snapshot-fanout regressions) |
-| Development | 221 | October 16 P1 character input, remote state and authoritative event regressions; Fantasy `df4ad5f`; expected .NET inventory 563 |
+| Development | 241 | October 16 training map, combat/reload, password and P1 regressions; Fantasy `df4ad5f`; expected .NET inventory 607 |
 
 Wrong totals, missing fixtures, failed/skipped cases and source changes fail the gate. Historical 128-test observations below remain evidence records, not a selectable current inventory.
 
@@ -22,7 +22,7 @@ For a clean current commit, start an isolated PostgreSQL 17.11, set `AINATIVE_TE
   -SdkPath (Get-Command dotnet).Source `
   -UnityEditorPath 'C:/Program Files/Unity/Hub/Editor/6000.3.23f1/Editor/Unity.exe' `
   -EvidenceDirectory ./artifacts/validation/new-current-run `
-  -Profile Development -ExpectedDotnetPassed 563 -ExpectedEditModePassed 221 `
+  -Profile Development -ExpectedDotnetPassed 607 -ExpectedEditModePassed 241 `
   -Phases Dotnet,Architecture,WindowsLegacy
 ```
 
@@ -41,7 +41,7 @@ $validationManifest = Get-AiNativeSourceManifest -Root $validationSource
   -SdkPath (Get-Command dotnet).Source `
   -UnityEditorPath 'C:/Program Files/Unity/Hub/Editor/6000.3.23f1/Editor/Unity.exe' `
   -EvidenceDirectory ./artifacts/validation/new-worktree-run `
-  -Profile Development -ExpectedDotnetPassed 563 -ExpectedEditModePassed 221 `
+  -Profile Development -ExpectedDotnetPassed 607 -ExpectedEditModePassed 241 `
   -SourceMode Worktree -ExpectedSourceManifestSha256 $validationManifest.sha256 `
   -Phases Dotnet,Architecture,WindowsLegacy
 ```

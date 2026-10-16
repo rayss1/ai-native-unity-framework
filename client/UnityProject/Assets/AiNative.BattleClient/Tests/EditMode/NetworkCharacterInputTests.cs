@@ -6,6 +6,39 @@ namespace AiNative.Client.Application.Tests
 {
     public sealed class NetworkCharacterInputTests
     {
+        [Test]
+        public void ReloadIsBufferedUntilCommitAndClearedAtInputBoundaries()
+        {
+            var input = new NetworkCharacterInput();
+            input.Sample(false, ArenaWeaponId.None, true);
+            input.Sample(false, ArenaWeaponId.None);
+            Assert.That(input.Buttons(true), Is.EqualTo(ArenaButtons.Fire | ArenaButtons.Reload));
+            input.Commit();
+            Assert.That(input.Buttons(false), Is.EqualTo(ArenaButtons.None));
+            input.Sample(false, ArenaWeaponId.None, true);
+            input.Clear();
+            Assert.That(input.Buttons(false), Is.EqualTo(ArenaButtons.None));
+        }
+
+        [TestCase(2f)]
+        [TestCase(10f)]
+        [TestCase(30f)]
+        public void ShoulderCameraAimConvergesOnVisibleCapsule(float distance)
+        {
+            var state = new ArenaPlayerState(0, 0, 0, 0);
+            var camera = new Vector3(.45f, 1.45f, -2.2f);
+            var feet = new Vector3(0, 0, distance);
+            Vector3 direction = (feet + Vector3.up * 1.2f - camera).normalized;
+            Vector3 relative = (camera - feet) * 1000;
+            Assert.That(ArenaHitGeometry.RayCapsule(relative.x, relative.y, relative.z,
+                direction.x, direction.y, direction.z, 100000, out double t), Is.True);
+            var point = camera + direction * ((float)t / 1000 + .02f);
+            NetworkCharacterInput.AimDelta(state, point, out int yaw, out int pitch);
+            Vector3 shot = Quaternion.Euler(-pitch / 1000f, yaw / 1000f, 0) * Vector3.forward;
+            Assert.That(ArenaHitGeometry.RayCapsule(0, 600, -distance * 1000,
+                shot.x, shot.y, shot.z, 100000, out _), Is.True);
+        }
+
         [TestCase(0, 0, 1000)]
         [TestCase(90, 1000, 0)]
         [TestCase(180, 0, -1000)]

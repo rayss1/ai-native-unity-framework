@@ -9,6 +9,26 @@ namespace AiNative.Server.Backend.Tests;
 
 public sealed class DomainTests
 {
+    [TestCase(5, false)]
+    [TestCase(6, true)]
+    [TestCase(32, true)]
+    [TestCase(33, false)]
+    public async Task Password_length_boundaries_apply_to_registration_and_login(int length, bool accepted)
+    {
+        using var key = RSA.Create(2048);
+        var player = new PlayerService(new MemoryStore(), key, new TestClock());
+        var request = new AccountRequest { Username = "boundary_user", Password = new string('a', length) };
+        var registration = await Call(player, Gate(), ServiceMethods.RegisterAccount, request);
+        Assert.That(registration.Success, Is.EqualTo(accepted));
+        var login = await Call(player, Gate(), ServiceMethods.Login, request);
+        Assert.That(login.Success, Is.EqualTo(accepted));
+        if (!accepted)
+        {
+            Assert.That(registration.Error, Is.EqualTo("invalid_credentials"));
+            Assert.That(login.Error, Is.EqualTo("invalid_credentials"));
+        }
+    }
+
     static ServiceCallContext Gate(string player = "") => new(ServiceRole.Gate, "gate", player);
     static ValueTask<ServiceReply> Call(IServiceHandler service, ServiceCallContext context, string method, IMessage body) => service.HandleAsync(context, method, body.ToByteArray());
 
