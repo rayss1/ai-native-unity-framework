@@ -9,17 +9,25 @@ namespace AiNative.Client.Application
     {
         private readonly GameObject[] _visuals = new GameObject[ArenaClientProtocolV1.MaxSnapshotPlayers - 1];
         private readonly uint[] _ids = new uint[ArenaClientProtocolV1.MaxSnapshotPlayers - 1];
+        private readonly NetworkCharacterPresenter[] _presenters = new NetworkCharacterPresenter[ArenaClientProtocolV1.MaxSnapshotPlayers - 1];
+        private readonly float _heightOffset;
         private bool _disposed;
 
-        public ArenaRemoteVisualPool(Material material)
+        public ArenaRemoteVisualPool(Material material) : this(material, null) { }
+
+        public ArenaRemoteVisualPool(Material material, GameObject characterPrefab)
         {
+            _heightOffset = characterPrefab == null ? 1f : 0f;
             for (int i = 0; i < _visuals.Length; i++)
             {
-                GameObject visual = GameObject.CreatePrimitive(PrimitiveType.Capsule);
-                visual.name = "RemotePlayerGreybox";
-                visual.GetComponent<Renderer>().sharedMaterial = material;
+                GameObject visual = characterPrefab == null
+                    ? GameObject.CreatePrimitive(PrimitiveType.Capsule)
+                    : UnityEngine.Object.Instantiate(characterPrefab);
+                visual.name = characterPrefab == null ? "RemotePlayerGreybox" : "RemoteNetworkCharacter";
+                if (characterPrefab == null) visual.GetComponent<Renderer>().sharedMaterial = material;
                 // Presentation geometry does not participate in prediction or authoritative collision.
-                visual.GetComponent<Collider>().enabled = false;
+                foreach (Collider collider in visual.GetComponentsInChildren<Collider>(true)) collider.enabled = false;
+                _presenters[i] = visual.GetComponent<NetworkCharacterPresenter>();
                 visual.SetActive(false);
                 _visuals[i] = visual;
             }
@@ -42,8 +50,9 @@ namespace AiNative.Client.Application
                 int slot = Array.IndexOf(_ids, pose.EntityId);
                 if (slot < 0) { slot = Array.IndexOf(_ids, 0u); _ids[slot] = pose.EntityId; }
                 GameObject visual = _visuals[slot];
+                _presenters[slot]?.Apply(pose.State);
                 visual.transform.SetPositionAndRotation(
-                    new Vector3((float)(pose.XMillimetres / 1000), (float)(pose.YMillimetres / 1000) + 1f, (float)(pose.ZMillimetres / 1000)),
+                    new Vector3((float)(pose.XMillimetres / 1000), (float)(pose.YMillimetres / 1000) + _heightOffset, (float)(pose.ZMillimetres / 1000)),
                     Quaternion.Euler(0, (float)(pose.YawMillidegrees / 1000), 0));
                 visual.SetActive(pose.Alive);
             }
@@ -55,6 +64,12 @@ namespace AiNative.Client.Application
             return _disposed || entityId == 0 || slot < 0 ? null : _visuals[slot];
         }
 
+        public NetworkCharacterPresenter GetPresenter(uint entityId)
+        {
+            int slot = Array.IndexOf(_ids, entityId);
+            return _disposed || entityId == 0 || slot < 0 ? null : _presenters[slot];
+        }
+
         public void Dispose()
         {
             if (_disposed) return;
@@ -63,6 +78,7 @@ namespace AiNative.Client.Application
             {
                 if (_visuals[i] != null) UnityEngine.Object.Destroy(_visuals[i]);
                 _visuals[i] = null;
+                _presenters[i] = null;
                 _ids[i] = 0;
             }
         }

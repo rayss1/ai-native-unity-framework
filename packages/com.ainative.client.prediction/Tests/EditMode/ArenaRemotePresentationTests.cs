@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using NUnit.Framework;
+using AiNative.Gameplay;
 
 namespace AiNative.Client.Prediction.Tests
 {
@@ -40,6 +41,55 @@ namespace AiNative.Client.Prediction.Tests
         }
 
         [Test]
+        public void AnimationSampleInterpolatesMotionWithoutEarlyDiscreteTransitions()
+        {
+            var view = new ArenaRemotePresentation();
+            var output = new ArenaRemotePose[8];
+            view.ApplySnapshot(Frame(100, AnimatedPlayer(2, 0, 0, 1000, 2000, 100, 1)), 1);
+            view.ApplySnapshot(Frame(112, AnimatedPlayer(2, 1200, 600, 3000, 10000, 40, 2)), 1);
+            view.Advance(0, output);
+            ArenaPlayerState state = output[0].State;
+            Assert.That(state.PositionXMillimetres, Is.EqualTo(600));
+            Assert.That(state.PositionYMillimetres, Is.EqualTo(300));
+            Assert.That(state.VelocityXMillimetresPerSecond, Is.EqualTo(2000));
+            Assert.That(state.PitchMillidegrees, Is.EqualTo(6000));
+            Assert.That(state.Grounded, Is.True);
+            Assert.That(state.Health, Is.EqualTo(100));
+            Assert.That(state.Weapon, Is.EqualTo(ArenaWeaponId.Machinegun));
+            view.Advance(1, output);
+            state = output[0].State;
+            Assert.That(state.Grounded, Is.False);
+            Assert.That(state.Health, Is.EqualTo(40));
+            Assert.That(state.Weapon, Is.EqualTo(ArenaWeaponId.Shotgun));
+            Assert.That(state.VelocityXMillimetresPerSecond, Is.EqualTo(3000));
+            view.Advance(1, output);
+            Assert.That(output[0].State, Is.EqualTo(state), "Starvation holds the full animation sample.");
+        }
+
+        [Test]
+        public void LegacyPoseConstructorProvidesConsistentPresentationState()
+        {
+            var pose = new ArenaRemotePose(2, 100, 200, 300, 90000, false);
+            Assert.That(pose.Alive, Is.False);
+            Assert.That(pose.State.Alive, Is.False);
+            Assert.That(pose.State.PositionXMillimetres, Is.EqualTo(100));
+            Assert.That(pose.State.YawMillidegrees, Is.EqualTo(90000));
+        }
+
+        private static byte[] AnimatedPlayer(uint id, int x, int y, int vx, int pitch, uint health, uint weapon)
+        {
+            var data = new List<byte> { 0x08 }; Varint(data, id);
+            data.Add(0x10); Varint(data, (uint)((x << 1) ^ (x >> 31)));
+            data.Add(0x18); Varint(data, (uint)((y << 1) ^ (y >> 31)));
+            data.Add(0x30); Varint(data, health);
+            data.Add(0x38); Varint(data, (uint)((vx << 1) ^ (vx >> 31)));
+            data.Add(0x50); Varint(data, weapon);
+            data.Add(0x60); Varint(data, 1);
+            data.Add(0x70); Varint(data, (uint)((pitch << 1) ^ (pitch >> 31)));
+            return data.ToArray();
+        }
+
+        [Test]
         public void RejectsDuplicateStaleMalformedAndOverCapacityWithoutPartialMutation()
         {
             var view = new ArenaRemotePresentation();
@@ -70,9 +120,13 @@ namespace AiNative.Client.Prediction.Tests
             view.ApplySnapshot(Frame(124, Player(2, 20000, alive: false)), 1);
             view.Advance(0, output);
             Assert.That(output[0].Alive, Is.False);
+            Assert.That(output[0].State.Alive, Is.False);
+            Assert.That(output[0].State.Tick, Is.EqualTo(124));
             view.ApplySnapshot(Frame(136, Player(2, 21000)), 1);
             view.Advance(0, output);
             Assert.That(output[0].XMillimetres, Is.EqualTo(21000));
+            Assert.That(output[0].State.Alive, Is.True);
+            Assert.That(output[0].State.PositionXMillimetres, Is.EqualTo(21000));
             view.Reset();
             Assert.That(view.Advance(0, output), Is.Zero);
             Assert.That(view.ApplySnapshot(Frame(1, Player(4, 800)), 1), Is.True);

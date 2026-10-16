@@ -97,6 +97,10 @@ function Get-AiNativeEditModeFixtureCounts {
         $fixtures['AiNative.Client.Application.Tests.LocalMultiplayerTests']=3
         $fixtures['AiNative.Client.Character.Tests.CharacterActionContractTests']=1
         $fixtures['AiNative.Client.Application.Tests.AndroidBattleClientBuildTests']=16
+        $fixtures['AiNative.Client.Prediction.Tests.ArenaRemotePresentationTests']=12
+        $fixtures['AiNative.Client.Prediction.Tests.ArenaCombatEventProtocolTests']=9
+        $fixtures['AiNative.Client.Application.Tests.NetworkCharacterInputTests']=8
+        $fixtures['AiNative.Client.Application.Tests.BattleCombatEventTests']=4
     }
     return $fixtures
 }

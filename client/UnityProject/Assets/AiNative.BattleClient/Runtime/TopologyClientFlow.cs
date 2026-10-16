@@ -5,6 +5,7 @@ using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 using AiNative.Client.Fantasy;
+using AiNative.Client.Character;
 using AiNative.Gameplay;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -47,6 +48,8 @@ namespace AiNative.Client.Application
         private long _baselinePlayed;
         private float _elapsed, _nextPoll, _deadlineSeconds = 120;
         public BattleClientSession Battle { get; private set; }
+        public CharacterOrbitCamera CharacterCamera { get; set; }
+        public bool IsCharacterAiming => _manualAim && CanSampleCharacterInput && !_pointerOverUi;
         public GateProfile Profile { get; private set; }
         public string PlayerId => _backend?.PlayerId ?? "";
         public string MatchId => _match?.MatchId ?? "";
@@ -77,7 +80,11 @@ namespace AiNative.Client.Application
         public string DisplayError => ErrorMessage(Error);
         public float QueueElapsedSeconds => State == "Queued" ? Math.Max(0, Time.unscaledTime - _queueStarted) : 0;
 
-        public void SetUiInputBlocked(bool keyboard, bool pointer) { _textInputFocused = keyboard; _pointerOverUi = pointer; }
+        public void SetUiInputBlocked(bool keyboard, bool pointer)
+        {
+            _textInputFocused = keyboard; _pointerOverUi = pointer;
+            if (keyboard || pointer) _characterInput.Clear();
+        }
 
         public void Authenticate(bool register, string username, string password, string host, string port, bool tls, string pin)
         {
@@ -243,6 +250,7 @@ namespace AiNative.Client.Application
             BattleClientSession finished = Battle;
             await finished.DisposeAsync();
             _lifetime.Token.ThrowIfCancellationRequested();
+            ClearManualInput();
             Battle = null; _match = null; _requestId = ""; _party = refreshedParty;
             Profile = profile; _baselinePlayed = profile.Played;
             Completed = SettlementConfirmed = Reconnected = false;
@@ -257,7 +265,29 @@ namespace AiNative.Client.Application
         // Sample devices in Update (Input System dynamic update). Fixed ticks consume
         // the snapshot without querying devices from the wrong input-update phase.
         private Vector2Int _manualMove;
-        private bool _manualFire;
+        private bool _manualFire, _manualAim;
+        private readonly NetworkCharacterInput _characterInput = new NetworkCharacterInput();
+        private bool HasGameFocus
+        {
+            get
+            {
+#if UNITY_EDITOR
+                return EditorHasGameFocus?.Invoke() ?? false;
+#else
+                return global::UnityEngine.Application.isFocused;
+#endif
+            }
+        }
+        private bool CanSampleCharacterInput => !_automated && HasGameFocus && !_textInputFocused &&
+            !_paused && !_resumePending && !Completed && State == "Battle" &&
+            Battle != null && Battle.State == BattleClientState.Active && Battle.IsPredictionInitialized &&
+            Battle.ArenaPhase != ArenaMatchPhase.Finished;
+
+        private void ClearManualInput()
+        {
+            _manualMove = Vector2Int.zero; _manualFire = _manualAim = false;
+            _characterInput.Clear();
+        }
 
         private void SampleManualInput()
         {
@@ -265,17 +295,27 @@ namespace AiNative.Client.Application
             _manualMove = keyboard == null ? Vector2Int.zero : new Vector2Int(
                 (keyboard.dKey.isPressed ? 1000 : 0) - (keyboard.aKey.isPressed ? 1000 : 0),
                 (keyboard.wKey.isPressed ? 1000 : 0) - (keyboard.sKey.isPressed ? 1000 : 0));
-            _manualFire = Mouse.current != null && Mouse.current.leftButton.isPressed;
+            Mouse mouse = Mouse.current;
+            _manualFire = mouse != null && mouse.leftButton.isPressed;
+            _manualAim = mouse != null && mouse.rightButton.isPressed;
+            if (!CanSampleCharacterInput || _pointerOverUi) { _characterInput.Clear(); return; }
+            // Hold RMB to orbit/aim; an unlocked cursor keeps the lobby and battle UI usable.
+            if (_manualAim && CharacterCamera != null) CharacterCamera.ApplyLook(mouse.delta.ReadValue());
+            _characterInput.Sample(keyboard != null && keyboard.spaceKey.wasPressedThisFrame,
+                keyboard != null && keyboard.digit1Key.wasPressedThisFrame ? ArenaWeaponId.Machinegun :
+                keyboard != null && keyboard.digit2Key.wasPressedThisFrame ? ArenaWeaponId.Shotgun :
+                keyboard != null && keyboard.digit3Key.wasPressedThisFrame ? ArenaWeaponId.Rocket : ArenaWeaponId.None);
         }
 
         private void OnApplicationFocus(bool focused)
         {
-            if (!focused) { _manualMove = Vector2Int.zero; _manualFire = false; }
+            if (!focused) ClearManualInput();
         }
 
         private void Update()
         {
             if (_disposed || _paused) return;
+            _view?.RefreshInputBlock();
             SampleManualInput();
             if (Completed || State == "Settling" || State == "AwaitingResult")
             {
@@ -335,17 +375,34 @@ namespace AiNative.Client.Application
         private void FixedUpdate()
         {
             _view?.RefreshInputBlock();
-            if (_paused || _resumePending || Completed || State == "Settling" || State == "AwaitingResult" || Battle == null || Battle.ArenaPhase == ArenaMatchPhase.Finished || Battle.State != BattleClientState.Active || !Battle.IsPredictionInitialized) return;
+            if (_paused || _resumePending || Completed || State == "Settling" || State == "AwaitingResult" || Battle == null || Battle.ArenaPhase == ArenaMatchPhase.Finished || Battle.State != BattleClientState.Active || !Battle.IsPredictionInitialized) { _characterInput.Clear(); return; }
             // Authoritative room time prevents backlog after network stalls from scheduling far-future inputs.
             _inputTick = Math.Max(_inputTick + 1, Battle.LastReceivedTick + 1);
-            bool acceptInput = global::UnityEngine.Application.isFocused && !_textInputFocused;
-#if UNITY_EDITOR
-            acceptInput = (EditorHasGameFocus?.Invoke() ?? false) && !_textInputFocused;
-#endif
+            bool acceptInput = HasGameFocus && !_textInputFocused;
+            if (!acceptInput || _pointerOverUi) _characterInput.Clear();
             int x = _automated ? ((_inputTick / 60) % 2 == 0 ? 1000 : -1000) : acceptInput ? _manualMove.x : 0;
             int z = !_automated && acceptInput ? _manualMove.y : 0;
-            var prepared = Battle.TryGetArenaState(out _) ? Battle.PredictAndQueueArenaInput(_inputTick, x, z, 0, 0, !_automated && acceptInput && !_pointerOverUi && _manualFire ? ArenaButtons.Fire : ArenaButtons.None, ArenaWeaponId.Machinegun) : Battle.PredictAndQueueInput(_inputTick, x, z);
-            if (prepared == AiNative.Client.Prediction.PredictionPrepareStatus.Prepared) PreparedInputs++;
+            AiNative.Client.Prediction.PredictionPrepareStatus prepared;
+            if (Battle.TryGetArenaState(out var state))
+            {
+                int yaw = 0, pitch = 0;
+                if (!_automated && CharacterCamera != null && acceptInput)
+                {
+                    Vector2Int move = NetworkCharacterInput.RotateMove(new Vector2Int(x, z), CharacterCamera.Yaw);
+                    x = move.x; z = move.y;
+                    if (!_pointerOverUi) NetworkCharacterInput.LookDelta(state, CharacterCamera.Yaw, CharacterCamera.Pitch, out yaw, out pitch);
+                }
+                ArenaButtons buttons = !_automated && acceptInput && !_pointerOverUi
+                    ? _characterInput.Buttons(_manualFire) : ArenaButtons.None;
+                prepared = Battle.PredictAndQueueArenaInput(_inputTick, x, z, yaw, pitch, buttons,
+                    _automated ? ArenaWeaponId.Machinegun : _characterInput.Weapon);
+            }
+            else prepared = Battle.PredictAndQueueInput(_inputTick, x, z);
+            if (prepared == AiNative.Client.Prediction.PredictionPrepareStatus.Prepared)
+            {
+                PreparedInputs++;
+                _characterInput.Commit();
+            }
         }
 
         private async Task PollAsync()
@@ -475,7 +532,7 @@ namespace AiNative.Client.Application
         {
             if (_disposed || Completed || paused == _paused) return; // Initial false and duplicate callbacks have no effect.
             _paused = paused;
-            if (paused) { PauseCount++; _pauseGeneration++; _manualMove = Vector2Int.zero; _manualFire = false; }
+            if (paused) { PauseCount++; _pauseGeneration++; ClearManualInput(); }
             else
             {
                 ResumeCount++; _skipElapsedFrame = true;

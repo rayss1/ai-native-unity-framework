@@ -83,6 +83,40 @@ namespace AiNative.Client.Character.Tests
             Assert.That(Vector3.Distance(orbit.transform.position, pivot), Is.LessThan(1));
         }
 
+        [UnityTest]
+        public IEnumerator ExternalPresentationFollowsTransformAndUsesAimAndCrouchWithoutMotor()
+        {
+            var remote = Create("Externally driven character");
+            remote.transform.position = new Vector3(1200, 1000, 1000);
+            orbit.ConfigurePresentation(remote.transform);
+            orbit.SetPresentationState(new CharacterMotionState { Aiming = true, Crouched = true });
+            orbit.ApplyLook(new Vector2(100, 50));
+            yield return null;
+            yield return null;
+            var rotation = Quaternion.Euler(9, 12, 0);
+            var expected = remote.transform.position + Vector3.up * .9f
+                + rotation * new Vector3(.45f, 0, -2.2f);
+            Assert.That(orbit.Yaw, Is.EqualTo(12).Within(.001f));
+            Assert.That(orbit.Pitch, Is.EqualTo(9).Within(.001f));
+            Assert.That(Vector3.Distance(orbit.transform.position, expected), Is.LessThan(.02f));
+            Assert.That(remote.GetComponent<CharacterMotor>(), Is.Null);
+        }
+
+        [UnityTest]
+        public IEnumerator ReturningToLocalMotorDiscardsExternalTargetAndPresentationState()
+        {
+            var remote = Create("Temporary external target");
+            remote.transform.position = new Vector3(1200, 1000, 1000);
+            orbit.ConfigurePresentation(remote.transform);
+            orbit.SetPresentationState(new CharacterMotionState { Aiming = true, Crouched = true });
+            yield return null;
+            orbit.Configure(motor, null);
+            yield return null;
+            yield return null;
+            Assert.That(Vector3.Distance(orbit.transform.position, pivot), Is.EqualTo(4).Within(.02f));
+            Assert.That(Vector3.Distance(orbit.transform.position, pivot + boomDirection * 4), Is.LessThan(.02f));
+        }
+
         private GameObject Create(string name)
         {
             var item = new GameObject(name);

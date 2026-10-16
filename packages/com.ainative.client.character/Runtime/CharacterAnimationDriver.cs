@@ -11,6 +11,9 @@ namespace AiNative.Client.Character
         [SerializeField] private Transform leftHandGrip;
         [SerializeField] private Vector3 hipPosition, aimPosition;
         [SerializeField] private Quaternion hipRotation = Quaternion.identity, aimRotation = Quaternion.identity;
+        private readonly CharacterConfiguration presentationConfiguration = new CharacterConfiguration();
+        private CharacterMotionState presentationState;
+        private bool externallyDriven;
         private float aimWeight;
         private uint lastShot;
         private bool wasRolling, wasMelee, wasGrounded = true;
@@ -34,12 +37,23 @@ namespace AiNative.Client.Character
         private const string Attack = "FullBody.Attacks.WeakAttacks.Unarmed.C";
         public void Configure(CharacterMotor source, Animator rig, GameObject weapon, Transform grip)
         {
+            externallyDriven = false;
             motor = source; animator = rig; rifle = weapon; leftHandGrip = grip;
             if (weapon != null)
             {
                 hipPosition = aimPosition = weapon.transform.localPosition;
                 hipRotation = aimRotation = weapon.transform.localRotation;
             }
+        }
+        /// <summary>
+        /// Drives animation and IK from application-owned motion without running a local motor.
+        /// Preserves the serialized animator, weapon, grip and avatar-specific poses.
+        /// Configure restores local motor control; external locomotion uses default speed thresholds.
+        /// </summary>
+        public void SetPresentationState(CharacterMotionState state)
+        {
+            presentationState = state;
+            externallyDriven = true;
         }
         /// <summary>Avatar-specific hand-local weapon pose; supplied by the application, not shared simulation.</summary>
         public void ConfigureAimPose(Vector3 localPosition, Quaternion localRotation)
@@ -63,11 +77,11 @@ namespace AiNative.Client.Character
         }
         private void Update()
         {
-            if (motor == null || animator == null) return;
-            var state = motor.State;
+            if ((!externallyDriven && motor == null) || animator == null) return;
+            var state = externallyDriven ? presentationState : motor.State;
             var velocity = state.Velocity; velocity.y = 0;
             float speed = velocity.magnitude;
-            var config = motor.Configuration;
+            var config = externallyDriven ? presentationConfiguration : motor.Configuration;
             float magnitude = speed <= config.WalkSpeed
                 ? .5f * speed / Mathf.Max(config.WalkSpeed, .01f)
                 : speed <= config.RunSpeed
@@ -118,8 +132,8 @@ namespace AiNative.Client.Character
         }
         private void OnAnimatorIK(int layerIndex)
         {
-            if (motor == null || animator == null) return;
-            var state = motor.State;
+            if ((!externallyDriven && motor == null) || animator == null) return;
+            var state = externallyDriven ? presentationState : motor.State;
             float weight = state.Mode == CharacterMode.Shooter && !state.Rolling && leftHandGrip != null ? 1 : 0;
             animator.SetIKPositionWeight(AvatarIKGoal.LeftHand, weight);
             animator.SetIKRotationWeight(AvatarIKGoal.LeftHand, weight);

@@ -1,11 +1,30 @@
 # Public API Contract Catalog
 
 Status: Minimum contract frozen for the first vertical slice
-Last updated: 2026-09-02
+Last updated: 2026-10-16
 
 This catalog defines ownership and semantics before implementation. Names and invariants are stable; value layouts may be extended additively as Spikes reveal required data. Implementations must not expose engine/framework types through these ports.
 
 ## Common conventions
+
+### Network character presentation (P1, 2026-10-16)
+
+Client-only additions; Shared ports and wire schemas are unchanged. Application composition owns
+`NetworkCharacterPresenter` and the stripped visual prefab. `CharacterAnimationDriver.SetPresentationState`
+accepts a `CharacterMotionState` value on the Unity main thread; it takes precedence over Motor until
+`Configure` restores local mode. `CharacterOrbitCamera.ConfigurePresentation(Transform)` and
+`SetPresentationState` follow an application-owned pose; `Yaw` / `Pitch` are degrees, positive Pitch
+points down in Unity. Neither interface simulates gameplay or applies health.
+
+`ArenaRemotePose.State` carries render-time motion and discrete snapshot state. Existing constructor
+and coordinate properties remain compatible. `ArenaCombatEventProtocolV1.TryDecode` validates the existing
+ReliableEvent combat payload; `ArenaPresentationEvent` carries server feedback, not commands.
+`BattleClientSession.DrainCombatEvents(Span<ArenaPresentationEvent>)` is owner-thread-only, writes at most
+caller capacity and removes those items. The 256-event queue drops oldest feedback on overflow and
+increments `DroppedCombatEvents`; snapshots remain authoritative. Same-room reconnect clears pending
+feedback while preserving event sequence deduplication. No event applies local damage.
+
+See [P1 integration](p1-network-character.md) for controls, asset generation and validation limits.
 
 ### Local character rifle prototype
 
