@@ -88,6 +88,7 @@ namespace AiNative.Client.Application.Tests
 
         [TestCase("ab", "long-enough-password")]
         [TestCase("valid_user", "short")]
+        [TestCase("valid_user", "123456789012345678901234567890123")]
         [TestCase("bad name", "long-enough-password")]
         [TestCase("中文账号", "long-enough-password")]
         public async Task InvalidCredentials_AreRejectedBeforeCreatingNetworkSession(string user, string password)
@@ -98,6 +99,16 @@ namespace AiNative.Client.Application.Tests
             Assert.That(_flow.State, Is.EqualTo("Disconnected"));
             Assert.That(Field("_backend"), Is.Null);
             Assert.That(Field("_password"), Is.EqualTo(""), "Invalid input should not be retained as a reconnect credential.");
+        }
+
+        [TestCase(6)]
+        [TestCase(32)]
+        public async Task ValidPasswordBoundariesReachAddressValidation(int length)
+        {
+            _flow.Authenticate(true, "valid_user", new string('a', length), "", "23001", false, "");
+            await Idle();
+            Assert.That(_flow.Error, Is.EqualTo("invalid-address"));
+            Assert.That(Field("_backend"), Is.Null);
         }
 
         [TestCase("", "23001")]

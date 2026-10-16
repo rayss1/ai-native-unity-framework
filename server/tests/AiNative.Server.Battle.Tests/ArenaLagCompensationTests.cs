@@ -100,15 +100,18 @@ public sealed class ArenaLagCompensationTests
         game.TryJoin(out uint target); capture.RecordJoin(game.Tick, target);
         for (uint sequence = 1; sequence <= 180; sequence++)
         {
-            var input = new ArenaInput(sequence, game.Tick + 1, sequence <= 120 ? 1000 : 0,
-                0, 0, 0, ArenaButtons.None, ArenaWeaponId.Machinegun);
+            var input = new ArenaInput(sequence, game.Tick + 1, 0,
+                sequence <= 40 ? -1000 : 0, 0, 0, ArenaButtons.None, ArenaWeaponId.Machinegun);
             Assert.That(game.SubmitInput(shooter, input), Is.True); capture.RecordInput(game.Tick, shooter, input);
+            var targetInput = new ArenaInput(sequence, game.Tick + 1, 0, sequence <= 40 ? -1000 : 0,
+                0, 0, ArenaButtons.None, ArenaWeaponId.Machinegun);
+            Assert.That(game.SubmitInput(target, targetInput), Is.True); capture.RecordInput(game.Tick, target, targetInput);
             game.TickOnce(); capture.RecordTick(game.Tick, game.ComputeStateHash());
         }
         ulong aim = game.Tick;
         for (uint sequence = 1; sequence <= 12; sequence++)
         {
-            var input = new ArenaInput(sequence, game.Tick + 1, 0, 1000, 0, 0, ArenaButtons.None, ArenaWeaponId.Machinegun);
+            var input = new ArenaInput(1000 + sequence, game.Tick + 1, 0, 1000, 0, 0, ArenaButtons.None, ArenaWeaponId.Machinegun);
             game.SubmitInput(target, input); capture.RecordInput(game.Tick, target, input);
             game.TickOnce(); capture.RecordTick(game.Tick, game.ComputeStateHash());
         }
@@ -169,9 +172,16 @@ public sealed class ArenaLagCompensationTests
         for (uint sequence = 1; sequence <= 180; sequence++)
         {
             Assert.That(room.SubmitInput(shooter, new ArenaInput(sequence, room.Tick + 1,
-                sequence <= 120 ? 1000 : 0, 0, 0, 0, ArenaButtons.None, ArenaWeaponId.Machinegun)), Is.True);
+                0, sequence <= 40 ? -1000 : 0, 0, 0, ArenaButtons.None, ArenaWeaponId.Machinegun)), Is.True);
+            Assert.That(room.SubmitInput(target, new ArenaInput(sequence, room.Tick + 1, 0,
+                sequence <= 40 ? -1000 : 0, 0, 0, ArenaButtons.None, ArenaWeaponId.Machinegun)), Is.True);
             room.TickOnce();
         }
+        room.TryGetPlayer(shooter, out var setupShooter); room.TryGetPlayer(target, out var setupTarget);
+        Assert.That(setupShooter.PositionZMillimetres, Is.EqualTo(setupTarget.PositionZMillimetres), "Fixture lane alignment");
+        Assert.That(ArenaTrainingMap.Occluded(setupShooter.PositionXMillimetres, 600, setupShooter.PositionZMillimetres,
+            setupTarget.PositionXMillimetres, 600, setupTarget.PositionZMillimetres), Is.False,
+            $"Fixture ray: ({setupShooter.PositionXMillimetres},{setupShooter.PositionZMillimetres}) to ({setupTarget.PositionXMillimetres},{setupTarget.PositionZMillimetres})");
         return room;
     }
 
@@ -179,7 +189,7 @@ public sealed class ArenaLagCompensationTests
     {
         for (uint sequence = 1; sequence <= ticks; sequence++)
         {
-            Assert.That(room.SubmitInput(target, new ArenaInput(sequence, room.Tick + 1,
+            Assert.That(room.SubmitInput(target, new ArenaInput(1000 + sequence, room.Tick + 1,
                 0, 1000, 0, 0, ArenaButtons.None, ArenaWeaponId.Machinegun)), Is.True);
             room.TickOnce();
         }

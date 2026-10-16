@@ -54,6 +54,7 @@ public sealed class ArenaInputLifecycleTests
         var room = Create();
         for (int i = 0; i <= ArenaRoom.RespawnProtectionTicks; i++) room.TickOnce();
         var players = Field<ArenaPlayerState[]>(room, "_players");
+        players[0].PositionZMillimetres = players[1].PositionZMillimetres = -17000;
         players[1].Health = 20; players[1].Armor = 0;
         Assert.That(room.SubmitInput(1, new ArenaInput(1, room.Tick + 1, 0, 0, 90000, 0, ArenaButtons.Fire, ArenaWeaponId.Machinegun)), Is.True);
         Assert.That(room.SubmitInput(2, Input(1, room)), Is.True);
@@ -89,6 +90,7 @@ public sealed class ArenaInputLifecycleTests
         for (int i = 0; i <= ArenaRoom.RespawnProtectionTicks; i++) room.TickOnce();
         uint shooter = projectile ? 1U : 2U, target = projectile ? 2U : 1U;
         var players = Field<ArenaPlayerState[]>(room, "_players");
+        players[0].PositionZMillimetres = players[1].PositionZMillimetres = -17000;
         players[target - 1].Health = 20; players[target - 1].Armor = 0;
         room.SubmitInput(shooter, new ArenaInput(1, room.Tick + 1, 0, 0, projectile ? 90000 : -90000, 0,
             ArenaButtons.Fire, projectile ? ArenaWeaponId.Rocket : ArenaWeaponId.Machinegun));

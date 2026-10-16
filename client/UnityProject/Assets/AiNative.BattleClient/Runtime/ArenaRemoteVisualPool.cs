@@ -1,5 +1,6 @@
 using System;
 using AiNative.Client.Prediction;
+using AiNative.Gameplay;
 using UnityEngine;
 
 namespace AiNative.Client.Application
@@ -56,6 +57,23 @@ namespace AiNative.Client.Application
                     Quaternion.Euler(0, (float)(pose.YawMillidegrees / 1000), 0));
                 visual.SetActive(pose.Alive);
             }
+        }
+
+        // Presentation-only target selection. The server independently validates every shot.
+        public Vector3 AimPoint(Ray ray, float range)
+        {
+            double nearest = range * 1000d;
+            bool found = false;
+            foreach (GameObject visual in _visuals)
+            {
+                if (visual == null || !visual.activeSelf) continue;
+                Vector3 relative = (ray.origin - visual.transform.position + Vector3.up * _heightOffset) * 1000f;
+                if (ArenaHitGeometry.RayCapsule(relative.x, relative.y, relative.z,
+                    ray.direction.x, ray.direction.y, ray.direction.z, nearest, out double hit))
+                { nearest = hit; found = true; }
+            }
+            // Aim slightly inside the surface to tolerate millidegree quantization.
+            return ray.GetPoint((float)(nearest / 1000d) + (found ? .02f : 0));
         }
 
         public GameObject GetVisual(uint entityId)
