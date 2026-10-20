@@ -10,8 +10,12 @@ public static class ResultPayload
     {
         MatchResult canonical = result.Clone();
         canonical.Players.Clear();
-        canonical.Players.Add(result.Players.OrderBy(x => x.PlayerId, StringComparer.Ordinal).Select(x => x.Clone()));
+        canonical.Players.Add(
+            result.Players.OrderBy(x => x.PlayerId, StringComparer.Ordinal).Select(x => x.Clone())
+        );
         return canonical;
     }
-    public static string Hash(MatchResult result) => Convert.ToHexString(SHA256.HashData(Canonicalize(result).ToByteArray()));
+
+    public static string Hash(MatchResult result) =>
+        Convert.ToHexString(SHA256.HashData(Canonicalize(result).ToByteArray()));
 }

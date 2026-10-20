@@ -82,7 +82,8 @@ namespace AiNative.Realtime
             int writtenBytes,
             int requiredBytes,
             ulong sequence,
-            uint connectionEpoch)
+            uint connectionEpoch
+        )
         {
             if (writtenBytes < 0)
             {

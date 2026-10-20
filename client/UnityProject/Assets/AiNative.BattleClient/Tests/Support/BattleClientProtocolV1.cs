@@ -19,29 +19,33 @@ namespace AiNative.Client.Application
         public static readonly TransportChannel ControlChannel = new TransportChannel(
             0,
             TransportDelivery.Reliable,
-            TransportOrdering.Ordered);
+            TransportOrdering.Ordered
+        );
 
         public static readonly TransportChannel SnapshotChannel = new TransportChannel(
             1,
             TransportDelivery.Unreliable,
-            TransportOrdering.Sequenced);
+            TransportOrdering.Sequenced
+        );
 
         public static readonly TransportChannel InputChannel = new TransportChannel(
             2,
             TransportDelivery.Unreliable,
-            TransportOrdering.Sequenced);
+            TransportOrdering.Sequenced
+        );
 
         public static bool TryEncodeLogin(
             string clientBuild,
             Span<byte> destination,
-            out int writtenBytes)
-            => TryEncodeLogin(clientBuild, null, destination, out writtenBytes);
+            out int writtenBytes
+        ) => TryEncodeLogin(clientBuild, null, destination, out writtenBytes);
 
         public static bool TryEncodeLogin(
             string clientBuild,
             BattleAdmissionInfo admission,
             Span<byte> destination,
-            out int writtenBytes)
+            out int writtenBytes
+        )
         {
             writtenBytes = 0;
             clientBuild ??= string.Empty;
@@ -53,25 +57,40 @@ namespace AiNative.Client.Application
 
             BinaryPrimitives.WriteUInt16LittleEndian(destination, LoginRequestMessageId);
             int offset = 2;
-            if (!TryWriteByte(destination, ref offset, 0x08) ||
-                !TryWriteVarint(destination, ref offset, 1) ||
-                (buildBytes != 0 &&
-                 (!TryWriteByte(destination, ref offset, 0x12) ||
-                  !TryWriteVarint(destination, ref offset, (ulong)buildBytes) ||
-                  destination.Length - offset < buildBytes)))
+            if (
+                !TryWriteByte(destination, ref offset, 0x08)
+                || !TryWriteVarint(destination, ref offset, 1)
+                || (
+                    buildBytes != 0
+                    && (
+                        !TryWriteByte(destination, ref offset, 0x12)
+                        || !TryWriteVarint(destination, ref offset, (ulong)buildBytes)
+                        || destination.Length - offset < buildBytes
+                    )
+                )
+            )
             {
                 return false;
             }
 
             if (buildBytes != 0)
             {
-                offset += Encoding.UTF8.GetBytes(clientBuild, destination.Slice(offset, buildBytes));
+                offset += Encoding.UTF8.GetBytes(
+                    clientBuild,
+                    destination.Slice(offset, buildBytes)
+                );
             }
 
-            if (admission is not null &&
-                (!TryWriteString(destination, ref offset, 0x1a, admission.EntryTicket) ||
-                 !TryWriteString(destination, ref offset, 0x22, admission.RoomId))) return false;
-            if (offset > MaxFrameBytes) return false;
+            if (
+                admission is not null
+                && (
+                    !TryWriteString(destination, ref offset, 0x1a, admission.EntryTicket)
+                    || !TryWriteString(destination, ref offset, 0x22, admission.RoomId)
+                )
+            )
+                return false;
+            if (offset > MaxFrameBytes)
+                return false;
 
             writtenBytes = offset;
             return true;
@@ -80,8 +99,8 @@ namespace AiNative.Client.Application
         public static bool TryDecodeLoginResponse(
             ReadOnlySpan<byte> frame,
             out ulong sessionId,
-            out uint connectionEpoch)
-            => TryDecodeLoginResponse(frame, out sessionId, out connectionEpoch, out _, out _, out _);
+            out uint connectionEpoch
+        ) => TryDecodeLoginResponse(frame, out sessionId, out connectionEpoch, out _, out _, out _);
 
         public static bool TryDecodeLoginResponse(
             ReadOnlySpan<byte> frame,
@@ -89,7 +108,8 @@ namespace AiNative.Client.Application
             out uint connectionEpoch,
             out string globalRoomId,
             out string bootEpoch,
-            out ulong roomTick)
+            out ulong roomTick
+        )
         {
             sessionId = 0;
             connectionEpoch = 0;
@@ -124,16 +144,26 @@ namespace AiNative.Client.Application
                 }
                 else if (field is 3 or 4 && wire == 2)
                 {
-                    if (!TryReadLength(frame, ref offset, out ReadOnlySpan<byte> value)) return false;
+                    if (!TryReadLength(frame, ref offset, out ReadOnlySpan<byte> value))
+                        return false;
                     string decoded;
-                    try { decoded = StrictUtf8.GetString(value); }
-                    catch (DecoderFallbackException) { return false; }
-                    if (field == 3) globalRoomId = decoded;
-                    else bootEpoch = decoded;
+                    try
+                    {
+                        decoded = StrictUtf8.GetString(value);
+                    }
+                    catch (DecoderFallbackException)
+                    {
+                        return false;
+                    }
+                    if (field == 3)
+                        globalRoomId = decoded;
+                    else
+                        bootEpoch = decoded;
                 }
                 else if (field == 5 && wire == 1)
                 {
-                    if (!TryReadFixed64(frame, ref offset, out roomTick)) return false;
+                    if (!TryReadFixed64(frame, ref offset, out roomTick))
+                        return false;
                 }
                 else if (!TrySkip(frame, ref offset, wire))
                 {
@@ -148,7 +178,8 @@ namespace AiNative.Client.Application
             ulong sessionId,
             uint roomId,
             Span<byte> destination,
-            out int writtenBytes)
+            out int writtenBytes
+        )
         {
             writtenBytes = 0;
             if (sessionId == 0 || roomId == 0 || destination.Length < 2)
@@ -158,10 +189,12 @@ namespace AiNative.Client.Application
 
             BinaryPrimitives.WriteUInt16LittleEndian(destination, JoinRoomRequestMessageId);
             int offset = 2;
-            if (!TryWriteByte(destination, ref offset, 0x09) ||
-                !TryWriteFixed64(destination, ref offset, sessionId) ||
-                !TryWriteByte(destination, ref offset, 0x10) ||
-                !TryWriteVarint(destination, ref offset, roomId))
+            if (
+                !TryWriteByte(destination, ref offset, 0x09)
+                || !TryWriteFixed64(destination, ref offset, sessionId)
+                || !TryWriteByte(destination, ref offset, 0x10)
+                || !TryWriteVarint(destination, ref offset, roomId)
+            )
             {
                 return false;
             }
@@ -174,7 +207,8 @@ namespace AiNative.Client.Application
             ReadOnlySpan<byte> frame,
             out uint roomId,
             out uint entityId,
-            out uint tickRate)
+            out uint tickRate
+        )
         {
             roomId = 0;
             entityId = 0;
@@ -198,9 +232,12 @@ namespace AiNative.Client.Application
                         return false;
                     }
 
-                    if (field == 1) roomId = value;
-                    else if (field == 2) entityId = value;
-                    else tickRate = value;
+                    if (field == 1)
+                        roomId = value;
+                    else if (field == 2)
+                        entityId = value;
+                    else
+                        tickRate = value;
                 }
                 else if (!TrySkip(frame, ref offset, wire))
                 {
@@ -216,7 +253,8 @@ namespace AiNative.Client.Application
             uint previousConnectionEpoch,
             ulong lastReceivedTick,
             Span<byte> destination,
-            out int writtenBytes)
+            out int writtenBytes
+        )
         {
             writtenBytes = 0;
             if (sessionId == 0 || previousConnectionEpoch == 0 || destination.Length < 2)
@@ -226,12 +264,14 @@ namespace AiNative.Client.Application
 
             BinaryPrimitives.WriteUInt16LittleEndian(destination, ReconnectRequestMessageId);
             int offset = 2;
-            if (!TryWriteByte(destination, ref offset, 0x09) ||
-                !TryWriteFixed64(destination, ref offset, sessionId) ||
-                !TryWriteByte(destination, ref offset, 0x10) ||
-                !TryWriteVarint(destination, ref offset, previousConnectionEpoch) ||
-                !TryWriteByte(destination, ref offset, 0x19) ||
-                !TryWriteFixed64(destination, ref offset, lastReceivedTick))
+            if (
+                !TryWriteByte(destination, ref offset, 0x09)
+                || !TryWriteFixed64(destination, ref offset, sessionId)
+                || !TryWriteByte(destination, ref offset, 0x10)
+                || !TryWriteVarint(destination, ref offset, previousConnectionEpoch)
+                || !TryWriteByte(destination, ref offset, 0x19)
+                || !TryWriteFixed64(destination, ref offset, lastReceivedTick)
+            )
             {
                 return false;
             }
@@ -243,7 +283,8 @@ namespace AiNative.Client.Application
         public static bool TryDecodeReconnectResponse(
             ReadOnlySpan<byte> frame,
             out uint connectionEpoch,
-            out ulong resumeTick)
+            out ulong resumeTick
+        )
         {
             connectionEpoch = 0;
             resumeTick = 0;
@@ -263,16 +304,19 @@ namespace AiNative.Client.Application
 
                 if (field == 1 && wire == 0)
                 {
-                    if (!TryReadUInt32(frame, ref offset, out connectionEpoch)) return false;
+                    if (!TryReadUInt32(frame, ref offset, out connectionEpoch))
+                        return false;
                 }
                 else if (field == 2 && wire == 1)
                 {
-                    if (!TryReadFixed64(frame, ref offset, out resumeTick)) return false;
+                    if (!TryReadFixed64(frame, ref offset, out resumeTick))
+                        return false;
                     hasTick = true;
                 }
                 else if (field == 3 && wire == 2)
                 {
-                    if (!TryReadLength(frame, ref offset, out _)) return false;
+                    if (!TryReadLength(frame, ref offset, out _))
+                        return false;
                     hasSnapshot = true;
                 }
                 else if (!TrySkip(frame, ref offset, wire))
@@ -287,7 +331,8 @@ namespace AiNative.Client.Application
         public static bool TryReadSnapshotMetadata(
             ReadOnlySpan<byte> frame,
             out ulong roomTick,
-            out uint acknowledgement)
+            out uint acknowledgement
+        )
         {
             roomTick = 0;
             acknowledgement = 0;
@@ -299,17 +344,21 @@ namespace AiNative.Client.Application
 
             while (offset < frame.Length)
             {
-                if (!TryReadKey(frame, ref offset, out int field, out int wire)) return false;
+                if (!TryReadKey(frame, ref offset, out int field, out int wire))
+                    return false;
                 if (field == 2 && wire == 1)
                 {
-                    if (!TryReadFixed64(frame, ref offset, out roomTick)) return false;
+                    if (!TryReadFixed64(frame, ref offset, out roomTick))
+                        return false;
                     hasTick = true;
                 }
                 else if (field == 6 && wire == 0)
                 {
-                    if (!TryReadUInt32(frame, ref offset, out acknowledgement)) return false;
+                    if (!TryReadUInt32(frame, ref offset, out acknowledgement))
+                        return false;
                 }
-                else if (!TrySkip(frame, ref offset, wire)) return false;
+                else if (!TrySkip(frame, ref offset, wire))
+                    return false;
             }
 
             return hasTick;
@@ -321,19 +370,24 @@ namespace AiNative.Client.Application
         private static bool TryBegin(ReadOnlySpan<byte> frame, ushort expected, out int offset)
         {
             offset = 2;
-            return frame.Length is >= 2 and <= MaxFrameBytes &&
-                   BinaryPrimitives.ReadUInt16LittleEndian(frame) == expected;
+            return frame.Length is >= 2 and <= MaxFrameBytes
+                && BinaryPrimitives.ReadUInt16LittleEndian(frame) == expected;
         }
 
         private static bool TryReadKey(
             ReadOnlySpan<byte> source,
             ref int offset,
             out int field,
-            out int wire)
+            out int wire
+        )
         {
             field = 0;
             wire = 0;
-            if (!TryReadVarint(source, ref offset, out ulong key) || key == 0 || key > uint.MaxValue)
+            if (
+                !TryReadVarint(source, ref offset, out ulong key)
+                || key == 0
+                || key > uint.MaxValue
+            )
             {
                 return false;
             }
@@ -355,25 +409,37 @@ namespace AiNative.Client.Application
             return true;
         }
 
-        private static bool TryReadVarint(ReadOnlySpan<byte> source, ref int offset, out ulong value)
+        private static bool TryReadVarint(
+            ReadOnlySpan<byte> source,
+            ref int offset,
+            out ulong value
+        )
         {
             value = 0;
             for (int shift = 0; shift < 70; shift += 7)
             {
-                if (offset >= source.Length) return false;
+                if (offset >= source.Length)
+                    return false;
                 byte current = source[offset++];
-                if (shift == 63 && current > 1) return false;
+                if (shift == 63 && current > 1)
+                    return false;
                 value |= (ulong)(current & 0x7f) << shift;
-                if ((current & 0x80) == 0) return true;
+                if ((current & 0x80) == 0)
+                    return true;
             }
 
             return false;
         }
 
-        private static bool TryReadFixed64(ReadOnlySpan<byte> source, ref int offset, out ulong value)
+        private static bool TryReadFixed64(
+            ReadOnlySpan<byte> source,
+            ref int offset,
+            out ulong value
+        )
         {
             value = 0;
-            if (source.Length - offset < 8) return false;
+            if (source.Length - offset < 8)
+                return false;
             value = BinaryPrimitives.ReadUInt64LittleEndian(source.Slice(offset, 8));
             offset += 8;
             return true;
@@ -382,11 +448,15 @@ namespace AiNative.Client.Application
         private static bool TryReadLength(
             ReadOnlySpan<byte> source,
             ref int offset,
-            out ReadOnlySpan<byte> value)
+            out ReadOnlySpan<byte> value
+        )
         {
             value = default;
-            if (!TryReadVarint(source, ref offset, out ulong length) ||
-                length > int.MaxValue || (int)length > source.Length - offset)
+            if (
+                !TryReadVarint(source, ref offset, out ulong length)
+                || length > int.MaxValue
+                || (int)length > source.Length - offset
+            )
             {
                 return false;
             }
@@ -400,35 +470,49 @@ namespace AiNative.Client.Application
         {
             switch (wire)
             {
-                case 0: return TryReadVarint(source, ref offset, out _);
+                case 0:
+                    return TryReadVarint(source, ref offset, out _);
                 case 1:
-                    if (source.Length - offset < 8) return false;
+                    if (source.Length - offset < 8)
+                        return false;
                     offset += 8;
                     return true;
-                case 2: return TryReadLength(source, ref offset, out _);
+                case 2:
+                    return TryReadLength(source, ref offset, out _);
                 case 5:
-                    if (source.Length - offset < 4) return false;
+                    if (source.Length - offset < 4)
+                        return false;
                     offset += 4;
                     return true;
-                default: return false;
+                default:
+                    return false;
             }
         }
 
         private static bool TryWriteByte(Span<byte> destination, ref int offset, byte value)
         {
-            if ((uint)offset >= (uint)destination.Length) return false;
+            if ((uint)offset >= (uint)destination.Length)
+                return false;
             destination[offset++] = value;
             return true;
         }
 
         private static readonly Encoding StrictUtf8 = new UTF8Encoding(false, true);
 
-        private static bool TryWriteString(Span<byte> destination, ref int offset, byte key, string value)
+        private static bool TryWriteString(
+            Span<byte> destination,
+            ref int offset,
+            byte key,
+            string value
+        )
         {
             int length = Encoding.UTF8.GetByteCount(value);
-            if (!TryWriteByte(destination, ref offset, key) ||
-                !TryWriteVarint(destination, ref offset, (ulong)length) ||
-                destination.Length - offset < length) return false;
+            if (
+                !TryWriteByte(destination, ref offset, key)
+                || !TryWriteVarint(destination, ref offset, (ulong)length)
+                || destination.Length - offset < length
+            )
+                return false;
             offset += Encoding.UTF8.GetBytes(value, destination.Slice(offset, length));
             return true;
         }
@@ -439,17 +523,19 @@ namespace AiNative.Client.Application
             {
                 byte current = (byte)(value & 0x7f);
                 value >>= 7;
-                if (value != 0) current |= 0x80;
-                if (!TryWriteByte(destination, ref offset, current)) return false;
-            }
-            while (value != 0);
+                if (value != 0)
+                    current |= 0x80;
+                if (!TryWriteByte(destination, ref offset, current))
+                    return false;
+            } while (value != 0);
 
             return true;
         }
 
         private static bool TryWriteFixed64(Span<byte> destination, ref int offset, ulong value)
         {
-            if (destination.Length - offset < 8) return false;
+            if (destination.Length - offset < 8)
+                return false;
             BinaryPrimitives.WriteUInt64LittleEndian(destination.Slice(offset, 8), value);
             offset += 8;
             return true;

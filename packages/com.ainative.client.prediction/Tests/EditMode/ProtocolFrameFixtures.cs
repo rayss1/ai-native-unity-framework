@@ -13,7 +13,8 @@ namespace AiNative.Client.Prediction.Tests
             int positionX,
             int positionZ,
             uint protocolMajor = 1,
-            bool includePlayer = true)
+            bool includePlayer = true
+        )
         {
             List<byte> payload = new List<byte>();
             WriteKey(payload, 1, 0);
@@ -51,10 +52,7 @@ namespace AiNative.Client.Prediction.Tests
             return Envelope(1101, payload);
         }
 
-        public static byte[] Reconnect(
-            uint connectionEpoch,
-            ulong resumeTick,
-            byte[] snapshotFrame)
+        public static byte[] Reconnect(uint connectionEpoch, ulong resumeTick, byte[] snapshotFrame)
         {
             List<byte> payload = new List<byte>();
             WriteKey(payload, 1, 0);
@@ -75,13 +73,15 @@ namespace AiNative.Client.Prediction.Tests
             byte[] frame,
             TransportChannel channel,
             uint connectionEpoch,
-            int? requiredBytes = null)
-            => new ReceivedPacket(
+            int? requiredBytes = null
+        ) =>
+            new ReceivedPacket(
                 channel,
                 frame.Length,
                 requiredBytes ?? frame.Length,
                 1,
-                connectionEpoch);
+                connectionEpoch
+            );
 
         private static byte[] Envelope(ushort messageId, List<byte> payload)
         {
@@ -92,8 +92,8 @@ namespace AiNative.Client.Prediction.Tests
             return frame;
         }
 
-        private static void WriteKey(List<byte> destination, int fieldNumber, int wireType)
-            => WriteVarint(destination, checked((uint)((fieldNumber << 3) | wireType)));
+        private static void WriteKey(List<byte> destination, int fieldNumber, int wireType) =>
+            WriteVarint(destination, checked((uint)((fieldNumber << 3) | wireType)));
 
         private static void WriteFixed64(List<byte> destination, ulong value)
         {

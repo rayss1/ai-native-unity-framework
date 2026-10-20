@@ -7,7 +7,8 @@ namespace AiNative.Client.Fantasy
         public FantasyKcpTransportOptions(
             string host,
             int port,
-            int connectTimeoutMilliseconds = 5000)
+            int connectTimeoutMilliseconds = 5000
+        )
         {
             Host = host;
             Port = port;
@@ -21,10 +22,10 @@ namespace AiNative.Client.Fantasy
         public int ConnectTimeoutMilliseconds { get; }
 
         internal bool IsValid =>
-            !string.IsNullOrWhiteSpace(Host) &&
-            Port > 0 &&
-            Port <= 65535 &&
-            ConnectTimeoutMilliseconds > 0;
+            !string.IsNullOrWhiteSpace(Host)
+            && Port > 0
+            && Port <= 65535
+            && ConnectTimeoutMilliseconds > 0;
     }
 
     public enum FantasyKcpConnectStatus : byte
@@ -41,7 +42,8 @@ namespace AiNative.Client.Fantasy
         internal FantasyKcpConnectResult(
             FantasyKcpConnectStatus status,
             FantasyKcpRealtimeTransport transport,
-            Exception error)
+            Exception error
+        )
         {
             Status = status;
             Transport = transport;
@@ -54,8 +56,7 @@ namespace AiNative.Client.Fantasy
 
         public Exception Error { get; }
 
-        public bool IsConnected =>
-            Status == FantasyKcpConnectStatus.Connected && Transport != null;
+        public bool IsConnected => Status == FantasyKcpConnectStatus.Connected && Transport != null;
     }
 
     public readonly struct FantasyKcpTransportDiagnostics
@@ -68,7 +69,8 @@ namespace AiNative.Client.Fantasy
             long invalidChannels,
             long staleSequences,
             long inboundDropped,
-            long connectionFaults)
+            long connectionFaults
+        )
         {
             SendsAccepted = sendsAccepted;
             SendBackpressure = sendBackpressure;

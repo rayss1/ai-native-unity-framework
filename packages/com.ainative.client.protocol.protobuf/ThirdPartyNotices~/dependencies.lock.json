@@ -33,9 +33,9 @@
     "shared/generated/csharp/ainative/v1/Gameplay.cs": "9b57ad1dc5f8a2e1c5a6c0b40da9faff3b5f6ecf85d9ab4e4e8efcfe0cd5927b",
     "shared/generated/csharp/ainative/v1/GateEnvelope.cs": "0348fbc4530dc84d24d6dded3915e917991b266e4cfe314bbd33959c05a53dab",
     "shared/protocol/Protocol.Shared.csproj": "f3c5a1a5de5310633ba2a9c14fa9928852db047257f6c70a0fc5f86ef80386e1",
-    "shared/schemas/ainative/v1/backend.proto": "05aa414c7fb7fafb711726945a031261ae74aec0d890ecf6d120357de1d603ee",
+    "shared/schemas/ainative/v1/backend.proto": "c3165fd9c50e4f230870a25c060f6ca345d7c182d0f0bb57e5b7877063c60362",
     "shared/schemas/ainative/v1/gameplay.proto": "f06bc8ccf7d0b757f2c122904da8c6e46bd3a822404856f931d3d3403747265d",
-    "shared/schemas/ainative/v1/gate_envelope.proto": "02837203d3ec2984392a6e3b49ed2be4c24cfde51b0e12863ce2ac473495379c",
+    "shared/schemas/ainative/v1/gate_envelope.proto": "3cb9e808762794b465b7be1f7dbe696885934056d2ad06117e0f7027bdf9e589",
     "tools/ProtocolCodegen/ProtocolCodegen.csproj": "fc93026316c3907da0ce5ae036ec0fb38ee4a1a6864c3b1704776fb728dcb284",
     "tools/ProtocolCodegen/package_unity.py": "f8ff31170def8e0f16bd2d9859e1c90a3abb58a88652f5bef7a4c4d27ed2ea7b"
   },

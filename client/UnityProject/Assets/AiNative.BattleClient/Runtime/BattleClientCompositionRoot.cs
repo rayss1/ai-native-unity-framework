@@ -1,10 +1,10 @@
-using AiNative.Client.Protocol.Protobuf;
-using AiNative.Client.Protocol;
 using System;
 using System.IO;
-using AiNative.Gameplay;
 using AiNative.Client.Character;
 using AiNative.Client.Prediction;
+using AiNative.Client.Protocol;
+using AiNative.Client.Protocol.Protobuf;
+using AiNative.Gameplay;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -45,7 +45,9 @@ namespace AiNative.Client.Application
         private Light _arenaLight;
         private GUIStyle _hudStyle;
         private ArenaRemoteVisualPool _remoteVisuals;
-        private readonly ArenaRemotePose[] _remotePoses = new ArenaRemotePose[BattlePacketBuffer.MaxArenaPlayers];
+        private readonly ArenaRemotePose[] _remotePoses = new ArenaRemotePose[
+            BattlePacketBuffer.MaxArenaPlayers
+        ];
 
         public BattleClientSession Session => _topology != null ? _topology.Battle : _session;
 
@@ -58,20 +60,42 @@ namespace AiNative.Client.Application
             _topology = gameObject.AddComponent<TopologyClientFlow>();
             try
             {
-                AndroidClientLaunchConfiguration configuration = AndroidClientLaunchConfiguration.ReadCurrentIntent();
-                _topology.Initialize(configuration.GateOptions, configuration.Automated, configuration.TimeoutSeconds, configuration.ResultPath, configuration.RunId);
+                AndroidClientLaunchConfiguration configuration =
+                    AndroidClientLaunchConfiguration.ReadCurrentIntent();
+                _topology.Initialize(
+                    configuration.GateOptions,
+                    configuration.Automated,
+                    configuration.TimeoutSeconds,
+                    configuration.ResultPath,
+                    configuration.RunId
+                );
             }
             catch (ArgumentException)
             {
                 // Invalid public intent never enables account automation. The ordinary login UI remains available.
-                AndroidClientLaunchConfiguration configuration = AndroidClientLaunchConfiguration.Parse(new System.Collections.Generic.Dictionary<string, string>(), global::UnityEngine.Application.persistentDataPath);
-                _topology.Initialize(configuration.GateOptions, false, configuration.TimeoutSeconds, configuration.ResultPath, configuration.RunId);
-                Debug.LogWarning("Android launch configuration was rejected; interactive login is available.");
+                AndroidClientLaunchConfiguration configuration =
+                    AndroidClientLaunchConfiguration.Parse(
+                        new System.Collections.Generic.Dictionary<string, string>(),
+                        global::UnityEngine.Application.persistentDataPath
+                    );
+                _topology.Initialize(
+                    configuration.GateOptions,
+                    false,
+                    configuration.TimeoutSeconds,
+                    configuration.ResultPath,
+                    configuration.RunId
+                );
+                Debug.LogWarning(
+                    "Android launch configuration was rejected; interactive login is available."
+                );
             }
             return;
 #else
             string[] arguments = Environment.GetCommandLineArgs();
-            if (Array.IndexOf(arguments, "--ainative-topology") >= 0 || Array.IndexOf(arguments, "--ainative-topology-smoke") >= 0)
+            if (
+                Array.IndexOf(arguments, "--ainative-topology") >= 0
+                || Array.IndexOf(arguments, "--ainative-topology-smoke") >= 0
+            )
             {
                 _topology = gameObject.AddComponent<TopologyClientFlow>();
                 return;
@@ -80,15 +104,19 @@ namespace AiNative.Client.Application
             if (editorLocalTopology)
             {
                 _topology = gameObject.AddComponent<TopologyClientFlow>();
-                _topology.Initialize(new AiNative.Client.Fantasy.GateConnectionOptions("127.0.0.1", 23001, false, ""));
+                _topology.Initialize(
+                    new AiNative.Client.Fantasy.GateConnectionOptions("127.0.0.1", 23001, false, "")
+                );
                 return;
             }
 #endif
             _launch = BattleClientLaunchOptions.Parse(arguments);
-            _session = new BattleClientSession(new ProtobufBattleProtocolCodec(),
+            _session = new BattleClientSession(
+                new ProtobufBattleProtocolCodec(),
                 _launch.Host,
                 _launch.Port,
-                global::UnityEngine.Application.version);
+                global::UnityEngine.Application.version
+            );
 #endif
         }
 
@@ -98,7 +126,10 @@ namespace AiNative.Client.Application
         {
             // Resource material references retain the URP shaders in standalone builds.
             GameObject prefab = Resources.Load<GameObject>("BattleClient/NetworkCharacter");
-            if (prefab == null) throw new InvalidOperationException("Missing NetworkCharacter prefab; run AiNative/Battle Client/Build Network Character.");
+            if (prefab == null)
+                throw new InvalidOperationException(
+                    "Missing NetworkCharacter prefab; run AiNative/Battle Client/Build Network Character."
+                );
             _playerVisual = Instantiate(prefab, transform);
             _playerVisual.name = "LocalNetworkCharacter";
             _playerVisual.transform.localPosition = Vector3.zero;
@@ -111,7 +142,8 @@ namespace AiNative.Client.Application
             _playerCamera.tag = "MainCamera";
             _orbitCamera = cameraObject.AddComponent<CharacterOrbitCamera>();
             _orbitCamera.ConfigurePresentation(transform);
-            if (_topology != null) _topology.CharacterCamera = _orbitCamera;
+            if (_topology != null)
+                _topology.CharacterCamera = _orbitCamera;
             _floorVisual = new GameObject("ArenaTrainingGround");
             _floorVisual.AddComponent<ArenaTrainingGroundPresentation>();
             GameObject lightObject = new GameObject("ArenaGreyboxLight");
@@ -125,27 +157,42 @@ namespace AiNative.Client.Application
         private void OnGUI()
         {
             DrawCharacterHud();
-            if (_topology != null) return; // Interactive topology owns its UGUI, including the HUD.
-            if (_topology == null && !_launch.Smoke && !_launch.RegionalCorrection && GUI.Button(new Rect(740, 16, 180, 32), "登录大厅与匹配")) SwitchToTopology();
+            if (_topology != null)
+                return; // Interactive topology owns its UGUI, including the HUD.
+            if (
+                _topology == null
+                && !_launch.Smoke
+                && !_launch.RegionalCorrection
+                && GUI.Button(new Rect(740, 16, 180, 32), "登录大厅与匹配")
+            )
+                SwitchToTopology();
             BattleClientSession session = Session;
-            if (session is null) return;
+            if (session is null)
+                return;
             _hudStyle ??= new GUIStyle(GUI.skin.label)
             {
                 fontSize = 16,
-                normal = { textColor = Color.white }
+                normal = { textColor = Color.white },
             };
-            GUI.Label(new Rect(16, 16, 700, 28),
-                $"BattleClient  {session.State}  epoch={session.ConnectionEpoch} tick={session.LastReceivedTick} ack={session.LastAcknowledgedSequence} dropped={session.DroppedInputFrames}", _hudStyle);
+            GUI.Label(
+                new Rect(16, 16, 700, 28),
+                $"BattleClient  {session.State}  epoch={session.ConnectionEpoch} tick={session.LastReceivedTick} ack={session.LastAcknowledgedSequence} dropped={session.DroppedInputFrames}",
+                _hudStyle
+            );
 
             if (session.TryGetArenaState(out ArenaPlayerState arenaState))
             {
-                GUI.Label(new Rect(16, 44, 700, 28),
-                    $"Arena  {session.ArenaPhase}  HP={arenaState.Health}  AR={arenaState.Armor}  " +
-                    $"Weapon={arenaState.Weapon}  Kills={arenaState.Kills}  Leader={session.ArenaLeaderEntityId}",
-                    _hudStyle);
-                GUI.Label(new Rect(16, 72, 900, 28),
+                GUI.Label(
+                    new Rect(16, 44, 700, 28),
+                    $"Arena  {session.ArenaPhase}  HP={arenaState.Health}  AR={arenaState.Armor}  "
+                        + $"Weapon={arenaState.Weapon}  Kills={arenaState.Kills}  Leader={session.ArenaLeaderEntityId}",
+                    _hudStyle
+                );
+                GUI.Label(
+                    new Rect(16, 72, 900, 28),
                     "WASD move  |  hold left mouse to fire  |  movement is predicted and server-corrected",
-                    _hudStyle);
+                    _hudStyle
+                );
             }
         }
 
@@ -155,19 +202,24 @@ namespace AiNative.Client.Application
             _session = null;
             _topology = gameObject.AddComponent<TopologyClientFlow>();
             _topology.CharacterCamera = _orbitCamera;
-            if (previous != null) await previous.DisposeAsync();
+            if (previous != null)
+                await previous.DisposeAsync();
         }
 
         private void OnDisable()
         {
             // Unity may have already destroyed native objects during Player shutdown.
             // The orbit camera has independent world-space rotation.
-            if (_playerCamera != null) Destroy(_playerCamera.gameObject);
+            if (_playerCamera != null)
+                Destroy(_playerCamera.gameObject);
             _remoteVisuals?.Dispose();
             _remoteVisuals = null;
-            if (_playerVisual != null) Destroy(_playerVisual);
-            if (_floorVisual != null) Destroy(_floorVisual);
-            if (_arenaLight != null) Destroy(_arenaLight.gameObject);
+            if (_playerVisual != null)
+                Destroy(_playerVisual);
+            if (_floorVisual != null)
+                Destroy(_floorVisual);
+            if (_arenaLight != null)
+                Destroy(_arenaLight.gameObject);
             _playerVisual = null;
             _floorVisual = null;
             _playerCamera = null;
@@ -177,7 +229,8 @@ namespace AiNative.Client.Application
         private static Material LoadGreyboxMaterial(string name)
         {
             Material material = Resources.Load<Material>("BattleClient/" + name);
-            if (material == null) throw new InvalidOperationException("Missing greybox material: " + name);
+            if (material == null)
+                throw new InvalidOperationException("Missing greybox material: " + name);
             return material;
         }
 
@@ -189,23 +242,33 @@ namespace AiNative.Client.Application
         private void SampleManualInput()
         {
             Keyboard keyboard = Keyboard.current;
-            _manualMove = keyboard == null ? Vector2Int.zero : new Vector2Int(
-                (keyboard.dKey.isPressed ? 1000 : 0) - (keyboard.aKey.isPressed ? 1000 : 0),
-                (keyboard.wKey.isPressed ? 1000 : 0) - (keyboard.sKey.isPressed ? 1000 : 0));
+            _manualMove =
+                keyboard == null
+                    ? Vector2Int.zero
+                    : new Vector2Int(
+                        (keyboard.dKey.isPressed ? 1000 : 0) - (keyboard.aKey.isPressed ? 1000 : 0),
+                        (keyboard.wKey.isPressed ? 1000 : 0) - (keyboard.sKey.isPressed ? 1000 : 0)
+                    );
             _manualFire = Mouse.current != null && Mouse.current.leftButton.isPressed;
         }
 
         private void OnApplicationFocus(bool focused)
         {
-            if (!focused) { _manualMove = Vector2Int.zero; _manualFire = false; }
+            if (!focused)
+            {
+                _manualMove = Vector2Int.zero;
+                _manualFire = false;
+            }
         }
 
         private void Update()
         {
-            if (_topology != null || _session == null) return;
+            if (_topology != null || _session == null)
+                return;
             SampleManualInput();
             _session.Pump(Time.unscaledDeltaTime);
-            if (_finished) return;
+            if (_finished)
+                return;
 
             if (_launch.RegionalCorrection)
             {
@@ -213,7 +276,8 @@ namespace AiNative.Client.Application
                 return;
             }
 
-            if (!_launch.Smoke) return;
+            if (!_launch.Smoke)
+                return;
 
             _smokeElapsed += Time.unscaledDeltaTime;
             if (_session.State == BattleClientState.Faulted)
@@ -222,19 +286,23 @@ namespace AiNative.Client.Application
                 return;
             }
 
-            if (!_smokeReconnectRequested &&
-                _session.IsPredictionInitialized &&
-                _session.LastAcknowledgedSequence >= 30)
+            if (
+                !_smokeReconnectRequested
+                && _session.IsPredictionInitialized
+                && _session.LastAcknowledgedSequence >= 30
+            )
             {
                 _smokeReconnectRequested = true;
                 _preReconnectAcknowledgement = _session.LastAcknowledgedSequence;
                 _session.RequestReconnect();
             }
 
-            if (_smokeReconnectRequested &&
-                _session.State == BattleClientState.Active &&
-                _session.ConnectionEpoch > _session.InitialConnectionEpoch &&
-                _session.LastAcknowledgedSequence > _preReconnectAcknowledgement)
+            if (
+                _smokeReconnectRequested
+                && _session.State == BattleClientState.Active
+                && _session.ConnectionEpoch > _session.InitialConnectionEpoch
+                && _session.LastAcknowledgedSequence > _preReconnectAcknowledgement
+            )
             {
                 FinishSmoke(true, string.Empty);
                 return;
@@ -248,8 +316,10 @@ namespace AiNative.Client.Application
 
         private void FixedUpdate()
         {
-            if (_topology != null || _session == null) return;
-            if (!_session.IsPredictionInitialized || _session.State != BattleClientState.Active) return;
+            if (_topology != null || _session == null)
+                return;
+            if (!_session.IsPredictionInitialized || _session.State != BattleClientState.Active)
+                return;
             _roomTick = Math.Max(_roomTick + 1, _session.LastReceivedTick + 1);
             int moveX;
             int moveZ;
@@ -257,8 +327,14 @@ namespace AiNative.Client.Application
             {
                 // A repeating, deterministic pattern keeps smoke evidence reproducible.
                 ulong phase = (_roomTick / 30) & 3;
-                moveX = phase == 0 ? MoveScaleMilli : phase == 2 ? -MoveScaleMilli : 0;
-                moveZ = phase == 1 ? MoveScaleMilli : phase == 3 ? -MoveScaleMilli : 0;
+                moveX =
+                    phase == 0 ? MoveScaleMilli
+                    : phase == 2 ? -MoveScaleMilli
+                    : 0;
+                moveZ =
+                    phase == 1 ? MoveScaleMilli
+                    : phase == 3 ? -MoveScaleMilli
+                    : 0;
             }
             else
             {
@@ -272,7 +348,10 @@ namespace AiNative.Client.Application
                 return;
             }
 
-            ArenaButtons buttons = global::UnityEngine.Application.isFocused && _manualFire ? ArenaButtons.Fire : ArenaButtons.None;
+            ArenaButtons buttons =
+                global::UnityEngine.Application.isFocused && _manualFire
+                    ? ArenaButtons.Fire
+                    : ArenaButtons.None;
             _session.PredictAndQueueArenaInput(
                 _roomTick,
                 moveX,
@@ -280,17 +359,20 @@ namespace AiNative.Client.Application
                 0,
                 0,
                 buttons,
-                ArenaWeaponId.Machinegun);
+                ArenaWeaponId.Machinegun
+            );
         }
 
         private void LateUpdate()
         {
             BattleClientSession session = Session;
-            int remoteCount = session?.AdvanceRemotePresentation(Time.unscaledDeltaTime, _remotePoses) ?? 0;
+            int remoteCount =
+                session?.AdvanceRemotePresentation(Time.unscaledDeltaTime, _remotePoses) ?? 0;
             _remoteVisuals?.Apply(_remotePoses, remoteCount);
             if (session is null)
             {
-                if (_playerVisual != null) _playerVisual.SetActive(false);
+                if (_playerVisual != null)
+                    _playerVisual.SetActive(false);
                 _visualEpoch = 0;
                 return;
             }
@@ -301,24 +383,39 @@ namespace AiNative.Client.Application
                 _combatFeedback = "";
             }
             int eventCount = session.DrainCombatEvents(_combatEvents);
-            for (int i = 0; i < eventCount; i++) PresentCombatEvent(_combatEvents[i], session.EntityId);
-            if (session.TryAdvancePresentation(
+            for (int i = 0; i < eventCount; i++)
+                PresentCombatEvent(_combatEvents[i], session.EntityId);
+            if (
+                session.TryAdvancePresentation(
                     Time.unscaledDeltaTime,
-                    out PresentationPosition position))
+                    out PresentationPosition position
+                )
+            )
             {
                 Vector3 current = transform.position;
                 transform.position = new Vector3(
                     (float)(position.XMillimetres / 1000d),
                     current.y,
-                    (float)(position.ZMillimetres / 1000d));
+                    (float)(position.ZMillimetres / 1000d)
+                );
             }
 
-            if (_playerVisual is not null && session.TryGetArenaState(out ArenaPlayerState arenaState))
+            if (
+                _playerVisual is not null
+                && session.TryGetArenaState(out ArenaPlayerState arenaState)
+            )
             {
                 Vector3 current = transform.position;
-                transform.position = new Vector3(current.x, arenaState.PositionYMillimetres / 1000f, current.z);
-                _playerVisual.transform.localRotation =
-                    Quaternion.Euler(0f, arenaState.YawMillidegrees / 1000f, 0f);
+                transform.position = new Vector3(
+                    current.x,
+                    arenaState.PositionYMillimetres / 1000f,
+                    current.z
+                );
+                _playerVisual.transform.localRotation = Quaternion.Euler(
+                    0f,
+                    arenaState.YawMillidegrees / 1000f,
+                    0f
+                );
                 _character.Apply(arenaState, _topology == null || _topology.IsCharacterAiming);
                 _orbitCamera.SetPresentationState(_character.MotionState);
             }
@@ -328,40 +425,89 @@ namespace AiNative.Client.Application
         {
             if (item.Kind == ArenaPresentationEventKind.Fire)
             {
-                NetworkCharacterPresenter shooter = item.SourceEntityId == localId ? _character :
-                    _remoteVisuals?.GetVisual(item.SourceEntityId)?.GetComponent<NetworkCharacterPresenter>();
+                NetworkCharacterPresenter shooter =
+                    item.SourceEntityId == localId
+                        ? _character
+                        : _remoteVisuals
+                            ?.GetVisual(item.SourceEntityId)
+                            ?.GetComponent<NetworkCharacterPresenter>();
                 shooter?.NotifyShot();
             }
-            if (item.Kind == ArenaPresentationEventKind.Hit && (item.SourceEntityId == localId || item.TargetEntityId == localId))
-                _combatFeedback = item.TargetEntityId == localId ? $"受到伤害 {item.Damage}" : $"命中 {item.Damage}";
+            if (
+                item.Kind == ArenaPresentationEventKind.Hit
+                && (item.SourceEntityId == localId || item.TargetEntityId == localId)
+            )
+                _combatFeedback =
+                    item.TargetEntityId == localId
+                        ? $"受到伤害 {item.Damage}"
+                        : $"命中 {item.Damage}";
             else if (item.Kind == ArenaPresentationEventKind.Kill)
-                _combatFeedback = item.TargetEntityId == localId ? "已阵亡" : $"玩家 {item.SourceEntityId} 击败 {item.TargetEntityId}";
-            else if (item.Kind == ArenaPresentationEventKind.Respawn && item.SourceEntityId == localId)
-            { _combatFeedback = "已重生"; _orbitCamera?.Snap(); }
-            else return;
+                _combatFeedback =
+                    item.TargetEntityId == localId
+                        ? "已阵亡"
+                        : $"玩家 {item.SourceEntityId} 击败 {item.TargetEntityId}";
+            else if (
+                item.Kind == ArenaPresentationEventKind.Respawn
+                && item.SourceEntityId == localId
+            )
+            {
+                _combatFeedback = "已重生";
+                _orbitCamera?.Snap();
+            }
+            else
+                return;
             _feedbackUntil = Time.unscaledTime + 2;
         }
 
         internal Vector3 GetAimPoint()
         {
-            Vector3 direction = Quaternion.Euler(_orbitCamera.Pitch, _orbitCamera.Yaw, 0) * Vector3.forward;
+            Vector3 direction =
+                Quaternion.Euler(_orbitCamera.Pitch, _orbitCamera.Yaw, 0) * Vector3.forward;
             var ray = new Ray(_playerCamera.transform.position, direction);
             float range = 100;
             Vector3 origin = ray.origin * 1000f;
-            if (ArenaTrainingMap.Raycast(origin.x, origin.y, origin.z, direction.x, direction.y, direction.z,
-                range * 1000d, out double distance)) range = (float)(distance / 1000d);
-            Vector3 point = _remoteVisuals != null ? _remoteVisuals.AimPoint(ray, range) : ray.GetPoint(range);
+            if (
+                ArenaTrainingMap.Raycast(
+                    origin.x,
+                    origin.y,
+                    origin.z,
+                    direction.x,
+                    direction.y,
+                    direction.z,
+                    range * 1000d,
+                    out double distance
+                )
+            )
+                range = (float)(distance / 1000d);
+            Vector3 point =
+                _remoteVisuals != null ? _remoteVisuals.AimPoint(ray, range) : ray.GetPoint(range);
             return ray.GetPoint(Mathf.Min(range, Vector3.Dot(point - ray.origin, ray.direction)));
         }
 
         private void DrawCharacterHud()
         {
             var session = Session;
-            if (session == null || !session.TryGetArenaState(out var state) || session.ArenaPhase == ArenaMatchPhase.Finished) return;
-            if (_topology != null) GUI.Label(new Rect(16, Screen.height - 50, 1000, 24), "WASD 移动  |  按住右键转向/瞄准  |  左键开火  |  Space 跳跃  |  1/2/3 武器");
-            if (Time.unscaledTime < _feedbackUntil) GUI.Label(new Rect(Screen.width / 2 - 100, Screen.height / 2 + 35, 260, 30), _combatFeedback);
+            if (
+                session == null
+                || !session.TryGetArenaState(out var state)
+                || session.ArenaPhase == ArenaMatchPhase.Finished
+            )
+                return;
+            if (_topology != null)
+                GUI.Label(
+                    new Rect(16, Screen.height - 50, 1000, 24),
+                    "WASD 移动  |  按住右键转向/瞄准  |  左键开火  |  Space 跳跃  |  1/2/3 武器"
+                );
+            if (Time.unscaledTime < _feedbackUntil)
+                GUI.Label(
+                    new Rect(Screen.width / 2 - 100, Screen.height / 2 + 35, 260, 30),
+                    _combatFeedback
+                );
             GUI.Label(new Rect(Screen.width / 2 - 6, Screen.height / 2 - 10, 24, 24), "+");
-            GUI.Label(new Rect(16, Screen.height - 75, 800, 24), "R 换弹 · 空仓自动换弹（2秒）· 备用弹不限");
+            GUI.Label(
+                new Rect(16, Screen.height - 75, 800, 24),
+                "R 换弹 · 空仓自动换弹（2秒）· 备用弹不限"
+            );
         }
 
         private async void OnDestroy()
@@ -391,7 +537,8 @@ namespace AiNative.Client.Application
             try
             {
                 string directory = Path.GetDirectoryName(_launch.ResultPath);
-                if (!string.IsNullOrEmpty(directory)) Directory.CreateDirectory(directory);
+                if (!string.IsNullOrEmpty(directory))
+                    Directory.CreateDirectory(directory);
                 File.WriteAllText(_launch.ResultPath, JsonUtility.ToJson(result, true));
             }
             catch (Exception exception)
@@ -422,13 +569,17 @@ namespace AiNative.Client.Application
             if (!_regionalMeasurementStarted)
             {
                 _regionalWarmupElapsed += Time.unscaledDeltaTime;
-                if (_regionalWarmupElapsed < RegionalWarmupSeconds) return;
-                if (!_session.ResetPredictionDiagnostics() ||
-                    !_session.ResetPresentationDiagnostics())
+                if (_regionalWarmupElapsed < RegionalWarmupSeconds)
+                    return;
+                if (
+                    !_session.ResetPredictionDiagnostics()
+                    || !_session.ResetPresentationDiagnostics()
+                )
                 {
                     FinishRegionalCorrection(
                         false,
-                        "Prediction or presentation diagnostics could not be reset after warm-up.");
+                        "Prediction or presentation diagnostics could not be reset after warm-up."
+                    );
                     return;
                 }
 
@@ -448,31 +599,32 @@ namespace AiNative.Client.Application
             PredictionDiagnostics diagnostics = _session.PredictionDiagnostics;
             PresentationCorrectionDiagnostics presentation = _session.PresentationDiagnostics;
             double measuredMinutes = _regionalMeasurementElapsed / 60d;
-            double correctionsOver250PerPlayerMinute = measuredMinutes > 0
-                ? diagnostics.CorrectionsOver250Millimetres / measuredMinutes
-                : 0d;
-            bool gatesPassed = completed &&
-                               _regionalMeasurementStarted &&
-                               diagnostics.ReconciliationSamples >= RegionalMinimumReconciliationSamples &&
-                               diagnostics.CorrectionP95Millimetres <= 250 &&
-                               diagnostics.CorrectionP99Millimetres <= 750 &&
-                               correctionsOver250PerPlayerMinute <= 2d &&
-                               diagnostics.HistoryMisses == 0 &&
-                               diagnostics.DroppedInputs == 0 &&
-                               presentation.SmoothedCorrections > 0 &&
-                               presentation.SnappedCorrections == 0 &&
-                               presentation.ResidualMillimetres <= 250 &&
-                               _session.DroppedInputFrames == 0 &&
-                               _session.State == BattleClientState.Active;
+            double correctionsOver250PerPlayerMinute =
+                measuredMinutes > 0
+                    ? diagnostics.CorrectionsOver250Millimetres / measuredMinutes
+                    : 0d;
+            bool gatesPassed =
+                completed
+                && _regionalMeasurementStarted
+                && diagnostics.ReconciliationSamples >= RegionalMinimumReconciliationSamples
+                && diagnostics.CorrectionP95Millimetres <= 250
+                && diagnostics.CorrectionP99Millimetres <= 750
+                && correctionsOver250PerPlayerMinute <= 2d
+                && diagnostics.HistoryMisses == 0
+                && diagnostics.DroppedInputs == 0
+                && presentation.SmoothedCorrections > 0
+                && presentation.SnappedCorrections == 0
+                && presentation.ResidualMillimetres <= 250
+                && _session.DroppedInputFrames == 0
+                && _session.State == BattleClientState.Active;
             _finished = true;
             RegionalCorrectionResult result = new RegionalCorrectionResult
             {
                 success = gatesPassed,
-                error = gatesPassed
-                    ? string.Empty
-                    : string.IsNullOrEmpty(error)
-                        ? "Regional correction gates failed."
-                        : error,
+                error =
+                    gatesPassed ? string.Empty
+                    : string.IsNullOrEmpty(error) ? "Regional correction gates failed."
+                    : error,
                 evidenceClass = "macos-arm64-mono-regional-real-client",
                 profile = "Regional",
                 configuredRttMilliseconds = 100,
@@ -507,9 +659,11 @@ namespace AiNative.Client.Application
             };
 
             WriteResult(result, ref gatesPassed);
-            Debug.Log(gatesPassed
-                ? "WS-27 Regional correction validation passed."
-                : "WS-27 Regional correction validation failed: " + result.error);
+            Debug.Log(
+                gatesPassed
+                    ? "WS-27 Regional correction validation passed."
+                    : "WS-27 Regional correction validation failed: " + result.error
+            );
 #if !UNITY_EDITOR
             global::UnityEngine.Application.Quit(gatesPassed ? 0 : 1);
 #endif
@@ -520,7 +674,8 @@ namespace AiNative.Client.Application
             try
             {
                 string directory = Path.GetDirectoryName(_launch.ResultPath);
-                if (!string.IsNullOrEmpty(directory)) Directory.CreateDirectory(directory);
+                if (!string.IsNullOrEmpty(directory))
+                    Directory.CreateDirectory(directory);
                 File.WriteAllText(_launch.ResultPath, JsonUtility.ToJson(result, true));
             }
             catch (Exception exception)
@@ -590,7 +745,8 @@ namespace AiNative.Client.Application
             bool regionalCorrection,
             string host,
             int port,
-            string resultPath)
+            string resultPath
+        )
         {
             Smoke = smoke;
             RegionalCorrection = regionalCorrection;
@@ -615,9 +771,12 @@ namespace AiNative.Client.Application
             bool regionalCorrection = false;
             string host = "127.0.0.1";
             int port = 22000;
-            string result = Path.GetFullPath(Path.Combine(
-                global::UnityEngine.Application.persistentDataPath,
-                "ainative-ws26-smoke.json"));
+            string result = Path.GetFullPath(
+                Path.Combine(
+                    global::UnityEngine.Application.persistentDataPath,
+                    "ainative-ws26-smoke.json"
+                )
+            );
 
             for (int index = 0; index < arguments.Length; index++)
             {
@@ -634,8 +793,11 @@ namespace AiNative.Client.Application
                 {
                     host = arguments[++index];
                 }
-                else if (argument == "--ainative-port" && index + 1 < arguments.Length &&
-                         int.TryParse(arguments[++index], out int parsedPort))
+                else if (
+                    argument == "--ainative-port"
+                    && index + 1 < arguments.Length
+                    && int.TryParse(arguments[++index], out int parsedPort)
+                )
                 {
                     port = parsedPort;
                 }
@@ -648,15 +810,11 @@ namespace AiNative.Client.Application
             if (smoke && regionalCorrection)
             {
                 throw new ArgumentException(
-                    "Smoke and Regional correction modes are mutually exclusive.");
+                    "Smoke and Regional correction modes are mutually exclusive."
+                );
             }
 
-            return new BattleClientLaunchOptions(
-                smoke,
-                regionalCorrection,
-                host,
-                port,
-                result);
+            return new BattleClientLaunchOptions(smoke, regionalCorrection, host, port, result);
         }
     }
 }

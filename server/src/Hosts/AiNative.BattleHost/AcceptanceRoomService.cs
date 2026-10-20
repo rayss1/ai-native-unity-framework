@@ -12,7 +12,8 @@ internal sealed class AcceptanceRoomService(
     ArenaRoom arenaRoom,
     BattleGameModeSettings gameMode,
     BattleReplayCapture replayCapture,
-    ILogger<AcceptanceRoomService> logger) : BackgroundService
+    ILogger<AcceptanceRoomService> logger
+) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -27,7 +28,8 @@ internal sealed class AcceptanceRoomService(
         logger.LogInformation(
             "Acceptance room set ready with {RoomCount} room(s) and {BotCapacity} total bots at 60 Hz",
             rooms.RoomCount,
-            rooms.Settings.TotalBotCapacity);
+            rooms.Settings.TotalBotCapacity
+        );
 
         try
         {
@@ -42,28 +44,30 @@ internal sealed class AcceptanceRoomService(
                 long gameplayAllocated = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
                 metrics.RecordGameplayTick(
                     Stopwatch.GetElapsedTime(gameplayStarted).TotalMilliseconds,
-                    gameplayAllocated);
+                    gameplayAllocated
+                );
                 readiness.AdvanceTick();
                 protocol.PublishSnapshots(checked((ulong)readiness.Tick));
                 metrics.RecordTick(Stopwatch.GetElapsedTime(started).TotalMilliseconds);
             }
         }
-        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
-        {
-        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { }
         finally
         {
             readiness.BeginDrain();
             await replayCapture.CompleteAsync(
                 checked((ulong)readiness.Tick),
-                rooms.ComputeCombinedStateHash());
+                rooms.ComputeCombinedStateHash()
+            );
             metrics.WriteAcceptanceReport(
                 checked((ulong)readiness.Tick),
-                rooms.ComputeCombinedStateHash());
+                rooms.ComputeCombinedStateHash()
+            );
             logger.LogInformation(
                 "Acceptance room set drained at tick {Tick} with {RoomCount} room(s)",
                 readiness.Tick,
-                rooms.RoomCount);
+                rooms.RoomCount
+            );
         }
     }
 
@@ -73,7 +77,8 @@ internal sealed class AcceptanceRoomService(
         readiness.MarkRoomReady();
         logger.LogInformation(
             "Arena room ready with capacity {Capacity} at 60 Hz",
-            ArenaRoom.MaxPlayers);
+            ArenaRoom.MaxPlayers
+        );
 
         try
         {
@@ -88,22 +93,22 @@ internal sealed class AcceptanceRoomService(
                 long gameplayAllocated = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
                 metrics.RecordGameplayTick(
                     Stopwatch.GetElapsedTime(gameplayStarted).TotalMilliseconds,
-                    gameplayAllocated);
+                    gameplayAllocated
+                );
                 readiness.AdvanceTick();
                 protocol.PublishSnapshots(checked((ulong)readiness.Tick));
                 metrics.RecordTick(Stopwatch.GetElapsedTime(started).TotalMilliseconds);
             }
         }
-        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
-        {
-        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { }
         finally
         {
             readiness.BeginDrain();
             logger.LogInformation(
                 "Arena room drained at tick {Tick} with {ConnectedCount} connected players",
                 readiness.Tick,
-                arenaRoom.ConnectedCount);
+                arenaRoom.ConnectedCount
+            );
         }
     }
 }
@@ -155,12 +160,8 @@ internal sealed class SyntheticRoom
             throw new ArgumentOutOfRangeException(nameof(entityIndex));
         }
 
-        _positionX[entityIndex] = KinematicMovement.ApplyAxis(
-            _positionX[entityIndex],
-            moveXMilli);
-        _positionZ[entityIndex] = KinematicMovement.ApplyAxis(
-            _positionZ[entityIndex],
-            moveYMilli);
+        _positionX[entityIndex] = KinematicMovement.ApplyAxis(_positionX[entityIndex], moveXMilli);
+        _positionZ[entityIndex] = KinematicMovement.ApplyAxis(_positionZ[entityIndex], moveYMilli);
     }
 
     public AiNative.Protocol.V1.Snapshot CreateSnapshot(ulong roomTick)
@@ -175,15 +176,17 @@ internal sealed class SyntheticRoom
 
         for (int index = 0; index < BotCount; index++)
         {
-            snapshot.Players.Add(new AiNative.Protocol.V1.PlayerState
-            {
-                EntityId = checked((uint)index + 1),
-                PositionXMilli = _positionX[index],
-                PositionYMilli = 0,
-                PositionZMilli = _positionZ[index],
-                YawMillidegrees = 0,
-                Health = checked((uint)_health[index]),
-            });
+            snapshot.Players.Add(
+                new AiNative.Protocol.V1.PlayerState
+                {
+                    EntityId = checked((uint)index + 1),
+                    PositionXMilli = _positionX[index],
+                    PositionYMilli = 0,
+                    PositionZMilli = _positionZ[index],
+                    YawMillidegrees = 0,
+                    Health = checked((uint)_health[index]),
+                }
+            );
         }
 
         return snapshot;
@@ -191,7 +194,8 @@ internal sealed class SyntheticRoom
 
     public ulong ComputeStateHash()
     {
-        Span<byte> canonical = stackalloc byte[CanonicalHeaderBytes + (MaxBots * CanonicalBotBytes)];
+        Span<byte> canonical =
+            stackalloc byte[CanonicalHeaderBytes + (MaxBots * CanonicalBotBytes)];
         BinaryPrimitives.WriteUInt32LittleEndian(canonical, 1);
         BinaryPrimitives.WriteUInt32LittleEndian(canonical[4..], checked((uint)BotCount));
         BinaryPrimitives.WriteUInt64LittleEndian(canonical[8..], _state);

@@ -1,6 +1,6 @@
-using AiNative.Client.Protocol.Protobuf;
-using AiNative.Client.Protocol;
 using System;
+using AiNative.Client.Protocol;
+using AiNative.Client.Protocol.Protobuf;
 using AiNative.Gameplay;
 using AiNative.Realtime;
 using NUnit.Framework;
@@ -12,28 +12,67 @@ namespace AiNative.Client.Prediction.Tests
         private static readonly TransportChannel SnapshotChannel = new TransportChannel(
             1,
             TransportDelivery.Unreliable,
-            TransportOrdering.Sequenced);
+            TransportOrdering.Sequenced
+        );
 
         private static readonly TransportChannel ControlChannel = new TransportChannel(
             0,
             TransportDelivery.Reliable,
-            TransportOrdering.Ordered);
+            TransportOrdering.Ordered
+        );
 
         [Test]
         public void ArenaOmittedFalseAliveRemainsDead()
         {
-            byte[] frame = { 0x4d, 0x04, 0x08, 1, 0x11, 100, 0, 0, 0, 0, 0, 0, 0, 0x22, 4, 0x08, 1, 0x50, 1 };
-            Assert.That(ArenaClientProtocolV1.TryDecodeSnapshot(frame, 1, out var decoded), Is.True);
+            byte[] frame =
+            {
+                0x4d,
+                0x04,
+                0x08,
+                1,
+                0x11,
+                100,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0x22,
+                4,
+                0x08,
+                1,
+                0x50,
+                1,
+            };
+            Assert.That(
+                ArenaClientProtocolV1.TryDecodeSnapshot(frame, 1, out var decoded),
+                Is.True
+            );
             Assert.That(decoded.State.Alive, Is.False);
         }
 
         [Test]
         public void ArenaInitializationContinuesAcknowledgedSequenceAndAlignsClientTick()
         {
-            var adapter = new ArenaClientPredictionAdapter(new FakeRealtimeTransport(), new ProtobufBattleProtocolCodec(), 1);
+            var adapter = new ArenaClientPredictionAdapter(
+                new FakeRealtimeTransport(),
+                new ProtobufBattleProtocolCodec(),
+                1
+            );
             var state = new ArenaPlayerState(100, 0, 0, 0) { LastProcessedInputSequence = 20 };
             adapter.Initialize(state);
-            var result = adapter.PrepareInput(1, 1000, 0, 0, 0, ArenaButtons.None, ArenaWeaponId.Machinegun, new byte[64]);
+            var result = adapter.PrepareInput(
+                1,
+                1000,
+                0,
+                0,
+                0,
+                ArenaButtons.None,
+                ArenaWeaponId.Machinegun,
+                new byte[64]
+            );
             Assert.That(result.PredictedState.LastProcessedInputSequence, Is.EqualTo(21));
             Assert.That(result.PredictedState.Tick, Is.EqualTo(101));
             Assert.That(result.PredictedState.PositionXMillimetres, Is.EqualTo(16));
@@ -41,27 +80,62 @@ namespace AiNative.Client.Prediction.Tests
 
         [TestCase(1UL)]
         [TestCase(ulong.MaxValue)]
-        public void ArenaWireTickUsesAuthorityWhileUnacknowledgedPredictionKeepsAdvancing(ulong callerTick)
+        public void ArenaWireTickUsesAuthorityWhileUnacknowledgedPredictionKeepsAdvancing(
+            ulong callerTick
+        )
         {
-            var adapter = new ArenaClientPredictionAdapter(new FakeRealtimeTransport(), new ProtobufBattleProtocolCodec(), 1);
+            var adapter = new ArenaClientPredictionAdapter(
+                new FakeRealtimeTransport(),
+                new ProtobufBattleProtocolCodec(),
+                1
+            );
             adapter.Initialize(new ArenaPlayerState(100, 0, 0, 0));
             byte[] frame = new byte[ArenaClientProtocolV1.MaxInputFrameBytes];
             for (int index = 0; index < 5; index++)
             {
-                var prepared = adapter.PrepareInput(callerTick, 1000, 0, 0, 0,
-                    ArenaButtons.None, ArenaWeaponId.Machinegun, frame);
+                var prepared = adapter.PrepareInput(
+                    callerTick,
+                    1000,
+                    0,
+                    0,
+                    0,
+                    ArenaButtons.None,
+                    ArenaWeaponId.Machinegun,
+                    frame
+                );
                 Assert.That(prepared.Status, Is.EqualTo(ArenaPredictionPrepareStatus.Prepared));
-                Assert.That(System.Buffers.Binary.BinaryPrimitives.ReadUInt64LittleEndian(frame.AsSpan(3)),
-                    Is.EqualTo(101), "Unacknowledged prediction must not advance the wire admission clock.");
+                Assert.That(
+                    System.Buffers.Binary.BinaryPrimitives.ReadUInt64LittleEndian(frame.AsSpan(3)),
+                    Is.EqualTo(101),
+                    "Unacknowledged prediction must not advance the wire admission clock."
+                );
                 Assert.That(prepared.PredictedState.Tick, Is.EqualTo(101 + index));
             }
 
             byte[] snapshot = ProtocolFrameFixtures.Snapshot(1, 103, 0, 0, 0);
-            adapter.ApplySnapshot(snapshot, ProtocolFrameFixtures.Packet(snapshot, SnapshotChannel, 1));
-            Assert.That(adapter.Current.Tick, Is.EqualTo(108), "Local prediction still replays unacknowledged commands.");
-            var next = adapter.PrepareInput(callerTick, 1000, 0, 0, 0,
-                ArenaButtons.None, ArenaWeaponId.Machinegun, frame);
-            Assert.That(System.Buffers.Binary.BinaryPrimitives.ReadUInt64LittleEndian(frame.AsSpan(3)), Is.EqualTo(104));
+            adapter.ApplySnapshot(
+                snapshot,
+                ProtocolFrameFixtures.Packet(snapshot, SnapshotChannel, 1)
+            );
+            Assert.That(
+                adapter.Current.Tick,
+                Is.EqualTo(108),
+                "Local prediction still replays unacknowledged commands."
+            );
+            var next = adapter.PrepareInput(
+                callerTick,
+                1000,
+                0,
+                0,
+                0,
+                ArenaButtons.None,
+                ArenaWeaponId.Machinegun,
+                frame
+            );
+            Assert.That(
+                System.Buffers.Binary.BinaryPrimitives.ReadUInt64LittleEndian(frame.AsSpan(3)),
+                Is.EqualTo(104)
+            );
             Assert.That(next.PredictedState.Tick, Is.EqualTo(109));
         }
 
@@ -71,7 +145,8 @@ namespace AiNative.Client.Prediction.Tests
             FakeRealtimeTransport transport = new FakeRealtimeTransport();
             ClientPredictionAdapter adapter = InitializedAdapter(transport, 7, 1);
 
-            PredictionSendResult result = adapter.SendInputAsync(42, 1000, -500)
+            PredictionSendResult result = adapter
+                .SendInputAsync(42, 1000, -500)
                 .GetAwaiter()
                 .GetResult();
 
@@ -81,36 +156,53 @@ namespace AiNative.Client.Prediction.Tests
             Assert.That(transport.LastChannel.Id, Is.EqualTo(2));
             Assert.That(transport.LastChannel.Delivery, Is.EqualTo(TransportDelivery.Unreliable));
             Assert.That(transport.LastChannel.Ordering, Is.EqualTo(TransportOrdering.Sequenced));
-            Assert.That(transport.LastPayload.ToArray(), Is.EqualTo(new byte[]
-            {
-                0x4c, 0x04,
-                0x09, 0x2a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                0x10, 0x01,
-                0x18, 0xd0, 0x0f,
-                0x20, 0xe7, 0x07,
-            }));
+            Assert.That(
+                transport.LastPayload.ToArray(),
+                Is.EqualTo(
+                    new byte[]
+                    {
+                        0x4c,
+                        0x04,
+                        0x09,
+                        0x2a,
+                        0x00,
+                        0x00,
+                        0x00,
+                        0x00,
+                        0x00,
+                        0x00,
+                        0x00,
+                        0x10,
+                        0x01,
+                        0x18,
+                        0xd0,
+                        0x0f,
+                        0x20,
+                        0xe7,
+                        0x07,
+                    }
+                )
+            );
 
             FakeRealtimeTransport maximumTransport = new FakeRealtimeTransport();
             ClientPredictionAdapter maximumAdapter = new ClientPredictionAdapter(
                 maximumTransport,
                 new ProtobufBattleProtocolCodec(),
                 7,
-                16);
-            byte[] maximumBaseline = ProtocolFrameFixtures.Snapshot(
-                7,
-                10,
-                uint.MaxValue - 1,
-                0,
-                0);
+                16
+            );
+            byte[] maximumBaseline = ProtocolFrameFixtures.Snapshot(7, 10, uint.MaxValue - 1, 0, 0);
             maximumAdapter.ApplyPacket(
                 maximumBaseline,
-                ProtocolFrameFixtures.Packet(maximumBaseline, SnapshotChannel, 1));
+                ProtocolFrameFixtures.Packet(maximumBaseline, SnapshotChannel, 1)
+            );
             byte[] exactBuffer = new byte[64];
             PredictionPrepareResult maximum = maximumAdapter.PrepareInput(
                 ulong.MaxValue,
                 int.MinValue,
                 int.MaxValue,
-                exactBuffer);
+                exactBuffer
+            );
             Assert.That(maximum.Status, Is.EqualTo(PredictionPrepareStatus.Prepared));
             Assert.That(maximum.WrittenBytes, Is.EqualTo(29));
         }
@@ -126,7 +218,8 @@ namespace AiNative.Client.Prediction.Tests
 
             SnapshotApplyResult applied = adapter.ApplyPacket(
                 snapshot,
-                ProtocolFrameFixtures.Packet(snapshot, SnapshotChannel, 1));
+                ProtocolFrameFixtures.Packet(snapshot, SnapshotChannel, 1)
+            );
 
             Assert.That(applied.Status, Is.EqualTo(SnapshotApplyStatus.Reconciled));
             Assert.That(applied.Reconciliation.Status, Is.EqualTo(ReconciliationStatus.Corrected));
@@ -147,7 +240,8 @@ namespace AiNative.Client.Prediction.Tests
 
             SnapshotApplyResult applied = adapter.ApplyPacket(
                 snapshot,
-                ProtocolFrameFixtures.Packet(snapshot, SnapshotChannel, 1));
+                ProtocolFrameFixtures.Packet(snapshot, SnapshotChannel, 1)
+            );
 
             Assert.That(applied.Reconciliation.Status, Is.EqualTo(ReconciliationStatus.Matched));
             Assert.That(applied.CorrectionMagnitudeMillimetres, Is.Zero);
@@ -168,10 +262,12 @@ namespace AiNative.Client.Prediction.Tests
                     (ulong)(10 + magnitude),
                     0,
                     position,
-                    0);
+                    0
+                );
                 adapter.ApplyPacket(
                     snapshot,
-                    ProtocolFrameFixtures.Packet(snapshot, SnapshotChannel, 1));
+                    ProtocolFrameFixtures.Packet(snapshot, SnapshotChannel, 1)
+                );
             }
 
             PredictionDiagnostics measured = adapter.Diagnostics;
@@ -193,19 +289,28 @@ namespace AiNative.Client.Prediction.Tests
         public void MissingPlayerAndProtocolMismatchFailClosed()
         {
             FakeRealtimeTransport transport = new FakeRealtimeTransport();
-            ClientPredictionAdapter adapter = new ClientPredictionAdapter(transport, new ProtobufBattleProtocolCodec(), 7);
+            ClientPredictionAdapter adapter = new ClientPredictionAdapter(
+                transport,
+                new ProtobufBattleProtocolCodec(),
+                7
+            );
             byte[] missing = ProtocolFrameFixtures.Snapshot(7, 10, 0, 0, 0, includePlayer: false);
             byte[] incompatible = ProtocolFrameFixtures.Snapshot(7, 10, 0, 0, 0, protocolMajor: 2);
 
             SnapshotApplyResult missingResult = adapter.ApplyPacket(
                 missing,
-                ProtocolFrameFixtures.Packet(missing, SnapshotChannel, 1));
+                ProtocolFrameFixtures.Packet(missing, SnapshotChannel, 1)
+            );
             SnapshotApplyResult incompatibleResult = adapter.ApplyPacket(
                 incompatible,
-                ProtocolFrameFixtures.Packet(incompatible, SnapshotChannel, 1));
+                ProtocolFrameFixtures.Packet(incompatible, SnapshotChannel, 1)
+            );
 
             Assert.That(missingResult.Status, Is.EqualTo(SnapshotApplyStatus.PlayerMissing));
-            Assert.That(incompatibleResult.Status, Is.EqualTo(SnapshotApplyStatus.ProtocolMismatch));
+            Assert.That(
+                incompatibleResult.Status,
+                Is.EqualTo(SnapshotApplyStatus.ProtocolMismatch)
+            );
             Assert.That(adapter.IsInitialized, Is.False);
         }
 
@@ -219,11 +324,9 @@ namespace AiNative.Client.Prediction.Tests
                 snapshot,
                 SnapshotChannel,
                 1,
-                snapshot.Length + 1);
-            ReceivedPacket wrongChannel = ProtocolFrameFixtures.Packet(
-                snapshot,
-                ControlChannel,
-                1);
+                snapshot.Length + 1
+            );
+            ReceivedPacket wrongChannel = ProtocolFrameFixtures.Packet(snapshot, ControlChannel, 1);
 
             SnapshotApplyResult truncatedResult = adapter.ApplyPacket(snapshot, truncated);
             SnapshotApplyResult wrongChannelResult = adapter.ApplyPacket(snapshot, wrongChannel);
@@ -244,7 +347,8 @@ namespace AiNative.Client.Prediction.Tests
 
             SnapshotApplyResult applied = adapter.ApplyPacket(
                 reconnect,
-                ProtocolFrameFixtures.Packet(reconnect, ControlChannel, 2));
+                ProtocolFrameFixtures.Packet(reconnect, ControlChannel, 2)
+            );
 
             Assert.That(applied.Status, Is.EqualTo(SnapshotApplyStatus.Reconciled));
             Assert.That(applied.ConnectionEpoch, Is.EqualTo(2));
@@ -254,7 +358,8 @@ namespace AiNative.Client.Prediction.Tests
             byte[] stale = ProtocolFrameFixtures.Snapshot(7, 12, 1, 45, 0);
             SnapshotApplyResult staleResult = adapter.ApplyPacket(
                 stale,
-                ProtocolFrameFixtures.Packet(stale, SnapshotChannel, 1));
+                ProtocolFrameFixtures.Packet(stale, SnapshotChannel, 1)
+            );
             Assert.That(staleResult.Status, Is.EqualTo(SnapshotApplyStatus.StaleConnectionEpoch));
         }
 
@@ -267,7 +372,8 @@ namespace AiNative.Client.Prediction.Tests
             };
             ClientPredictionAdapter adapter = InitializedAdapter(transport, 7, 1);
 
-            PredictionSendResult result = adapter.SendInputAsync(11, 1000, 0)
+            PredictionSendResult result = adapter
+                .SendInputAsync(11, 1000, 0)
                 .GetAwaiter()
                 .GetResult();
 
@@ -291,7 +397,8 @@ namespace AiNative.Client.Prediction.Tests
             byte[] acknowledged = ProtocolFrameFixtures.Snapshot(7, 2010, 2000, 0, 0);
             adapter.ApplyPacket(
                 acknowledged,
-                ProtocolFrameFixtures.Packet(acknowledged, SnapshotChannel, 1));
+                ProtocolFrameFixtures.Packet(acknowledged, SnapshotChannel, 1)
+            );
             for (ulong tick = 2001; tick <= 3000; tick++)
             {
                 adapter.PrepareInput(tick, 1, -1, inputBuffer);
@@ -300,15 +407,17 @@ namespace AiNative.Client.Prediction.Tests
             byte[] secondAcknowledgement = ProtocolFrameFixtures.Snapshot(7, 3010, 3000, 0, 0);
             adapter.ApplyPacket(
                 secondAcknowledgement,
-                ProtocolFrameFixtures.Packet(secondAcknowledgement, SnapshotChannel, 1));
+                ProtocolFrameFixtures.Packet(secondAcknowledgement, SnapshotChannel, 1)
+            );
             PredictionPrepareStatus lastStatus = PredictionPrepareStatus.NotInitialized;
 
-            using var allocationMeter = new CalibratedAllocationMeter(); allocationMeter.RequireSupported(); allocationMeter.Begin();
+            using var allocationMeter = new CalibratedAllocationMeter();
+            allocationMeter.RequireSupported();
+            allocationMeter.Begin();
 
             for (ulong tick = 3001; tick <= 13000; tick++)
             {
-                lastStatus = adapter.PrepareInput(tick, 1, -1, inputBuffer)
-                    .Status;
+                lastStatus = adapter.PrepareInput(tick, 1, -1, inputBuffer).Status;
             }
 
             long allocated = allocationMeter.End();
@@ -326,15 +435,20 @@ namespace AiNative.Client.Prediction.Tests
             FakeRealtimeTransport transport,
             uint entityId,
             uint connectionEpoch,
-            int capacity = 16)
+            int capacity = 16
+        )
         {
-            ClientPredictionAdapter adapter = new ClientPredictionAdapter(transport, new ProtobufBattleProtocolCodec(),
+            ClientPredictionAdapter adapter = new ClientPredictionAdapter(
+                transport,
+                new ProtobufBattleProtocolCodec(),
                 entityId,
-                capacity);
+                capacity
+            );
             byte[] baseline = ProtocolFrameFixtures.Snapshot(entityId, 10, 0, 0, 0);
             SnapshotApplyResult initialized = adapter.ApplyPacket(
                 baseline,
-                ProtocolFrameFixtures.Packet(baseline, SnapshotChannel, connectionEpoch));
+                ProtocolFrameFixtures.Packet(baseline, SnapshotChannel, connectionEpoch)
+            );
             Assert.That(initialized.Status, Is.EqualTo(SnapshotApplyStatus.Initialized));
             return adapter;
         }

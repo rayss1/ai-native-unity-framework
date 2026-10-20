@@ -1,6 +1,6 @@
-using AiNative.Client.Protocol;
 using System;
 using System.Buffers.Binary;
+using AiNative.Client.Protocol;
 using AiNative.Gameplay;
 using AiNative.Realtime;
 
@@ -22,7 +22,8 @@ namespace AiNative.Client.Prediction
         public DecodedAuthoritativeSnapshot(
             in KinematicState state,
             bool isReconnect,
-            uint reconnectConnectionEpoch)
+            uint reconnectConnectionEpoch
+        )
         {
             State = state;
             IsReconnect = isReconnect;
@@ -48,23 +49,27 @@ namespace AiNative.Client.Prediction
         public static readonly TransportChannel ControlChannel = new TransportChannel(
             0,
             TransportDelivery.Reliable,
-            TransportOrdering.Ordered);
+            TransportOrdering.Ordered
+        );
 
         public static readonly TransportChannel SnapshotChannel = new TransportChannel(
             1,
             TransportDelivery.Unreliable,
-            TransportOrdering.Sequenced);
+            TransportOrdering.Sequenced
+        );
 
         public static readonly TransportChannel InputChannel = new TransportChannel(
             2,
             TransportDelivery.Unreliable,
-            TransportOrdering.Sequenced);
+            TransportOrdering.Sequenced
+        );
 
         public static bool TryEncodeInput(
             ulong roomTick,
             in KinematicInput input,
             Span<byte> destination,
-            out int writtenBytes)
+            out int writtenBytes
+        )
         {
             writtenBytes = 0;
             if (destination.Length < HeaderBytes)
@@ -74,24 +79,34 @@ namespace AiNative.Client.Prediction
 
             BinaryPrimitives.WriteUInt16LittleEndian(destination, InputCommandMessageId);
             int offset = HeaderBytes;
-            if (!TryWriteByte(destination, ref offset, 0x09) ||
-                !TryWriteFixed64(destination, ref offset, roomTick) ||
-                !TryWriteByte(destination, ref offset, 0x10) ||
-                !TryWriteVarint(destination, ref offset, input.Sequence))
+            if (
+                !TryWriteByte(destination, ref offset, 0x09)
+                || !TryWriteFixed64(destination, ref offset, roomTick)
+                || !TryWriteByte(destination, ref offset, 0x10)
+                || !TryWriteVarint(destination, ref offset, input.Sequence)
+            )
             {
                 return false;
             }
 
-            if (input.MoveXMilli != 0 &&
-                (!TryWriteByte(destination, ref offset, 0x18) ||
-                 !TryWriteVarint(destination, ref offset, ZigZag(input.MoveXMilli))))
+            if (
+                input.MoveXMilli != 0
+                && (
+                    !TryWriteByte(destination, ref offset, 0x18)
+                    || !TryWriteVarint(destination, ref offset, ZigZag(input.MoveXMilli))
+                )
+            )
             {
                 return false;
             }
 
-            if (input.MoveZMilli != 0 &&
-                (!TryWriteByte(destination, ref offset, 0x20) ||
-                 !TryWriteVarint(destination, ref offset, ZigZag(input.MoveZMilli))))
+            if (
+                input.MoveZMilli != 0
+                && (
+                    !TryWriteByte(destination, ref offset, 0x20)
+                    || !TryWriteVarint(destination, ref offset, ZigZag(input.MoveZMilli))
+                )
+            )
             {
                 return false;
             }
@@ -104,7 +119,8 @@ namespace AiNative.Client.Prediction
             ReadOnlySpan<byte> frame,
             uint entityId,
             out TransportChannel expectedChannel,
-            out DecodedAuthoritativeSnapshot decoded)
+            out DecodedAuthoritativeSnapshot decoded
+        )
         {
             expectedChannel = default;
             decoded = default;
@@ -136,7 +152,8 @@ namespace AiNative.Client.Prediction
         private static ClientProtocolDecodeStatus TryDecodeReconnectPayload(
             ReadOnlySpan<byte> payload,
             uint entityId,
-            out DecodedAuthoritativeSnapshot decoded)
+            out DecodedAuthoritativeSnapshot decoded
+        )
         {
             decoded = default;
             int offset = 0;
@@ -171,7 +188,14 @@ namespace AiNative.Client.Prediction
                         hasResumeTick = true;
                         break;
                     case 3 when wireType == 2:
-                        if (hasSnapshot || !TryReadLengthDelimited(payload, ref offset, out ReadOnlySpan<byte> snapshot))
+                        if (
+                            hasSnapshot
+                            || !TryReadLengthDelimited(
+                                payload,
+                                ref offset,
+                                out ReadOnlySpan<byte> snapshot
+                            )
+                        )
                         {
                             return ClientProtocolDecodeStatus.MalformedPayload;
                         }
@@ -181,7 +205,8 @@ namespace AiNative.Client.Prediction
                             entityId,
                             true,
                             connectionEpoch,
-                            out nested);
+                            out nested
+                        );
                         if (status != ClientProtocolDecodeStatus.Accepted)
                         {
                             return status;
@@ -199,8 +224,13 @@ namespace AiNative.Client.Prediction
                 }
             }
 
-            if (connectionEpoch == 0 || !hasResumeTick || !hasSnapshot ||
-                resumeTick > long.MaxValue || resumeTick < (ulong)nested.State.Tick)
+            if (
+                connectionEpoch == 0
+                || !hasResumeTick
+                || !hasSnapshot
+                || resumeTick > long.MaxValue
+                || resumeTick < (ulong)nested.State.Tick
+            )
             {
                 return ClientProtocolDecodeStatus.MalformedPayload;
             }
@@ -214,7 +244,8 @@ namespace AiNative.Client.Prediction
             uint entityId,
             bool isReconnect,
             uint reconnectConnectionEpoch,
-            out DecodedAuthoritativeSnapshot decoded)
+            out DecodedAuthoritativeSnapshot decoded
+        )
         {
             decoded = default;
             int offset = 0;
@@ -251,8 +282,19 @@ namespace AiNative.Client.Prediction
                         hasRoomTick = true;
                         break;
                     case 4 when wireType == 2:
-                        if (!TryReadLengthDelimited(payload, ref offset, out ReadOnlySpan<byte> player) ||
-                            !TryDecodePlayer(player, out uint candidateEntity, out int candidateX, out int candidateZ))
+                        if (
+                            !TryReadLengthDelimited(
+                                payload,
+                                ref offset,
+                                out ReadOnlySpan<byte> player
+                            )
+                            || !TryDecodePlayer(
+                                player,
+                                out uint candidateEntity,
+                                out int candidateX,
+                                out int candidateZ
+                            )
+                        )
                         {
                             return ClientProtocolDecodeStatus.MalformedPayload;
                         }
@@ -306,11 +348,13 @@ namespace AiNative.Client.Prediction
                 (long)roomTick,
                 acknowledgement,
                 positionX,
-                positionZ);
+                positionZ
+            );
             decoded = new DecodedAuthoritativeSnapshot(
                 state,
                 isReconnect,
-                reconnectConnectionEpoch);
+                reconnectConnectionEpoch
+            );
             return ClientProtocolDecodeStatus.Accepted;
         }
 
@@ -318,7 +362,8 @@ namespace AiNative.Client.Prediction
             ReadOnlySpan<byte> payload,
             out uint entityId,
             out int positionX,
-            out int positionZ)
+            out int positionZ
+        )
         {
             entityId = 0;
             positionX = 0;
@@ -373,11 +418,16 @@ namespace AiNative.Client.Prediction
             ReadOnlySpan<byte> source,
             ref int offset,
             out int fieldNumber,
-            out int wireType)
+            out int wireType
+        )
         {
             fieldNumber = 0;
             wireType = 0;
-            if (!TryReadVarint(source, ref offset, out ulong key) || key == 0 || key > uint.MaxValue)
+            if (
+                !TryReadVarint(source, ref offset, out ulong key)
+                || key == 0
+                || key > uint.MaxValue
+            )
             {
                 return false;
             }
@@ -387,10 +437,7 @@ namespace AiNative.Client.Prediction
             return fieldNumber > 0;
         }
 
-        private static bool TryReadUInt32(
-            ReadOnlySpan<byte> source,
-            ref int offset,
-            out uint value)
+        private static bool TryReadUInt32(ReadOnlySpan<byte> source, ref int offset, out uint value)
         {
             value = 0;
             if (!TryReadVarint(source, ref offset, out ulong wide) || wide > uint.MaxValue)
@@ -405,7 +452,8 @@ namespace AiNative.Client.Prediction
         private static bool TryReadVarint(
             ReadOnlySpan<byte> source,
             ref int offset,
-            out ulong value)
+            out ulong value
+        )
         {
             value = 0;
             for (int shift = 0; shift < 70; shift += 7)
@@ -434,7 +482,8 @@ namespace AiNative.Client.Prediction
         private static bool TryReadFixed64(
             ReadOnlySpan<byte> source,
             ref int offset,
-            out ulong value)
+            out ulong value
+        )
         {
             value = 0;
             if (source.Length - offset < sizeof(ulong))
@@ -450,12 +499,15 @@ namespace AiNative.Client.Prediction
         private static bool TryReadLengthDelimited(
             ReadOnlySpan<byte> source,
             ref int offset,
-            out ReadOnlySpan<byte> value)
+            out ReadOnlySpan<byte> value
+        )
         {
             value = default;
-            if (!TryReadVarint(source, ref offset, out ulong length) ||
-                length > int.MaxValue ||
-                (int)length > source.Length - offset)
+            if (
+                !TryReadVarint(source, ref offset, out ulong length)
+                || length > int.MaxValue
+                || (int)length > source.Length - offset
+            )
             {
                 return false;
             }
@@ -512,7 +564,10 @@ namespace AiNative.Client.Prediction
                 return false;
             }
 
-            BinaryPrimitives.WriteUInt64LittleEndian(destination.Slice(offset, sizeof(ulong)), value);
+            BinaryPrimitives.WriteUInt64LittleEndian(
+                destination.Slice(offset, sizeof(ulong)),
+                value
+            );
             offset += sizeof(ulong);
             return true;
         }

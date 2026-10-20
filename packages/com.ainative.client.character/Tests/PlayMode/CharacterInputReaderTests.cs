@@ -70,8 +70,15 @@ namespace AiNative.Client.Character.Tests
             var motor = owner.AddComponent<CharacterMotor>();
             motor.Configure(null, null);
             // Start in another mode so the default Free value cannot hide a lost input.
-            motor.Simulate(new CharacterInputFrame { ChangeMode = true,
-                Mode = mode == CharacterMode.Free ? CharacterMode.Melee : CharacterMode.Free }, 0, 1f / 60);
+            motor.Simulate(
+                new CharacterInputFrame
+                {
+                    ChangeMode = true,
+                    Mode = mode == CharacterMode.Free ? CharacterMode.Melee : CharacterMode.Free,
+                },
+                0,
+                1f / 60
+            );
             for (int i = 0; i < 2; i++)
             {
                 Press(keyboard[key]);
@@ -143,12 +150,28 @@ namespace AiNative.Client.Character.Tests
             // InputTestFixture.Set always queues events in a UnityTest; unlike a plain
             // Test, Press does not process them until the following player-loop update.
             yield return null;
-            Assert.That(mouse.leftButton.isPressed, Is.True, "The player loop must process the queued second click.");
+            Assert.That(
+                mouse.leftButton.isPressed,
+                Is.True,
+                "The player loop must process the queued second click."
+            );
             Assert.That(reader.IsCaptured, Is.True, "Capture must survive the second click.");
             var attack = reader.Actions.FindAction("Gameplay/Attack", true);
-            Assert.That(attack.enabled, Is.True, "Gameplay attack must be enabled after recapture.");
-            Assert.That(attack.phase, Is.EqualTo(InputActionPhase.Performed), "Device pressed but Attack did not perform.");
-            Assert.That(reader.ConsumeFrame().Attack, Is.True, "Performed attack must reach the pending input frame.");
+            Assert.That(
+                attack.enabled,
+                Is.True,
+                "Gameplay attack must be enabled after recapture."
+            );
+            Assert.That(
+                attack.phase,
+                Is.EqualTo(InputActionPhase.Performed),
+                "Device pressed but Attack did not perform."
+            );
+            Assert.That(
+                reader.ConsumeFrame().Attack,
+                Is.True,
+                "Performed attack must reach the pending input frame."
+            );
         }
     }
 }

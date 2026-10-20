@@ -10,8 +10,8 @@ internal sealed record BattleGameModeSettings(BattleGameModeKind Kind)
 {
     public bool IsArena => Kind == BattleGameModeKind.Arena;
 
-    public int GetConnectionCapacity(BattleHostCapacitySettings capacitySettings)
-        => IsArena ? ArenaRoom.MaxPlayers : capacitySettings.TotalBotCapacity;
+    public int GetConnectionCapacity(BattleHostCapacitySettings capacitySettings) =>
+        IsArena ? ArenaRoom.MaxPlayers : capacitySettings.TotalBotCapacity;
 
     public static BattleGameModeSettings Create(IConfiguration configuration)
     {
@@ -21,7 +21,8 @@ internal sealed record BattleGameModeSettings(BattleGameModeKind Kind)
             "acceptance" => new BattleGameModeSettings(BattleGameModeKind.Acceptance),
             "arena" => new BattleGameModeSettings(BattleGameModeKind.Arena),
             _ => throw new InvalidOperationException(
-                "AINATIVE_GAME_MODE must be either 'acceptance' or 'arena'."),
+                "AINATIVE_GAME_MODE must be either 'acceptance' or 'arena'."
+            ),
         };
     }
 }

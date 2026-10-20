@@ -9,22 +9,33 @@ public sealed class FantasyRealtimeTransportTests
     [Test]
     public async Task UnderlyingDisconnectPropagatesWithoutAnyOutboundSend()
     {
-        FakeSender sender = new(); await using FantasyRealtimeTransport transport = new(sender);
-        sender.Dispose(); Assert.That(transport.State, Is.EqualTo(TransportState.Closed));
+        FakeSender sender = new();
+        await using FantasyRealtimeTransport transport = new(sender);
+        sender.Dispose();
+        Assert.That(transport.State, Is.EqualTo(TransportState.Closed));
         Assert.That(sender.SendCount, Is.Zero);
     }
+
     [Test]
     public async Task ClosedTransportDisposalStillReleasesItsBufferedPackets()
     {
-        FakeSender sender = new(); FantasyRealtimeTransport transport = new(sender);
-        Assert.That(transport.TryEnqueueReceived(SnapshotChannel, new byte[] { 1, 2 }, 1, 1), Is.True);
-        sender.Dispose(); Assert.That(transport.State, Is.EqualTo(TransportState.Closed));
-        await transport.DisposeAsync(); Assert.That(transport.TryReceive(new byte[8], out _), Is.False);
+        FakeSender sender = new();
+        FantasyRealtimeTransport transport = new(sender);
+        Assert.That(
+            transport.TryEnqueueReceived(SnapshotChannel, new byte[] { 1, 2 }, 1, 1),
+            Is.True
+        );
+        sender.Dispose();
+        Assert.That(transport.State, Is.EqualTo(TransportState.Closed));
+        await transport.DisposeAsync();
+        Assert.That(transport.TryReceive(new byte[8], out _), Is.False);
     }
+
     private static readonly TransportChannel SnapshotChannel = new(
         1,
         TransportDelivery.Unreliable,
-        TransportOrdering.Sequenced);
+        TransportOrdering.Sequenced
+    );
 
     [Test]
     public async Task GatewayUsesTheInternetSafeOuterKcpMtu()
@@ -55,8 +66,14 @@ public sealed class FantasyRealtimeTransportTests
         FakeSender sender = new();
         await using FantasyRealtimeTransport transport = new(sender, maxInboundBytes: 8);
 
-        Assert.That(transport.TryEnqueueReceived(SnapshotChannel, new byte[] { 1, 2, 3, 4, 5 }, 9, 2), Is.True);
-        Assert.That(transport.TryEnqueueReceived(SnapshotChannel, new byte[] { 6, 7, 8, 9 }, 10, 2), Is.False);
+        Assert.That(
+            transport.TryEnqueueReceived(SnapshotChannel, new byte[] { 1, 2, 3, 4, 5 }, 9, 2),
+            Is.True
+        );
+        Assert.That(
+            transport.TryEnqueueReceived(SnapshotChannel, new byte[] { 6, 7, 8, 9 }, 10, 2),
+            Is.False
+        );
 
         Span<byte> destination = stackalloc byte[3];
         Assert.That(transport.TryReceive(destination, out ReceivedPacket packet), Is.True);
@@ -84,7 +101,8 @@ public sealed class FantasyRealtimeTransportTests
         await using FantasyRealtimeTransport transport = new(
             new FakeSender(),
             maxInboundBytes: 256,
-            maxInboundPackets: 2);
+            maxInboundPackets: 2
+        );
 
         Assert.That(transport.TryEnqueueReceived(SnapshotChannel, [], 1, 1), Is.True);
         Assert.That(transport.TryEnqueueReceived(SnapshotChannel, [], 2, 1), Is.True);
@@ -101,11 +119,15 @@ public sealed class FantasyRealtimeTransportTests
         using FantasySessionSender sender = new(
             dispatcher,
             maxOutboundBytes: 4096,
-            maxOutboundPackets: 8);
+            maxOutboundPackets: 8
+        );
 
         for (int index = 0; index < 1000; index++)
         {
-            Assert.That(sender.Send(SnapshotChannel, BitConverter.GetBytes(index)), Is.EqualTo(SendStatus.Accepted));
+            Assert.That(
+                sender.Send(SnapshotChannel, BitConverter.GetBytes(index)),
+                Is.EqualTo(SendStatus.Accepted)
+            );
         }
 
         Assert.That(sender.PendingOutboundPackets, Is.EqualTo(1));

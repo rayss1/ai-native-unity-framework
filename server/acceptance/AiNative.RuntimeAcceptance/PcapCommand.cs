@@ -11,27 +11,42 @@ internal static class PcapCommand
         Dictionary<string, string> values = ParsePairs(args);
         string pcapPath = Require(values, "pcap");
         string outputPath = Require(values, "output");
-        int serverPort = int.Parse(values.GetValueOrDefault("server-port", "22000"), System.Globalization.CultureInfo.InvariantCulture);
-        long startUnixMilliseconds = long.Parse(Require(values, "start-unix-ms"), System.Globalization.CultureInfo.InvariantCulture);
-        int durationSeconds = int.Parse(Require(values, "duration-seconds"), System.Globalization.CultureInfo.InvariantCulture);
+        int serverPort = int.Parse(
+            values.GetValueOrDefault("server-port", "22000"),
+            System.Globalization.CultureInfo.InvariantCulture
+        );
+        long startUnixMilliseconds = long.Parse(
+            Require(values, "start-unix-ms"),
+            System.Globalization.CultureInfo.InvariantCulture
+        );
+        int durationSeconds = int.Parse(
+            Require(values, "duration-seconds"),
+            System.Globalization.CultureInfo.InvariantCulture
+        );
         int expectedClientCount = int.Parse(
             values.GetValueOrDefault("expected-clients", "64"),
-            System.Globalization.CultureInfo.InvariantCulture);
+            System.Globalization.CultureInfo.InvariantCulture
+        );
         int headroomPercent = int.Parse(
             values.GetValueOrDefault("headroom-percent", "0"),
-            System.Globalization.CultureInfo.InvariantCulture);
+            System.Globalization.CultureInfo.InvariantCulture
+        );
         PcapReport report = PcapAnalyzer.Analyze(
             pcapPath,
             serverPort,
             startUnixMilliseconds,
             durationSeconds,
             expectedClientCount,
-            headroomPercent);
-        string json = JsonSerializer.Serialize(report, new JsonSerializerOptions
-        {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            WriteIndented = true,
-        });
+            headroomPercent
+        );
+        string json = JsonSerializer.Serialize(
+            report,
+            new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                WriteIndented = true,
+            }
+        );
         string fullOutputPath = Path.GetFullPath(outputPath);
         Directory.CreateDirectory(Path.GetDirectoryName(fullOutputPath)!);
         File.WriteAllText(fullOutputPath, json + Environment.NewLine);
@@ -72,7 +87,8 @@ internal static class PcapAnalyzer
         long startUnixMilliseconds,
         int durationSeconds,
         int expectedClientCount = 64,
-        int headroomPercent = 0)
+        int headroomPercent = 0
+    )
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(serverPort, 1);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(serverPort, ushort.MaxValue);
@@ -131,14 +147,20 @@ internal static class PcapAnalyzer
             byte[] packet = new byte[includedLength];
             stream.ReadExactly(packet);
             long packetUnixMilliseconds = checked(
-                (seconds * 1000L) + (nanoseconds ? fraction / 1_000_000L : fraction / 1_000L));
-            if (packetUnixMilliseconds < startUnixMilliseconds || packetUnixMilliseconds >= endUnixMilliseconds)
+                (seconds * 1000L) + (nanoseconds ? fraction / 1_000_000L : fraction / 1_000L)
+            );
+            if (
+                packetUnixMilliseconds < startUnixMilliseconds
+                || packetUnixMilliseconds >= endUnixMilliseconds
+            )
             {
                 continue;
             }
 
-            if (!TryReadUdp(packet, linkType, out UdpPacket udp) ||
-                (udp.SourcePort != serverPort && udp.DestinationPort != serverPort))
+            if (
+                !TryReadUdp(packet, linkType, out UdpPacket udp)
+                || (udp.SourcePort != serverPort && udp.DestinationPort != serverPort)
+            )
             {
                 continue;
             }
@@ -153,7 +175,8 @@ internal static class PcapAnalyzer
             int bucket = Math.Clamp(
                 checked((int)((packetUnixMilliseconds - startUnixMilliseconds) / 1000)),
                 0,
-                durationSeconds - 1);
+                durationSeconds - 1
+            );
             if (udp.SourcePort == serverPort)
             {
                 samples.DownstreamBytes[bucket] += udp.IpTotalLength;
@@ -168,7 +191,9 @@ internal static class PcapAnalyzer
             datagramPayloadBytes.Add(udp.UdpPayloadLength);
         }
 
-        double[] downstreamKbps = FlattenKbps(clients.Values.Select(client => client.DownstreamBytes));
+        double[] downstreamKbps = FlattenKbps(
+            clients.Values.Select(client => client.DownstreamBytes)
+        );
         double[] upstreamKbps = FlattenKbps(clients.Values.Select(client => client.UpstreamBytes));
         datagramPayloadBytes.Sort();
         double downstreamP95 = Percentile(downstreamKbps, 0.95);
@@ -179,11 +204,11 @@ internal static class PcapAnalyzer
         double upstreamLimit = 64d * retainedFraction;
         double datagramLimit = 1200d * retainedFraction;
         bool gatesPassed =
-            clients.Count == expectedClientCount &&
-            packetCount > 0 &&
-            downstreamP95 <= downstreamLimit &&
-            upstreamP95 <= upstreamLimit &&
-            datagramP95 <= datagramLimit;
+            clients.Count == expectedClientCount
+            && packetCount > 0
+            && downstreamP95 <= downstreamLimit
+            && upstreamP95 <= upstreamLimit
+            && datagramP95 <= datagramLimit;
 
         return new PcapReport(
             EvidenceClass: "linux-loopback-netem-pcap",
@@ -212,10 +237,14 @@ internal static class PcapAnalyzer
             DatagramPayloadP95Bytes: datagramP95,
             DatagramPayloadP99Bytes: Percentile(datagramPayloadBytes, 0.99),
             MaxDatagramPayloadBytes: datagramPayloadBytes.Count == 0 ? 0 : datagramPayloadBytes[^1],
-            SourceCommit: Environment.GetEnvironmentVariable("AINATIVE_SOURCE_COMMIT") ?? "unrecorded",
-            FantasyCommit: Environment.GetEnvironmentVariable("AINATIVE_FANTASY_COMMIT") ?? "unrecorded",
-            ProtocolIdentity: Environment.GetEnvironmentVariable("AINATIVE_PROTOCOL_IDENTITY") ?? "unrecorded",
-            GatesPassed: gatesPassed);
+            SourceCommit: Environment.GetEnvironmentVariable("AINATIVE_SOURCE_COMMIT")
+                ?? "unrecorded",
+            FantasyCommit: Environment.GetEnvironmentVariable("AINATIVE_FANTASY_COMMIT")
+                ?? "unrecorded",
+            ProtocolIdentity: Environment.GetEnvironmentVariable("AINATIVE_PROTOCOL_IDENTITY")
+                ?? "unrecorded",
+            GatesPassed: gatesPassed
+        );
     }
 
     private static bool TryReadUdp(ReadOnlySpan<byte> packet, uint linkType, out UdpPacket udp)
@@ -257,7 +286,12 @@ internal static class PcapAnalyzer
 
         ReadOnlySpan<byte> ip = packet[ipOffset..];
         int ipHeaderLength = (ip[0] & 0x0f) * 4;
-        if ((ip[0] >> 4) != 4 || ipHeaderLength < 20 || ip.Length < ipHeaderLength + 8 || ip[9] != 17)
+        if (
+            (ip[0] >> 4) != 4
+            || ipHeaderLength < 20
+            || ip.Length < ipHeaderLength + 8
+            || ip[9] != 17
+        )
         {
             return false;
         }
@@ -279,7 +313,8 @@ internal static class PcapAnalyzer
             BinaryPrimitives.ReadUInt16BigEndian(udpHeader),
             BinaryPrimitives.ReadUInt16BigEndian(udpHeader[2..]),
             ipTotalLength,
-            udpLength - 8);
+            udpLength - 8
+        );
         return true;
     }
 
@@ -290,7 +325,10 @@ internal static class PcapAnalyzer
 
     private static double[] FlattenKbps(IEnumerable<long[]> windows)
     {
-        double[] values = windows.SelectMany(window => window).Select(bytes => bytes * 8d / 1000d).ToArray();
+        double[] values = windows
+            .SelectMany(window => window)
+            .Select(bytes => bytes * 8d / 1000d)
+            .ToArray();
         Array.Sort(values);
         return values;
     }
@@ -315,7 +353,8 @@ internal static class PcapAnalyzer
         ushort SourcePort,
         ushort DestinationPort,
         int IpTotalLength,
-        int UdpPayloadLength);
+        int UdpPayloadLength
+    );
 }
 
 internal sealed record PcapReport(
@@ -348,4 +387,5 @@ internal sealed record PcapReport(
     string SourceCommit,
     string FantasyCommit,
     string ProtocolIdentity,
-    bool GatesPassed);
+    bool GatesPassed
+);

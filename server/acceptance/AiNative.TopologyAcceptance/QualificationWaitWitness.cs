@@ -13,12 +13,16 @@ public sealed class QualificationWaitWitness : IDisposable
     private readonly SlowCycle[] _slow = new SlowCycle[SlowCapacity];
     private Thread? _thread;
     private volatile bool _stop;
-    private bool _started, _closed;
-    private long _measurementStart, _measurementEnd, _omitted;
+    private bool _started,
+        _closed;
+    private long _measurementStart,
+        _measurementEnd,
+        _omitted;
     private int _slowCount;
     private string? _failure;
 
-    public QualificationWaitWitness() : this(Stopwatch.GetTimestamp, () => Thread.Sleep(1)) { }
+    public QualificationWaitWitness()
+        : this(Stopwatch.GetTimestamp, () => Thread.Sleep(1)) { }
 
     // Deterministic clock/sleep seam for tests; production always uses the constructor above.
     internal QualificationWaitWitness(Func<long> clock, Action sleep)
@@ -34,21 +38,36 @@ public sealed class QualificationWaitWitness : IDisposable
             throw new ArgumentOutOfRangeException(nameof(measurementEndTicks));
         lock (_lifecycle)
         {
-            if (_started || _closed) throw new InvalidOperationException("Witness cannot be restarted.");
+            if (_started || _closed)
+                throw new InvalidOperationException("Witness cannot be restarted.");
             _measurementStart = measurementStartTicks;
             _measurementEnd = measurementEndTicks;
             _started = true;
             _thread = new Thread(Run) { IsBackground = true, Name = "Qualification wait witness" };
-            try { _thread.Start(); }
-            catch { _thread = null; _closed = true; throw; }
+            try
+            {
+                _thread.Start();
+            }
+            catch
+            {
+                _thread = null;
+                _closed = true;
+                throw;
+            }
         }
     }
 
     public void Stop()
     {
         Thread? owned;
-        lock (_lifecycle) { _stop = true; _closed = true; owned = _thread; }
-        if (owned == Thread.CurrentThread) throw new InvalidOperationException("Witness cannot join itself.");
+        lock (_lifecycle)
+        {
+            _stop = true;
+            _closed = true;
+            owned = _thread;
+        }
+        if (owned == Thread.CurrentThread)
+            throw new InvalidOperationException("Witness cannot join itself.");
         owned?.Join();
     }
 
@@ -58,25 +77,28 @@ public sealed class QualificationWaitWitness : IDisposable
     {
         lock (_lifecycle)
         {
-            if (_thread?.IsAlive == true) throw new InvalidOperationException("Stop the witness before reporting.");
+            if (_thread?.IsAlive == true)
+                throw new InvalidOperationException("Stop the witness before reporting.");
             _thread?.Join();
-            return JsonSerializer.SerializeToElement(new
-            {
-                scope = "Diagnostic only; dedicated Thread.Sleep(1) witness; GC counts are correlation observations, not causal attribution",
-                windowMethod = "record waits whose resume timestamp is in [measurementStartTicks, measurementEndTicks); a wait may begin before the window",
-                measurementStartTicks = _measurementStart,
-                measurementEndTicks = _measurementEnd,
-                requestedSleepMilliseconds = 1,
-                slowThresholdStopwatchTicks = Stopwatch.Frequency / 60,
-                slowThresholdMethod = "strictly greater than one 60 Hz period (integer Stopwatch ticks)",
-                started = _started,
-                threadAlive = false,
-                failure = _failure,
-                wait = _wait.Report(),
-                slowCycles = _slow.AsSpan(0, _slowCount).ToArray(),
-                slowCyclesCapacity = SlowCapacity,
-                slowCyclesOmitted = _omitted
-            });
+            return JsonSerializer.SerializeToElement(
+                new
+                {
+                    scope = "Diagnostic only; dedicated Thread.Sleep(1) witness; GC counts are correlation observations, not causal attribution",
+                    windowMethod = "record waits whose resume timestamp is in [measurementStartTicks, measurementEndTicks); a wait may begin before the window",
+                    measurementStartTicks = _measurementStart,
+                    measurementEndTicks = _measurementEnd,
+                    requestedSleepMilliseconds = 1,
+                    slowThresholdStopwatchTicks = Stopwatch.Frequency / 60,
+                    slowThresholdMethod = "strictly greater than one 60 Hz period (integer Stopwatch ticks)",
+                    started = _started,
+                    threadAlive = false,
+                    failure = _failure,
+                    wait = _wait.Report(),
+                    slowCycles = _slow.AsSpan(0, _slowCount).ToArray(),
+                    slowCyclesCapacity = SlowCapacity,
+                    slowCyclesOmitted = _omitted,
+                }
+            );
         }
     }
 
@@ -87,19 +109,31 @@ public sealed class QualificationWaitWitness : IDisposable
             while (!_stop)
             {
                 long started = _clock();
-                if (started >= _measurementEnd) break;
+                if (started >= _measurementEnd)
+                    break;
                 _sleep();
                 long ended = _clock();
-                if (ended < started) throw new InvalidOperationException("Witness clock moved backwards.");
-                if (ended >= _measurementEnd) break;
-                if (ended < _measurementStart) continue;
+                if (ended < started)
+                    throw new InvalidOperationException("Witness clock moved backwards.");
+                if (ended >= _measurementEnd)
+                    break;
+                if (ended < _measurementStart)
+                    continue;
                 long elapsed = ended - started;
                 _wait.Record(elapsed);
-                if (elapsed <= Stopwatch.Frequency / 60) continue;
+                if (elapsed <= Stopwatch.Frequency / 60)
+                    continue;
                 if (_slowCount < SlowCapacity)
-                    _slow[_slowCount++] = new(started, ended, Environment.CurrentManagedThreadId,
-                        GC.CollectionCount(0), GC.CollectionCount(1), GC.CollectionCount(2));
-                else if (_omitted < long.MaxValue) _omitted++;
+                    _slow[_slowCount++] = new(
+                        started,
+                        ended,
+                        Environment.CurrentManagedThreadId,
+                        GC.CollectionCount(0),
+                        GC.CollectionCount(1),
+                        GC.CollectionCount(2)
+                    );
+                else if (_omitted < long.MaxValue)
+                    _omitted++;
             }
         }
         catch (Exception error)
@@ -109,5 +143,12 @@ public sealed class QualificationWaitWitness : IDisposable
         }
     }
 
-    private readonly record struct SlowCycle(long StartedTicks, long EndedTicks, int ThreadId, int Gen0, int Gen1, int Gen2);
+    private readonly record struct SlowCycle(
+        long StartedTicks,
+        long EndedTicks,
+        int ThreadId,
+        int Gen0,
+        int Gen1,
+        int Gen2
+    );
 }

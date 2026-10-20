@@ -8,7 +8,10 @@ namespace AiNative.Gameplay
         {
             if ((stream & 1UL) == 0)
             {
-                throw new ArgumentException("The PCG stream increment must be odd.", nameof(stream));
+                throw new ArgumentException(
+                    "The PCG stream increment must be odd.",
+                    nameof(stream)
+                );
             }
 
             State = state;

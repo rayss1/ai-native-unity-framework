@@ -10,14 +10,13 @@ internal sealed class MonotonicFixedRatePacer
     private long _nextTick = 1;
 
     public MonotonicFixedRatePacer(int ticksPerSecond)
-        : this(ticksPerSecond, Stopwatch.Frequency, Stopwatch.GetTimestamp())
-    {
-    }
+        : this(ticksPerSecond, Stopwatch.Frequency, Stopwatch.GetTimestamp()) { }
 
     internal MonotonicFixedRatePacer(
         int ticksPerSecond,
         long timestampFrequency,
-        long startedTimestamp)
+        long startedTimestamp
+    )
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(ticksPerSecond);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(timestampFrequency);
@@ -33,7 +32,9 @@ internal sealed class MonotonicFixedRatePacer
             cancellationToken.ThrowIfCancellationRequested();
             long now = Stopwatch.GetTimestamp();
             long deadline = checked(
-                _startedTimestamp + GetDeadlineOffset(_nextTick, _ticksPerSecond, _timestampFrequency));
+                _startedTimestamp
+                + GetDeadlineOffset(_nextTick, _ticksPerSecond, _timestampFrequency)
+            );
             long remaining = deadline - now;
             if (remaining <= 0)
             {
@@ -45,17 +46,16 @@ internal sealed class MonotonicFixedRatePacer
 
             long delayMilliseconds = Math.Max(
                 1,
-                checked((remaining * 1000 + _timestampFrequency - 1) / _timestampFrequency));
+                checked((remaining * 1000 + _timestampFrequency - 1) / _timestampFrequency)
+            );
             await Task.Delay(
                 TimeSpan.FromMilliseconds(Math.Min(delayMilliseconds, int.MaxValue)),
-                cancellationToken);
+                cancellationToken
+            );
         }
     }
 
-    internal static long GetDeadlineOffset(
-        long tick,
-        int ticksPerSecond,
-        long timestampFrequency)
+    internal static long GetDeadlineOffset(long tick, int ticksPerSecond, long timestampFrequency)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(tick);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(ticksPerSecond);

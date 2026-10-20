@@ -1,5 +1,5 @@
-using System.Diagnostics.Metrics;
 using System.Diagnostics;
+using System.Diagnostics.Metrics;
 using System.Text.Json;
 
 namespace AiNative.BattleHost;
@@ -32,24 +32,30 @@ internal sealed class BattleMetrics : IDisposable
     public BattleMetrics(
         IConfiguration? configuration = null,
         TelemetryExportHealth? telemetryHealth = null,
-        BattleHostCapacitySettings? capacitySettings = null)
+        BattleHostCapacitySettings? capacitySettings = null
+    )
     {
         _capacitySettings = capacitySettings ?? new BattleHostCapacitySettings(1);
         _telemetryHealth = telemetryHealth ?? new TelemetryExportHealth(exporterConfigured: false);
         _tickDurationMilliseconds = _meter.CreateHistogram<double>("battle.tick.duration", "ms");
         _droppedDiagnostics = _meter.CreateCounter<long>("battle.diagnostics.dropped");
         _droppedReplayRecords = _meter.CreateCounter<long>("battle.replay.records.dropped");
-        _activeConnections = _meter.CreateUpDownCounter<long>("battle.connections.active", "{connection}");
+        _activeConnections = _meter.CreateUpDownCounter<long>(
+            "battle.connections.active",
+            "{connection}"
+        );
         _telemetryExportFailures = _meter.CreateObservableCounter<long>(
             "battle.telemetry.export.failures",
             () =>
             {
                 TelemetryExportSnapshot snapshot = _telemetryHealth.Snapshot();
                 return snapshot.MetricExportFailures + snapshot.TraceExportFailures;
-            });
+            }
+        );
         _telemetryTraceRecordsDropped = _meter.CreateObservableCounter<long>(
             "battle.telemetry.trace.records.dropped",
-            () => _telemetryHealth.Snapshot().TraceRecordsDropped);
+            () => _telemetryHealth.Snapshot().TraceRecordsDropped
+        );
         _outerKcpMtu = configuration?.GetValue("AINATIVE_FANTASY_OUTER_KCP_MTU", 1150) ?? 1150;
         _acceptanceReportPath = configuration?["AINATIVE_ACCEPTANCE_REPORT_PATH"];
         if (!string.IsNullOrWhiteSpace(_acceptanceReportPath))
@@ -92,10 +98,12 @@ internal sealed class BattleMetrics : IDisposable
 
     public void RecordGameplayTick(double milliseconds, long allocatedBytes)
     {
-        if (_gameplaySamples is null ||
-            _gameplayAllocations is null ||
-            _observedTickCount < _warmupTicks ||
-            _sampleCount >= _gameplaySamples.Length)
+        if (
+            _gameplaySamples is null
+            || _gameplayAllocations is null
+            || _observedTickCount < _warmupTicks
+            || _sampleCount >= _gameplaySamples.Length
+        )
         {
             return;
         }
@@ -124,11 +132,13 @@ internal sealed class BattleMetrics : IDisposable
 
     public void WriteAcceptanceReport(ulong finalTick, ulong finalStateHash)
     {
-        if (_acceptanceReportPath is null ||
-            _tickSamples is null ||
-            _gameplaySamples is null ||
-            _gameplayAllocations is null ||
-            Interlocked.Exchange(ref _acceptanceReportWritten, 1) != 0)
+        if (
+            _acceptanceReportPath is null
+            || _tickSamples is null
+            || _gameplaySamples is null
+            || _gameplayAllocations is null
+            || Interlocked.Exchange(ref _acceptanceReportWritten, 1) != 0
+        )
         {
             return;
         }
@@ -146,14 +156,20 @@ internal sealed class BattleMetrics : IDisposable
         using Process process = Process.GetCurrentProcess();
         GCMemoryInfo gc = GC.GetGCMemoryInfo();
         TelemetryExportSnapshot telemetry = _telemetryHealth.Snapshot();
-        double elapsedSeconds = Stopwatch.GetElapsedTime(Volatile.Read(ref _startedTimestamp)).TotalSeconds;
+        double elapsedSeconds = Stopwatch
+            .GetElapsedTime(Volatile.Read(ref _startedTimestamp))
+            .TotalSeconds;
         double processorMilliseconds = process.TotalProcessorTime.TotalMilliseconds;
         double measurementProcessorMilliseconds = Math.Max(
             0,
-            processorMilliseconds - Volatile.Read(ref _startedProcessorMilliseconds));
-        double cpuUtilizationPercentage = elapsedSeconds <= 0 || Environment.ProcessorCount <= 0
-            ? 0
-            : measurementProcessorMilliseconds / (elapsedSeconds * 1000d * Environment.ProcessorCount) * 100d;
+            processorMilliseconds - Volatile.Read(ref _startedProcessorMilliseconds)
+        );
+        double cpuUtilizationPercentage =
+            elapsedSeconds <= 0 || Environment.ProcessorCount <= 0
+                ? 0
+                : measurementProcessorMilliseconds
+                    / (elapsedSeconds * 1000d * Environment.ProcessorCount)
+                    * 100d;
         RuntimeSoakReport report = new(
             EvidenceClass: "release-equivalent-host-core",
             RoomCount: _capacitySettings.RoomCount,
@@ -163,7 +179,10 @@ internal sealed class BattleMetrics : IDisposable
             ObservedTickCount: _observedTickCount,
             SampleCount: count,
             FinalTick: finalTick,
-            FinalStateHash: finalStateHash.ToString("x16", System.Globalization.CultureInfo.InvariantCulture),
+            FinalStateHash: finalStateHash.ToString(
+                "x16",
+                System.Globalization.CultureInfo.InvariantCulture
+            ),
             ElapsedSeconds: elapsedSeconds,
             TickP99Milliseconds: tickP99,
             TickP999Milliseconds: tickP999,
@@ -183,9 +202,12 @@ internal sealed class BattleMetrics : IDisposable
             GcTotalAvailableMemoryBytes: gc.TotalAvailableMemoryBytes,
             ThreadPoolThreadCount: ThreadPool.ThreadCount,
             OuterKcpMtu: _outerKcpMtu,
-            SourceCommit: Environment.GetEnvironmentVariable("AINATIVE_SOURCE_COMMIT") ?? "unrecorded",
-            FantasyCommit: Environment.GetEnvironmentVariable("AINATIVE_FANTASY_COMMIT") ?? "unrecorded",
-            ProtocolIdentity: Environment.GetEnvironmentVariable("AINATIVE_PROTOCOL_IDENTITY") ?? "unrecorded",
+            SourceCommit: Environment.GetEnvironmentVariable("AINATIVE_SOURCE_COMMIT")
+                ?? "unrecorded",
+            FantasyCommit: Environment.GetEnvironmentVariable("AINATIVE_FANTASY_COMMIT")
+                ?? "unrecorded",
+            ProtocolIdentity: Environment.GetEnvironmentVariable("AINATIVE_PROTOCOL_IDENTITY")
+                ?? "unrecorded",
             TelemetryExporterConfigured: telemetry.ExporterConfigured,
             TelemetryMetricExportAttempts: telemetry.MetricExportAttempts,
             TelemetryMetricExportFailures: telemetry.MetricExportFailures,
@@ -196,14 +218,21 @@ internal sealed class BattleMetrics : IDisposable
             ProjectMetricSeries: telemetry.ProjectMetricSeries,
             ProjectMetricSeriesLimit: TelemetryExportHealth.MaximumProjectMetricSeries,
             ProjectMetricTagViolations: telemetry.ProjectMetricTagViolations,
-            ProjectMetricSeriesOverflow: telemetry.ProjectMetricSeriesOverflow);
+            ProjectMetricSeriesOverflow: telemetry.ProjectMetricSeriesOverflow
+        );
         string fullPath = Path.GetFullPath(_acceptanceReportPath);
         Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
-        File.WriteAllText(fullPath, JsonSerializer.Serialize(report, new JsonSerializerOptions
-        {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            WriteIndented = true,
-        }) + Environment.NewLine);
+        File.WriteAllText(
+            fullPath,
+            JsonSerializer.Serialize(
+                report,
+                new JsonSerializerOptions
+                {
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                    WriteIndented = true,
+                }
+            ) + Environment.NewLine
+        );
     }
 
     public void Dispose() => _meter.Dispose();
@@ -217,7 +246,13 @@ internal sealed class BattleMetrics : IDisposable
     private static double Percentile(double[] samples, double percentile) =>
         samples.Length == 0
             ? 0
-            : samples[Math.Clamp((int)Math.Ceiling(samples.Length * percentile) - 1, 0, samples.Length - 1)];
+            : samples[
+                Math.Clamp(
+                    (int)Math.Ceiling(samples.Length * percentile) - 1,
+                    0,
+                    samples.Length - 1
+                )
+            ];
 }
 
 internal sealed record RuntimeSoakReport(
@@ -262,4 +297,5 @@ internal sealed record RuntimeSoakReport(
     int ProjectMetricSeries,
     int ProjectMetricSeriesLimit,
     long ProjectMetricTagViolations,
-    long ProjectMetricSeriesOverflow);
+    long ProjectMetricSeriesOverflow
+);

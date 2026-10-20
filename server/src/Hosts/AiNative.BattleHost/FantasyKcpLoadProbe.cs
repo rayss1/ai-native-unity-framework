@@ -15,28 +15,39 @@ internal static class FantasyKcpLoadProbe
         TimeSpan measuredDuration,
         TimeSpan warmupDuration,
         Action loadReady,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken
+    )
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(botCount, 2);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(
             botCount,
-            BattleHostCapacitySettings.BotsPerRoom * BattleHostCapacitySettings.MaximumEvaluationRooms);
+            BattleHostCapacitySettings.BotsPerRoom
+                * BattleHostCapacitySettings.MaximumEvaluationRooms
+        );
         ArgumentOutOfRangeException.ThrowIfLessThan(roomCount, 1);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(
             roomCount,
-            BattleHostCapacitySettings.MaximumEvaluationRooms);
-        if (botCount % roomCount != 0 ||
-            botCount / roomCount is < 2 or > BattleHostCapacitySettings.BotsPerRoom)
+            BattleHostCapacitySettings.MaximumEvaluationRooms
+        );
+        if (
+            botCount % roomCount != 0
+            || botCount / roomCount is < 2 or > BattleHostCapacitySettings.BotsPerRoom
+        )
         {
             throw new ArgumentException(
                 "The KCP load probe requires 2-64 bots in each evenly populated room.",
-                nameof(botCount));
+                nameof(botCount)
+            );
         }
 
         int botsPerRoom = botCount / roomCount;
         ArgumentNullException.ThrowIfNull(loadReady);
-        if (measuredDuration <= TimeSpan.Zero || measuredDuration > TimeSpan.FromMinutes(60) ||
-            warmupDuration < TimeSpan.Zero || warmupDuration > TimeSpan.FromMinutes(5))
+        if (
+            measuredDuration <= TimeSpan.Zero
+            || measuredDuration > TimeSpan.FromMinutes(60)
+            || warmupDuration < TimeSpan.Zero
+            || warmupDuration > TimeSpan.FromMinutes(5)
+        )
         {
             throw new ArgumentOutOfRangeException(nameof(measuredDuration));
         }
@@ -99,11 +110,13 @@ internal static class FantasyKcpLoadProbe
                         MessageId.LoginRequest,
                         new LoginRequest { ProtocolMajor = 1, ClientBuild = "kcp-multi-room-load" },
                         sendBuffer,
-                        startupTimeout.Token);
+                        startupTimeout.Token
+                    );
                     LoginResponse login = await FantasyKcpLoopbackProbe.ReceiveAsync<LoginResponse>(
                         probes[index],
                         MessageId.LoginResponse,
-                        startupTimeout.Token);
+                        startupTimeout.Token
+                    );
                     uint requestedRoom = checked((uint)(index / botsPerRoom) + 1);
                     await FantasyKcpLoopbackProbe.SendAsync(
                         probes[index],
@@ -114,18 +127,24 @@ internal static class FantasyKcpLoadProbe
                             RequestedRoom = requestedRoom,
                         },
                         sendBuffer,
-                        startupTimeout.Token);
-                    JoinRoomResponse join = await FantasyKcpLoopbackProbe.ReceiveAsync<JoinRoomResponse>(
-                        probes[index],
-                        MessageId.JoinRoomResponse,
-                        startupTimeout.Token);
-                    if (join.RoomId != requestedRoom ||
-                        join.EntityId is 0 or > BattleHostCapacitySettings.BotsPerRoom ||
-                        !assignedEntities.Add((join.RoomId, join.EntityId)) ||
-                        join.TickRate != 60)
+                        startupTimeout.Token
+                    );
+                    JoinRoomResponse join =
+                        await FantasyKcpLoopbackProbe.ReceiveAsync<JoinRoomResponse>(
+                            probes[index],
+                            MessageId.JoinRoomResponse,
+                            startupTimeout.Token
+                        );
+                    if (
+                        join.RoomId != requestedRoom
+                        || join.EntityId is 0 or > BattleHostCapacitySettings.BotsPerRoom
+                        || !assignedEntities.Add((join.RoomId, join.EntityId))
+                        || join.TickRate != 60
+                    )
                     {
                         throw new InvalidOperationException(
-                            "The KCP load probe received an invalid room assignment.");
+                            "The KCP load probe received an invalid room assignment."
+                        );
                     }
                 }
 
@@ -143,7 +162,8 @@ internal static class FantasyKcpLoadProbe
                         MessageId.InputCommand,
                         command,
                         sendBuffer,
-                        startupTimeout.Token);
+                        startupTimeout.Token
+                    );
                 }
             }
 
@@ -162,7 +182,8 @@ internal static class FantasyKcpLoadProbe
                 if (loadTick == warmupTicks)
                 {
                     measuredStartedTimestamp = Stopwatch.GetTimestamp();
-                    measuredStartedUnixMilliseconds = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+                    measuredStartedUnixMilliseconds =
+                        DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
                 }
 
                 await pacer.WaitForNextTickAsync(cancellationToken);
@@ -174,8 +195,10 @@ internal static class FantasyKcpLoadProbe
                     InputCommand command = inputBatches[index].Commands[commandSlot];
                     command.RoomTick = newestSnapshotTick;
                     command.Sequence = sequence;
-                    command.MoveXMilli = ((index + roomIndex + (int)sequence) & 1) == 0 ? 1000 : -1000;
-                    command.MoveYMilli = ((index + roomIndex + (int)(sequence / 30)) & 1) == 0 ? 500 : -500;
+                    command.MoveXMilli =
+                        ((index + roomIndex + (int)sequence) & 1) == 0 ? 1000 : -1000;
+                    command.MoveYMilli =
+                        ((index + roomIndex + (int)(sequence / 30)) & 1) == 0 ? 500 : -500;
                     command.Buttons = (sequence + (uint)roomIndex) % 6 == 0 ? 1U : 0U;
                     inputFrames++;
                     if (loadTick >= warmupTicks)
@@ -193,7 +216,8 @@ internal static class FantasyKcpLoadProbe
                             MessageId.InputBatch,
                             inputBatches[index],
                             sendBuffer,
-                            cancellationToken);
+                            cancellationToken
+                        );
                         inputBatchesSent++;
                         if (loadTick >= warmupTicks)
                         {
@@ -205,14 +229,19 @@ internal static class FantasyKcpLoadProbe
                 for (int index = 0; index < botCount; index++)
                 {
                     Span<byte> receiveBuffer = receiveBuffers[index];
-                    while (probes[index].Transport.TryReceive(receiveBuffer, out ReceivedPacket packet))
+                    while (
+                        probes[index].Transport.TryReceive(receiveBuffer, out ReceivedPacket packet)
+                    )
                     {
-                        if (!packet.IsComplete ||
-                            RealtimeProtocolCodec.TryDecode(
+                        if (
+                            !packet.IsComplete
+                            || RealtimeProtocolCodec.TryDecode(
                                 receiveBuffer[..packet.WrittenBytes],
-                                out DecodedProtocolMessage decoded) != ProtocolDecodeStatus.Accepted ||
-                            decoded.MessageId != MessageId.Snapshot ||
-                            decoded.Message is not Snapshot snapshot)
+                                out DecodedProtocolMessage decoded
+                            ) != ProtocolDecodeStatus.Accepted
+                            || decoded.MessageId != MessageId.Snapshot
+                            || decoded.Message is not Snapshot snapshot
+                        )
                         {
                             continue;
                         }
@@ -226,18 +255,23 @@ internal static class FantasyKcpLoadProbe
 
             if (snapshotFrames == 0 || newestSnapshotTick == 0)
             {
-                throw new InvalidOperationException("The 64-bot KCP load probe received no production snapshots.");
+                throw new InvalidOperationException(
+                    "The 64-bot KCP load probe received no production snapshots."
+                );
             }
 
             long completedTimestamp = Stopwatch.GetTimestamp();
-            double measuredInputElapsedSeconds =
-                Stopwatch.GetElapsedTime(measuredStartedTimestamp, completedTimestamp).TotalSeconds;
+            double measuredInputElapsedSeconds = Stopwatch
+                .GetElapsedTime(measuredStartedTimestamp, completedTimestamp)
+                .TotalSeconds;
             return new FantasyKcpLoadResult(
                 botCount,
                 roomCount,
                 botsPerRoom,
                 SetupSeconds: Stopwatch.GetElapsedTime(started, loadStartedTimestamp).TotalSeconds,
-                LoadElapsedSeconds: Stopwatch.GetElapsedTime(loadStartedTimestamp, completedTimestamp).TotalSeconds,
+                LoadElapsedSeconds: Stopwatch
+                    .GetElapsedTime(loadStartedTimestamp, completedTimestamp)
+                    .TotalSeconds,
                 WarmupSeconds: warmupDuration.TotalSeconds,
                 MeasuredSeconds: measuredDuration.TotalSeconds,
                 LoadStartedUnixMilliseconds: loadStartedUnixMilliseconds,
@@ -257,7 +291,8 @@ internal static class FantasyKcpLoadProbe
                 gateway.OuterKcpMtu,
                 Environment.GetEnvironmentVariable("AINATIVE_SOURCE_COMMIT") ?? "unrecorded",
                 Environment.GetEnvironmentVariable("AINATIVE_FANTASY_COMMIT") ?? "unrecorded",
-                Environment.GetEnvironmentVariable("AINATIVE_PROTOCOL_IDENTITY") ?? "unrecorded");
+                Environment.GetEnvironmentVariable("AINATIVE_PROTOCOL_IDENTITY") ?? "unrecorded"
+            );
         }
         finally
         {
@@ -297,4 +332,5 @@ internal readonly record struct FantasyKcpLoadResult(
     int OuterKcpMtu,
     string SourceCommit,
     string FantasyCommit,
-    string ProtocolIdentity);
+    string ProtocolIdentity
+);

@@ -16,14 +16,12 @@ namespace AiNative.Gameplay.Tests
                 actual[index] = random.NextUInt32();
             }
 
-            Assert.That(actual, Is.EqualTo(new uint[]
-            {
-                0xa15c02b7,
-                0x7b47f409,
-                0xba1d3330,
-                0x83d2f293,
-                0xbfa4784b,
-            }));
+            Assert.That(
+                actual,
+                Is.EqualTo(
+                    new uint[] { 0xa15c02b7, 0x7b47f409, 0xba1d3330, 0x83d2f293, 0xbfa4784b }
+                )
+            );
         }
 
         [Test]

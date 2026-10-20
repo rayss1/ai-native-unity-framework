@@ -24,7 +24,8 @@ internal sealed class BattleReplayCapture : IAsyncDisposable
     public BattleReplayCapture(
         IConfiguration configuration,
         BattleHostCapacitySettings capacitySettings,
-        BattleMetrics metrics)
+        BattleMetrics metrics
+    )
     {
         _metrics = metrics;
         _roomCount = capacitySettings.RoomCount;
@@ -37,13 +38,15 @@ internal sealed class BattleReplayCapture : IAsyncDisposable
         int capacity = configuration.GetValue("AINATIVE_REPLAY_CAPTURE_CAPACITY", 65_536);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(capacity);
         ReplayIdentity identity = ReplayIdentity.FromConfiguration(configuration, capacitySettings);
-        _records = Channel.CreateBounded<CaptureRecord>(new BoundedChannelOptions(capacity)
-        {
-            FullMode = BoundedChannelFullMode.Wait,
-            SingleReader = true,
-            SingleWriter = true,
-            AllowSynchronousContinuations = false,
-        });
+        _records = Channel.CreateBounded<CaptureRecord>(
+            new BoundedChannelOptions(capacity)
+            {
+                FullMode = BoundedChannelFullMode.Wait,
+                SingleReader = true,
+                SingleWriter = true,
+                AllowSynchronousContinuations = false,
+            }
+        );
         _writer = WriteAsync(Path.GetFullPath(path), identity, _records.Reader);
     }
 
@@ -53,7 +56,8 @@ internal sealed class BattleReplayCapture : IAsyncDisposable
         int roomIndex,
         ulong roomTick,
         int entityIndex,
-        ReadOnlySpan<byte> frame)
+        ReadOnlySpan<byte> frame
+    )
     {
         if (_records is null)
         {
@@ -67,12 +71,11 @@ internal sealed class BattleReplayCapture : IAsyncDisposable
 
         byte[] ownedFrame = ArrayPool<byte>.Shared.Rent(frame.Length);
         frame.CopyTo(ownedFrame);
-        if (_records.Writer.TryWrite(CaptureRecord.Input(
-                roomIndex,
-                roomTick,
-                entityIndex,
-                ownedFrame,
-                frame.Length)))
+        if (
+            _records.Writer.TryWrite(
+                CaptureRecord.Input(roomIndex, roomTick, entityIndex, ownedFrame, frame.Length)
+            )
+        )
         {
             return true;
         }
@@ -90,10 +93,9 @@ internal sealed class BattleReplayCapture : IAsyncDisposable
             return;
         }
 
-        await _records.Writer.WriteAsync(CaptureRecord.Footer(
-            finalTick,
-            finalStateHash,
-            Interlocked.Read(ref _droppedRecords)));
+        await _records.Writer.WriteAsync(
+            CaptureRecord.Footer(finalTick, finalStateHash, Interlocked.Read(ref _droppedRecords))
+        );
         _records.Writer.Complete();
         await _writer!;
     }
@@ -103,7 +105,11 @@ internal sealed class BattleReplayCapture : IAsyncDisposable
         await CompleteAsync(0, 0);
     }
 
-    private async Task WriteAsync(string path, ReplayIdentity identity, ChannelReader<CaptureRecord> reader)
+    private async Task WriteAsync(
+        string path,
+        ReplayIdentity identity,
+        ChannelReader<CaptureRecord> reader
+    )
     {
         string? directory = Path.GetDirectoryName(path);
         if (!string.IsNullOrEmpty(directory))
@@ -117,7 +123,8 @@ internal sealed class BattleReplayCapture : IAsyncDisposable
             FileAccess.Write,
             FileShare.Read,
             bufferSize: 64 * 1024,
-            FileOptions.Asynchronous | FileOptions.SequentialScan);
+            FileOptions.Asynchronous | FileOptions.SequentialScan
+        );
         using BinaryWriter writer = new(stream, Encoding.UTF8, leaveOpen: true);
         writer.Write(FileMagic);
         writer.Write(FormatVersion);
@@ -177,18 +184,32 @@ internal sealed class BattleReplayCapture : IAsyncDisposable
         byte[] Frame,
         int FrameLength,
         ulong FinalStateHash,
-        long DroppedRecords)
+        long DroppedRecords
+    )
     {
         public static CaptureRecord Input(
             int roomIndex,
             ulong roomTick,
             int entityIndex,
             byte[] frame,
-            int frameLength) =>
-            new(InputRecord, roomIndex, roomTick, entityIndex, frame, frameLength, 0, 0);
+            int frameLength
+        ) => new(InputRecord, roomIndex, roomTick, entityIndex, frame, frameLength, 0, 0);
 
-        public static CaptureRecord Footer(ulong finalTick, ulong finalStateHash, long droppedRecords) =>
-            new(FooterRecord, 0, finalTick, 0, Array.Empty<byte>(), 0, finalStateHash, droppedRecords);
+        public static CaptureRecord Footer(
+            ulong finalTick,
+            ulong finalStateHash,
+            long droppedRecords
+        ) =>
+            new(
+                FooterRecord,
+                0,
+                finalTick,
+                0,
+                Array.Empty<byte>(),
+                0,
+                finalStateHash,
+                droppedRecords
+            );
     }
 
     internal readonly record struct ReplayIdentity(
@@ -198,18 +219,22 @@ internal sealed class BattleReplayCapture : IAsyncDisposable
         string SourceCommit,
         string FantasyCommit,
         string ProtocolIdentity,
-        string ConfigurationIdentity)
+        string ConfigurationIdentity
+    )
     {
         public static ReplayIdentity FromConfiguration(
             IConfiguration configuration,
-            BattleHostCapacitySettings capacitySettings) => new(
-            capacitySettings.RoomCount,
-            BattleHostCapacitySettings.BotsPerRoom,
-            InitialRandomState: SyntheticRoom.InitialRandomState,
-            RequiredIdentity(configuration, "AINATIVE_SOURCE_COMMIT"),
-            RequiredIdentity(configuration, "AINATIVE_FANTASY_COMMIT"),
-            RequiredIdentity(configuration, "AINATIVE_PROTOCOL_IDENTITY"),
-            ResolveConfigurationIdentity(configuration));
+            BattleHostCapacitySettings capacitySettings
+        ) =>
+            new(
+                capacitySettings.RoomCount,
+                BattleHostCapacitySettings.BotsPerRoom,
+                InitialRandomState: SyntheticRoom.InitialRandomState,
+                RequiredIdentity(configuration, "AINATIVE_SOURCE_COMMIT"),
+                RequiredIdentity(configuration, "AINATIVE_FANTASY_COMMIT"),
+                RequiredIdentity(configuration, "AINATIVE_PROTOCOL_IDENTITY"),
+                ResolveConfigurationIdentity(configuration)
+            );
 
         private static string RequiredIdentity(IConfiguration configuration, string key) =>
             configuration[key] is { Length: > 0 } value ? value : "unrecorded";
@@ -243,9 +268,14 @@ internal static class BattleReplayVerifier
         using BinaryReader reader = new(stream, Encoding.UTF8, leaveOpen: false);
         uint magic = reader.ReadUInt32();
         ushort formatVersion = reader.ReadUInt16();
-        if (magic != FileMagic || formatVersion is not (LegacyFormatVersion or RoomAwareFormatVersion))
+        if (
+            magic != FileMagic
+            || formatVersion is not (LegacyFormatVersion or RoomAwareFormatVersion)
+        )
         {
-            throw new InvalidDataException("The replay header is not a supported AI Native replay.");
+            throw new InvalidDataException(
+                "The replay header is not a supported AI Native replay."
+            );
         }
 
         int roomCount;
@@ -261,10 +291,14 @@ internal static class BattleReplayVerifier
             botsPerRoom = reader.ReadInt32();
         }
 
-        if (roomCount is < 1 or > BattleHostCapacitySettings.MaximumEvaluationRooms ||
-            botsPerRoom != BattleHostCapacitySettings.BotsPerRoom)
+        if (
+            roomCount is < 1 or > BattleHostCapacitySettings.MaximumEvaluationRooms
+            || botsPerRoom != BattleHostCapacitySettings.BotsPerRoom
+        )
         {
-            throw new InvalidDataException("The replay room topology is not supported by this simulation build.");
+            throw new InvalidDataException(
+                "The replay room topology is not supported by this simulation build."
+            );
         }
 
         ulong initialRandomState = reader.ReadUInt64();
@@ -278,15 +312,19 @@ internal static class BattleReplayVerifier
         EnsureRecordedIdentity(nameof(configurationIdentity), configurationIdentity);
         if (initialRandomState != SyntheticRoom.InitialRandomState)
         {
-            throw new InvalidDataException("The replay RNG state is not supported by this simulation build.");
+            throw new InvalidDataException(
+                "The replay RNG state is not supported by this simulation build."
+            );
         }
 
-        SyntheticRoom[] rooms = Enumerable.Range(0, roomCount)
+        SyntheticRoom[] rooms = Enumerable
+            .Range(0, roomCount)
             .Select(_ => new SyntheticRoom(botsPerRoom))
             .ToArray();
         ulong simulatedTick = 0;
         long inputCount = 0;
-        uint[][] lastInputSequences = Enumerable.Range(0, roomCount)
+        uint[][] lastInputSequences = Enumerable
+            .Range(0, roomCount)
             .Select(_ => new uint[botsPerRoom])
             .ToArray();
         bool sawFooter = false;
@@ -301,9 +339,10 @@ internal static class BattleReplayVerifier
                 throw new InvalidDataException("The replay contains an unknown record.");
             }
 
-            int roomIndex = kind == InputRecord && formatVersion == RoomAwareFormatVersion
-                ? reader.ReadInt32()
-                : 0;
+            int roomIndex =
+                kind == InputRecord && formatVersion == RoomAwareFormatVersion
+                    ? reader.ReadInt32()
+                    : 0;
             ulong recordTick = reader.ReadUInt64();
             if (kind == FooterRecord)
             {
@@ -311,7 +350,9 @@ internal static class BattleReplayVerifier
                 long droppedRecords = reader.ReadInt64();
                 if (droppedRecords != 0)
                 {
-                    throw new InvalidDataException($"The replay is incomplete: {droppedRecords} input records were dropped.");
+                    throw new InvalidDataException(
+                        $"The replay is incomplete: {droppedRecords} input records were dropped."
+                    );
                 }
 
                 finalTick = recordTick;
@@ -321,7 +362,9 @@ internal static class BattleReplayVerifier
 
             if ((uint)roomIndex >= (uint)roomCount || recordTick < simulatedTick)
             {
-                throw new InvalidDataException("The replay contains an invalid room or out-of-order record.");
+                throw new InvalidDataException(
+                    "The replay contains an invalid room or out-of-order record."
+                );
             }
 
             while (simulatedTick < recordTick)
@@ -337,43 +380,55 @@ internal static class BattleReplayVerifier
             int entityIndex = reader.ReadInt32();
             int frameLength = reader.ReadUInt16();
             byte[] frame = reader.ReadBytes(frameLength);
-            if (frame.Length != frameLength ||
-                RealtimeProtocolCodec.TryDecode(frame, out DecodedProtocolMessage decoded) != ProtocolDecodeStatus.Accepted)
+            if (
+                frame.Length != frameLength
+                || RealtimeProtocolCodec.TryDecode(frame, out DecodedProtocolMessage decoded)
+                    != ProtocolDecodeStatus.Accepted
+            )
             {
-                throw new InvalidDataException("The replay contains an invalid production Input frame.");
+                throw new InvalidDataException(
+                    "The replay contains an invalid production Input frame."
+                );
             }
 
             switch (decoded.MessageId, decoded.Message)
             {
                 case (MessageId.InputCommand, InputCommand command)
-                    when (uint)entityIndex < (uint)botsPerRoom &&
-                         command.Sequence > lastInputSequences[roomIndex][entityIndex]:
+                    when (uint)entityIndex < (uint)botsPerRoom
+                        && command.Sequence > lastInputSequences[roomIndex][entityIndex]:
                     lastInputSequences[roomIndex][entityIndex] = command.Sequence;
-                    rooms[roomIndex].ApplyInput(entityIndex, command.MoveXMilli, command.MoveYMilli);
+                    rooms[roomIndex]
+                        .ApplyInput(entityIndex, command.MoveXMilli, command.MoveYMilli);
                     inputCount++;
                     break;
                 case (MessageId.InputBatch, InputBatch batch)
-                    when (uint)entityIndex < (uint)botsPerRoom && batch.Commands.Count is >= 1 and <= 2:
+                    when (uint)entityIndex < (uint)botsPerRoom
+                        && batch.Commands.Count is >= 1 and <= 2:
                     uint previousSequence = lastInputSequences[roomIndex][entityIndex];
                     foreach (InputCommand batchedCommand in batch.Commands)
                     {
                         if (batchedCommand.Sequence <= previousSequence)
                         {
                             throw new InvalidDataException(
-                                "The replay contains an out-of-order production Input batch.");
+                                "The replay contains an out-of-order production Input batch."
+                            );
                         }
 
                         previousSequence = batchedCommand.Sequence;
-                        rooms[roomIndex].ApplyInput(
-                            entityIndex,
-                            batchedCommand.MoveXMilli,
-                            batchedCommand.MoveYMilli);
+                        rooms[roomIndex]
+                            .ApplyInput(
+                                entityIndex,
+                                batchedCommand.MoveXMilli,
+                                batchedCommand.MoveYMilli
+                            );
                         inputCount++;
                     }
                     lastInputSequences[roomIndex][entityIndex] = previousSequence;
                     break;
                 default:
-                    throw new InvalidDataException("The replay contains an invalid production Input frame.");
+                    throw new InvalidDataException(
+                        "The replay contains an invalid production Input frame."
+                    );
             }
         }
 
@@ -396,7 +451,8 @@ internal static class BattleReplayVerifier
         if (actualHash != expectedHash)
         {
             throw new InvalidDataException(
-                $"Replay state hash mismatch: expected {expectedHash:x16}, actual {actualHash:x16}.");
+                $"Replay state hash mismatch: expected {expectedHash:x16}, actual {actualHash:x16}."
+            );
         }
 
         return new ReplayVerificationResult(
@@ -409,7 +465,8 @@ internal static class BattleReplayVerifier
             botsPerRoom,
             finalTick,
             inputCount,
-            actualHash);
+            actualHash
+        );
     }
 
     private static string ReadIdentity(BinaryReader reader)
@@ -443,7 +500,8 @@ internal readonly record struct ReplayVerificationResult(
     int BotsPerRoom,
     ulong FinalTick,
     long InputCount,
-    ulong StateHash)
+    ulong StateHash
+)
 {
     public int BotCount => BotsPerRoom;
 

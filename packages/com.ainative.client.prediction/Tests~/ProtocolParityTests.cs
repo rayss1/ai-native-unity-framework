@@ -1,6 +1,6 @@
-using AiNative.Client.Protocol.Protobuf;
-using AiNative.Client.Protocol;
 using System;
+using AiNative.Client.Protocol;
+using AiNative.Client.Protocol.Protobuf;
 using AiNative.Protocol.V1;
 using AiNative.Realtime;
 using Google.Protobuf;
@@ -13,12 +13,14 @@ namespace AiNative.Client.Prediction.Tests
         private static readonly TransportChannel SnapshotChannel = new TransportChannel(
             1,
             TransportDelivery.Unreliable,
-            TransportOrdering.Sequenced);
+            TransportOrdering.Sequenced
+        );
 
         private static readonly TransportChannel ControlChannel = new TransportChannel(
             0,
             TransportDelivery.Reliable,
-            TransportOrdering.Ordered);
+            TransportOrdering.Ordered
+        );
 
         [Test]
         public void EncodedInputMatchesTrackedProtobufPayload()
@@ -52,11 +54,7 @@ namespace AiNative.Client.Prediction.Tests
                 RoomTick = 11,
                 LastProcessedInputSequence = 1,
             };
-            snapshot.Players.Add(new PlayerState
-            {
-                EntityId = 7,
-                PositionXMilli = 40,
-            });
+            snapshot.Players.Add(new PlayerState { EntityId = 7, PositionXMilli = 40 });
             byte[] frame = Envelope(MessageId.Snapshot, snapshot);
             Array.Resize(ref frame, frame.Length + 3);
             frame[frame.Length - 3] = 0xa0;
@@ -65,7 +63,8 @@ namespace AiNative.Client.Prediction.Tests
 
             SnapshotApplyResult applied = adapter.ApplyPacket(
                 frame,
-                new ReceivedPacket(SnapshotChannel, frame.Length, frame.Length, 1, 1));
+                new ReceivedPacket(SnapshotChannel, frame.Length, frame.Length, 1, 1)
+            );
 
             Assert.That(applied.Status, Is.EqualTo(SnapshotApplyStatus.Reconciled));
             Assert.That(applied.Reconciliation.After.PositionXMillimetres, Is.EqualTo(90));
@@ -76,11 +75,7 @@ namespace AiNative.Client.Prediction.Tests
         {
             FakeRealtimeTransport transport = new FakeRealtimeTransport();
             ClientPredictionAdapter adapter = Initialize(transport, 7, 1);
-            Snapshot snapshot = new Snapshot
-            {
-                ProtocolMajor = 1,
-                RoomTick = 12,
-            };
+            Snapshot snapshot = new Snapshot { ProtocolMajor = 1, RoomTick = 12 };
             snapshot.Players.Add(new PlayerState { EntityId = 7 });
             ReconnectResponse reconnect = new ReconnectResponse
             {
@@ -92,7 +87,8 @@ namespace AiNative.Client.Prediction.Tests
 
             SnapshotApplyResult applied = adapter.ApplyPacket(
                 frame,
-                new ReceivedPacket(ControlChannel, frame.Length, frame.Length, 1, 2));
+                new ReceivedPacket(ControlChannel, frame.Length, frame.Length, 1, 2)
+            );
 
             Assert.That(applied.Status, Is.EqualTo(SnapshotApplyStatus.Reconciled));
             Assert.That(adapter.ConnectionEpoch, Is.EqualTo(2));
@@ -101,24 +97,22 @@ namespace AiNative.Client.Prediction.Tests
         private static ClientPredictionAdapter Initialize(
             FakeRealtimeTransport transport,
             uint entityId,
-            uint connectionEpoch)
+            uint connectionEpoch
+        )
         {
-            ClientPredictionAdapter adapter = new ClientPredictionAdapter(transport, new ProtobufBattleProtocolCodec(), entityId, 16);
-            Snapshot snapshot = new Snapshot
-            {
-                ProtocolMajor = 1,
-                RoomTick = 10,
-            };
+            ClientPredictionAdapter adapter = new ClientPredictionAdapter(
+                transport,
+                new ProtobufBattleProtocolCodec(),
+                entityId,
+                16
+            );
+            Snapshot snapshot = new Snapshot { ProtocolMajor = 1, RoomTick = 10 };
             snapshot.Players.Add(new PlayerState { EntityId = entityId });
             byte[] frame = Envelope(MessageId.Snapshot, snapshot);
             SnapshotApplyResult applied = adapter.ApplyPacket(
                 frame,
-                new ReceivedPacket(
-                    SnapshotChannel,
-                    frame.Length,
-                    frame.Length,
-                    1,
-                    connectionEpoch));
+                new ReceivedPacket(SnapshotChannel, frame.Length, frame.Length, 1, connectionEpoch)
+            );
             Assert.That(applied.Status, Is.EqualTo(SnapshotApplyStatus.Initialized));
             return adapter;
         }

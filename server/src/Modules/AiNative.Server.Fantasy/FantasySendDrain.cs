@@ -3,7 +3,12 @@ using global::Fantasy.Network;
 
 namespace AiNative.Server.Fantasy;
 
-internal enum FantasySendDrainStatus { Pending, Drained, Failed }
+internal enum FantasySendDrainStatus
+{
+    Pending,
+    Drained,
+    Failed,
+}
 
 internal interface IFantasySendDrain
 {
@@ -29,22 +34,34 @@ internal sealed partial class FantasySessionSender
             {
                 if (IsClosed || _dispatcher is not IFantasySendDrainDispatcher observer)
                     return Task.FromResult(FantasySendDrainStatus.Failed);
-                if (_pendingSendDrainCheck is { } pending) return pending.Task;
-                var completion = new TaskCompletionSource<FantasySendDrainStatus>(TaskCreationOptions.RunContinuationsAsynchronously);
+                if (_pendingSendDrainCheck is { } pending)
+                    return pending.Task;
+                var completion = new TaskCompletionSource<FantasySendDrainStatus>(
+                    TaskCreationOptions.RunContinuationsAsynchronously
+                );
                 _pendingSendDrainCheck = completion;
                 try
                 {
                     if (!observer.TryPostSendDrainCheck(() => CheckOnScene(observer, completion)))
                         CompleteSendDrainCheck(completion, FantasySendDrainStatus.Failed);
                 }
-                catch { CompleteSendDrainCheck(completion, FantasySendDrainStatus.Failed); }
+                catch
+                {
+                    CompleteSendDrainCheck(completion, FantasySendDrainStatus.Failed);
+                }
                 return completion.Task;
             }
-            catch { return Task.FromResult(FantasySendDrainStatus.Failed); }
+            catch
+            {
+                return Task.FromResult(FantasySendDrainStatus.Failed);
+            }
         }
     }
 
-    private void CheckOnScene(IFantasySendDrainDispatcher observer, TaskCompletionSource<FantasySendDrainStatus> completion)
+    private void CheckOnScene(
+        IFantasySendDrainDispatcher observer,
+        TaskCompletionSource<FantasySendDrainStatus> completion
+    )
     {
         FantasySendDrainStatus result = FantasySendDrainStatus.Failed;
         try
@@ -53,23 +70,39 @@ internal sealed partial class FantasySessionSender
             // The scheduled flag also detects a drain posted behind this check by a concurrent producer.
             if (!IsClosed)
             {
-                if (Volatile.Read(ref _drainScheduled) != 0 || PendingOutboundPackets != 0 ||
-                    !_outbound.IsEmpty || HasPendingSnapshot()) result = FantasySendDrainStatus.Pending;
+                if (
+                    Volatile.Read(ref _drainScheduled) != 0
+                    || PendingOutboundPackets != 0
+                    || !_outbound.IsEmpty
+                    || HasPendingSnapshot()
+                )
+                    result = FantasySendDrainStatus.Pending;
                 else if (observer.TryGetPendingKcpSends(out uint count))
-                    result = count == 0 ? FantasySendDrainStatus.Drained : FantasySendDrainStatus.Pending;
-                if (IsClosed) result = FantasySendDrainStatus.Failed;
+                    result =
+                        count == 0
+                            ? FantasySendDrainStatus.Drained
+                            : FantasySendDrainStatus.Pending;
+                if (IsClosed)
+                    result = FantasySendDrainStatus.Failed;
             }
         }
-        catch { result = FantasySendDrainStatus.Failed; }
+        catch
+        {
+            result = FantasySendDrainStatus.Failed;
+        }
         CompleteSendDrainCheck(completion, result);
     }
 
-    private void CompleteSendDrainCheck(TaskCompletionSource<FantasySendDrainStatus> completion, FantasySendDrainStatus result)
+    private void CompleteSendDrainCheck(
+        TaskCompletionSource<FantasySendDrainStatus> completion,
+        FantasySendDrainStatus result
+    )
     {
         lock (_sendDrainCheckGate)
         {
             completion.TrySetResult(result);
-            if (ReferenceEquals(_pendingSendDrainCheck, completion)) _pendingSendDrainCheck = null;
+            if (ReferenceEquals(_pendingSendDrainCheck, completion))
+                _pendingSendDrainCheck = null;
         }
     }
 
@@ -96,31 +129,51 @@ internal static class FantasyKcpSendDrainObservation
     {
         try
         {
-            Channel = typeof(Session).GetProperty("Channel", BindingFlags.Instance | BindingFlags.NonPublic);
-            KcpChannelType = typeof(Session).Assembly.GetType("Fantasy.Network.KCP.KCPServerNetworkChannel", throwOnError: false);
+            Channel = typeof(Session).GetProperty(
+                "Channel",
+                BindingFlags.Instance | BindingFlags.NonPublic
+            );
+            KcpChannelType = typeof(Session).Assembly.GetType(
+                "Fantasy.Network.KCP.KCPServerNetworkChannel",
+                throwOnError: false
+            );
             Kcp = KcpChannelType?.GetProperty("Kcp", BindingFlags.Instance | BindingFlags.Public);
-            WaitSendCount = Kcp?.PropertyType.GetProperty("WaitSendCount", BindingFlags.Instance | BindingFlags.Public);
+            WaitSendCount = Kcp?.PropertyType.GetProperty(
+                "WaitSendCount",
+                BindingFlags.Instance | BindingFlags.Public
+            );
         }
-        catch { /* Contract unavailable: all checks fail closed. */ }
+        catch
+        { /* Contract unavailable: all checks fail closed. */
+        }
     }
 
-    internal static bool IsContractAvailable => Channel?.GetMethod is not null &&
-        KcpChannelType is not null && Kcp?.GetMethod is not null &&
-        WaitSendCount?.GetMethod is not null && WaitSendCount.PropertyType == typeof(uint);
+    internal static bool IsContractAvailable =>
+        Channel?.GetMethod is not null
+        && KcpChannelType is not null
+        && Kcp?.GetMethod is not null
+        && WaitSendCount?.GetMethod is not null
+        && WaitSendCount.PropertyType == typeof(uint);
 
     internal static bool TryRead(Session session, out uint count)
     {
         count = 0;
         try
         {
-            if (!IsContractAvailable || session.IsDisposed) return false;
+            if (!IsContractAvailable || session.IsDisposed)
+                return false;
             object? channel = Channel!.GetValue(session);
-            if (channel is null || !KcpChannelType!.IsInstanceOfType(channel)) return false;
+            if (channel is null || !KcpChannelType!.IsInstanceOfType(channel))
+                return false;
             object? kcp = Kcp!.GetValue(channel);
-            if (kcp is null || WaitSendCount!.GetValue(kcp) is not uint pending) return false;
+            if (kcp is null || WaitSendCount!.GetValue(kcp) is not uint pending)
+                return false;
             count = pending;
             return true;
         }
-        catch { return false; }
+        catch
+        {
+            return false;
+        }
     }
 }

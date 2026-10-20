@@ -8,8 +8,21 @@ namespace AiNative.Gameplay.Tests
         [Test]
         public void ExtremeLookDeltasUseSafeSignedArithmetic()
         {
-            var state = new ArenaPlayerState(0, 0, 0, 0) { YawMillidegrees = 1, PitchMillidegrees = 1 };
-            var input = new ArenaInput(1, 1, 0, 0, int.MaxValue, int.MaxValue, ArenaButtons.None, ArenaWeaponId.None);
+            var state = new ArenaPlayerState(0, 0, 0, 0)
+            {
+                YawMillidegrees = 1,
+                PitchMillidegrees = 1,
+            };
+            var input = new ArenaInput(
+                1,
+                1,
+                0,
+                0,
+                int.MaxValue,
+                int.MaxValue,
+                ArenaButtons.None,
+                ArenaWeaponId.None
+            );
             var next = ArenaMovement.Step(state, input);
             Assert.That(next.YawMillidegrees, Is.EqualTo((int)(((long)int.MaxValue + 1) % 360000)));
             Assert.That(next.PitchMillidegrees, Is.EqualTo(ArenaMovement.MaximumPitchMillidegrees));
@@ -19,13 +32,31 @@ namespace AiNative.Gameplay.Tests
         public void GroundAccelerationAndFrictionAreDeterministic()
         {
             ArenaPlayerState state = new ArenaPlayerState(0, 0, 0, 0);
-            ArenaInput forward = new ArenaInput(1, 1, 0, 1000, 0, 0, ArenaButtons.None, ArenaWeaponId.Machinegun);
+            ArenaInput forward = new ArenaInput(
+                1,
+                1,
+                0,
+                1000,
+                0,
+                0,
+                ArenaButtons.None,
+                ArenaWeaponId.Machinegun
+            );
             ArenaPlayerState accelerated = ArenaMovement.Step(state, forward);
 
             Assert.That(accelerated.VelocityZMillimetresPerSecond, Is.EqualTo(1000));
             Assert.That(accelerated.PositionZMillimetres, Is.EqualTo(16));
 
-            ArenaInput idle = new ArenaInput(2, 2, 0, 0, 0, 0, ArenaButtons.None, ArenaWeaponId.Machinegun);
+            ArenaInput idle = new ArenaInput(
+                2,
+                2,
+                0,
+                0,
+                0,
+                0,
+                ArenaButtons.None,
+                ArenaWeaponId.Machinegun
+            );
             ArenaPlayerState slowed = ArenaMovement.Step(accelerated, idle);
             Assert.That(slowed.VelocityZMillimetresPerSecond, Is.EqualTo(867));
         }
@@ -34,7 +65,16 @@ namespace AiNative.Gameplay.Tests
         public void JumpAppliesGravityAndLandsOnTheGround()
         {
             ArenaPlayerState state = new ArenaPlayerState(0, 0, 0, 0);
-            ArenaInput jump = new ArenaInput(1, 1, 0, 0, 0, 0, ArenaButtons.Jump, ArenaWeaponId.Machinegun);
+            ArenaInput jump = new ArenaInput(
+                1,
+                1,
+                0,
+                0,
+                0,
+                0,
+                ArenaButtons.Jump,
+                ArenaWeaponId.Machinegun
+            );
             ArenaPlayerState airborne = ArenaMovement.Step(state, jump);
 
             Assert.That(airborne.Grounded, Is.False);
@@ -44,7 +84,16 @@ namespace AiNative.Gameplay.Tests
             ArenaPlayerState current = airborne;
             for (uint sequence = 2; sequence < 80 && !current.Grounded; sequence++)
             {
-                ArenaInput input = new ArenaInput(sequence, sequence, 0, 0, 0, 0, ArenaButtons.None, ArenaWeaponId.Machinegun);
+                ArenaInput input = new ArenaInput(
+                    sequence,
+                    sequence,
+                    0,
+                    0,
+                    0,
+                    0,
+                    ArenaButtons.None,
+                    ArenaWeaponId.Machinegun
+                );
                 current = ArenaMovement.Step(current, input);
             }
 
@@ -56,7 +105,16 @@ namespace AiNative.Gameplay.Tests
         public void ViewAnglesWrapAndClamp()
         {
             ArenaPlayerState state = new ArenaPlayerState(0, 0, 0, 0);
-            ArenaInput input = new ArenaInput(1, 1, 0, 0, 400000, 100000, ArenaButtons.None, ArenaWeaponId.Machinegun);
+            ArenaInput input = new ArenaInput(
+                1,
+                1,
+                0,
+                0,
+                400000,
+                100000,
+                ArenaButtons.None,
+                ArenaWeaponId.Machinegun
+            );
             ArenaPlayerState next = ArenaMovement.Step(state, input);
 
             Assert.That(next.YawMillidegrees, Is.EqualTo(40000));
@@ -114,8 +172,14 @@ namespace AiNative.Gameplay.Tests
             ArenaPredictionHistory history = new ArenaPredictionHistory(8);
             ArenaPlayerState baseline = new ArenaPlayerState(0, 0, 0, 0);
             history.Initialize(baseline);
-            history.Predict(new ArenaInput(1, 1, 1000, 0, 0, 0, ArenaButtons.None, ArenaWeaponId.Machinegun), out _);
-            history.Predict(new ArenaInput(2, 2, 0, 1000, 0, 0, ArenaButtons.None, ArenaWeaponId.Machinegun), out _);
+            history.Predict(
+                new ArenaInput(1, 1, 1000, 0, 0, 0, ArenaButtons.None, ArenaWeaponId.Machinegun),
+                out _
+            );
+            history.Predict(
+                new ArenaInput(2, 2, 0, 1000, 0, 0, ArenaButtons.None, ArenaWeaponId.Machinegun),
+                out _
+            );
 
             ArenaPlayerState authoritative = baseline;
             authoritative.Tick = 1;

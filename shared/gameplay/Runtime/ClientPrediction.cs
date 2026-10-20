@@ -29,7 +29,8 @@ namespace AiNative.Gameplay
             long tick,
             uint lastProcessedInputSequence,
             int positionXMillimetres,
-            int positionZMillimetres)
+            int positionZMillimetres
+        )
         {
             if (tick < 0)
             {
@@ -50,14 +51,13 @@ namespace AiNative.Gameplay
 
         public int PositionZMillimetres { get; }
 
-        public bool Equals(KinematicState other)
-            => Tick == other.Tick &&
-               LastProcessedInputSequence == other.LastProcessedInputSequence &&
-               PositionXMillimetres == other.PositionXMillimetres &&
-               PositionZMillimetres == other.PositionZMillimetres;
+        public bool Equals(KinematicState other) =>
+            Tick == other.Tick
+            && LastProcessedInputSequence == other.LastProcessedInputSequence
+            && PositionXMillimetres == other.PositionXMillimetres
+            && PositionZMillimetres == other.PositionZMillimetres;
 
-        public override bool Equals(object obj)
-            => obj is KinematicState other && Equals(other);
+        public override bool Equals(object obj) => obj is KinematicState other && Equals(other);
 
         public override int GetHashCode()
         {
@@ -71,11 +71,11 @@ namespace AiNative.Gameplay
             }
         }
 
-        public static bool operator ==(KinematicState left, KinematicState right)
-            => left.Equals(right);
+        public static bool operator ==(KinematicState left, KinematicState right) =>
+            left.Equals(right);
 
-        public static bool operator !=(KinematicState left, KinematicState right)
-            => !left.Equals(right);
+        public static bool operator !=(KinematicState left, KinematicState right) =>
+            !left.Equals(right);
     }
 
     public static class KinematicMovement
@@ -89,21 +89,24 @@ namespace AiNative.Gameplay
             {
                 throw new ArgumentOutOfRangeException(
                     nameof(input),
-                    "Prediction input sequences must increase monotonically.");
+                    "Prediction input sequences must increase monotonically."
+                );
             }
 
             return new KinematicState(
                 checked(state.Tick + 1),
                 input.Sequence,
                 ApplyAxis(state.PositionXMillimetres, input.MoveXMilli),
-                ApplyAxis(state.PositionZMillimetres, input.MoveZMilli));
+                ApplyAxis(state.PositionZMillimetres, input.MoveZMilli)
+            );
         }
 
         public static int ApplyAxis(int positionMillimetres, int inputMilli)
         {
             int clamped = Math.Max(
                 -MaximumInputMagnitude,
-                Math.Min(MaximumInputMagnitude, inputMilli));
+                Math.Min(MaximumInputMagnitude, inputMilli)
+            );
             int displacement = clamped * FullInputMillimetresPerTick / MaximumInputMagnitude;
             return checked(positionMillimetres + displacement);
         }
@@ -127,7 +130,8 @@ namespace AiNative.Gameplay
             int errorXMillimetres,
             int errorZMillimetres,
             int discardedInputCount,
-            int replayedInputCount)
+            int replayedInputCount
+        )
         {
             Status = status;
             Before = before;
@@ -227,11 +231,14 @@ namespace AiNative.Gameplay
             EnsureInitialized();
             KinematicState before = _current;
 
-            if (authoritativeState.LastProcessedInputSequence <
-                    _baseline.LastProcessedInputSequence ||
-                (authoritativeState.LastProcessedInputSequence ==
-                    _baseline.LastProcessedInputSequence &&
-                 authoritativeState.Tick < _baseline.Tick))
+            if (
+                authoritativeState.LastProcessedInputSequence < _baseline.LastProcessedInputSequence
+                || (
+                    authoritativeState.LastProcessedInputSequence
+                        == _baseline.LastProcessedInputSequence
+                    && authoritativeState.Tick < _baseline.Tick
+                )
+            )
             {
                 return new ReconciliationResult(
                     ReconciliationStatus.StaleSnapshotIgnored,
@@ -240,11 +247,11 @@ namespace AiNative.Gameplay
                     0,
                     0,
                     0,
-                    0);
+                    0
+                );
             }
 
-            if (authoritativeState.LastProcessedInputSequence >
-                _current.LastProcessedInputSequence)
+            if (authoritativeState.LastProcessedInputSequence > _current.LastProcessedInputSequence)
             {
                 Initialize(authoritativeState);
                 return new ReconciliationResult(
@@ -254,16 +261,20 @@ namespace AiNative.Gameplay
                     0,
                     0,
                     0,
-                    0);
+                    0
+                );
             }
 
             KinematicState predictedAtAcknowledgement = _baseline;
             int discardCount = 0;
-            if (authoritativeState.LastProcessedInputSequence !=
-                _baseline.LastProcessedInputSequence)
+            if (
+                authoritativeState.LastProcessedInputSequence
+                != _baseline.LastProcessedInputSequence
+            )
             {
                 int acknowledgementOffset = FindSequence(
-                    authoritativeState.LastProcessedInputSequence);
+                    authoritativeState.LastProcessedInputSequence
+                );
                 if (acknowledgementOffset < 0)
                 {
                     Initialize(authoritativeState);
@@ -274,7 +285,8 @@ namespace AiNative.Gameplay
                         0,
                         0,
                         0,
-                        0);
+                        0
+                    );
                 }
 
                 int acknowledgementIndex = (_start + acknowledgementOffset) % Capacity;
@@ -283,11 +295,13 @@ namespace AiNative.Gameplay
             }
 
             int errorX = checked(
-                authoritativeState.PositionXMillimetres -
-                predictedAtAcknowledgement.PositionXMillimetres);
+                authoritativeState.PositionXMillimetres
+                - predictedAtAcknowledgement.PositionXMillimetres
+            );
             int errorZ = checked(
-                authoritativeState.PositionZMillimetres -
-                predictedAtAcknowledgement.PositionZMillimetres);
+                authoritativeState.PositionZMillimetres
+                - predictedAtAcknowledgement.PositionZMillimetres
+            );
 
             _start = (_start + discardCount) % Capacity;
             _count -= discardCount;
@@ -301,9 +315,10 @@ namespace AiNative.Gameplay
             }
 
             _current = replayed;
-            ReconciliationStatus status = errorX == 0 && errorZ == 0
-                ? ReconciliationStatus.Matched
-                : ReconciliationStatus.Corrected;
+            ReconciliationStatus status =
+                errorX == 0 && errorZ == 0
+                    ? ReconciliationStatus.Matched
+                    : ReconciliationStatus.Corrected;
             return new ReconciliationResult(
                 status,
                 before,
@@ -311,7 +326,8 @@ namespace AiNative.Gameplay
                 errorX,
                 errorZ,
                 discardCount,
-                _count);
+                _count
+            );
         }
 
         private int FindSequence(uint sequence)
@@ -333,7 +349,8 @@ namespace AiNative.Gameplay
             if (!_initialized)
             {
                 throw new InvalidOperationException(
-                    "Prediction history must be initialized from an authoritative state.");
+                    "Prediction history must be initialized from an authoritative state."
+                );
             }
         }
     }

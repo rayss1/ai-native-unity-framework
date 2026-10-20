@@ -1,7 +1,7 @@
-using AiNative.Client.Protocol;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using AiNative.Client.Protocol;
 using AiNative.Gameplay;
 using AiNative.Realtime;
 
@@ -29,7 +29,8 @@ namespace AiNative.Client.Prediction
             PredictionSendStatus status,
             bool predicted,
             in KinematicState predictedState,
-            bool droppedOldestInput)
+            bool droppedOldestInput
+        )
         {
             Status = status;
             Predicted = predicted;
@@ -62,7 +63,8 @@ namespace AiNative.Client.Prediction
             PredictionPrepareStatus status,
             int writtenBytes,
             in KinematicState predictedState,
-            bool droppedOldestInput)
+            bool droppedOldestInput
+        )
         {
             Status = status;
             WrittenBytes = writtenBytes;
@@ -102,7 +104,8 @@ namespace AiNative.Client.Prediction
             uint connectionEpoch,
             bool hasReconciliation,
             in ReconciliationResult reconciliation,
-            int correctionMagnitudeMillimetres)
+            int correctionMagnitudeMillimetres
+        )
         {
             Status = status;
             ConnectionEpoch = connectionEpoch;
@@ -131,7 +134,8 @@ namespace AiNative.Client.Prediction
             int maximumCorrectionMillimetres,
             long historyMisses,
             long staleSnapshots,
-            long droppedInputs)
+            long droppedInputs
+        )
             : this(
                 acceptedSnapshots,
                 corrections,
@@ -142,9 +146,8 @@ namespace AiNative.Client.Prediction
                 droppedInputs,
                 0,
                 0,
-                0)
-        {
-        }
+                0
+            ) { }
 
         public PredictionDiagnostics(
             long acceptedSnapshots,
@@ -156,7 +159,8 @@ namespace AiNative.Client.Prediction
             long droppedInputs,
             long reconciliationSamples,
             int correctionP95Millimetres,
-            int correctionP99Millimetres)
+            int correctionP99Millimetres
+        )
         {
             AcceptedSnapshots = acceptedSnapshots;
             Corrections = corrections;
@@ -208,8 +212,9 @@ namespace AiNative.Client.Prediction
         private readonly byte[] _sendBuffer;
         private readonly bool _ownsTransport;
         private readonly uint _entityId;
-        private readonly long[] _correctionHistogram =
-            new long[CorrectionHistogramMaximumMillimetres + 2];
+        private readonly long[] _correctionHistogram = new long[
+            CorrectionHistogramMaximumMillimetres + 2
+        ];
         private uint _nextInputSequence = 1;
         private long _authoritativeTick;
         private uint _authoritativeAcknowledgement;
@@ -231,7 +236,8 @@ namespace AiNative.Client.Prediction
             IBattleProtocolCodec codec,
             uint entityId,
             int historyCapacity = 256,
-            bool ownsTransport = false)
+            bool ownsTransport = false
+        )
         {
             _transport = transport ?? throw new ArgumentNullException(nameof(transport));
             _codec = codec ?? throw new ArgumentNullException(nameof(codec));
@@ -252,24 +258,27 @@ namespace AiNative.Client.Prediction
 
         public bool IsInitialized => _initialized;
 
-        public PredictionDiagnostics Diagnostics => new PredictionDiagnostics(
-            _acceptedSnapshots,
-            _corrections,
-            _correctionsOver250Millimetres,
-            _maximumCorrectionMillimetres,
-            _historyMisses,
-            _staleSnapshots,
-            _history.DroppedInputCount - _droppedInputBaseline,
-            _reconciliationSamples,
-            CalculateCorrectionPercentile(95),
-            CalculateCorrectionPercentile(99));
+        public PredictionDiagnostics Diagnostics =>
+            new PredictionDiagnostics(
+                _acceptedSnapshots,
+                _corrections,
+                _correctionsOver250Millimetres,
+                _maximumCorrectionMillimetres,
+                _historyMisses,
+                _staleSnapshots,
+                _history.DroppedInputCount - _droppedInputBaseline,
+                _reconciliationSamples,
+                CalculateCorrectionPercentile(95),
+                CalculateCorrectionPercentile(99)
+            );
 
         /// <summary>
         /// Starts a new bounded diagnostics window without changing prediction state.
         /// </summary>
         public void ResetDiagnostics()
         {
-            if (_disposed) return;
+            if (_disposed)
+                return;
             _acceptedSnapshots = 0;
             _corrections = 0;
             _correctionsOver250Millimetres = 0;
@@ -301,7 +310,8 @@ namespace AiNative.Client.Prediction
             ulong roomTick,
             int moveXMilli,
             int moveZMilli,
-            Span<byte> destination)
+            Span<byte> destination
+        )
         {
             if (_disposed)
             {
@@ -309,7 +319,8 @@ namespace AiNative.Client.Prediction
                     PredictionPrepareStatus.Disposed,
                     0,
                     default,
-                    false);
+                    false
+                );
             }
 
             if (!_initialized)
@@ -318,7 +329,8 @@ namespace AiNative.Client.Prediction
                     PredictionPrepareStatus.NotInitialized,
                     0,
                     default,
-                    false);
+                    false
+                );
             }
 
             if (destination.Length < RequiredInputBufferBytes)
@@ -327,7 +339,8 @@ namespace AiNative.Client.Prediction
                     PredictionPrepareStatus.BufferTooSmall,
                     0,
                     default,
-                    false);
+                    false
+                );
             }
 
             if (_nextInputSequence == 0)
@@ -336,15 +349,26 @@ namespace AiNative.Client.Prediction
                     PredictionPrepareStatus.SequenceExhausted,
                     0,
                     default,
-                    false);
+                    false
+                );
             }
 
             if (!CanReplaySafely(_history.Current))
-                return new PredictionPrepareResult(PredictionPrepareStatus.ArithmeticOverflow, 0, default, false);
+                return new PredictionPrepareResult(
+                    PredictionPrepareStatus.ArithmeticOverflow,
+                    0,
+                    default,
+                    false
+                );
             uint sequence = _nextInputSequence;
             KinematicInput input = new KinematicInput(sequence, moveXMilli, moveZMilli);
             if (!_codec.TryEncodeLegacyInput(roomTick, input, destination, out int writtenBytes))
-                return new PredictionPrepareResult(PredictionPrepareStatus.BufferTooSmall, 0, default, false);
+                return new PredictionPrepareResult(
+                    PredictionPrepareStatus.BufferTooSmall,
+                    0,
+                    default,
+                    false
+                );
             KinematicState predicted = _history.Predict(input, out bool droppedOldest);
             _nextInputSequence = sequence == uint.MaxValue ? 0 : sequence + 1;
 
@@ -352,14 +376,16 @@ namespace AiNative.Client.Prediction
                 PredictionPrepareStatus.Prepared,
                 writtenBytes,
                 predicted,
-                droppedOldest);
+                droppedOldest
+            );
         }
 
         public ValueTask<PredictionSendResult> SendInputAsync(
             ulong roomTick,
             int moveXMilli,
             int moveZMilli,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken = default
+        )
         {
             if (_disposed)
             {
@@ -390,14 +416,16 @@ namespace AiNative.Client.Prediction
                 roomTick,
                 moveXMilli,
                 moveZMilli,
-                _sendBuffer);
+                _sendBuffer
+            );
             if (prepared.Status != PredictionPrepareStatus.Prepared)
             {
                 Volatile.Write(ref _sendInFlight, 0);
                 return Completed(
                     prepared.Status == PredictionPrepareStatus.SequenceExhausted
                         ? PredictionSendStatus.SequenceExhausted
-                        : PredictionSendStatus.Faulted);
+                        : PredictionSendStatus.Faulted
+                );
             }
 
             try
@@ -405,7 +433,8 @@ namespace AiNative.Client.Prediction
                 ValueTask<SendResult> pending = _transport.SendAsync(
                     _codec.InputChannel,
                     _sendBuffer.AsMemory(0, prepared.WrittenBytes),
-                    cancellationToken);
+                    cancellationToken
+                );
                 if (pending.IsCompletedSuccessfully)
                 {
                     SendResult send = pending.Result;
@@ -414,14 +443,16 @@ namespace AiNative.Client.Prediction
                         MapSendStatus(send, prepared.WrittenBytes),
                         true,
                         prepared.PredictedState,
-                        prepared.DroppedOldestInput);
+                        prepared.DroppedOldestInput
+                    );
                 }
 
                 return AwaitSendAsync(
                     pending,
                     prepared.WrittenBytes,
                     prepared.PredictedState,
-                    prepared.DroppedOldestInput);
+                    prepared.DroppedOldestInput
+                );
             }
             catch (OperationCanceledException)
             {
@@ -430,7 +461,8 @@ namespace AiNative.Client.Prediction
                     PredictionSendStatus.Cancelled,
                     true,
                     prepared.PredictedState,
-                    prepared.DroppedOldestInput);
+                    prepared.DroppedOldestInput
+                );
             }
             catch (Exception)
             {
@@ -439,13 +471,12 @@ namespace AiNative.Client.Prediction
                     PredictionSendStatus.Faulted,
                     true,
                     prepared.PredictedState,
-                    prepared.DroppedOldestInput);
+                    prepared.DroppedOldestInput
+                );
             }
         }
 
-        public SnapshotApplyResult ApplyPacket(
-            ReadOnlySpan<byte> frame,
-            in ReceivedPacket packet)
+        public SnapshotApplyResult ApplyPacket(ReadOnlySpan<byte> frame, in ReceivedPacket packet)
         {
             if (_disposed)
             {
@@ -457,30 +488,46 @@ namespace AiNative.Client.Prediction
                 return Failure(SnapshotApplyStatus.Truncated, packet.ConnectionEpoch);
             }
 
-            BattleDecodeStatus decode = _codec.TryDecode(frame.Slice(0, packet.WrittenBytes), _decoded);
-            if (decode != BattleDecodeStatus.Accepted) return Failure(MapDecodeStatus(decode), packet.ConnectionEpoch);
+            BattleDecodeStatus decode = _codec.TryDecode(
+                frame.Slice(0, packet.WrittenBytes),
+                _decoded
+            );
+            if (decode != BattleDecodeStatus.Accepted)
+                return Failure(MapDecodeStatus(decode), packet.ConnectionEpoch);
             return ApplyDecoded(_decoded, packet);
         }
 
-        public SnapshotApplyResult ApplyDecoded(BattlePacketBuffer decoded, in ReceivedPacket packet)
+        public SnapshotApplyResult ApplyDecoded(
+            BattlePacketBuffer decoded,
+            in ReceivedPacket packet
+        )
         {
-            if (_disposed) return Failure(SnapshotApplyStatus.Disposed, packet.ConnectionEpoch);
+            if (_disposed)
+                return Failure(SnapshotApplyStatus.Disposed, packet.ConnectionEpoch);
             bool reconnect = decoded.Kind == BattleMessageKind.ReconnectResponse;
-            if (!reconnect && decoded.Kind != BattleMessageKind.Snapshot) return Failure(SnapshotApplyStatus.WrongMessage, packet.ConnectionEpoch);
-            if (!decoded.TryGetPlayer(_entityId, out var player)) return Failure(SnapshotApplyStatus.PlayerMissing, packet.ConnectionEpoch);
-            if (player.State.Tick < 0) return Failure(SnapshotApplyStatus.ArithmeticOverflow, packet.ConnectionEpoch);
-            var state = new KinematicState(player.State.Tick, player.Acknowledgement, player.State.PositionXMillimetres, player.State.PositionZMillimetres);
+            if (!reconnect && decoded.Kind != BattleMessageKind.Snapshot)
+                return Failure(SnapshotApplyStatus.WrongMessage, packet.ConnectionEpoch);
+            if (!decoded.TryGetPlayer(_entityId, out var player))
+                return Failure(SnapshotApplyStatus.PlayerMissing, packet.ConnectionEpoch);
+            if (player.State.Tick < 0)
+                return Failure(SnapshotApplyStatus.ArithmeticOverflow, packet.ConnectionEpoch);
+            var state = new KinematicState(
+                player.State.Tick,
+                player.Acknowledgement,
+                player.State.PositionXMillimetres,
+                player.State.PositionZMillimetres
+            );
             var expectedChannel = reconnect ? _codec.ControlChannel : _codec.SnapshotChannel;
             if (!packet.Channel.Equals(expectedChannel))
             {
                 return Failure(SnapshotApplyStatus.WrongChannel, packet.ConnectionEpoch);
             }
 
-            uint authoritativeEpoch = reconnect
-                ? decoded.ConnectionEpoch
-                : packet.ConnectionEpoch;
-            if (authoritativeEpoch == 0 ||
-                (reconnect && authoritativeEpoch != packet.ConnectionEpoch))
+            uint authoritativeEpoch = reconnect ? decoded.ConnectionEpoch : packet.ConnectionEpoch;
+            if (
+                authoritativeEpoch == 0
+                || (reconnect && authoritativeEpoch != packet.ConnectionEpoch)
+            )
             {
                 return Failure(SnapshotApplyStatus.ConnectionEpochMismatch, authoritativeEpoch);
             }
@@ -490,12 +537,32 @@ namespace AiNative.Client.Prediction
                 return Failure(SnapshotApplyStatus.StaleConnectionEpoch, authoritativeEpoch);
             }
 
-            if (_initialized && (state.Tick < _authoritativeTick || state.LastProcessedInputSequence < _authoritativeAcknowledgement))
+            if (
+                _initialized
+                && (
+                    state.Tick < _authoritativeTick
+                    || state.LastProcessedInputSequence < _authoritativeAcknowledgement
+                )
+            )
             {
                 var current = _history.Current;
-                var stale = new ReconciliationResult(ReconciliationStatus.StaleSnapshotIgnored, current, current, 0, 0, 0, 0);
+                var stale = new ReconciliationResult(
+                    ReconciliationStatus.StaleSnapshotIgnored,
+                    current,
+                    current,
+                    0,
+                    0,
+                    0,
+                    0
+                );
                 _staleSnapshots++;
-                return new SnapshotApplyResult(SnapshotApplyStatus.Reconciled, _connectionEpoch, true, stale, 0);
+                return new SnapshotApplyResult(
+                    SnapshotApplyStatus.Reconciled,
+                    _connectionEpoch,
+                    true,
+                    stale,
+                    0
+                );
             }
             // Reconcile mutates its ring before replaying. Prove numeric headroom first,
             // including one next input; rejection must preserve history, epoch and sequence.
@@ -515,21 +582,24 @@ namespace AiNative.Client.Prediction
                     authoritativeEpoch,
                     false,
                     default,
-                    0);
+                    0
+                );
             }
 
             {
                 ReconciliationResult reconciliation = _history.Reconcile(state);
                 int magnitude = CalculateMagnitude(
                     reconciliation.ErrorXMillimetres,
-                    reconciliation.ErrorZMillimetres);
+                    reconciliation.ErrorZMillimetres
+                );
                 RecordDiagnostics(reconciliation.Status, magnitude);
                 return new SnapshotApplyResult(
                     SnapshotApplyStatus.Reconciled,
                     authoritativeEpoch,
                     true,
                     reconciliation,
-                    magnitude);
+                    magnitude
+                );
             }
         }
 
@@ -537,19 +607,28 @@ namespace AiNative.Client.Prediction
         /// Call and apply on the owner thread without preparing intervening inputs.</summary>
         public bool CanReplaySafely(in KinematicState state)
         {
-            if (_disposed) return false;
+            if (_disposed)
+                return false;
             long steps = (_initialized ? _history.Count : 0) + 1L;
-            if (state.Tick < 0 || state.Tick > long.MaxValue - steps) return false;
+            if (state.Tick < 0 || state.Tick > long.MaxValue - steps)
+                return false;
             long margin = steps * KinematicMovement.FullInputMillimetresPerTick;
-            long x = state.PositionXMillimetres, z = state.PositionZMillimetres;
-            if (x < int.MinValue + margin || x > int.MaxValue - margin ||
-                z < int.MinValue + margin || z > int.MaxValue - margin) return false;
-            if (!_initialized) return true;
+            long x = state.PositionXMillimetres,
+                z = state.PositionZMillimetres;
+            if (
+                x < int.MinValue + margin
+                || x > int.MaxValue - margin
+                || z < int.MinValue + margin
+                || z > int.MaxValue - margin
+            )
+                return false;
+            if (!_initialized)
+                return true;
             // Any acknowledged historical position is at most Count steps from Current.
             // Reserve that distance in both directions before int correction subtraction.
             var current = _history.Current;
-            return Math.Abs(x - current.PositionXMillimetres) + margin <= int.MaxValue &&
-                Math.Abs(z - current.PositionZMillimetres) + margin <= int.MaxValue;
+            return Math.Abs(x - current.PositionXMillimetres) + margin <= int.MaxValue
+                && Math.Abs(z - current.PositionZMillimetres) + margin <= int.MaxValue;
         }
 
         public ValueTask DisposeAsync()
@@ -567,7 +646,8 @@ namespace AiNative.Client.Prediction
             ValueTask<SendResult> pending,
             int writtenBytes,
             KinematicState predicted,
-            bool droppedOldest)
+            bool droppedOldest
+        )
         {
             try
             {
@@ -576,7 +656,8 @@ namespace AiNative.Client.Prediction
                     MapSendStatus(send, writtenBytes),
                     true,
                     predicted,
-                    droppedOldest);
+                    droppedOldest
+                );
             }
             catch (OperationCanceledException)
             {
@@ -584,7 +665,8 @@ namespace AiNative.Client.Prediction
                     PredictionSendStatus.Cancelled,
                     true,
                     predicted,
-                    droppedOldest);
+                    droppedOldest
+                );
             }
             catch (Exception)
             {
@@ -592,7 +674,8 @@ namespace AiNative.Client.Prediction
                     PredictionSendStatus.Faulted,
                     true,
                     predicted,
-                    droppedOldest);
+                    droppedOldest
+                );
             }
             finally
             {
@@ -602,7 +685,8 @@ namespace AiNative.Client.Prediction
 
         private void EnsureNextSequenceAfter(uint acknowledgement)
         {
-            if (_nextInputSequence == 0) return; // Exhaustion is terminal for this session.
+            if (_nextInputSequence == 0)
+                return; // Exhaustion is terminal for this session.
             if (acknowledgement == uint.MaxValue)
             {
                 _nextInputSequence = 0;
@@ -648,16 +732,18 @@ namespace AiNative.Client.Prediction
 
         private void RecordCorrectionSample(int magnitude)
         {
-            int bucket = magnitude <= CorrectionHistogramMaximumMillimetres
-                ? magnitude
-                : CorrectionHistogramMaximumMillimetres + 1;
+            int bucket =
+                magnitude <= CorrectionHistogramMaximumMillimetres
+                    ? magnitude
+                    : CorrectionHistogramMaximumMillimetres + 1;
             _correctionHistogram[bucket]++;
             _reconciliationSamples++;
         }
 
         private int CalculateCorrectionPercentile(int percentile)
         {
-            if (_reconciliationSamples == 0) return 0;
+            if (_reconciliationSamples == 0)
+                return 0;
             long rank = (long)Math.Ceiling(_reconciliationSamples * (percentile / 100d));
             long cumulative = 0;
             for (int index = 0; index < _correctionHistogram.Length; index++)
@@ -723,13 +809,15 @@ namespace AiNative.Client.Prediction
             PredictionSendStatus status,
             bool predicted = false,
             KinematicState predictedState = default,
-            bool droppedOldest = false)
-            => new ValueTask<PredictionSendResult>(
-                new PredictionSendResult(status, predicted, predictedState, droppedOldest));
+            bool droppedOldest = false
+        ) =>
+            new ValueTask<PredictionSendResult>(
+                new PredictionSendResult(status, predicted, predictedState, droppedOldest)
+            );
 
         private static SnapshotApplyResult Failure(
             SnapshotApplyStatus status,
-            uint connectionEpoch)
-            => new SnapshotApplyResult(status, connectionEpoch, false, default, 0);
+            uint connectionEpoch
+        ) => new SnapshotApplyResult(status, connectionEpoch, false, default, 0);
     }
 }

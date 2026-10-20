@@ -26,7 +26,8 @@ namespace AiNative.Client.Fantasy
         Task<IFantasyClientSession> ConnectAsync(
             FantasyKcpTransportOptions options,
             Action disconnected,
-            CancellationToken cancellationToken);
+            CancellationToken cancellationToken
+        );
     }
 
     internal sealed class FantasyClientSession : IFantasyClientSession
@@ -45,8 +46,7 @@ namespace AiNative.Client.Fantasy
 
         public bool IsClosed => Volatile.Read(ref _disposed) != 0 || _session.IsDisposed;
 
-        public void Post(Action action) =>
-            _session.Scene.ThreadSynchronizationContext.Post(action);
+        public void Post(Action action) => _session.Scene.ThreadSynchronizationContext.Post(action);
 
         public void Send(FantasyRealtimeEnvelope envelope) => _session.Send(envelope);
 
@@ -80,14 +80,13 @@ namespace AiNative.Client.Fantasy
         private static readonly SemaphoreSlim InitializationGate = new SemaphoreSlim(1, 1);
         private static int _initialized;
 
-        private FantasyClientConnector()
-        {
-        }
+        private FantasyClientConnector() { }
 
         public Task<IFantasyClientSession> ConnectAsync(
             FantasyKcpTransportOptions options,
             Action disconnected,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken
+        )
         {
             KCPSettings.ConfigureOuterMtu(FantasyKcpRealtimeTransport.OuterKcpMtu);
             typeof(FantasyRealtimeEnvelope).Assembly.EnsureLoaded();
@@ -100,7 +99,8 @@ namespace AiNative.Client.Fantasy
         {
             private readonly TaskCompletionSource<IFantasyClientSession> _completion =
                 new TaskCompletionSource<IFantasyClientSession>(
-                    TaskCreationOptions.RunContinuationsAsynchronously);
+                    TaskCreationOptions.RunContinuationsAsynchronously
+                );
             private readonly Action _disconnected;
             private readonly FantasyKcpTransportOptions _options;
             private readonly CancellationToken _cancellationToken;
@@ -113,7 +113,8 @@ namespace AiNative.Client.Fantasy
             internal ConnectAttempt(
                 FantasyKcpTransportOptions options,
                 Action disconnected,
-                CancellationToken cancellationToken)
+                CancellationToken cancellationToken
+            )
             {
                 _options = options;
                 _disconnected = disconnected;
@@ -147,7 +148,8 @@ namespace AiNative.Client.Fantasy
                         onConnectDisconnect: _disconnected,
                         isHttps: false,
                         connectTimeout: _options.ConnectTimeoutMilliseconds,
-                        enableReceiveMessageJsonLog: false);
+                        enableReceiveMessageJsonLog: false
+                    );
                     if (Volatile.Read(ref _connectCallbackReceived) != 0)
                     {
                         CompleteConnected();
@@ -175,14 +177,18 @@ namespace AiNative.Client.Fantasy
             {
                 DisposeScene();
                 _completion.TrySetException(
-                    new InvalidOperationException("Fantasy KCP connection failed."));
+                    new InvalidOperationException("Fantasy KCP connection failed.")
+                );
             }
 
             private void CompleteConnected()
             {
                 Volatile.Write(ref _connectCallbackReceived, 1);
-                if (_scene == null || _session == null ||
-                    Interlocked.CompareExchange(ref _adapterCreated, 1, 0) != 0)
+                if (
+                    _scene == null
+                    || _session == null
+                    || Interlocked.CompareExchange(ref _adapterCreated, 1, 0) != 0
+                )
                 {
                     return;
                 }
@@ -195,8 +201,9 @@ namespace AiNative.Client.Fantasy
                     // removes the heartbeat timers; use FantasyRuntime's pinned defaults.
                     if (_session.GetComponent<SessionHeartbeatComponent>() == null)
                     {
-                        _session.AddComponent<SessionHeartbeatComponent>().Start(
-                            interval: 2000, timeOut: 30000, timeOutInterval: 5000);
+                        _session
+                            .AddComponent<SessionHeartbeatComponent>()
+                            .Start(interval: 2000, timeOut: 30000, timeOutInterval: 5000);
                     }
 
                     var adapter = new FantasyClientSession(_scene, _session);
@@ -277,13 +284,17 @@ namespace AiNative.Client.Fantasy
         private static readonly ConcurrentDictionary<long, FantasyKcpRealtimeTransport> Transports =
             new ConcurrentDictionary<long, FantasyKcpRealtimeTransport>();
 
-        internal static bool Register(long sessionRuntimeId, FantasyKcpRealtimeTransport transport) =>
-            Transports.TryAdd(sessionRuntimeId, transport);
+        internal static bool Register(
+            long sessionRuntimeId,
+            FantasyKcpRealtimeTransport transport
+        ) => Transports.TryAdd(sessionRuntimeId, transport);
 
         internal static void Remove(long sessionRuntimeId, FantasyKcpRealtimeTransport transport)
         {
-            if (Transports.TryGetValue(sessionRuntimeId, out FantasyKcpRealtimeTransport current) &&
-                ReferenceEquals(current, transport))
+            if (
+                Transports.TryGetValue(sessionRuntimeId, out FantasyKcpRealtimeTransport current)
+                && ReferenceEquals(current, transport)
+            )
             {
                 Transports.TryRemove(sessionRuntimeId, out _);
             }
@@ -293,10 +304,13 @@ namespace AiNative.Client.Fantasy
             long sessionRuntimeId,
             uint channelId,
             ReadOnlySpan<byte> payload,
-            ulong sequence)
+            ulong sequence
+        )
         {
-            return Transports.TryGetValue(sessionRuntimeId, out FantasyKcpRealtimeTransport transport) &&
-                transport.TryEnqueueReceived(channelId, payload, sequence);
+            return Transports.TryGetValue(
+                    sessionRuntimeId,
+                    out FantasyKcpRealtimeTransport transport
+                ) && transport.TryEnqueueReceived(channelId, payload, sequence);
         }
     }
 }

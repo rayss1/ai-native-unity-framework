@@ -20,11 +20,14 @@ internal static class Program
         NetworkProfile profile = NetworkProfile.Resolve(options.Profile);
         ScenarioReport report = ScenarioRunner.Run(profile, options);
 
-        string json = JsonSerializer.Serialize(report, new JsonSerializerOptions
-        {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            WriteIndented = true,
-        });
+        string json = JsonSerializer.Serialize(
+            report,
+            new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                WriteIndented = true,
+            }
+        );
         if (options.OutputPath is { } outputPath)
         {
             string fullPath = Path.GetFullPath(outputPath);
@@ -42,7 +45,8 @@ internal sealed record AcceptanceOptions(
     int WarmupTicks,
     int MeasuredTicks,
     ulong Seed,
-    string? OutputPath)
+    string? OutputPath
+)
 {
     public static AcceptanceOptions Parse(string[] args)
     {
@@ -58,12 +62,27 @@ internal sealed record AcceptanceOptions(
         }
 
         string profile = values.GetValueOrDefault("profile", "regional");
-        int warmup = int.Parse(values.GetValueOrDefault("warmup-ticks", "600"), System.Globalization.CultureInfo.InvariantCulture);
-        int measured = int.Parse(values.GetValueOrDefault("measured-ticks", "3600"), System.Globalization.CultureInfo.InvariantCulture);
-        ulong seed = ulong.Parse(values.GetValueOrDefault("seed", "1592594996"), System.Globalization.CultureInfo.InvariantCulture);
+        int warmup = int.Parse(
+            values.GetValueOrDefault("warmup-ticks", "600"),
+            System.Globalization.CultureInfo.InvariantCulture
+        );
+        int measured = int.Parse(
+            values.GetValueOrDefault("measured-ticks", "3600"),
+            System.Globalization.CultureInfo.InvariantCulture
+        );
+        ulong seed = ulong.Parse(
+            values.GetValueOrDefault("seed", "1592594996"),
+            System.Globalization.CultureInfo.InvariantCulture
+        );
         ArgumentOutOfRangeException.ThrowIfNegative(warmup);
         ArgumentOutOfRangeException.ThrowIfLessThan(measured, 60);
-        return new AcceptanceOptions(profile, warmup, measured, seed, values.GetValueOrDefault("output"));
+        return new AcceptanceOptions(
+            profile,
+            warmup,
+            measured,
+            seed,
+            values.GetValueOrDefault("output")
+        );
     }
 }
 
@@ -74,15 +93,17 @@ internal readonly record struct NetworkProfile(
     int JitterTicks,
     int DuplicateBasisPoints,
     int ReorderBasisPoints,
-    bool BlockOneClient)
+    bool BlockOneClient
+)
 {
-    public static NetworkProfile Resolve(string name) => name.ToLowerInvariant() switch
-    {
-        "regional" => new("Regional", 100, 100, 1, 50, 100, false),
-        "degraded" => new("Degraded", 200, 500, 2, 100, 200, false),
-        "backpressure" => new("Backpressure", 100, 100, 1, 50, 100, true),
-        _ => throw new ArgumentException($"Unknown impairment profile '{name}'."),
-    };
+    public static NetworkProfile Resolve(string name) =>
+        name.ToLowerInvariant() switch
+        {
+            "regional" => new("Regional", 100, 100, 1, 50, 100, false),
+            "degraded" => new("Degraded", 200, 500, 2, 100, 200, false),
+            "backpressure" => new("Backpressure", 100, 100, 1, 50, 100, true),
+            _ => throw new ArgumentException($"Unknown impairment profile '{name}'."),
+        };
 }
 
 internal static class ScenarioRunner
@@ -98,21 +119,28 @@ internal static class ScenarioRunner
         double blockedDelta = 0;
         if (profile.BlockOneClient)
         {
-            ScenarioMeasurements baseline = Execute(profile with { BlockOneClient = false }, options, false);
+            ScenarioMeasurements baseline = Execute(
+                profile with
+                {
+                    BlockOneClient = false,
+                },
+                options,
+                false
+            );
             blockedDelta = measurements.TickP99Milliseconds - baseline.TickP99Milliseconds;
         }
 
         bool gatesPassed =
-            measurements.TickP99Milliseconds <= 16.67 &&
-            measurements.TickP999Milliseconds <= 20.0 &&
-            measurements.SlowTickPercentage <= 0.1 &&
-            measurements.GameplayP99Milliseconds <= 8.0 &&
-            measurements.DownstreamP95Kbps <= 256.0 &&
-            measurements.UpstreamP95Kbps <= 64.0 &&
-            measurements.MaxDatagramBytes <= RealtimeProtocolCodec.MaxDatagramBytes &&
-            measurements.MaxOutboundPackets <= 3 &&
-            measurements.MaxOutboundBytes <= 256 * 1024 &&
-            (!profile.BlockOneClient || blockedDelta < 0.5);
+            measurements.TickP99Milliseconds <= 16.67
+            && measurements.TickP999Milliseconds <= 20.0
+            && measurements.SlowTickPercentage <= 0.1
+            && measurements.GameplayP99Milliseconds <= 8.0
+            && measurements.DownstreamP95Kbps <= 256.0
+            && measurements.UpstreamP95Kbps <= 64.0
+            && measurements.MaxDatagramBytes <= RealtimeProtocolCodec.MaxDatagramBytes
+            && measurements.MaxOutboundPackets <= 3
+            && measurements.MaxOutboundBytes <= 256 * 1024
+            && (!profile.BlockOneClient || blockedDelta < 0.5);
 
         return new ScenarioReport(
             EvidenceClass: "deterministic-production-codec-impairment",
@@ -149,14 +177,19 @@ internal static class ScenarioRunner
             measurements.QueueDroppedPackets,
             measurements.DuplicatedPackets,
             measurements.ReorderedPackets,
-            measurements.FinalStateHash.ToString("x16", System.Globalization.CultureInfo.InvariantCulture),
-            gatesPassed);
+            measurements.FinalStateHash.ToString(
+                "x16",
+                System.Globalization.CultureInfo.InvariantCulture
+            ),
+            gatesPassed
+        );
     }
 
     private static ScenarioMeasurements Execute(
         NetworkProfile profile,
         AcceptanceOptions options,
-        bool blockOneClient)
+        bool blockOneClient
+    )
     {
         int totalTicks = checked(options.WarmupTicks + options.MeasuredTicks);
         int measuredSeconds = (options.MeasuredTicks + TickRate - 1) / TickRate;
@@ -171,7 +204,10 @@ internal static class ScenarioRunner
         SyntheticRoom room = new(BotCount);
         Pcg32Random inputRandom = new(options.Seed, 0x51UL);
         Pcg32Random impairmentRandom = new(options.Seed ^ 0x9e3779b97f4a7c15UL, 0x13UL);
-        int oneWayTicks = Math.Max(1, (int)Math.Ceiling(profile.RttMilliseconds * TickRate / 2000d));
+        int oneWayTicks = Math.Max(
+            1,
+            (int)Math.Ceiling(profile.RttMilliseconds * TickRate / 2000d)
+        );
         for (int index = 0; index < BotCount; index++)
         {
             upstream[index] = new SimulatedLink(1024, 256 * 1024);
@@ -208,18 +244,27 @@ internal static class ScenarioRunner
                 }
 
                 InputBatch batch = new();
-                batch.Commands.Add(pendingInputs[entity] ??
-                    throw new InvalidOperationException("The acceptance Input batch lost its first frame."));
+                batch.Commands.Add(
+                    pendingInputs[entity]
+                        ?? throw new InvalidOperationException(
+                            "The acceptance Input batch lost its first frame."
+                        )
+                );
                 batch.Commands.Add(command);
                 pendingInputs[entity] = null;
-                if (!RealtimeProtocolCodec.TryEncode(
-                    MessageId.InputBatch,
-                    batch,
-                    encodeBuffer,
-                    out _,
-                    out int inputBytes))
+                if (
+                    !RealtimeProtocolCodec.TryEncode(
+                        MessageId.InputBatch,
+                        batch,
+                        encodeBuffer,
+                        out _,
+                        out int inputBytes
+                    )
+                )
                 {
-                    throw new InvalidOperationException("The production codec rejected an acceptance InputBatch.");
+                    throw new InvalidOperationException(
+                        "The production codec rejected an acceptance InputBatch."
+                    );
                 }
 
                 byte[] frame = encodeBuffer.AsSpan(0, inputBytes).ToArray();
@@ -229,12 +274,19 @@ internal static class ScenarioRunner
                     tick,
                     oneWayTicks,
                     profile,
-                    impairmentRandom);
+                    impairmentRandom
+                );
                 networkDrops += scheduled.NetworkDropped;
                 queueDrops += scheduled.QueueDropped;
                 duplicates += scheduled.Duplicated;
                 reorders += scheduled.Reordered;
-                RecordWireBytes(upstreamBytes, entity, tick, options.WarmupTicks, scheduled.WireCopies * (inputBytes + EstimatedWireOverheadBytes));
+                RecordWireBytes(
+                    upstreamBytes,
+                    entity,
+                    tick,
+                    options.WarmupTicks,
+                    scheduled.WireCopies * (inputBytes + EstimatedWireOverheadBytes)
+                );
                 maxDatagramBytes = Math.Max(maxDatagramBytes, inputBytes);
             }
 
@@ -242,24 +294,37 @@ internal static class ScenarioRunner
             for (int entity = 0; entity < BotCount; entity++)
             {
                 int capturedEntity = entity;
-                upstream[entity].DrainDue(tick, packet =>
-                {
-                    if (RealtimeProtocolCodec.TryDecode(packet, out DecodedProtocolMessage decoded) != ProtocolDecodeStatus.Accepted ||
-                        decoded.MessageId != MessageId.InputBatch ||
-                        decoded.Message is not InputBatch batch)
-                    {
-                        return;
-                    }
-
-                    foreach (InputCommand input in batch.Commands)
-                    {
-                        if (input.Sequence > lastInputSequence[capturedEntity])
+                upstream[entity]
+                    .DrainDue(
+                        tick,
+                        packet =>
                         {
-                            lastInputSequence[capturedEntity] = input.Sequence;
-                            room.ApplyInput(capturedEntity, input.MoveXMilli, input.MoveYMilli);
+                            if (
+                                RealtimeProtocolCodec.TryDecode(
+                                    packet,
+                                    out DecodedProtocolMessage decoded
+                                ) != ProtocolDecodeStatus.Accepted
+                                || decoded.MessageId != MessageId.InputBatch
+                                || decoded.Message is not InputBatch batch
+                            )
+                            {
+                                return;
+                            }
+
+                            foreach (InputCommand input in batch.Commands)
+                            {
+                                if (input.Sequence > lastInputSequence[capturedEntity])
+                                {
+                                    lastInputSequence[capturedEntity] = input.Sequence;
+                                    room.ApplyInput(
+                                        capturedEntity,
+                                        input.MoveXMilli,
+                                        input.MoveYMilli
+                                    );
+                                }
+                            }
                         }
-                    }
-                });
+                    );
             }
 
             long gameplayStarted = Stopwatch.GetTimestamp();
@@ -269,14 +334,19 @@ internal static class ScenarioRunner
             if ((tick + 1) % SnapshotIntervalTicks == 0)
             {
                 Snapshot snapshot = room.CreateSnapshot(checked((ulong)tick + 1));
-                if (!RealtimeProtocolCodec.TryEncode(
-                    MessageId.Snapshot,
-                    snapshot,
-                    encodeBuffer,
-                    out _,
-                    out int snapshotBytes))
+                if (
+                    !RealtimeProtocolCodec.TryEncode(
+                        MessageId.Snapshot,
+                        snapshot,
+                        encodeBuffer,
+                        out _,
+                        out int snapshotBytes
+                    )
+                )
                 {
-                    throw new InvalidOperationException("The 64-player Snapshot exceeded the production codec MTU.");
+                    throw new InvalidOperationException(
+                        "The 64-player Snapshot exceeded the production codec MTU."
+                    );
                 }
 
                 byte[] frame = encodeBuffer.AsSpan(0, snapshotBytes).ToArray();
@@ -288,12 +358,19 @@ internal static class ScenarioRunner
                         tick,
                         oneWayTicks,
                         profile,
-                        impairmentRandom);
+                        impairmentRandom
+                    );
                     networkDrops += scheduled.NetworkDropped;
                     queueDrops += scheduled.QueueDropped;
                     duplicates += scheduled.Duplicated;
                     reorders += scheduled.Reordered;
-                    RecordWireBytes(downstreamBytes, entity, tick, options.WarmupTicks, scheduled.WireCopies * (snapshotBytes + EstimatedWireOverheadBytes));
+                    RecordWireBytes(
+                        downstreamBytes,
+                        entity,
+                        tick,
+                        options.WarmupTicks,
+                        scheduled.WireCopies * (snapshotBytes + EstimatedWireOverheadBytes)
+                    );
                 }
 
                 maxDatagramBytes = Math.Max(maxDatagramBytes, snapshotBytes);
@@ -301,7 +378,8 @@ internal static class ScenarioRunner
 
             for (int entity = 0; entity < BotCount; entity++)
             {
-                bool blocked = blockOneClient && entity == 0 && tick >= blockedStart && tick < blockedEnd;
+                bool blocked =
+                    blockOneClient && entity == 0 && tick >= blockedStart && tick < blockedEnd;
                 if (!blocked)
                 {
                     downstream[entity].DrainDue(tick, static _ => { });
@@ -322,9 +400,16 @@ internal static class ScenarioRunner
         Array.Sort(tickDurations);
         Array.Sort(gameplayDurations);
         double tickP99 = ToMilliseconds(tickDurations[PercentileIndex(tickDurations.Length, 0.99)]);
-        double tickP999 = ToMilliseconds(tickDurations[PercentileIndex(tickDurations.Length, 0.999)]);
-        double slowPercentage = tickDurations.Count(value => ToMilliseconds(value) > 16.67) * 100d / tickDurations.Length;
-        double gameplayP99 = ToMilliseconds(gameplayDurations[PercentileIndex(gameplayDurations.Length, 0.99)]);
+        double tickP999 = ToMilliseconds(
+            tickDurations[PercentileIndex(tickDurations.Length, 0.999)]
+        );
+        double slowPercentage =
+            tickDurations.Count(value => ToMilliseconds(value) > 16.67)
+            * 100d
+            / tickDurations.Length;
+        double gameplayP99 = ToMilliseconds(
+            gameplayDurations[PercentileIndex(gameplayDurations.Length, 0.99)]
+        );
 
         return new ScenarioMeasurements(
             tickP99,
@@ -340,7 +425,8 @@ internal static class ScenarioRunner
             queueDrops,
             duplicates,
             reorders,
-            room.ComputeStateHash());
+            room.ComputeStateHash()
+        );
     }
 
     private static LinkScheduleResult Schedule(
@@ -349,11 +435,14 @@ internal static class ScenarioRunner
         int currentTick,
         int oneWayTicks,
         NetworkProfile profile,
-        Pcg32Random random)
+        Pcg32Random random
+    )
     {
-        int jitter = profile.JitterTicks == 0
-            ? 0
-            : (int)(random.NextUInt32() % checked((uint)((profile.JitterTicks * 2) + 1))) - profile.JitterTicks;
+        int jitter =
+            profile.JitterTicks == 0
+                ? 0
+                : (int)(random.NextUInt32() % checked((uint)((profile.JitterTicks * 2) + 1)))
+                    - profile.JitterTicks;
         int dueTick = currentTick + Math.Max(1, oneWayTicks + jitter);
         bool reordered = random.NextUInt32() % 10_000 < profile.ReorderBasisPoints;
         if (reordered)
@@ -376,10 +465,22 @@ internal static class ScenarioRunner
             queueDropped += link.TrySchedule(packet, dueTick + 1) ? 0 : 1;
         }
 
-        return new LinkScheduleResult(wireCopies, 0, queueDropped, duplicated ? 1 : 0, reordered ? 1 : 0);
+        return new LinkScheduleResult(
+            wireCopies,
+            0,
+            queueDropped,
+            duplicated ? 1 : 0,
+            reordered ? 1 : 0
+        );
     }
 
-    private static void RecordWireBytes(long[,] windows, int entity, int tick, int warmupTicks, int bytes)
+    private static void RecordWireBytes(
+        long[,] windows,
+        int entity,
+        int tick,
+        int warmupTicks,
+        int bytes
+    )
     {
         if (tick < warmupTicks)
         {
@@ -409,7 +510,8 @@ internal static class ScenarioRunner
     private static int PercentileIndex(int count, double percentile) =>
         Math.Clamp((int)Math.Ceiling(count * percentile) - 1, 0, count - 1);
 
-    private static double ToMilliseconds(long timestamps) => timestamps * 1000d / Stopwatch.Frequency;
+    private static double ToMilliseconds(long timestamps) =>
+        timestamps * 1000d / Stopwatch.Frequency;
 }
 
 internal sealed class SimulatedLink(int maxPackets, int maxBytes)
@@ -435,7 +537,10 @@ internal sealed class SimulatedLink(int maxPackets, int maxBytes)
 
     public void DrainDue(int currentTick, Action<byte[]> consume)
     {
-        while (_packets.TryPeek(out _, out (int DueTick, long Sequence) priority) && priority.DueTick <= currentTick)
+        while (
+            _packets.TryPeek(out _, out (int DueTick, long Sequence) priority)
+            && priority.DueTick <= currentTick
+        )
         {
             byte[] packet = _packets.Dequeue();
             Bytes -= packet.Length;
@@ -449,7 +554,8 @@ internal readonly record struct LinkScheduleResult(
     int NetworkDropped,
     int QueueDropped,
     int Duplicated,
-    int Reordered);
+    int Reordered
+);
 
 internal readonly record struct ScenarioMeasurements(
     double TickP99Milliseconds,
@@ -465,7 +571,8 @@ internal readonly record struct ScenarioMeasurements(
     long QueueDroppedPackets,
     long DuplicatedPackets,
     long ReorderedPackets,
-    ulong FinalStateHash);
+    ulong FinalStateHash
+);
 
 internal sealed record ScenarioReport(
     string EvidenceClass,
@@ -503,4 +610,5 @@ internal sealed record ScenarioReport(
     long DuplicatedPackets,
     long ReorderedPackets,
     string FinalStateHash,
-    bool GatesPassed);
+    bool GatesPassed
+);

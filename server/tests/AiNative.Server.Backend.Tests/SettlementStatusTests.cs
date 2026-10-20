@@ -13,12 +13,19 @@ public sealed class SettlementStatusTests
     [TestCase("Ready")]
     [TestCase("Released")]
     [TestCase("Lost")]
-    public async Task Gate_participant_gets_unconfirmed_receipt_until_result_is_persisted(string state)
+    public async Task Gate_participant_gets_unconfirmed_receipt_until_result_is_persisted(
+        string state
+    )
     {
         using var fixture = new SettlementFixture();
         fixture.Authority.Room!.State = state;
-        var receipt = (await fixture.QueryAsync(ServiceRole.Gate, "gate", "p1")).Read(SettlementReceipt.Parser);
-        Assert.That((receipt.MatchId, receipt.Confirmed, receipt.PayloadHash), Is.EqualTo(("match", false, "")));
+        var receipt = (await fixture.QueryAsync(ServiceRole.Gate, "gate", "p1")).Read(
+            SettlementReceipt.Parser
+        );
+        Assert.That(
+            (receipt.MatchId, receipt.Confirmed, receipt.PayloadHash),
+            Is.EqualTo(("match", false, ""))
+        );
     }
 
     [Test]
@@ -28,7 +35,9 @@ public sealed class SettlementStatusTests
         var committed = await fixture.SettleAsync();
         fixture.Authority.Room!.State = "Released";
         fixture.RestartPlayer();
-        var receipt = (await fixture.QueryAsync(ServiceRole.Gate, "gate", "p1")).Read(SettlementReceipt.Parser);
+        var receipt = (await fixture.QueryAsync(ServiceRole.Gate, "gate", "p1")).Read(
+            SettlementReceipt.Parser
+        );
         Assert.That(receipt, Is.EqualTo(committed));
         Assert.That(receipt.Confirmed, Is.True);
         Assert.That(receipt.PayloadHash, Is.Not.Empty);
@@ -40,8 +49,13 @@ public sealed class SettlementStatusTests
         using var fixture = new SettlementFixture();
         await fixture.SettleAsync();
         fixture.Authority.Room!.MatchId = "next-match";
-        var receipt = (await fixture.QueryAsync(ServiceRole.Gate, "gate", "p1", "next-match")).Read(SettlementReceipt.Parser);
-        Assert.That((receipt.MatchId, receipt.Confirmed, receipt.PayloadHash), Is.EqualTo(("next-match", false, "")));
+        var receipt = (await fixture.QueryAsync(ServiceRole.Gate, "gate", "p1", "next-match")).Read(
+            SettlementReceipt.Parser
+        );
+        Assert.That(
+            (receipt.MatchId, receipt.Confirmed, receipt.PayloadHash),
+            Is.EqualTo(("next-match", false, ""))
+        );
     }
 
     [TestCase(ServiceRole.Client)]
@@ -58,13 +72,22 @@ public sealed class SettlementStatusTests
 
     [TestCase("")]
     [TestCase("other-player")]
-    public async Task Gate_requires_an_authenticated_participant_even_with_a_forged_body(string player)
+    public async Task Gate_requires_an_authenticated_participant_even_with_a_forged_body(
+        string player
+    )
     {
         using var fixture = new SettlementFixture();
         await fixture.SettleAsync();
         // Unknown field 2 pretends to name p1; it must never override adapter identity.
-        var payload = new SettlementQuery { MatchId = "match" }.ToByteArray().Concat(new byte[] { 0x12, 0x02, (byte)'p', (byte)'1' }).ToArray();
-        var reply = await fixture.Player.HandleAsync(new(ServiceRole.Gate, "gate", player), ServiceMethods.SettlementStatus, payload);
+        var payload = new SettlementQuery { MatchId = "match" }
+            .ToByteArray()
+            .Concat(new byte[] { 0x12, 0x02, (byte)'p', (byte)'1' })
+            .ToArray();
+        var reply = await fixture.Player.HandleAsync(
+            new(ServiceRole.Gate, "gate", player),
+            ServiceMethods.SettlementStatus,
+            payload
+        );
         Assert.That(reply.Error, Is.EqualTo("forbidden"));
     }
 
@@ -72,19 +95,32 @@ public sealed class SettlementStatusTests
     [TestCase("room")]
     [TestCase("node")]
     [TestCase("epoch")]
-    public async Task Gate_rejects_mismatched_or_invalid_authoritative_allocation_identity(string changed)
+    public async Task Gate_rejects_mismatched_or_invalid_authoritative_allocation_identity(
+        string changed
+    )
     {
         using var fixture = new SettlementFixture();
         await fixture.SettleAsync();
         var room = fixture.Authority.Room!;
         switch (changed)
         {
-            case "match": room.MatchId = "different-match"; break;
-            case "room": room.RoomId = ""; break;
-            case "node": room.NodeId = "invalid node"; break;
-            case "epoch": room.BootEpoch = ""; break;
+            case "match":
+                room.MatchId = "different-match";
+                break;
+            case "room":
+                room.RoomId = "";
+                break;
+            case "node":
+                room.NodeId = "invalid node";
+                break;
+            case "epoch":
+                room.BootEpoch = "";
+                break;
         }
-        Assert.That((await fixture.QueryAsync(ServiceRole.Gate, "gate", "p1")).Error, Is.EqualTo("forbidden"));
+        Assert.That(
+            (await fixture.QueryAsync(ServiceRole.Gate, "gate", "p1")).Error,
+            Is.EqualTo("forbidden")
+        );
     }
 
     [Test]
@@ -92,8 +128,16 @@ public sealed class SettlementStatusTests
     {
         using var fixture = new SettlementFixture();
         var committed = await fixture.SettleAsync();
-        Assert.That((await fixture.QueryAsync(ServiceRole.Battle, "battle", "")).Read(SettlementReceipt.Parser), Is.EqualTo(committed));
-        Assert.That((await fixture.QueryAsync(ServiceRole.Battle, "other-node", "p1")).Error, Is.EqualTo("forbidden"));
+        Assert.That(
+            (await fixture.QueryAsync(ServiceRole.Battle, "battle", "")).Read(
+                SettlementReceipt.Parser
+            ),
+            Is.EqualTo(committed)
+        );
+        Assert.That(
+            (await fixture.QueryAsync(ServiceRole.Battle, "other-node", "p1")).Error,
+            Is.EqualTo("forbidden")
+        );
     }
 
     [TestCase("")]
@@ -101,7 +145,10 @@ public sealed class SettlementStatusTests
     public async Task Gate_rejects_invalid_match_identifiers(string match)
     {
         using var fixture = new SettlementFixture();
-        Assert.That((await fixture.QueryAsync(ServiceRole.Gate, "gate", "p1", match)).Error, Is.EqualTo("invalid_request"));
+        Assert.That(
+            (await fixture.QueryAsync(ServiceRole.Gate, "gate", "p1", match)).Error,
+            Is.EqualTo("invalid_request")
+        );
     }
 
     [Test]
@@ -109,8 +156,11 @@ public sealed class SettlementStatusTests
     {
         using var fixture = new SettlementFixture();
         var player = new PlayerService(fixture.Store, fixture.Key, new TestClock());
-        var reply = await player.HandleAsync(new(ServiceRole.Gate, "gate", "p1"), ServiceMethods.SettlementStatus,
-            new SettlementQuery { MatchId = "match" }.ToByteArray());
+        var reply = await player.HandleAsync(
+            new(ServiceRole.Gate, "gate", "p1"),
+            ServiceMethods.SettlementStatus,
+            new SettlementQuery { MatchId = "match" }.ToByteArray()
+        );
         Assert.That(reply.Error, Is.EqualTo("authority_unavailable"));
     }
 }
@@ -119,25 +169,68 @@ sealed class SettlementFixture : IDisposable
 {
     public RSA Key { get; } = RSA.Create(2048);
     public MemoryStore Store { get; } = new();
-    public RoomAuthority Authority { get; } = new()
-    {
-        Room = new RoomAllocation { AllocationId = "allocation", MatchId = "match", RoomId = "room", NodeId = "battle", BootEpoch = "epoch", State = "Ready" }
-    };
+    public RoomAuthority Authority { get; } =
+        new()
+        {
+            Room = new RoomAllocation
+            {
+                AllocationId = "allocation",
+                MatchId = "match",
+                RoomId = "room",
+                NodeId = "battle",
+                BootEpoch = "epoch",
+                State = "Ready",
+            },
+        };
     public PlayerService Player { get; private set; }
+
     public SettlementFixture()
     {
         Authority.Room!.PlayerIds.Add("p1");
         Store.CreateAsync(new("p1", "player", new byte[32], new byte[32])).GetAwaiter().GetResult();
         Player = new(Store, Key, new TestClock(), Authority);
     }
+
     public void RestartPlayer() => Player = new(Store, Key, new TestClock(), Authority);
-    public ValueTask<ServiceReply> QueryAsync(ServiceRole role, string peer, string player, string match = "match") =>
-        Player.HandleAsync(new(role, peer, player), ServiceMethods.SettlementStatus, new SettlementQuery { MatchId = match }.ToByteArray());
+
+    public ValueTask<ServiceReply> QueryAsync(
+        ServiceRole role,
+        string peer,
+        string player,
+        string match = "match"
+    ) =>
+        Player.HandleAsync(
+            new(role, peer, player),
+            ServiceMethods.SettlementStatus,
+            new SettlementQuery { MatchId = match }.ToByteArray()
+        );
+
     public async Task<SettlementReceipt> SettleAsync()
     {
-        var result = new MatchResult { MatchId = "match", RoomId = "room", NodeId = "battle", BootEpoch = "epoch", Completion = "completed" };
-        result.Players.Add(new PlayerResult { PlayerId = "p1", Won = true, Kills = 2 });
-        return (await Player.HandleAsync(new(ServiceRole.Battle, "battle"), ServiceMethods.Settle, result.ToByteArray())).Read(SettlementReceipt.Parser);
+        var result = new MatchResult
+        {
+            MatchId = "match",
+            RoomId = "room",
+            NodeId = "battle",
+            BootEpoch = "epoch",
+            Completion = "completed",
+        };
+        result.Players.Add(
+            new PlayerResult
+            {
+                PlayerId = "p1",
+                Won = true,
+                Kills = 2,
+            }
+        );
+        return (
+            await Player.HandleAsync(
+                new(ServiceRole.Battle, "battle"),
+                ServiceMethods.Settle,
+                result.ToByteArray()
+            )
+        ).Read(SettlementReceipt.Parser);
     }
+
     public void Dispose() => Key.Dispose();
 }

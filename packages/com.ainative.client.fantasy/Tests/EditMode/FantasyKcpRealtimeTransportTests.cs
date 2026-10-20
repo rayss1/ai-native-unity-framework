@@ -24,11 +24,10 @@ namespace AiNative.Client.Fantasy.Tests
             Assert.That(session.Sent[0].OpCode(), Is.EqualTo(134217729U));
             Assert.That(session.Sent[0].ChannelId, Is.EqualTo(0U));
             Assert.That(session.Sent[0].Payload, Is.EqualTo(new byte[] { 7, 8, 9 }));
-            Assert.That(FantasyClientSessionRouter.Deliver(
-                session.RuntimeId,
-                2,
-                new byte[] { 4 },
-                1), Is.True);
+            Assert.That(
+                FantasyClientSessionRouter.Deliver(session.RuntimeId, 2, new byte[] { 4 }, 1),
+                Is.True
+            );
             Assert.That(transport.TryReceive(new byte[1], out ReceivedPacket packet), Is.True);
             Assert.That(packet.Channel, Is.EqualTo(UnreliableSequenced(2)));
             await transport.DisposeAsync();
@@ -63,8 +62,11 @@ namespace AiNative.Client.Fantasy.Tests
             Assert.That(transport.TryAdvanceConnectionEpoch(7), Is.False);
             Assert.That(transport.TryReceive(new byte[1], out ReceivedPacket packet), Is.True);
             Assert.That(packet.ConnectionEpoch, Is.EqualTo(8U));
-            Assert.That(transport.TryEnqueueReceived(1, new byte[] { 2 }, 1), Is.True,
-                "Advancing an epoch resets per-channel sequence history.");
+            Assert.That(
+                transport.TryEnqueueReceived(1, new byte[] { 2 }, 1),
+                Is.True,
+                "Advancing an epoch resets per-channel sequence history."
+            );
             await transport.DisposeAsync();
         }
 
@@ -91,9 +93,13 @@ namespace AiNative.Client.Fantasy.Tests
             var transport = new FantasyKcpRealtimeTransport(
                 session,
                 maximumQueuedPackets: 1,
-                maximumQueuedBytes: 4);
+                maximumQueuedBytes: 4
+            );
 
-            SendResult first = await transport.SendAsync(ReliableOrdered(0), new byte[] { 1, 2, 3, 4 });
+            SendResult first = await transport.SendAsync(
+                ReliableOrdered(0),
+                new byte[] { 1, 2, 3, 4 }
+            );
             SendResult second = await transport.SendAsync(ReliableOrdered(0), new byte[] { 5 });
             Assert.That(first.Status, Is.EqualTo(SendStatus.Accepted));
             Assert.That(second.Status, Is.EqualTo(SendStatus.WouldBlock));
@@ -116,7 +122,8 @@ namespace AiNative.Client.Fantasy.Tests
             SendResult tooLarge = await transport.SendAsync(UnreliableSequenced(1), oversized);
             SendResult invalid = await transport.SendAsync(
                 new TransportChannel(1, TransportDelivery.Reliable, TransportOrdering.Ordered),
-                new byte[1]);
+                new byte[1]
+            );
 
             Assert.That(accepted.Status, Is.EqualTo(SendStatus.Accepted));
             Assert.That(tooLarge.Status, Is.EqualTo(SendStatus.PayloadTooLarge));
@@ -138,7 +145,9 @@ namespace AiNative.Client.Fantasy.Tests
                     await faultingTransport.SendAsync(
                         ReliableOrdered(0),
                         new byte[1],
-                        cancelled.Token));
+                        cancelled.Token
+                    )
+                );
             }
 
             await faultingTransport.DisposeAsync();
@@ -149,19 +158,17 @@ namespace AiNative.Client.Fantasy.Tests
         {
             var session = new FakeFantasyClientSession();
             var transport = new FantasyKcpRealtimeTransport(session);
-            Assert.That(FantasyClientSessionRouter.Deliver(
-                session.RuntimeId,
-                0,
-                new byte[] { 1 },
-                1), Is.True);
+            Assert.That(
+                FantasyClientSessionRouter.Deliver(session.RuntimeId, 0, new byte[] { 1 }, 1),
+                Is.True
+            );
 
             await transport.DisposeAsync();
 
-            Assert.That(FantasyClientSessionRouter.Deliver(
-                session.RuntimeId,
-                0,
-                new byte[] { 2 },
-                2), Is.False);
+            Assert.That(
+                FantasyClientSessionRouter.Deliver(session.RuntimeId, 0, new byte[] { 2 }, 2),
+                Is.False
+            );
             Assert.That(session.IsClosed, Is.True);
             Assert.That(transport.State, Is.EqualTo(TransportState.Closed));
         }
@@ -181,7 +188,10 @@ namespace AiNative.Client.Fantasy.Tests
             Assert.That(session.DisposeCount, Is.EqualTo(1));
             Assert.That(transport.State, Is.EqualTo(TransportState.Closed));
             Assert.That(session.Sent, Is.Empty);
-            Assert.That(FantasyClientSessionRouter.Deliver(session.RuntimeId, 0, new byte[] { 2 }, 1), Is.False);
+            Assert.That(
+                FantasyClientSessionRouter.Deliver(session.RuntimeId, 0, new byte[] { 2 }, 1),
+                Is.False
+            );
         }
 
         [Test]
@@ -221,13 +231,20 @@ namespace AiNative.Client.Fantasy.Tests
                 transport.NotifyDisconnected();
                 await transport.DisposeAsync();
 
-                Assert.DoesNotThrow(() => replacement = new FantasyKcpRealtimeTransport(new FakeFantasyClientSession(registeredId)), "Disconnection must remove the original router key even after Fantasy clears its session ID.");
+                Assert.DoesNotThrow(
+                    () =>
+                        replacement = new FantasyKcpRealtimeTransport(
+                            new FakeFantasyClientSession(registeredId)
+                        ),
+                    "Disconnection must remove the original router key even after Fantasy clears its session ID."
+                );
                 Assert.That(session.DisposeCount, Is.EqualTo(1));
             }
             finally
             {
                 FantasyClientSessionRouter.Remove(registeredId, transport);
-                if (replacement != null) await replacement.DisposeAsync();
+                if (replacement != null)
+                    await replacement.DisposeAsync();
             }
         }
 
@@ -236,7 +253,11 @@ namespace AiNative.Client.Fantasy.Tests
         {
             var session = new FakeFantasyClientSession { RunPostsImmediately = false };
             var transport = new FantasyKcpRealtimeTransport(session);
-            session.BeforeClosedCheck = () => { session.BeforeClosedCheck = null; transport.DisposeAsync().GetAwaiter().GetResult(); };
+            session.BeforeClosedCheck = () =>
+            {
+                session.BeforeClosedCheck = null;
+                transport.DisposeAsync().GetAwaiter().GetResult();
+            };
 
             SendResult result = await transport.SendAsync(ReliableOrdered(0), new byte[] { 1 });
 
@@ -278,17 +299,31 @@ namespace AiNative.Client.Fantasy.Tests
         {
             var session = new FakeFantasyClientSession();
             var transport = new FantasyKcpRealtimeTransport(session);
-            object sequenceGate = typeof(FantasyKcpRealtimeTransport).GetField("_sequenceGate", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(transport);
+            object sequenceGate = typeof(FantasyKcpRealtimeTransport)
+                .GetField("_sequenceGate", BindingFlags.Instance | BindingFlags.NonPublic)
+                .GetValue(transport);
             bool received = false;
-            var callback = new Thread(() => received = transport.TryEnqueueReceived(0, new byte[] { 1 }, 1));
+            var callback = new Thread(() =>
+                received = transport.TryEnqueueReceived(0, new byte[] { 1 }, 1)
+            );
             Monitor.Enter(sequenceGate);
             try
             {
                 callback.Start();
-                Assert.That(SpinWait.SpinUntil(() => (callback.ThreadState & ThreadState.WaitSleepJoin) != 0, 2000), Is.True, "The callback must pass its initial state check and wait for sequence admission.");
+                Assert.That(
+                    SpinWait.SpinUntil(
+                        () => (callback.ThreadState & ThreadState.WaitSleepJoin) != 0,
+                        2000
+                    ),
+                    Is.True,
+                    "The callback must pass its initial state check and wait for sequence admission."
+                );
                 transport.DisposeAsync().GetAwaiter().GetResult();
             }
-            finally { Monitor.Exit(sequenceGate); }
+            finally
+            {
+                Monitor.Exit(sequenceGate);
+            }
             Assert.That(callback.Join(2000), Is.True);
 
             Assert.That(received, Is.False);
@@ -331,13 +366,25 @@ namespace AiNative.Client.Fantasy.Tests
 
         internal FakeFantasyClientSession(long runtimeId = 0)
         {
-            RuntimeId = runtimeId == 0 ? System.Threading.Interlocked.Increment(ref _nextRuntimeId) : runtimeId;
+            RuntimeId =
+                runtimeId == 0
+                    ? System.Threading.Interlocked.Increment(ref _nextRuntimeId)
+                    : runtimeId;
         }
 
         public long RuntimeId { get; private set; }
+
         internal void ResetRuntimeId() => RuntimeId = 0;
 
-        public bool IsClosed { get { bool closed = _isClosed; BeforeClosedCheck?.Invoke(); return closed; } }
+        public bool IsClosed
+        {
+            get
+            {
+                bool closed = _isClosed;
+                BeforeClosedCheck?.Invoke();
+                return closed;
+            }
+        }
 
         internal bool RunPostsImmediately { get; set; } = true;
 
@@ -349,8 +396,7 @@ namespace AiNative.Client.Fantasy.Tests
 
         internal int DisposeCount;
 
-        internal List<FantasyRealtimeEnvelope> Sent { get; } =
-            new List<FantasyRealtimeEnvelope>();
+        internal List<FantasyRealtimeEnvelope> Sent { get; } = new List<FantasyRealtimeEnvelope>();
 
         public void Post(Action action)
         {
@@ -372,11 +418,16 @@ namespace AiNative.Client.Fantasy.Tests
         public void Send(FantasyRealtimeEnvelope envelope)
         {
             BeforeSend?.Invoke();
-            if (ThrowWhenSending) throw new InvalidOperationException("Injected send failure.");
+            if (ThrowWhenSending)
+                throw new InvalidOperationException("Injected send failure.");
             Sent.Add(envelope);
         }
 
-        public void Dispose() { Interlocked.Increment(ref DisposeCount); _isClosed = true; }
+        public void Dispose()
+        {
+            Interlocked.Increment(ref DisposeCount);
+            _isClosed = true;
+        }
 
         internal void RunPostedActions()
         {

@@ -37,7 +37,15 @@ namespace AiNative.Gameplay
 
     public readonly struct ArenaPickupState
     {
-        public ArenaPickupState(int id, ArenaPickupType type, int x, int y, int z, bool active, ulong respawnTick)
+        public ArenaPickupState(
+            int id,
+            ArenaPickupType type,
+            int x,
+            int y,
+            int z,
+            bool active,
+            ulong respawnTick
+        )
         {
             Id = id;
             Type = type;
@@ -67,9 +75,11 @@ namespace AiNative.Gameplay
             int lookYawMilli,
             int lookPitchMilli,
             ArenaButtons buttons,
-            ArenaWeaponId weapon)
+            ArenaWeaponId weapon
+        )
         {
-            if (sequence == 0) throw new ArgumentOutOfRangeException(nameof(sequence));
+            if (sequence == 0)
+                throw new ArgumentOutOfRangeException(nameof(sequence));
             Sequence = sequence;
             ClientTick = clientTick;
             MoveXMilli = moveXMilli;
@@ -129,26 +139,25 @@ namespace AiNative.Gameplay
             Kills = 0;
         }
 
-        public bool Equals(ArenaPlayerState other)
-            => Tick == other.Tick &&
-               PositionXMillimetres == other.PositionXMillimetres &&
-               PositionYMillimetres == other.PositionYMillimetres &&
-               PositionZMillimetres == other.PositionZMillimetres &&
-               VelocityXMillimetresPerSecond == other.VelocityXMillimetresPerSecond &&
-               VelocityYMillimetresPerSecond == other.VelocityYMillimetresPerSecond &&
-               VelocityZMillimetresPerSecond == other.VelocityZMillimetresPerSecond &&
-               YawMillidegrees == other.YawMillidegrees &&
-               PitchMillidegrees == other.PitchMillidegrees &&
-               Health == other.Health &&
-               Armor == other.Armor &&
-               Weapon == other.Weapon &&
-               Alive == other.Alive &&
-               Grounded == other.Grounded &&
-               LastProcessedInputSequence == other.LastProcessedInputSequence &&
-               Kills == other.Kills;
+        public bool Equals(ArenaPlayerState other) =>
+            Tick == other.Tick
+            && PositionXMillimetres == other.PositionXMillimetres
+            && PositionYMillimetres == other.PositionYMillimetres
+            && PositionZMillimetres == other.PositionZMillimetres
+            && VelocityXMillimetresPerSecond == other.VelocityXMillimetresPerSecond
+            && VelocityYMillimetresPerSecond == other.VelocityYMillimetresPerSecond
+            && VelocityZMillimetresPerSecond == other.VelocityZMillimetresPerSecond
+            && YawMillidegrees == other.YawMillidegrees
+            && PitchMillidegrees == other.PitchMillidegrees
+            && Health == other.Health
+            && Armor == other.Armor
+            && Weapon == other.Weapon
+            && Alive == other.Alive
+            && Grounded == other.Grounded
+            && LastProcessedInputSequence == other.LastProcessedInputSequence
+            && Kills == other.Kills;
 
-        public override bool Equals(object obj)
-            => obj is ArenaPlayerState other && Equals(other);
+        public override bool Equals(object obj) => obj is ArenaPlayerState other && Equals(other);
 
         public override int GetHashCode()
         {
@@ -173,11 +182,11 @@ namespace AiNative.Gameplay
             }
         }
 
-        public static bool operator ==(ArenaPlayerState left, ArenaPlayerState right)
-            => left.Equals(right);
+        public static bool operator ==(ArenaPlayerState left, ArenaPlayerState right) =>
+            left.Equals(right);
 
-        public static bool operator !=(ArenaPlayerState left, ArenaPlayerState right)
-            => !left.Equals(right);
+        public static bool operator !=(ArenaPlayerState left, ArenaPlayerState right) =>
+            !left.Equals(right);
     }
 
     public static class ArenaMovement
@@ -201,9 +210,17 @@ namespace AiNative.Gameplay
             next.LastProcessedInputSequence = input.Sequence;
             next.YawMillidegrees = WrapYaw((long)state.YawMillidegrees + input.LookYawMilli);
             next.PitchMillidegrees = Clamp(
-                (int)Math.Max(-MaximumPitchMillidegrees, Math.Min(MaximumPitchMillidegrees, (long)state.PitchMillidegrees + input.LookPitchMilli)),
+                (int)
+                    Math.Max(
+                        -MaximumPitchMillidegrees,
+                        Math.Min(
+                            MaximumPitchMillidegrees,
+                            (long)state.PitchMillidegrees + input.LookPitchMilli
+                        )
+                    ),
                 -MaximumPitchMillidegrees,
-                MaximumPitchMillidegrees);
+                MaximumPitchMillidegrees
+            );
 
             if (!state.Alive)
             {
@@ -224,21 +241,25 @@ namespace AiNative.Gameplay
             {
                 next.VelocityXMillimetresPerSecond = ApplyFriction(
                     state.VelocityXMillimetresPerSecond,
-                    GroundFrictionMillimetresPerSecondSquared);
+                    GroundFrictionMillimetresPerSecondSquared
+                );
                 next.VelocityZMillimetresPerSecond = ApplyFriction(
                     state.VelocityZMillimetresPerSecond,
-                    GroundFrictionMillimetresPerSecondSquared);
+                    GroundFrictionMillimetresPerSecondSquared
+                );
             }
             else
             {
                 next.VelocityXMillimetresPerSecond = Accelerate(
                     state.VelocityXMillimetresPerSecond,
                     targetX,
-                    acceleration);
+                    acceleration
+                );
                 next.VelocityZMillimetresPerSecond = Accelerate(
                     state.VelocityZMillimetresPerSecond,
                     targetZ,
-                    acceleration);
+                    acceleration
+                );
             }
 
             if (state.Grounded && (input.Buttons & ArenaButtons.Jump) != 0)
@@ -249,19 +270,24 @@ namespace AiNative.Gameplay
             else if (!state.Grounded)
             {
                 next.VelocityYMillimetresPerSecond = checked(
-                    state.VelocityYMillimetresPerSecond - GravityMillimetresPerSecondSquared / TickRate);
+                    state.VelocityYMillimetresPerSecond
+                    - GravityMillimetresPerSecondSquared / TickRate
+                );
             }
 
             next.PositionXMillimetres = Clamp(
                 checked(state.PositionXMillimetres + next.VelocityXMillimetresPerSecond / TickRate),
                 -ArenaHalfExtentMillimetres,
-                ArenaHalfExtentMillimetres);
+                ArenaHalfExtentMillimetres
+            );
             next.PositionYMillimetres = checked(
-                state.PositionYMillimetres + next.VelocityYMillimetresPerSecond / TickRate);
+                state.PositionYMillimetres + next.VelocityYMillimetresPerSecond / TickRate
+            );
             next.PositionZMillimetres = Clamp(
                 checked(state.PositionZMillimetres + next.VelocityZMillimetresPerSecond / TickRate),
                 -ArenaHalfExtentMillimetres,
-                ArenaHalfExtentMillimetres);
+                ArenaHalfExtentMillimetres
+            );
 
             if (next.PositionYMillimetres <= 0)
             {
@@ -278,16 +304,20 @@ namespace AiNative.Gameplay
         {
             int delta = target - current;
             int step = acceleration / TickRate;
-            if (delta > step) return checked(current + step);
-            if (delta < -step) return checked(current - step);
+            if (delta > step)
+                return checked(current + step);
+            if (delta < -step)
+                return checked(current - step);
             return target;
         }
 
         private static int ApplyFriction(int velocity, int friction)
         {
             int step = friction / TickRate;
-            if (velocity > 0) return Math.Max(0, velocity - step);
-            if (velocity < 0) return Math.Min(0, velocity + step);
+            if (velocity > 0)
+                return Math.Max(0, velocity - step);
+            if (velocity < 0)
+                return Math.Min(0, velocity + step);
             return 0;
         }
 
@@ -297,8 +327,8 @@ namespace AiNative.Gameplay
             return wrapped < 0 ? wrapped + 360000 : wrapped;
         }
 
-        private static int Clamp(int value, int minimum, int maximum)
-            => Math.Max(minimum, Math.Min(maximum, value));
+        private static int Clamp(int value, int minimum, int maximum) =>
+            Math.Max(minimum, Math.Min(maximum, value));
     }
 
     public readonly struct ArenaWeaponDefinition
@@ -309,7 +339,8 @@ namespace AiNative.Gameplay
             int reserveAmmo,
             int damage,
             int roundsPerMinute,
-            int rangeMillimetres)
+            int rangeMillimetres
+        )
         {
             Id = id;
             MagazineSize = magazineSize;
@@ -329,17 +360,17 @@ namespace AiNative.Gameplay
 
     public static class ArenaWeaponRules
     {
-        public static ArenaWeaponDefinition Machinegun => new(
-            ArenaWeaponId.Machinegun, 40, 200, 20, 600, 100000);
+        public static ArenaWeaponDefinition Machinegun =>
+            new(ArenaWeaponId.Machinegun, 40, 200, 20, 600, 100000);
 
-        public static ArenaWeaponDefinition Shotgun => new(
-            ArenaWeaponId.Shotgun, 8, 64, 8, 72, 25000);
+        public static ArenaWeaponDefinition Shotgun =>
+            new(ArenaWeaponId.Shotgun, 8, 64, 8, 72, 25000);
 
-        public static ArenaWeaponDefinition Rocket => new(
-            ArenaWeaponId.Rocket, 20, 20, 100, 48, 100000);
+        public static ArenaWeaponDefinition Rocket =>
+            new(ArenaWeaponId.Rocket, 20, 20, 100, 48, 100000);
 
-        public static ArenaWeaponDefinition Get(ArenaWeaponId id)
-            => id switch
+        public static ArenaWeaponDefinition Get(ArenaWeaponId id) =>
+            id switch
             {
                 ArenaWeaponId.Machinegun => Machinegun,
                 ArenaWeaponId.Shotgun => Shotgun,
@@ -360,7 +391,8 @@ namespace AiNative.Gameplay
 
         public static int ApplyDamage(ref ArenaPlayerState target, int damage)
         {
-            if (!target.Alive || damage <= 0) return 0;
+            if (!target.Alive || damage <= 0)
+                return 0;
             int absorbed = Math.Min(target.Armor, damage * ArmorAbsorptionPercent / 100);
             int healthDamage = damage - absorbed;
             target.Armor -= absorbed;
@@ -399,8 +431,10 @@ namespace AiNative.Gameplay
                 return 0;
             }
 
-            int damage = RocketSplashDamage * (RocketSplashRadiusMillimetres - distanceMillimetres)
-                         / RocketSplashRadiusMillimetres;
+            int damage =
+                RocketSplashDamage
+                * (RocketSplashRadiusMillimetres - distanceMillimetres)
+                / RocketSplashRadiusMillimetres;
             return selfDamage ? damage / 2 : damage;
         }
     }
@@ -433,8 +467,10 @@ namespace AiNative.Gameplay
 
         public bool IsInitialized => _initialized;
 
-        public ArenaPlayerState Current
-            => _initialized ? _current : throw new InvalidOperationException("Prediction is not initialized.");
+        public ArenaPlayerState Current =>
+            _initialized
+                ? _current
+                : throw new InvalidOperationException("Prediction is not initialized.");
 
         public void Initialize(in ArenaPlayerState authoritative)
         {
@@ -447,7 +483,8 @@ namespace AiNative.Gameplay
 
         public ArenaPlayerState Predict(in ArenaInput input, out bool droppedOldest)
         {
-            if (!_initialized) throw new InvalidOperationException("Prediction is not initialized.");
+            if (!_initialized)
+                throw new InvalidOperationException("Prediction is not initialized.");
             ArenaPlayerState predicted = ArenaMovement.Step(_current, input);
             droppedOldest = false;
             if (_count == _inputs.Length)
@@ -469,11 +506,16 @@ namespace AiNative.Gameplay
 
         public ReconciliationResult Reconcile(in ArenaPlayerState authoritative)
         {
-            if (!_initialized) throw new InvalidOperationException("Prediction is not initialized.");
+            if (!_initialized)
+                throw new InvalidOperationException("Prediction is not initialized.");
             ArenaPlayerState before = _current;
-            if (authoritative.LastProcessedInputSequence < _baseline.LastProcessedInputSequence ||
-                (authoritative.LastProcessedInputSequence == _baseline.LastProcessedInputSequence &&
-                 authoritative.Tick < _baseline.Tick))
+            if (
+                authoritative.LastProcessedInputSequence < _baseline.LastProcessedInputSequence
+                || (
+                    authoritative.LastProcessedInputSequence == _baseline.LastProcessedInputSequence
+                    && authoritative.Tick < _baseline.Tick
+                )
+            )
             {
                 return new ReconciliationResult(
                     ReconciliationStatus.StaleSnapshotIgnored,
@@ -482,7 +524,8 @@ namespace AiNative.Gameplay
                     0,
                     0,
                     0,
-                    0);
+                    0
+                );
             }
 
             if (authoritative.LastProcessedInputSequence > _current.LastProcessedInputSequence)
@@ -495,11 +538,15 @@ namespace AiNative.Gameplay
                     0,
                     0,
                     0,
-                    0);
+                    0
+                );
             }
 
             int discardOffset = FindSequence(authoritative.LastProcessedInputSequence);
-            if (authoritative.LastProcessedInputSequence != _baseline.LastProcessedInputSequence && discardOffset < 0)
+            if (
+                authoritative.LastProcessedInputSequence != _baseline.LastProcessedInputSequence
+                && discardOffset < 0
+            )
             {
                 Initialize(authoritative);
                 return new ReconciliationResult(
@@ -509,7 +556,8 @@ namespace AiNative.Gameplay
                     0,
                     0,
                     0,
-                    0);
+                    0
+                );
             }
 
             int discardCount = 0;
@@ -534,11 +582,12 @@ namespace AiNative.Gameplay
             }
 
             _current = replayed;
-            ReconciliationStatus status = before.PositionXMillimetres == replayed.PositionXMillimetres &&
-                                          before.PositionYMillimetres == replayed.PositionYMillimetres &&
-                                          before.PositionZMillimetres == replayed.PositionZMillimetres
-                ? ReconciliationStatus.Matched
-                : ReconciliationStatus.Corrected;
+            ReconciliationStatus status =
+                before.PositionXMillimetres == replayed.PositionXMillimetres
+                && before.PositionYMillimetres == replayed.PositionYMillimetres
+                && before.PositionZMillimetres == replayed.PositionZMillimetres
+                    ? ReconciliationStatus.Matched
+                    : ReconciliationStatus.Corrected;
             return new ReconciliationResult(
                 status,
                 ToKinematic(before),
@@ -546,7 +595,8 @@ namespace AiNative.Gameplay
                 checked(replayed.PositionXMillimetres - before.PositionXMillimetres),
                 checked(replayed.PositionZMillimetres - before.PositionZMillimetres),
                 discardCount,
-                _count);
+                _count
+            );
         }
 
         private int FindSequence(uint sequence)
@@ -554,17 +604,19 @@ namespace AiNative.Gameplay
             for (int index = 0; index < _count; index++)
             {
                 int ringIndex = (_start + index) % _inputs.Length;
-                if (_inputs[ringIndex].Sequence == sequence) return index;
+                if (_inputs[ringIndex].Sequence == sequence)
+                    return index;
             }
 
             return -1;
         }
 
-        private static KinematicState ToKinematic(in ArenaPlayerState state)
-            => new KinematicState(
+        private static KinematicState ToKinematic(in ArenaPlayerState state) =>
+            new KinematicState(
                 state.Tick,
                 state.LastProcessedInputSequence,
                 state.PositionXMillimetres,
-                state.PositionZMillimetres);
+                state.PositionZMillimetres
+            );
     }
 }

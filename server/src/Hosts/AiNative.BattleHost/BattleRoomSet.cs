@@ -16,14 +16,15 @@ internal sealed record BattleHostCapacitySettings(int RoomCount)
         if (roomCount is < 1 or > MaximumEvaluationRooms)
         {
             throw new InvalidOperationException(
-                $"AINATIVE_EVALUATION_ROOM_COUNT must be between 1 and {MaximumEvaluationRooms}.");
+                $"AINATIVE_EVALUATION_ROOM_COUNT must be between 1 and {MaximumEvaluationRooms}."
+            );
         }
 
-        if (roomCount > 1 &&
-            !configuration.GetValue("AINATIVE_ENABLE_EVALUATION_ENDPOINTS", false))
+        if (roomCount > 1 && !configuration.GetValue("AINATIVE_ENABLE_EVALUATION_ENDPOINTS", false))
         {
             throw new InvalidOperationException(
-                "Multi-room execution is evaluation-only until its capacity evidence is accepted.");
+                "Multi-room execution is evaluation-only until its capacity evidence is accepted."
+            );
         }
 
         return new BattleHostCapacitySettings(roomCount);
@@ -39,10 +40,12 @@ internal sealed class BattleRoomSet
     public BattleRoomSet(BattleHostCapacitySettings settings)
     {
         Settings = settings;
-        _rooms = Enumerable.Range(0, settings.RoomCount)
+        _rooms = Enumerable
+            .Range(0, settings.RoomCount)
             .Select(_ => new SyntheticRoom(BattleHostCapacitySettings.BotsPerRoom))
             .ToArray();
-        _assignedEntities = Enumerable.Range(0, settings.RoomCount)
+        _assignedEntities = Enumerable
+            .Range(0, settings.RoomCount)
             .Select(_ => new bool[BattleHostCapacitySettings.BotsPerRoom])
             .ToArray();
     }
@@ -82,29 +85,32 @@ internal sealed class BattleRoomSet
 
     public void ReleaseEntity(int roomIndex, int entityIndex)
     {
-        if ((uint)roomIndex < (uint)_assignedEntities.Length &&
-            (uint)entityIndex < (uint)_assignedEntities[roomIndex].Length)
+        if (
+            (uint)roomIndex < (uint)_assignedEntities.Length
+            && (uint)entityIndex < (uint)_assignedEntities[roomIndex].Length
+        )
         {
             _assignedEntities[roomIndex][entityIndex] = false;
         }
     }
 
-    public ulong ComputeCombinedStateHash()
-        => ComputeCombinedStateHash(_rooms);
+    public ulong ComputeCombinedStateHash() => ComputeCombinedStateHash(_rooms);
 
     internal static ulong ComputeCombinedStateHash(IReadOnlyList<SyntheticRoom> rooms)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(rooms.Count, 1);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(
             rooms.Count,
-            BattleHostCapacitySettings.MaximumEvaluationRooms);
+            BattleHostCapacitySettings.MaximumEvaluationRooms
+        );
 
         if (rooms.Count == 1)
         {
             return rooms[0].ComputeStateHash();
         }
 
-        Span<byte> canonical = stackalloc byte[4 + (BattleHostCapacitySettings.MaximumEvaluationRooms * 8)];
+        Span<byte> canonical =
+            stackalloc byte[4 + (BattleHostCapacitySettings.MaximumEvaluationRooms * 8)];
         BinaryPrimitives.WriteUInt32LittleEndian(canonical, checked((uint)rooms.Count));
         int offset = 4;
         foreach (SyntheticRoom room in rooms)

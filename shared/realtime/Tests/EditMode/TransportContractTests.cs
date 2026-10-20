@@ -10,7 +10,8 @@ namespace AiNative.Realtime.Tests
             TransportChannel channel = new TransportChannel(
                 2,
                 TransportDelivery.Unreliable,
-                TransportOrdering.Sequenced);
+                TransportOrdering.Sequenced
+            );
 
             ReceivedPacket packet = new ReceivedPacket(channel, 64, 128, 42, 3);
 

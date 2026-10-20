@@ -1,0 +1,8 @@
+**/vendor/**
+shared/generated/**
+**/ThirdParty/**
+artifacts/**
+**/Library/**
+**/Temp/**
+**/obj/**
+**/bin/**

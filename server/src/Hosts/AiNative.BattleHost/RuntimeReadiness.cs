@@ -15,9 +15,9 @@ public sealed class RuntimeReadiness
     }
 
     public bool IsReady =>
-        Volatile.Read(ref _accepting) == 1 &&
-        Volatile.Read(ref _roomReady) == 1 &&
-        (!_networkRequired || Volatile.Read(ref _networkReady) == 1);
+        Volatile.Read(ref _accepting) == 1
+        && Volatile.Read(ref _roomReady) == 1
+        && (!_networkRequired || Volatile.Read(ref _networkReady) == 1);
 
     public long Tick => Interlocked.Read(ref _tick);
 
