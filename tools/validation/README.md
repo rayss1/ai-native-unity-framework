@@ -1,5 +1,7 @@
 # Current-source validation
 
+October 20 documentation sync is based on PR #44 merged at `aa06c05`. The earlier 132-test local review used the pre-#44 worktree at `2d92bcb`; it does not validate the training map or combat repairs. See the [review scope and commands](../../Docs/Architecture/current-status.md).
+
 Current project progress is maintained in [one status page](../../Docs/Architecture/current-status.md). For the October 16 P1 source, select `-Profile Development -ExpectedDotnetPassed 607 -ExpectedEditModePassed 241` on Windows. The local Windows solution run discovered 607 .NET cases: 602 passed and five PostgreSQL cases were skipped without AINATIVE_TEST_POSTGRES. The full gate expects all 607 to pass with the database configured; this local run is not a full release qualification claim. The P1 targeted prediction suite passed 56 cases; the historical P0 macOS full run passed 541 and skipped five Windows-only tests. Strict release gates still reject skips. The two executable entries obtain Unity inventories and Fantasy package pins from the same profile contract. Defaults remain historical for compatibility; select the profile explicitly.
 
 | Profile | Unity EditMode | Source/dependency scope |

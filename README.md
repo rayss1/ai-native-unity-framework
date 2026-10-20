@@ -3,7 +3,11 @@ An AI-native full-stack Unity game development framework for autonomous AI agent
 
 See [current progress and remaining gates](Docs/Architecture/current-status.md) for the single current status entry. Dated reports retain their original source/platform limits.
 
-The [2026-10-15 P0 validation](Docs/Architecture/p0-validation-2026-10-15.md) repairs local SDK/submodule alignment, portable tool tests, Unity CI checkout and Android build-host path checks. The current source uses the explicit `Development` validation profile (198 EditMode cases); `Current` retains the historical 166-case inventory. This is macOS worktree evidence, not release qualification.
+P0 (PR #42), [P1 network character integration](Docs/Architecture/p1-network-character.md) (PR #43), and training arena/combat repairs (PR #44) are merged in the inspected `origin/main` at `aa06c05`. The current source uses the explicit `Development` validation profile (241 EditMode cases; expected full .NET inventory 607); `Current` retains the historical 166-case inventory. These counts are validation requirements, not a claim that the merged source has passed the full release gate.
+
+The [current progress page](Docs/Architecture/current-status.md) includes a plain-language architecture/code map and the October 20 local review on the earlier `2d92bcb` worktree: .NET Release build, architecture validation and 132 targeted tests passed. Those results do not validate PR #44. Unity, full .NET, database, device and deployment qualification were not rerun in that review. The current Arena supports at most eight players per room; historical 128-client results span multiple rooms.
+
+The [2026-10-15 P0 validation](Docs/Architecture/p0-validation-2026-10-15.md) repaired local SDK/submodule alignment, portable tool tests, Unity CI checkout and Android build-host path checks. Its 198 EditMode cases describe the earlier macOS worktree, not the current inventory or release qualification.
 
 The [2026-10-08 development validation](Docs/Architecture/validation-2026-10-08.json) passed 532 .NET tests (including real PostgreSQL), 166 Unity EditMode tests, three legacy KCP PlayMode tests, and Windows x64 Mono Player build/reconnect smoke. It binds an uncommitted source snapshot; release and other-platform gates remain separate.
 
@@ -71,10 +75,10 @@ tools/run-unity-manual-validation.sh
 
 The macOS script is the complete WS-26 through WS-28 desktop, real-client correction, and presentation-smoothing gate. It builds the exact-source Host with fixed .NET images, verifies exactly 44 EditMode and 2 real-KCP PlayMode tests, builds an ARM64 Mono Player, runs the reconnect smoke, applies the symmetric Regional network profile, measures correction percentiles for 60 seconds after warm-up, and retains the evidence bundle. The complete contracts are defined in [Unity macOS Validation](Docs/Architecture/unity-manual-validation.md), [Regional Real-Client Correction Validation](Docs/Architecture/regional-client-correction-validation.md), and [Presentation Correction Smoothing](Docs/Architecture/presentation-correction-smoothing.md).
 
-For the current Windows source, select the reviewed 198-test development profile; use the unified entry for .NET/PostgreSQL and Unity phases. Historical macOS commands above qualify only their recorded source. The default Windows mode requires a clean commit:
+For the current Windows source, select the 241-test development profile; use the unified entry for .NET/PostgreSQL and Unity phases with expected .NET inventory 607. Historical macOS commands above qualify only their recorded source. The default Windows mode requires a clean commit:
 
 ```powershell
-tools/run-unity-windows-validation.ps1 -Profile Development -ExpectedEditModePassed 198
+tools/run-unity-windows-validation.ps1 -Profile Development -ExpectedEditModePassed 241
 ```
 
 The formal paths require a clean checkout so every result identifies one exact commit. The Windows and unified entries also support explicitly hashed `Worktree` development validation; see the [entry contract](tools/validation/README.md). A historical passing macOS bundle does not imply current-source Windows, Universal/x86_64, Android/iOS IL2CPP, production deployment, or a real Linux environment canary. Retain and review the generated bundle before updating milestone status.
@@ -84,6 +88,7 @@ The architecture-check command returns `0` for a valid repository, `1` for archi
 ## Current layout
 
 - `client/UnityProject`: minimal Unity composition project and local package manifest.
+- `packages/com.ainative.client.character`: reusable local character input, motor, camera and animation presentation. Networked characters consume authoritative/predicted state through the application adapter; local motor and damage are not multiplayer authority.
 - `packages/com.ainative.client.prediction`: Unity-ready input/Snapshot/reconnect adapter and presentation-only correction smoother over project-owned Shared contracts.
 - `packages/com.ainative.client.fantasy`: the sole Client Fantasy namespace boundary, implementing bounded Fantasy KCP behind `IRealtimeTransport` with pinned `Fantasy.Unity` and retained third-party notices.
 - `shared`: UPM/.NET Standard 2.1 Gameplay and realtime contracts, Protobuf schemas/generated code, and dual-runtime tests.
