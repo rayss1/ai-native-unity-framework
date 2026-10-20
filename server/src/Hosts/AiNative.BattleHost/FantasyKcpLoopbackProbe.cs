@@ -17,39 +17,39 @@ internal static class FantasyKcpLoopbackProbe
         );
         timeout.CancelAfter(TimeSpan.FromSeconds(12));
 
-        LoginResponse login;
-        JoinRoomResponse join;
-        Snapshot snapshot;
+        S2C_LoginResponse login;
+        S2C_JoinRoomResponse join;
+        S2C_SnapshotPush snapshot;
 
         await using (FantasyKcpProbe probe = await gateway.ConnectLoopbackProbeAsync(timeout.Token))
         {
             await SendAsync(
                 probe,
-                MessageId.LoginRequest,
-                new LoginRequest { ProtocolMajor = 1, ClientBuild = "kcp-loopback-probe" },
+                MessageId.C2SLoginRequest,
+                new C2S_LoginRequest { ProtocolMajor = 1, ClientBuild = "kcp-loopback-probe" },
                 timeout.Token
             );
-            login = await ReceiveAsync<LoginResponse>(
+            login = await ReceiveAsync<S2C_LoginResponse>(
                 probe,
-                MessageId.LoginResponse,
+                MessageId.S2CLoginResponse,
                 timeout.Token
             );
 
             await SendAsync(
                 probe,
-                MessageId.JoinRoomRequest,
-                new JoinRoomRequest { SessionId = login.SessionId, RequestedRoom = 1 },
+                MessageId.C2SJoinRoomRequest,
+                new C2S_JoinRoomRequest { SessionId = login.SessionId, RequestedRoom = 1 },
                 timeout.Token
             );
-            join = await ReceiveAsync<JoinRoomResponse>(
+            join = await ReceiveAsync<S2C_JoinRoomResponse>(
                 probe,
-                MessageId.JoinRoomResponse,
+                MessageId.S2CJoinRoomResponse,
                 timeout.Token
             );
 
-            Snapshot baseline = await ReceiveAsync<Snapshot>(
+            S2C_SnapshotPush baseline = await ReceiveAsync<S2C_SnapshotPush>(
                 probe,
-                MessageId.Snapshot,
+                MessageId.S2CSnapshotPush,
                 timeout.Token
             );
             PlayerState baselinePlayer = baseline.Players.First(player =>
@@ -58,8 +58,8 @@ internal static class FantasyKcpLoopbackProbe
 
             await SendAsync(
                 probe,
-                MessageId.InputCommand,
-                new InputCommand
+                MessageId.C2SInputCommand,
+                new C2S_InputCommand
                 {
                     RoomTick = 0,
                     Sequence = 1,
@@ -70,7 +70,11 @@ internal static class FantasyKcpLoopbackProbe
             );
             do
             {
-                snapshot = await ReceiveAsync<Snapshot>(probe, MessageId.Snapshot, timeout.Token);
+                snapshot = await ReceiveAsync<S2C_SnapshotPush>(
+                    probe,
+                    MessageId.S2CSnapshotPush,
+                    timeout.Token
+                );
             } while (
                 snapshot.Players.First(player => player.EntityId == join.EntityId).PositionXMilli
                 < baselinePlayer.PositionXMilli + 25
@@ -89,8 +93,8 @@ internal static class FantasyKcpLoopbackProbe
         );
         await SendAsync(
             reconnectProbe,
-            MessageId.ReconnectRequest,
-            new ReconnectRequest
+            MessageId.C2SReconnectRequest,
+            new C2S_ReconnectRequest
             {
                 SessionId = login.SessionId,
                 ConnectionEpoch = login.ConnectionEpoch,
@@ -98,9 +102,9 @@ internal static class FantasyKcpLoopbackProbe
             },
             timeout.Token
         );
-        ReconnectResponse reconnect = await ReceiveAsync<ReconnectResponse>(
+        S2C_ReconnectResponse reconnect = await ReceiveAsync<S2C_ReconnectResponse>(
             reconnectProbe,
-            MessageId.ReconnectResponse,
+            MessageId.S2CReconnectResponse,
             timeout.Token
         );
 

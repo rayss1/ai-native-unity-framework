@@ -20,7 +20,7 @@ public sealed class DomainTests
     {
         using var key = RSA.Create(2048);
         var player = new PlayerService(new MemoryStore(), key, new TestClock());
-        var request = new AccountRequest
+        var request = new AccountCredentials
         {
             Username = "boundary_user",
             Password = new string('a', length),
@@ -53,7 +53,11 @@ public sealed class DomainTests
         var store = new MemoryStore();
         var authority = new RoomAuthority();
         var player = new PlayerService(store, key, clock, authority);
-        var account = new AccountRequest { Username = "TestUser", Password = "correct-password" };
+        var account = new AccountCredentials
+        {
+            Username = "TestUser",
+            Password = "correct-password",
+        };
         var login = (await Call(player, Gate(), ServiceMethods.RegisterAccount, account)).Read(
             LoginResult.Parser
         );
@@ -67,7 +71,7 @@ public sealed class DomainTests
                     player,
                     Gate(),
                     ServiceMethods.Login,
-                    new AccountRequest { Username = "testuser", Password = "wrong-password" }
+                    new AccountCredentials { Username = "testuser", Password = "wrong-password" }
                 )
             ).Success,
             Is.False
@@ -78,7 +82,7 @@ public sealed class DomainTests
                     player,
                     Gate(),
                     ServiceMethods.ValidateSession,
-                    new SessionRequest { SessionToken = login.SessionToken }
+                    new SessionCredentials { SessionToken = login.SessionToken }
                 )
             )
                 .Read(PlayerIdentity.Parser)
@@ -100,7 +104,7 @@ public sealed class DomainTests
                 player,
                 Gate(login.PlayerId),
                 ServiceMethods.IssueTicket,
-                new TicketRequest { PlayerId = login.PlayerId, Allocation = room }
+                new TicketSpec { PlayerId = login.PlayerId, Allocation = room }
             )
         ).Read(EntryTicket.Parser);
         var verifier = new EntryTicketVerifier(key, clock);
@@ -187,7 +191,7 @@ public sealed class DomainTests
                 player,
                 Gate(login.PlayerId),
                 ServiceMethods.Profile,
-                new ProfileRequest { PlayerId = login.PlayerId }
+                new ProfileQuery { PlayerId = login.PlayerId }
             )
         ).Read(PlayerProfile.Parser);
         Assert.That((profile.Played, profile.Won, profile.Kills), Is.EqualTo((1L, 1L, 3L)));
@@ -198,7 +202,7 @@ public sealed class DomainTests
     {
         var lobby = new LobbyService(new Remote(), maxMembers: 2);
         var party = (
-            await Call(lobby, Gate("p1"), ServiceMethods.PartyCreate, new PartyCommand())
+            await Call(lobby, Gate("p1"), ServiceMethods.PartyCreate, new PartyOperation())
         ).Read(PartyState.Parser);
         Assert.That(
             (
@@ -206,7 +210,7 @@ public sealed class DomainTests
                     lobby,
                     Gate("p2"),
                     ServiceMethods.PartyAccept,
-                    new PartyCommand { PartyId = party.PartyId, ExpectedVersion = party.Version }
+                    new PartyOperation { PartyId = party.PartyId, ExpectedVersion = party.Version }
                 )
             ).Error,
             Is.EqualTo("invitation_required")
@@ -217,7 +221,7 @@ public sealed class DomainTests
                     lobby,
                     Gate("p2"),
                     ServiceMethods.PartyInvite,
-                    new PartyCommand
+                    new PartyOperation
                     {
                         PartyId = party.PartyId,
                         TargetPlayerId = "p3",
@@ -232,7 +236,7 @@ public sealed class DomainTests
                 lobby,
                 Gate("p1"),
                 ServiceMethods.PartyInvite,
-                new PartyCommand
+                new PartyOperation
                 {
                     PartyId = party.PartyId,
                     TargetPlayerId = "p2",
@@ -245,7 +249,7 @@ public sealed class DomainTests
                 lobby,
                 Gate("p2"),
                 ServiceMethods.PartyAccept,
-                new PartyCommand { PartyId = party.PartyId, ExpectedVersion = party.Version }
+                new PartyOperation { PartyId = party.PartyId, ExpectedVersion = party.Version }
             )
         ).Read(PartyState.Parser);
         Assert.That(
@@ -254,7 +258,7 @@ public sealed class DomainTests
                     lobby,
                     Gate("p1"),
                     ServiceMethods.PartyQueue,
-                    new PartyQueueRequest
+                    new PartyQueueData
                     {
                         PartyId = party.PartyId,
                         ExpectedVersion = party.Version,
@@ -269,7 +273,7 @@ public sealed class DomainTests
                 lobby,
                 Gate("p1"),
                 ServiceMethods.PartyReady,
-                new PartyCommand
+                new PartyOperation
                 {
                     PartyId = party.PartyId,
                     ExpectedVersion = party.Version,
@@ -282,7 +286,7 @@ public sealed class DomainTests
                 lobby,
                 Gate("p2"),
                 ServiceMethods.PartyReady,
-                new PartyCommand
+                new PartyOperation
                 {
                     PartyId = party.PartyId,
                     ExpectedVersion = party.Version,
@@ -296,7 +300,7 @@ public sealed class DomainTests
                     lobby,
                     Gate("p2"),
                     ServiceMethods.PartyQueue,
-                    new PartyQueueRequest
+                    new PartyQueueData
                     {
                         PartyId = party.PartyId,
                         ExpectedVersion = party.Version,
@@ -312,7 +316,7 @@ public sealed class DomainTests
                     lobby,
                     Gate("p1"),
                     ServiceMethods.PartyQueue,
-                    new PartyQueueRequest
+                    new PartyQueueData
                     {
                         PartyId = party.PartyId,
                         ExpectedVersion = party.Version,
@@ -328,7 +332,7 @@ public sealed class DomainTests
                     lobby,
                     Gate("p1"),
                     ServiceMethods.PartyLeave,
-                    new PartyCommand { PartyId = party.PartyId, ExpectedVersion = party.Version }
+                    new PartyOperation { PartyId = party.PartyId, ExpectedVersion = party.Version }
                 )
             ).Error,
             Is.EqualTo("party_queued")
@@ -339,7 +343,7 @@ public sealed class DomainTests
                     new LobbyService(new Remote()),
                     Gate("p1"),
                     ServiceMethods.PartyGet,
-                    new PartyCommand { PartyId = party.PartyId }
+                    new PartyOperation { PartyId = party.PartyId }
                 )
             ).Success,
             Is.False
@@ -468,7 +472,7 @@ sealed class Remote : IServiceRpc
                     }
                 )
             );
-        var request = AllocationRequest.Parser.ParseFrom(payload.Span);
+        var request = AllocationSpec.Parser.ParseFrom(payload.Span);
         MatchIds.Add(request.MatchId);
         if (Timeout)
             throw new TimeoutException();

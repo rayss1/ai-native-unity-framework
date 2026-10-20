@@ -15,7 +15,7 @@ namespace AiNative.Client.Prediction.Tests
         [TestCase(5)]
         public void GeneratedReliableEventMatchesRuntimeDecoder(int kind)
         {
-            var message = new ReliableEvent
+            var message = new S2C_ReliableEventPush
             {
                 RoomTick = 100,
                 Sequence = 42,

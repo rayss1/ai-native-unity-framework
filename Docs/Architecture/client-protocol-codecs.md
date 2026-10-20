@@ -47,3 +47,8 @@ Unity 的 `AiNative.Protocol.dll` 和 `Google.Protobuf.dll` 位于 Protobuf 包�
 换成其他库只需实现接口并在组合根替换注入，但这不等于服务器自动理解新格式。网络格式不兼容时，必须同步升级服务器。本次只有 Protobuf 生产实现；另一种测试编码仅用于证明依赖隔离。
 
 验证结果见 [本次验证记录](client-protocol-validation-2026-10-20.md)。
+
+## 协议方向名称
+
+生成消息已按 ADR-0020 使用 C2S/S2C/S2S 前缀；共用业务数据保持中性名称。
+类型迁移和请求体/返回体对照见 [协议阅读指南](protocol-naming.md)。

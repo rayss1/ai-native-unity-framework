@@ -203,7 +203,7 @@ public sealed class EdgeTests
                 ServiceRole.Gate,
                 "p1",
                 ServiceMethods.PartyCreate,
-                new PartyCommand()
+                new PartyOperation()
             )
         ).Read(PartyState.Parser);
         Assert.That(
@@ -213,7 +213,7 @@ public sealed class EdgeTests
                     ServiceRole.Gate,
                     "p2",
                     ServiceMethods.PartyCreate,
-                    new PartyCommand()
+                    new PartyOperation()
                 )
             ).Error,
             Is.EqualTo("party_capacity")
@@ -224,7 +224,7 @@ public sealed class EdgeTests
                 ServiceRole.Gate,
                 "p1",
                 ServiceMethods.PartyInvite,
-                new PartyCommand
+                new PartyOperation
                 {
                     PartyId = party.PartyId,
                     ExpectedVersion = party.Version,
@@ -239,7 +239,7 @@ public sealed class EdgeTests
                     ServiceRole.Gate,
                     "p2",
                     ServiceMethods.PartyAccept,
-                    new PartyCommand { PartyId = party.PartyId, ExpectedVersion = party.Version }
+                    new PartyOperation { PartyId = party.PartyId, ExpectedVersion = party.Version }
                 )
             ).Error,
             Is.EqualTo("member_capacity")
@@ -251,7 +251,7 @@ public sealed class EdgeTests
                     ServiceRole.Gate,
                     "p1",
                     ServiceMethods.PartyReady,
-                    new PartyCommand
+                    new PartyOperation
                     {
                         PartyId = party.PartyId,
                         ExpectedVersion = party.Version - 1,
@@ -267,7 +267,7 @@ public sealed class EdgeTests
                 ServiceRole.Gate,
                 "p1",
                 ServiceMethods.PartyReady,
-                new PartyCommand
+                new PartyOperation
                 {
                     PartyId = party.PartyId,
                     ExpectedVersion = party.Version,
@@ -280,7 +280,7 @@ public sealed class EdgeTests
             ServiceRole.Gate,
             "p1",
             ServiceMethods.PartyQueue,
-            new PartyQueueRequest
+            new PartyQueueData
             {
                 PartyId = party.PartyId,
                 ExpectedVersion = party.Version,
@@ -305,7 +305,7 @@ public sealed class EdgeTests
                 ServiceRole.Gate,
                 "p1",
                 ServiceMethods.PartyGet,
-                new PartyCommand { PartyId = party.PartyId }
+                new PartyOperation { PartyId = party.PartyId }
             )
         ).Read(PartyState.Parser);
         Assert.That(party.Members[0].Ready, Is.False);
@@ -316,7 +316,7 @@ public sealed class EdgeTests
                     ServiceRole.Gate,
                     "p1",
                     ServiceMethods.PartyLeave,
-                    new PartyCommand { PartyId = party.PartyId, ExpectedVersion = party.Version }
+                    new PartyOperation { PartyId = party.PartyId, ExpectedVersion = party.Version }
                 )
             ).Success,
             Is.True
@@ -335,7 +335,7 @@ public sealed class EdgeTests
             clock,
             sessionLifetime: TimeSpan.FromSeconds(1)
         );
-        var request = new AccountRequest { Username = "player", Password = "valid-password" };
+        var request = new AccountCredentials { Username = "player", Password = "valid-password" };
         var login = (
             await Call(service, ServiceRole.Gate, "", ServiceMethods.RegisterAccount, request)
         ).Read(LoginResult.Parser);
@@ -347,7 +347,7 @@ public sealed class EdgeTests
                     ServiceRole.Gate,
                     "",
                     ServiceMethods.ValidateSession,
-                    new SessionRequest { SessionToken = login.SessionToken }
+                    new SessionCredentials { SessionToken = login.SessionToken }
                 )
             ).Error,
             Is.EqualTo("invalid_session")
@@ -359,7 +359,7 @@ public sealed class EdgeTests
                     ServiceRole.Gate,
                     "other",
                     ServiceMethods.Profile,
-                    new ProfileRequest { PlayerId = login.PlayerId }
+                    new ProfileQuery { PlayerId = login.PlayerId }
                 )
             ).Error,
             Is.EqualTo("forbidden")
@@ -402,7 +402,7 @@ public sealed class EdgeTests
                 ServiceRole.Gate,
                 "",
                 ServiceMethods.RegisterAccount,
-                new AccountRequest { Username = "player", Password = "valid-password" }
+                new AccountCredentials { Username = "player", Password = "valid-password" }
             )
         ).Read(LoginResult.Parser);
         var room = new RoomAllocation
@@ -416,7 +416,7 @@ public sealed class EdgeTests
         };
         room.PlayerIds.Add(login.PlayerId);
         authority.Room = room.Clone();
-        var request = new TicketRequest { PlayerId = login.PlayerId, Allocation = room };
+        var request = new TicketSpec { PlayerId = login.PlayerId, Allocation = room };
         var unavailable = new PlayerService(store, key, clock);
         Assert.That(
             (
@@ -494,7 +494,7 @@ class AllocationRemote : IServiceRpc
     {
         if (method == ServiceMethods.Allocate)
         {
-            var request = AllocationRequest.Parser.ParseFrom(payload.Span);
+            var request = AllocationSpec.Parser.ParseFrom(payload.Span);
             Allocation = new()
             {
                 AllocationId = "allocation",

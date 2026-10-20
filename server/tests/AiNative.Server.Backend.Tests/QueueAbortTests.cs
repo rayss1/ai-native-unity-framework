@@ -140,14 +140,14 @@ public sealed class QueueAbortTests
             await lobby.HandleAsync(
                 gate,
                 ServiceMethods.PartyCreate,
-                new PartyCommand().ToByteArray()
+                new PartyOperation().ToByteArray()
             )
         ).Read(PartyState.Parser);
         party = (
             await lobby.HandleAsync(
                 gate,
                 ServiceMethods.PartyReady,
-                new PartyCommand
+                new PartyOperation
                 {
                     PartyId = party.PartyId,
                     ExpectedVersion = party.Version,
@@ -155,7 +155,7 @@ public sealed class QueueAbortTests
                 }.ToByteArray()
             )
         ).Read(PartyState.Parser);
-        var request = new PartyQueueRequest
+        var request = new PartyQueueData
         {
             PartyId = party.PartyId,
             ExpectedVersion = party.Version,
@@ -193,7 +193,7 @@ public sealed class QueueAbortTests
             await lobby.HandleAsync(
                 gate,
                 ServiceMethods.PartyGet,
-                new PartyCommand { PartyId = party.PartyId }.ToByteArray()
+                new PartyOperation { PartyId = party.PartyId }.ToByteArray()
             )
         ).Read(PartyState.Parser);
         Assert.That(cleared.QueueRequestId, Is.Empty);
@@ -203,7 +203,7 @@ public sealed class QueueAbortTests
                 await lobby.HandleAsync(
                     gate,
                     ServiceMethods.PartyLeave,
-                    new PartyCommand
+                    new PartyOperation
                     {
                         PartyId = party.PartyId,
                         ExpectedVersion = cleared.Version,

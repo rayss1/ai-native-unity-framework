@@ -78,7 +78,7 @@ public sealed class PlayerService : IServiceHandler
                 {
                     if (context.Caller != ServiceRole.Gate)
                         return ServiceReply.Reject("forbidden");
-                    var request = AccountRequest.Parser.ParseFrom(payload.Span);
+                    var request = AccountCredentials.Parser.ParseFrom(payload.Span);
                     var username = request.Username.Trim().ToLowerInvariant();
                     if (
                         username.Length is < 3 or > 32
@@ -135,7 +135,7 @@ public sealed class PlayerService : IServiceHandler
                 {
                     if (context.Caller != ServiceRole.Gate)
                         return ServiceReply.Reject("forbidden");
-                    var request = SessionRequest.Parser.ParseFrom(payload.Span);
+                    var request = SessionCredentials.Parser.ParseFrom(payload.Span);
                     if (!tokens.TryRead(request.SessionToken, "session", out var claims))
                         return ServiceReply.Reject("invalid_session");
                     return ServiceReply.From(
@@ -148,7 +148,7 @@ public sealed class PlayerService : IServiceHandler
                 }
                 case ServiceMethods.Profile:
                 {
-                    var request = ProfileRequest.Parser.ParseFrom(payload.Span);
+                    var request = ProfileQuery.Parser.ParseFrom(payload.Span);
                     if (
                         context.Caller != ServiceRole.Gate
                         || context.PlayerId.Length == 0
@@ -162,7 +162,7 @@ public sealed class PlayerService : IServiceHandler
                 }
                 case ServiceMethods.IssueTicket:
                 {
-                    var request = TicketRequest.Parser.ParseFrom(payload.Span);
+                    var request = TicketSpec.Parser.ParseFrom(payload.Span);
                     if (
                         context.Caller is not (ServiceRole.Gate or ServiceRole.Match)
                         || (

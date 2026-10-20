@@ -111,7 +111,7 @@ internal sealed class RoomProtocolService(
                     {
                         Send(
                             connection,
-                            MessageId.Snapshot,
+                            MessageId.S2CSnapshotPush,
                             CreateArenaSnapshot(session, roomTick)
                         );
                         continue;
@@ -153,7 +153,7 @@ internal sealed class RoomProtocolService(
         for (int i = 0; i < count; i++)
         {
             ArenaCombatEventRecord e = _arenaEvents[i];
-            var message = new ReliableEvent
+            var message = new S2C_ReliableEventPush
             {
                 RoomTick = e.Tick,
                 Sequence = ++_arenaEventSequence,
@@ -173,7 +173,7 @@ internal sealed class RoomProtocolService(
             };
             foreach (ConnectionState connection in _connections)
                 if (connection.Session is { Joined: true })
-                    Send(connection, MessageId.ReliableEvent, message);
+                    Send(connection, MessageId.S2CReliableEventPush, message);
         }
     }
 
@@ -207,19 +207,19 @@ internal sealed class RoomProtocolService(
     {
         switch (decoded.MessageId)
         {
-            case MessageId.LoginRequest when decoded.Message is LoginRequest request:
+            case MessageId.C2SLoginRequest when decoded.Message is C2S_LoginRequest request:
                 HandleLogin(connection, request);
                 return;
-            case MessageId.JoinRoomRequest when decoded.Message is JoinRoomRequest request:
+            case MessageId.C2SJoinRoomRequest when decoded.Message is C2S_JoinRoomRequest request:
                 HandleJoin(connection, request);
                 return;
-            case MessageId.InputCommand when decoded.Message is InputCommand command:
+            case MessageId.C2SInputCommand when decoded.Message is C2S_InputCommand command:
                 HandleInput(connection, command, roomTick, frame);
                 return;
-            case MessageId.InputBatch when decoded.Message is InputBatch batch:
+            case MessageId.C2SInputBatch when decoded.Message is C2S_InputBatch batch:
                 HandleInputBatch(connection, batch, roomTick, frame);
                 return;
-            case MessageId.ReconnectRequest when decoded.Message is ReconnectRequest request:
+            case MessageId.C2SReconnectRequest when decoded.Message is C2S_ReconnectRequest request:
                 HandleReconnect(connection, request, roomTick);
                 return;
             default:
@@ -228,7 +228,7 @@ internal sealed class RoomProtocolService(
         }
     }
 
-    private void HandleLogin(ConnectionState connection, LoginRequest request)
+    private void HandleLogin(ConnectionState connection, C2S_LoginRequest request)
     {
         if (request.ProtocolMajor != 1 || connection.Session is not null)
         {
@@ -243,8 +243,8 @@ internal sealed class RoomProtocolService(
 
         Send(
             connection,
-            MessageId.LoginResponse,
-            new LoginResponse
+            MessageId.S2CLoginResponse,
+            new S2C_LoginResponse
             {
                 SessionId = sessionId,
                 ConnectionEpoch = connection.Connection.ConnectionEpoch,
@@ -252,7 +252,7 @@ internal sealed class RoomProtocolService(
         );
     }
 
-    private void HandleJoin(ConnectionState connection, JoinRoomRequest request)
+    private void HandleJoin(ConnectionState connection, C2S_JoinRoomRequest request)
     {
         LogicalSession? session = connection.Session;
         if (session is null || session.SessionId != request.SessionId || session.Joined)
@@ -291,8 +291,8 @@ internal sealed class RoomProtocolService(
         session.Joined = true;
         Send(
             connection,
-            MessageId.JoinRoomResponse,
-            new JoinRoomResponse
+            MessageId.S2CJoinRoomResponse,
+            new S2C_JoinRoomResponse
             {
                 RoomId = requestedRoom,
                 EntityId = checked((uint)entityIndex + 1),
@@ -303,7 +303,7 @@ internal sealed class RoomProtocolService(
 
     private void HandleInput(
         ConnectionState connection,
-        InputCommand command,
+        C2S_InputCommand command,
         ulong roomTick,
         ReadOnlySpan<byte> frame
     )
@@ -345,7 +345,7 @@ internal sealed class RoomProtocolService(
 
     private void HandleInputBatch(
         ConnectionState connection,
-        InputBatch batch,
+        C2S_InputBatch batch,
         ulong roomTick,
         ReadOnlySpan<byte> frame
     )
@@ -358,7 +358,7 @@ internal sealed class RoomProtocolService(
         }
 
         uint previousSequence = session.LastInputSequence;
-        foreach (InputCommand command in batch.Commands)
+        foreach (C2S_InputCommand command in batch.Commands)
         {
             if (command.Sequence <= previousSequence)
             {
@@ -371,7 +371,7 @@ internal sealed class RoomProtocolService(
 
         if (gameMode.IsArena)
         {
-            foreach (InputCommand command in batch.Commands)
+            foreach (C2S_InputCommand command in batch.Commands)
             {
                 ArenaInput input = new(
                     command.Sequence,
@@ -395,7 +395,7 @@ internal sealed class RoomProtocolService(
         }
 
         replayCapture.TryRecordInput(session.RoomIndex, roomTick, session.EntityIndex, frame);
-        foreach (InputCommand command in batch.Commands)
+        foreach (C2S_InputCommand command in batch.Commands)
         {
             rooms[session.RoomIndex]
                 .ApplyInput(session.EntityIndex, command.MoveXMilli, command.MoveYMilli);
@@ -406,7 +406,7 @@ internal sealed class RoomProtocolService(
 
     private void HandleReconnect(
         ConnectionState connection,
-        ReconnectRequest request,
+        C2S_ReconnectRequest request,
         ulong roomTick
     )
     {
@@ -424,15 +424,15 @@ internal sealed class RoomProtocolService(
         session.Connection = connection;
         session.DisconnectedAtTick = null;
         connection.Session = session;
-        Snapshot resumeSnapshot = gameMode.IsArena
+        S2C_SnapshotPush resumeSnapshot = gameMode.IsArena
             ? CreateArenaSnapshot(session, roomTick)
             : rooms[session.RoomIndex].CreateSnapshot(roomTick);
         if (!gameMode.IsArena)
             resumeSnapshot.LastProcessedInputSequence = session.LastInputSequence;
         Send(
             connection,
-            MessageId.ReconnectResponse,
-            new ReconnectResponse
+            MessageId.S2CReconnectResponse,
+            new S2C_ReconnectResponse
             {
                 ConnectionEpoch = connection.Connection.ConnectionEpoch,
                 ResumeTick = roomTick,
@@ -567,9 +567,9 @@ internal sealed class RoomProtocolService(
         public ulong? DisconnectedAtTick { get; set; }
     }
 
-    private Snapshot CreateArenaSnapshot(LogicalSession session, ulong roomTick)
+    private S2C_SnapshotPush CreateArenaSnapshot(LogicalSession session, ulong roomTick)
     {
-        Snapshot snapshot = new()
+        S2C_SnapshotPush snapshot = new()
         {
             ProtocolMajor = 1,
             RoomTick = roomTick,

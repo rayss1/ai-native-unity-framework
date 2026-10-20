@@ -103,12 +103,17 @@ internal static class TerminalDeliveryScenarios
         Record("client-to-server-barriers-closed");
         // No new input is needed: the configured real match timeout ends this two-player match.
         // KCP may receive/retransmit normally, but neither peer's transport ACK reaches Battle.
-        async Task<Snapshot> Finished(IRealtimeTransport transport)
+        async Task<S2C_SnapshotPush> Finished(IRealtimeTransport transport)
         {
-            Snapshot snapshot;
+            S2C_SnapshotPush snapshot;
             do
             {
-                snapshot = await fixture.Receive<Snapshot>(transport, MessageId.Snapshot, 15, ct);
+                snapshot = await fixture.Receive<S2C_SnapshotPush>(
+                    transport,
+                    MessageId.S2CSnapshotPush,
+                    15,
+                    ct
+                );
             } while (snapshot.MatchPhase != ArenaMatchPhase.ArenaMatchFinished);
             return snapshot;
         }
@@ -203,7 +208,7 @@ internal static class TerminalDeliveryScenarios
             PlayerProfile profile = (
                 await member.gate.CallAsync(
                     ServiceMethods.Profile,
-                    new ProfileRequest { PlayerId = member.login.PlayerId }.ToByteArray(),
+                    new ProfileQuery { PlayerId = member.login.PlayerId }.ToByteArray(),
                     member.login.SessionToken,
                     ct
                 )

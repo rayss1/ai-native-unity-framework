@@ -18,14 +18,14 @@ internal sealed class PreparedLegacySnapshot
         Channel = default;
     }
 
-    public bool TryPrepare(Snapshot snapshot)
+    public bool TryPrepare(S2C_SnapshotPush snapshot)
     {
         Reset();
         // Field 6 must be absent from the common body: each recipient gets exactly one ACK.
         if (
             snapshot.LastProcessedInputSequence != 0
             || !RealtimeProtocolCodec.TryEncode(
-                MessageId.Snapshot,
+                MessageId.S2CSnapshotPush,
                 snapshot,
                 _frame,
                 out var channel,
@@ -61,7 +61,7 @@ internal sealed class PreparedLegacySnapshot
         int offset = _length;
         if (acknowledgedSequence != 0)
         {
-            destination[offset++] = 0x30; // Snapshot.last_processed_input_sequence, field 6 / wire 0.
+            destination[offset++] = 0x30; // S2C_SnapshotPush.last_processed_input_sequence, field 6 / wire 0.
             uint remaining = acknowledgedSequence;
             while (remaining >= 0x80)
             {

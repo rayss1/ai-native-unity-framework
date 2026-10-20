@@ -86,7 +86,7 @@ internal sealed class TopologyBattleEngine(
     public long DroppedPackets => Interlocked.Read(ref _drops);
     public long DroppedEvents => Interlocked.Read(ref _eventDrops);
 
-    // Snapshot on the diagnostic caller; no enumeration, allocation or export enters Tick.
+    // S2C_SnapshotPush on the diagnostic caller; no enumeration, allocation or export enters Tick.
     public object Diagnostics() =>
         new
         {
@@ -302,7 +302,7 @@ internal sealed class TopologyBattleEngine(
 
     private void Handle(Connection c, IMessage message)
     {
-        if (message is LoginRequest login)
+        if (message is C2S_LoginRequest login)
         {
             if (
                 c.Room != null
@@ -332,8 +332,8 @@ internal sealed class TopologyBattleEngine(
             c.Player = Array.IndexOf(room.Roster, player);
             Send(
                 c,
-                MessageId.LoginResponse,
-                new LoginResponse
+                MessageId.S2CLoginResponse,
+                new S2C_LoginResponse
                 {
                     SessionId = room.Sessions[c.Player],
                     ConnectionEpoch = c.Wire.ConnectionEpoch,
@@ -354,23 +354,23 @@ internal sealed class TopologyBattleEngine(
             Drop(PacketDropReason.FinishedRoom);
             return;
         }
-        if (message is JoinRoomRequest join && join.SessionId == r.Sessions[c.Player])
+        if (message is C2S_JoinRoomRequest join && join.SessionId == r.Sessions[c.Player])
             Enqueue(r, new Command(c, default, 1));
         else if (
-            message is ReconnectRequest reconnect
+            message is C2S_ReconnectRequest reconnect
             && reconnect.SessionId == r.Sessions[c.Player]
         )
             Enqueue(r, new Command(c, default, 2));
-        else if (message is InputCommand input)
+        else if (message is C2S_InputCommand input)
             Input(c, input);
-        else if (message is InputBatch batch && batch.Commands.Count is > 0 and <= 2)
+        else if (message is C2S_InputBatch batch && batch.Commands.Count is > 0 and <= 2)
             foreach (var input2 in batch.Commands)
                 Input(c, input2);
         else
             Drop();
     }
 
-    private void Input(Connection c, InputCommand input)
+    private void Input(Connection c, C2S_InputCommand input)
     {
         if (
             input.Sequence == 0
@@ -476,8 +476,8 @@ internal sealed class TopologyBattleEngine(
                     if (response == 1)
                         Send(
                             c,
-                            MessageId.JoinRoomResponse,
-                            new JoinRoomResponse
+                            MessageId.S2CJoinRoomResponse,
+                            new S2C_JoinRoomResponse
                             {
                                 RoomId = Pool.GetLocalRoomId(room.Allocation.RoomId),
                                 EntityId = room.Entities[p],
@@ -487,15 +487,15 @@ internal sealed class TopologyBattleEngine(
                     if (response == 2)
                         Send(
                             c,
-                            MessageId.ReconnectResponse,
-                            new ReconnectResponse
+                            MessageId.S2CReconnectResponse,
+                            new S2C_ReconnectResponse
                             {
                                 ConnectionEpoch = c.Wire.ConnectionEpoch,
                                 ResumeTick = selected.Tick,
                                 Snapshot = snapshot,
                             }
                         );
-                    Send(c, MessageId.Snapshot, snapshot);
+                    Send(c, MessageId.S2CSnapshotPush, snapshot);
                 }
             }
             finally
@@ -505,7 +505,7 @@ internal sealed class TopologyBattleEngine(
         }
         while (publishedTick is { } tick && TryReadPublishedEvent(room.Events, tick, out var e))
         {
-            var message = new ReliableEvent
+            var message = new S2C_ReliableEventPush
             {
                 RoomTick = e.Tick,
                 Sequence = ++room.EventSequence,
@@ -525,7 +525,7 @@ internal sealed class TopologyBattleEngine(
             };
             foreach (var c in room.Owners)
                 if (c is { Joined: true })
-                    Send(c, MessageId.ReliableEvent, message);
+                    Send(c, MessageId.S2CReliableEventPush, message);
         }
     }
 
@@ -536,7 +536,7 @@ internal sealed class TopologyBattleEngine(
         List<TerminalDatagram> events = [];
         while (room.Events.TryRead(out var e))
         {
-            var message = new ReliableEvent
+            var message = new S2C_ReliableEventPush
             {
                 RoomTick = e.Tick,
                 Sequence = ++room.EventSequence,
@@ -554,7 +554,7 @@ internal sealed class TopologyBattleEngine(
                     PositionZMilli = e.PositionZMillimetres,
                 },
             };
-            events.Add(EncodeTerminal(MessageId.ReliableEvent, message));
+            events.Add(EncodeTerminal(MessageId.S2CReliableEventPush, message));
         }
         List<TerminalRoomDelivery.Peer> peers = [];
         for (int p = 0; p < room.Roster.Length; p++)
@@ -562,14 +562,14 @@ internal sealed class TopologyBattleEngine(
             var c = Volatile.Read(ref room.Owners[p]);
             if (c is null || c.Revoked || !c.Joined)
                 continue;
-            Snapshot snapshot = SnapshotOf(frame, room.Entities[p]);
+            S2C_SnapshotPush snapshot = SnapshotOf(frame, room.Entities[p]);
             List<TerminalDatagram> packets = [];
             int response = Interlocked.Exchange(ref c.Response, 0);
             if (response == 1)
                 packets.Add(
                     EncodeTerminal(
-                        MessageId.JoinRoomResponse,
-                        new JoinRoomResponse
+                        MessageId.S2CJoinRoomResponse,
+                        new S2C_JoinRoomResponse
                         {
                             RoomId = Pool.GetLocalRoomId(room.Allocation.RoomId),
                             EntityId = room.Entities[p],
@@ -580,8 +580,8 @@ internal sealed class TopologyBattleEngine(
             if (response == 2)
                 packets.Add(
                     EncodeTerminal(
-                        MessageId.ReconnectResponse,
-                        new ReconnectResponse
+                        MessageId.S2CReconnectResponse,
+                        new S2C_ReconnectResponse
                         {
                             ConnectionEpoch = c.Wire.ConnectionEpoch,
                             ResumeTick = frame.Tick,
@@ -589,7 +589,7 @@ internal sealed class TopologyBattleEngine(
                         }
                     )
                 );
-            packets.Add(EncodeTerminal(MessageId.Snapshot, snapshot));
+            packets.Add(EncodeTerminal(MessageId.S2CSnapshotPush, snapshot));
             packets.AddRange(events);
             peers.Add(new(c.Wire.Transport, packets.ToArray()));
         }
@@ -635,9 +635,9 @@ internal sealed class TopologyBattleEngine(
         Volatile.Write(ref room.TerminalRecorded, true);
     }
 
-    private static Snapshot SnapshotOf(Frame f, uint entity)
+    private static S2C_SnapshotPush SnapshotOf(Frame f, uint entity)
     {
-        var s = new Snapshot
+        var s = new S2C_SnapshotPush
         {
             ProtocolMajor = 1,
             RoomTick = f.Tick,

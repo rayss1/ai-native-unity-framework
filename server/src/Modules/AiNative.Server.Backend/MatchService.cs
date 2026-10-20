@@ -214,7 +214,7 @@ public sealed class MatchService : IServiceHandler
             }
             try
             {
-                var request = new AllocationRequest { MatchId = job.Id };
+                var request = new AllocationSpec { MatchId = job.Id };
                 request.PlayerIds.Add(job.Entries.SelectMany(e => e.Request.PlayerIds));
                 var reply = await rpc.CallAsync(
                     new(ServiceRole.Coordinator),

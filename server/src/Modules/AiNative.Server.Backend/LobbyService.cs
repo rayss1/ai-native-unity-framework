@@ -186,7 +186,7 @@ public sealed class LobbyService : IServiceHandler
             }
             if (method == ServiceMethods.PartyQueue)
             {
-                var request = PartyQueueRequest.Parser.ParseFrom(payload.Span);
+                var request = PartyQueueData.Parser.ParseFrom(payload.Span);
                 Party queuedParty;
                 bool retry;
                 lock (sync)
@@ -307,7 +307,7 @@ public sealed class LobbyService : IServiceHandler
                     }
                 return reply;
             }
-            var command = PartyCommand.Parser.ParseFrom(payload.Span);
+            var command = PartyOperation.Parser.ParseFrom(payload.Span);
             lock (sync)
             {
                 if (method == ServiceMethods.PartyCreate)

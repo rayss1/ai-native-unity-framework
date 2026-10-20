@@ -52,14 +52,16 @@ public class AcceptanceBehaviorTests
     public async Task InputsFollowEachConnectionsAuthoritativeTickAndSequence()
     {
         var transport = new FakeTransport();
-        transport.Enqueue(new Snapshot { RoomTick = 100, LastProcessedInputSequence = 41 });
+        transport.Enqueue(new S2C_SnapshotPush { RoomTick = 100, LastProcessedInputSequence = 41 });
         dynamic loop = Start(transport);
         try
         {
             await Until(() => transport.Inputs.Count > 0);
             Assert.That(transport.Inputs.First().RoomTick, Is.EqualTo(102));
             Assert.That(transport.Inputs.First().Sequence, Is.EqualTo(42));
-            transport.Enqueue(new Snapshot { RoomTick = 200, LastProcessedInputSequence = 80 });
+            transport.Enqueue(
+                new S2C_SnapshotPush { RoomTick = 200, LastProcessedInputSequence = 80 }
+            );
             await Until(() => transport.Inputs.Any(x => x.RoomTick == 202));
             Assert.That(transport.Inputs.First(x => x.RoomTick == 202).Sequence, Is.EqualTo(81));
         }
@@ -77,12 +79,17 @@ public class AcceptanceBehaviorTests
     {
         var transport = new FakeTransport();
         transport.Enqueue(
-            new Snapshot { RoomTick = 36000, MatchPhase = ArenaMatchPhase.ArenaMatchFinished }
+            new S2C_SnapshotPush
+            {
+                RoomTick = 36000,
+                MatchPhase = ArenaMatchPhase.ArenaMatchFinished,
+            }
         );
         dynamic loop = Start(transport);
         try
         {
-            Snapshot finished = await (Task<Snapshot>)loop.ReadAsync(TimeSpan.FromSeconds(1));
+            S2C_SnapshotPush finished = await (Task<S2C_SnapshotPush>)
+                loop.ReadAsync(TimeSpan.FromSeconds(1));
             Assert.That(finished.RoomTick, Is.EqualTo(36000));
             await ((Task)loop.Completion).WaitAsync(TimeSpan.FromSeconds(1));
             Assert.That(loop.LastSnapshot, Is.Not.Null);
@@ -176,7 +183,7 @@ public class AcceptanceBehaviorTests
 
     static async Task<object> FailedLoop(FakeTransport transport)
     {
-        transport.Enqueue(new Snapshot { RoomTick = 100 });
+        transport.Enqueue(new S2C_SnapshotPush { RoomTick = 100 });
         dynamic loop = Start(transport);
         await Until(() => ((Task)loop.Completion).IsCompleted);
         Assert.That(((Task)loop.Completion).IsFaulted, Is.True);
@@ -245,16 +252,16 @@ public class AcceptanceBehaviorTests
     sealed class FakeTransport : IRealtimeTransport
     {
         readonly ConcurrentQueue<byte[]> packets = new();
-        public ConcurrentQueue<InputCommand> Inputs { get; } = new();
+        public ConcurrentQueue<C2S_InputCommand> Inputs { get; } = new();
         public bool AlwaysReadable;
         public SendStatus SendOutcome = SendStatus.Accepted;
         public Exception? SendFailure;
         public TransportState State => TransportState.Connected;
 
-        public void Enqueue(Snapshot snapshot)
+        public void Enqueue(S2C_SnapshotPush snapshot)
         {
             byte[] bytes = new byte[2 + snapshot.CalculateSize()];
-            BinaryPrimitives.WriteUInt16LittleEndian(bytes, (ushort)MessageId.Snapshot);
+            BinaryPrimitives.WriteUInt16LittleEndian(bytes, (ushort)MessageId.S2CSnapshotPush);
             snapshot.WriteTo(bytes.AsSpan(2));
             packets.Enqueue(bytes);
         }
@@ -282,9 +289,9 @@ public class AcceptanceBehaviorTests
                 throw SendFailure;
             if (
                 BinaryPrimitives.ReadUInt16LittleEndian(payload.Span)
-                == (ushort)MessageId.InputCommand
+                == (ushort)MessageId.C2SInputCommand
             )
-                Inputs.Enqueue(InputCommand.Parser.ParseFrom(payload.Span[2..]));
+                Inputs.Enqueue(C2S_InputCommand.Parser.ParseFrom(payload.Span[2..]));
             return ValueTask.FromResult(
                 new SendResult(SendOutcome, SendOutcome == SendStatus.Accepted ? payload.Length : 0)
             );

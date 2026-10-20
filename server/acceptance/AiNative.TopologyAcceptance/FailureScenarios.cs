@@ -34,7 +34,7 @@ internal static class QualificationPartyCleanup
             {
                 reply = await call(
                     ServiceMethods.PartyGet,
-                    new PartyCommand { PartyId = partyId },
+                    new PartyOperation { PartyId = partyId },
                     CancellationToken.None
                 );
             }
@@ -119,7 +119,7 @@ internal static class QualificationPartyCleanup
                 {
                     await call(
                         ServiceMethods.PartyLeave,
-                        new PartyCommand { PartyId = partyId, ExpectedVersion = party.Version },
+                        new PartyOperation { PartyId = partyId, ExpectedVersion = party.Version },
                         CancellationToken.None
                     );
                 }
@@ -171,7 +171,7 @@ internal static class FailureScenarios
         }
         await using Pair pair = await fixture.CreatePair();
         var original = pair.ReadyA.Status.Allocation;
-        Snapshot before = await fixture.FreshSnapshot(pair.A.Transport);
+        S2C_SnapshotPush before = await fixture.FreshSnapshot(pair.A.Transport);
         if (mode == "backend-restarts")
         {
             fixture.BeginKeepAlive(pair);
@@ -187,7 +187,7 @@ internal static class FailureScenarios
                     && recovered.State == "Ready",
                 "coordinator-rebuild-identity-epoch"
             );
-            Snapshot after = await fixture.FreshSnapshot(pair.A.Transport);
+            S2C_SnapshotPush after = await fixture.FreshSnapshot(pair.A.Transport);
             Fixture.Check(after.RoomTick > before.RoomTick, "coordinator-restart-keeps-battle");
             evidence.Add(
                 new
@@ -217,7 +217,7 @@ internal static class FailureScenarios
             var party = (
                 await pendingMatch.gate.CallAsync(
                     ServiceMethods.PartyGet,
-                    new PartyCommand { PartyId = pendingMatch.partyId }.ToByteArray(),
+                    new PartyOperation { PartyId = pendingMatch.partyId }.ToByteArray(),
                     pendingMatch.login.SessionToken,
                     ct
                 )
@@ -229,7 +229,7 @@ internal static class FailureScenarios
             party = (
                 await pendingMatch.gate.CallAsync(
                     ServiceMethods.PartyReady,
-                    new PartyCommand
+                    new PartyOperation
                     {
                         PartyId = party.PartyId,
                         ExpectedVersion = party.Version,
@@ -243,7 +243,7 @@ internal static class FailureScenarios
             (
                 await pendingMatch.gate.CallAsync(
                     ServiceMethods.PartyQueue,
-                    new PartyQueueRequest
+                    new PartyQueueData
                     {
                         PartyId = party.PartyId,
                         ExpectedVersion = party.Version,
@@ -327,7 +327,7 @@ internal static class FailureScenarios
         else if (mode == "player-outage")
         {
             await fixture.Signal("stop", "player");
-            Snapshot finished = await fixture.Finished(pair.A.Transport);
+            S2C_SnapshotPush finished = await fixture.Finished(pair.A.Transport);
             string path = Path.Combine(
                 HostSettings.Required("AINATIVE_ACCEPTANCE_RUN_DIRECTORY"),
                 "outbox",
@@ -372,8 +372,8 @@ internal static class FailureScenarios
             await using var stale = await runtime.ConnectBattleProbeAsync(original.Address, ct);
             await fixture.Send(
                 stale.Transport,
-                MessageId.LoginRequest,
-                new LoginRequest
+                MessageId.C2SLoginRequest,
+                new C2S_LoginRequest
                 {
                     ProtocolMajor = 1,
                     ClientBuild = "failure-acceptance",
@@ -384,7 +384,11 @@ internal static class FailureScenarios
             bool rejected = false;
             try
             {
-                await fixture.Receive<LoginResponse>(stale.Transport, MessageId.LoginResponse, 2);
+                await fixture.Receive<S2C_LoginResponse>(
+                    stale.Transport,
+                    MessageId.S2CLoginResponse,
+                    2
+                );
             }
             catch (TimeoutException)
             {
@@ -421,7 +425,7 @@ internal static class FailureScenarios
                 await Task.Delay(1000, ct);
                 await fixture.FreshSnapshot(pair.A.Transport);
             }
-            Snapshot active = await fixture.FreshSnapshot(pair.A.Transport);
+            S2C_SnapshotPush active = await fixture.FreshSnapshot(pair.A.Transport);
             Fixture.Check(
                 active.MatchPhase == ArenaMatchPhase.ArenaMatchActive,
                 "expiry-tested-in-live-room"
@@ -429,8 +433,8 @@ internal static class FailureScenarios
             await using var expired = await runtime.ConnectBattleProbeAsync(original.Address, ct);
             await fixture.Send(
                 expired.Transport,
-                MessageId.LoginRequest,
-                new LoginRequest
+                MessageId.C2SLoginRequest,
+                new C2S_LoginRequest
                 {
                     ProtocolMajor = 1,
                     ClientBuild = "expiry-acceptance",
@@ -441,7 +445,11 @@ internal static class FailureScenarios
             bool rejected = false;
             try
             {
-                await fixture.Receive<LoginResponse>(expired.Transport, MessageId.LoginResponse, 2);
+                await fixture.Receive<S2C_LoginResponse>(
+                    expired.Transport,
+                    MessageId.S2CLoginResponse,
+                    2
+                );
             }
             catch (TimeoutException)
             {
@@ -522,7 +530,7 @@ internal static class FailureScenarios
                                         bytes.AsSpan(0, packet.WrittenBytes),
                                         out var decoded
                                     ) == ProtocolDecodeStatus.Accepted
-                                    && decoded.Message is Snapshot snapshot
+                                    && decoded.Message is S2C_SnapshotPush snapshot
                                 )
                                 {
                                     tick = snapshot.RoomTick;
@@ -533,13 +541,13 @@ internal static class FailureScenarios
                                 }
                             if (tick > 0)
                             {
-                                var input = new InputCommand
+                                var input = new C2S_InputCommand
                                 {
                                     RoomTick = tick + 2,
                                     Sequence = ++sequence,
                                 };
-                                await Send(pair.A.Transport, MessageId.InputCommand, input);
-                                await Send(pair.B.Transport, MessageId.InputCommand, input);
+                                await Send(pair.A.Transport, MessageId.C2SInputCommand, input);
+                                await Send(pair.B.Transport, MessageId.C2SInputCommand, input);
                             }
                             await Task.Delay(500, pair.KeepAliveStop.Token);
                         }
@@ -647,7 +655,7 @@ internal static class FailureScenarios
             try
             {
                 token.ThrowIfCancellationRequested();
-                var account = new AccountRequest
+                var account = new AccountCredentials
                 {
                     Username = "fault_" + Guid.NewGuid().ToString("N")[..16],
                     Password = Guid.NewGuid().ToString("N"),
@@ -698,7 +706,7 @@ internal static class FailureScenarios
                 party = (
                     await gate.CallAsync(
                         ServiceMethods.PartyReady,
-                        new PartyCommand
+                        new PartyOperation
                         {
                             PartyId = party.PartyId,
                             ExpectedVersion = party.Version,
@@ -741,7 +749,7 @@ internal static class FailureScenarios
             var party = (
                 await member.gate.CallAsync(
                     ServiceMethods.PartyGet,
-                    new PartyCommand { PartyId = member.partyId }.ToByteArray(),
+                    new PartyOperation { PartyId = member.partyId }.ToByteArray(),
                     member.login.SessionToken,
                     CancellationToken.None
                 )
@@ -785,7 +793,7 @@ internal static class FailureScenarios
             (
                 await member.gate.CallAsync(
                     ServiceMethods.PartyQueue,
-                    new PartyQueueRequest
+                    new PartyQueueData
                     {
                         PartyId = member.partyId,
                         ExpectedVersion = member.partyVersion,
@@ -856,7 +864,7 @@ internal static class FailureScenarios
             );
         }
 
-        public async Task<JoinRoomResponse> Join(
+        public async Task<S2C_JoinRoomResponse> Join(
             IRealtimeTransport transport,
             MatchReady ready,
             CancellationToken? cancellation = null
@@ -864,8 +872,8 @@ internal static class FailureScenarios
         {
             await Send(
                 transport,
-                MessageId.LoginRequest,
-                new LoginRequest
+                MessageId.C2SLoginRequest,
+                new C2S_LoginRequest
                 {
                     ProtocolMajor = 1,
                     ClientBuild = "failure-acceptance",
@@ -874,22 +882,22 @@ internal static class FailureScenarios
                 },
                 cancellation
             );
-            var login = await Receive<LoginResponse>(
+            var login = await Receive<S2C_LoginResponse>(
                 transport,
-                MessageId.LoginResponse,
+                MessageId.S2CLoginResponse,
                 10,
                 cancellation
             );
             Check(login.BootEpoch == ready.Status.Allocation.BootEpoch, "join-boot-identity");
             await Send(
                 transport,
-                MessageId.JoinRoomRequest,
-                new JoinRoomRequest { SessionId = login.SessionId, RequestedRoom = 1 },
+                MessageId.C2SJoinRoomRequest,
+                new C2S_JoinRoomRequest { SessionId = login.SessionId, RequestedRoom = 1 },
                 cancellation
             );
-            return await Receive<JoinRoomResponse>(
+            return await Receive<S2C_JoinRoomResponse>(
                 transport,
-                MessageId.JoinRoomResponse,
+                MessageId.S2CJoinRoomResponse,
                 10,
                 cancellation
             );
@@ -953,22 +961,27 @@ internal static class FailureScenarios
             throw new TimeoutException("receive-" + id);
         }
 
-        public Task<Snapshot> Snapshot(IRealtimeTransport transport) =>
-            Receive<Snapshot>(transport, MessageId.Snapshot, 15);
+        public Task<S2C_SnapshotPush> Snapshot(IRealtimeTransport transport) =>
+            Receive<S2C_SnapshotPush>(transport, MessageId.S2CSnapshotPush, 15);
 
-        public Task<Snapshot> FreshSnapshot(
+        public Task<S2C_SnapshotPush> FreshSnapshot(
             IRealtimeTransport transport,
             CancellationToken? cancellation = null
         )
         {
             byte[] bytes = new byte[1200];
             while (transport.TryReceive(bytes, out _)) { }
-            return Receive<Snapshot>(transport, MessageId.Snapshot, 15, cancellation);
+            return Receive<S2C_SnapshotPush>(
+                transport,
+                MessageId.S2CSnapshotPush,
+                15,
+                cancellation
+            );
         }
 
-        public async Task<Snapshot> Finished(IRealtimeTransport transport)
+        public async Task<S2C_SnapshotPush> Finished(IRealtimeTransport transport)
         {
-            Snapshot value;
+            S2C_SnapshotPush value;
             do
             {
                 value = await Snapshot(transport);
@@ -988,7 +1001,7 @@ internal static class FailureScenarios
                 await Task.Delay(300, ct);
                 var reply = await gate.CallAsync(
                     ServiceMethods.Profile,
-                    new ProfileRequest { PlayerId = pair.LoginA.PlayerId }.ToByteArray(),
+                    new ProfileQuery { PlayerId = pair.LoginA.PlayerId }.ToByteArray(),
                     pair.LoginA.SessionToken,
                     ct
                 );
@@ -1002,7 +1015,7 @@ internal static class FailureScenarios
             profile = (
                 await gate.CallAsync(
                     ServiceMethods.Profile,
-                    new ProfileRequest { PlayerId = pair.LoginA.PlayerId }.ToByteArray(),
+                    new ProfileQuery { PlayerId = pair.LoginA.PlayerId }.ToByteArray(),
                     pair.LoginA.SessionToken,
                     ct
                 )
@@ -1032,7 +1045,7 @@ internal static class FailureScenarios
             await using var member = await runtime.ConnectGateProbeAsync("127.0.0.1:23001", ct);
             async Task<LoginResult> Register(FantasyBackendProbe gate)
             {
-                var account = new AccountRequest
+                var account = new AccountCredentials
                 {
                     Username = "party_" + Guid.NewGuid().ToString("N")[..16],
                     Password = Guid.NewGuid().ToString("N"),
@@ -1069,7 +1082,7 @@ internal static class FailureScenarios
             party = (
                 await leader.CallAsync(
                     ServiceMethods.PartyInvite,
-                    new PartyCommand
+                    new PartyOperation
                     {
                         PartyId = party.PartyId,
                         TargetPlayerId = memberLogin.PlayerId,
@@ -1094,7 +1107,7 @@ internal static class FailureScenarios
             party = (
                 await member.CallAsync(
                     ServiceMethods.PartyAccept,
-                    new PartyCommand
+                    new PartyOperation
                     {
                         PartyId = party.PartyId,
                         ExpectedVersion = party.Version,
@@ -1106,7 +1119,7 @@ internal static class FailureScenarios
             party = (
                 await leader.CallAsync(
                     ServiceMethods.PartyReady,
-                    new PartyCommand
+                    new PartyOperation
                     {
                         PartyId = party.PartyId,
                         ExpectedVersion = party.Version,
@@ -1119,7 +1132,7 @@ internal static class FailureScenarios
             party = (
                 await member.CallAsync(
                     ServiceMethods.PartyReady,
-                    new PartyCommand
+                    new PartyOperation
                     {
                         PartyId = party.PartyId,
                         ExpectedVersion = party.Version,
@@ -1133,7 +1146,7 @@ internal static class FailureScenarios
             (
                 await leader.CallAsync(
                     ServiceMethods.PartyQueue,
-                    new PartyQueueRequest
+                    new PartyQueueData
                     {
                         PartyId = party.PartyId,
                         ExpectedVersion = party.Version,
@@ -1355,7 +1368,7 @@ internal static class FailureScenarios
                                 buffer.AsSpan(0, packet.WrittenBytes),
                                 out var decoded
                             ) != ProtocolDecodeStatus.Accepted
-                            || decoded.Message is not Snapshot snap
+                            || decoded.Message is not S2C_SnapshotPush snap
                         )
                             continue;
                         bot.Last = snap;
@@ -1388,8 +1401,8 @@ internal static class FailureScenarios
                         bot.Pending[seq] = Stopwatch.GetTimestamp();
                         await Send(
                             bot.Transport,
-                            MessageId.InputCommand,
-                            new InputCommand
+                            MessageId.C2SInputCommand,
+                            new C2S_InputCommand
                             {
                                 RoomTick = bot.Last.RoomTick + 2,
                                 Sequence = seq,
@@ -1600,7 +1613,7 @@ internal static class FailureScenarios
             public IRealtimeTransport Transport = transport;
             public uint Entity = entity,
                 Sequence;
-            public Snapshot Last = new();
+            public S2C_SnapshotPush Last = new();
             public int StartX;
             public Dictionary<uint, long> Pending = [];
         }

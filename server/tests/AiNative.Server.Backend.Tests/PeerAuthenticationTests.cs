@@ -26,7 +26,11 @@ public sealed class PeerAuthenticationTests
             },
             new Clock()
         );
-        ControlRequest request = new() { CorrelationId = "a", Method = ServiceMethods.Allocate };
+        S2S_ControlRequest request = new()
+        {
+            CorrelationId = "a",
+            Method = ServiceMethods.Allocate,
+        };
         auth.Sign(request);
         Assert.That(auth.TryAuthenticate(request, out _), Is.False);
     }
@@ -45,7 +49,7 @@ public sealed class PeerAuthenticationTests
         using PeerAuthentication sender =
                 new("gate", gate.ExportPkcs8PrivateKeyPem(), peers, clock),
             receiver = new("player", player.ExportPkcs8PrivateKeyPem(), peers, clock);
-        ControlRequest request = new()
+        S2S_ControlRequest request = new()
         {
             CorrelationId = "a",
             Method = ServiceMethods.Profile,
@@ -53,7 +57,7 @@ public sealed class PeerAuthenticationTests
             DelegatedPlayerId = "p1",
         };
         sender.Sign(request);
-        ControlRequest tampered = request.Clone();
+        S2S_ControlRequest tampered = request.Clone();
         tampered.DelegatedPlayerId = "p2";
         Assert.That(receiver.TryAuthenticate(tampered, out _), Is.False);
         Assert.That(receiver.TryAuthenticate(request, out var context), Is.True);
@@ -78,7 +82,7 @@ public sealed class PeerAuthenticationTests
             peers,
             new Clock()
         );
-        ControlRequest request = new()
+        S2S_ControlRequest request = new()
         {
             CorrelationId = "a",
             Method = ServiceMethods.Settle,

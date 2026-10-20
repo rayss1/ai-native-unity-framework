@@ -25,110 +25,118 @@ namespace AiNative.Protocol.Backend.V1 {
       byte[] descriptorData = global::System.Convert.FromBase64String(
           string.Concat(
             "ChlhaW5hdGl2ZS92MS9iYWNrZW5kLnByb3RvEhNhaW5hdGl2ZS5iYWNrZW5k",
-            "LnYxIqIBCg5Db250cm9sUmVxdWVzdBIWCg5jb3JyZWxhdGlvbl9pZBgBIAEo",
-            "CRIOCgZtZXRob2QYAiABKAkSDAoEYm9keRgDIAEoDBISCgpjcmVkZW50aWFs",
-            "GAQgASgJEhsKE2RlbGVnYXRlZF9wbGF5ZXJfaWQYBSABKAkSFAoMdHJhY2Vf",
-            "cGFyZW50GAYgASgJEhMKC3RyYWNlX3N0YXRlGAcgASgJIkYKD0NvbnRyb2xS",
-            "ZXNwb25zZRIWCg5jb3JyZWxhdGlvbl9pZBgBIAEoCRIMCgRib2R5GAIgASgM",
-            "Eg0KBWVycm9yGAMgASgJIjMKE0NvbnRyb2xOb3RpZmljYXRpb24SDgoGbWV0",
-            "aG9kGAEgASgJEgwKBGJvZHkYAiABKAwiIAoOUHJlc2VuY2VVcGRhdGUSDgoG",
-            "b25saW5lGAEgASgIIjIKDVByZXNlbmNlU3RhdGUSEQoJcGxheWVyX2lkGAEg",
-            "ASgJEg4KBm9ubGluZRgCIAEoCCIHCgVFbXB0eSI0Cg5BY2NvdW50UmVxdWVz",
-            "dBIQCgh1c2VybmFtZRgBIAEoCRIQCghwYXNzd29yZBgCIAEoCSJVCgtMb2dp",
-            "blJlc3VsdBIRCglwbGF5ZXJfaWQYASABKAkSFQoNc2Vzc2lvbl90b2tlbhgC",
-            "IAEoCRIcChRleHBpcmVzX3VuaXhfc2Vjb25kcxgDIAEoAyInCg5TZXNzaW9u",
-            "UmVxdWVzdBIVCg1zZXNzaW9uX3Rva2VuGAEgASgJIkEKDlBsYXllcklkZW50",
-            "aXR5EhEKCXBsYXllcl9pZBgBIAEoCRIcChRleHBpcmVzX3VuaXhfc2Vjb25k",
-            "cxgCIAEoAyJkCg1QbGF5ZXJQcm9maWxlEhEKCXBsYXllcl9pZBgBIAEoCRIU",
-            "CgxkaXNwbGF5X25hbWUYAiABKAkSDgoGcGxheWVkGAMgASgDEgsKA3dvbhgE",
-            "IAEoAxINCgVraWxscxgFIAEoAyIjCg5Qcm9maWxlUmVxdWVzdBIRCglwbGF5",
-            "ZXJfaWQYASABKAkiYwoMUGFydHlDb21tYW5kEhAKCHBhcnR5X2lkGAEgASgJ",
-            "EhgKEHRhcmdldF9wbGF5ZXJfaWQYAiABKAkSDQoFcmVhZHkYAyABKAgSGAoQ",
-            "ZXhwZWN0ZWRfdmVyc2lvbhgEIAEoBCIvCgtQYXJ0eU1lbWJlchIRCglwbGF5",
-            "ZXJfaWQYASABKAkSDQoFcmVhZHkYAiABKAgijwEKClBhcnR5U3RhdGUSEAoI",
-            "cGFydHlfaWQYASABKAkSEQoJbGVhZGVyX2lkGAIgASgJEg8KB3ZlcnNpb24Y",
-            "AyABKAQSMQoHbWVtYmVycxgEIAMoCzIgLmFpbmF0aXZlLmJhY2tlbmQudjEu",
-            "UGFydHlNZW1iZXISGAoQcXVldWVfcmVxdWVzdF9pZBgFIAEoCSIdCgxTZXJ2",
-            "aWNlRXBvY2gSDQoFZXBvY2gYASABKAkiRAoQUGFydHlJbnZpdGF0aW9ucxIw",
-            "CgdwYXJ0aWVzGAEgAygLMh8uYWluYXRpdmUuYmFja2VuZC52MS5QYXJ0eVN0",
-            "YXRlIlMKEVBhcnR5UXVldWVSZXF1ZXN0EhAKCHBhcnR5X2lkGAEgASgJEhgK",
-            "EGV4cGVjdGVkX3ZlcnNpb24YAiABKAQSEgoKcmVxdWVzdF9pZBgDIAEoCSKj",
-            "AQoKUXVldWVFbnRyeRISCgpyZXF1ZXN0X2lkGAEgASgJEhAKCHBhcnR5X2lk",
-            "GAIgASgJEhUKDXBhcnR5X3ZlcnNpb24YAyABKAQSEgoKcGxheWVyX2lkcxgE",
-            "IAMoCRIcChRleHBlY3RlZF9tYXRjaF9lcG9jaBgFIAEoCRImCh5hZG1pc3Np",
-            "b25fZXhwaXJlc191bml4X3NlY29uZHMYBiABKAMiIAoKTWF0Y2hRdWVyeRIS",
-            "CgpyZXF1ZXN0X2lkGAEgASgJIowBCgtNYXRjaFN0YXR1cxISCgpyZXF1ZXN0",
-            "X2lkGAEgASgJEg0KBXN0YXRlGAIgASgJEhAKCG1hdGNoX2lkGAMgASgJEjcK",
-            "CmFsbG9jYXRpb24YBCABKAsyIy5haW5hdGl2ZS5iYWNrZW5kLnYxLlJvb21B",
-            "bGxvY2F0aW9uEg8KB2ZhaWx1cmUYBSABKAkiOQoRQWxsb2NhdGlvblJlcXVl",
-            "c3QSEAoIbWF0Y2hfaWQYASABKAkSEgoKcGxheWVyX2lkcxgCIAMoCSJYCglS",
-            "b29tUXVlcnkSDwoHcm9vbV9pZBgBIAEoCRIQCghtYXRjaF9pZBgCIAEoCRIR",
-            "CglwYWdlX3NpemUYAyABKA0SFQoNYWZ0ZXJfcm9vbV9pZBgEIAEoCSL2AQoO",
-            "Um9vbUFsbG9jYXRpb24SFQoNYWxsb2NhdGlvbl9pZBgBIAEoCRIQCghtYXRj",
-            "aF9pZBgCIAEoCRIPCgdyb29tX2lkGAMgASgJEg8KB25vZGVfaWQYBCABKAkS",
-            "EgoKYm9vdF9lcG9jaBgFIAEoCRIPCgdhZGRyZXNzGAYgASgJEg0KBXN0YXRl",
-            "GAcgASgJEhIKCnBsYXllcl9pZHMYCCADKAkSHAoUY3JlYXRlZF91bml4X3Nl",
-            "Y29uZHMYCSABKAMSGQoRY29vcmRpbmF0b3JfZXBvY2gYCiABKAkSGAoQYXV0",
-            "aG9yaXR5X2ZlbmNlZBgLIAEoCCJxCg5Xb3JrZXJDYXBhY2l0eRIRCgl3b3Jr",
-            "ZXJfaWQYASABKAUSFwoPYXZhaWxhYmxlX3Jvb21zGAIgASgFEhkKEW1haWxi",
-            "b3hfYXZhaWxhYmxlGAMgASgFEhgKEGxhc3RfdGlja19taWNyb3MYBCABKAMi",
-            "3AEKEEJhdHRsZU5vZGVSZXBvcnQSDwoHbm9kZV9pZBgBIAEoCRISCgpib290",
-            "X2Vwb2NoGAIgASgJEg8KB2FkZHJlc3MYAyABKAkSEAoIZHJhaW5pbmcYBCAB",
-            "KAgSFgoOb3V0Ym94X2hlYWx0aHkYBSABKAgSNAoHd29ya2VycxgGIAMoCzIj",
-            "LmFpbmF0aXZlLmJhY2tlbmQudjEuV29ya2VyQ2FwYWNpdHkSMgoFcm9vbXMY",
-            "ByADKAsyIy5haW5hdGl2ZS5iYWNrZW5kLnYxLlJvb21BbGxvY2F0aW9uIkoK",
-            "D1Jvb21SZXNlcnZhdGlvbhI3CgphbGxvY2F0aW9uGAEgASgLMiMuYWluYXRp",
-            "dmUuYmFja2VuZC52MS5Sb29tQWxsb2NhdGlvbiJlCgxSb29tQ3JlYXRpb24S",
-            "FQoNYWxsb2NhdGlvbl9pZBgBIAEoCRIPCgdyb29tX2lkGAIgASgJEhIKCmJv",
-            "b3RfZXBvY2gYAyABKAkSGQoRY29vcmRpbmF0b3JfZXBvY2gYBCABKAkidAoL",
-            "Um9vbVJlbGVhc2USFQoNYWxsb2NhdGlvbl9pZBgBIAEoCRIPCgdyb29tX2lk",
-            "GAIgASgJEhIKCmJvb3RfZXBvY2gYAyABKAkSDgoGcmVhc29uGAQgASgJEhkK",
-            "EWNvb3JkaW5hdG9yX2Vwb2NoGAUgASgJImgKCFJvb21MaXN0EjIKBXJvb21z",
-            "GAEgAygLMiMuYWluYXRpdmUuYmFja2VuZC52MS5Sb29tQWxsb2NhdGlvbhIS",
-            "CgphbGxvY2F0aW5nGAIgASgIEhQKDG5leHRfcm9vbV9pZBgDIAEoCSI9CgxE",
-            "cmFpblJlcXVlc3QSEgoKYm9vdF9lcG9jaBgBIAEoCRIZChFjb29yZGluYXRv",
-            "cl9lcG9jaBgCIAEoCSJBChBDb29yZGluYXRvckZlbmNlEhkKEWNvb3JkaW5h",
-            "dG9yX2Vwb2NoGAEgASgJEhIKCmJvb3RfZXBvY2gYAiABKAkiWwoNVGlja2V0",
-            "UmVxdWVzdBIRCglwbGF5ZXJfaWQYASABKAkSNwoKYWxsb2NhdGlvbhgCIAEo",
-            "CzIjLmFpbmF0aXZlLmJhY2tlbmQudjEuUm9vbUFsbG9jYXRpb24iOwoLRW50",
-            "cnlUaWNrZXQSDgoGdGlja2V0GAEgASgJEhwKFGV4cGlyZXNfdW5peF9zZWNv",
-            "bmRzGAIgASgDIjgKD0JhdHRsZUFkbWlzc2lvbhIUCgxlbnRyeV90aWNrZXQY",
-            "ASABKAkSDwoHcm9vbV9pZBgCIAEoCSJUCgpNYXRjaFJlYWR5EjAKBnN0YXR1",
-            "cxgBIAEoCzIgLmFpbmF0aXZlLmJhY2tlbmQudjEuTWF0Y2hTdGF0dXMSFAoM",
-            "ZW50cnlfdGlja2V0GAIgASgJIj0KDFBsYXllclJlc3VsdBIRCglwbGF5ZXJf",
-            "aWQYASABKAkSCwoDd29uGAIgASgIEg0KBWtpbGxzGAMgASgFIp0BCgtNYXRj",
-            "aFJlc3VsdBIQCghtYXRjaF9pZBgBIAEoCRIPCgdyb29tX2lkGAIgASgJEg8K",
-            "B25vZGVfaWQYAyABKAkSEgoKYm9vdF9lcG9jaBgEIAEoCRIyCgdwbGF5ZXJz",
-            "GAUgAygLMiEuYWluYXRpdmUuYmFja2VuZC52MS5QbGF5ZXJSZXN1bHQSEgoK",
-            "Y29tcGxldGlvbhgGIAEoCSIjCg9TZXR0bGVtZW50UXVlcnkSEAoIbWF0Y2hf",
-            "aWQYASABKAkiTgoRU2V0dGxlbWVudFJlY2VpcHQSEAoIbWF0Y2hfaWQYASAB",
-            "KAkSFAoMcGF5bG9hZF9oYXNoGAIgASgJEhEKCWNvbmZpcm1lZBgDIAEoCEIf",
-            "qgIcQWlOYXRpdmUuUHJvdG9jb2wuQmFja2VuZC5WMWIGcHJvdG8z"));
+            "LnYxIqMBCg9DMlNfR2F0ZVJlcXVlc3QSFgoOY29ycmVsYXRpb25faWQYASAB",
+            "KAkSDgoGbWV0aG9kGAIgASgJEgwKBGJvZHkYAyABKAwSEgoKY3JlZGVudGlh",
+            "bBgEIAEoCRIbChNkZWxlZ2F0ZWRfcGxheWVyX2lkGAUgASgJEhQKDHRyYWNl",
+            "X3BhcmVudBgGIAEoCRITCgt0cmFjZV9zdGF0ZRgHIAEoCSJHChBTMkNfR2F0",
+            "ZVJlc3BvbnNlEhYKDmNvcnJlbGF0aW9uX2lkGAEgASgJEgwKBGJvZHkYAiAB",
+            "KAwSDQoFZXJyb3IYAyABKAkipgEKElMyU19Db250cm9sUmVxdWVzdBIWCg5j",
+            "b3JyZWxhdGlvbl9pZBgBIAEoCRIOCgZtZXRob2QYAiABKAkSDAoEYm9keRgD",
+            "IAEoDBISCgpjcmVkZW50aWFsGAQgASgJEhsKE2RlbGVnYXRlZF9wbGF5ZXJf",
+            "aWQYBSABKAkSFAoMdHJhY2VfcGFyZW50GAYgASgJEhMKC3RyYWNlX3N0YXRl",
+            "GAcgASgJIkoKE1MyU19Db250cm9sUmVzcG9uc2USFgoOY29ycmVsYXRpb25f",
+            "aWQYASABKAkSDAoEYm9keRgCIAEoDBINCgVlcnJvchgDIAEoCSIsCgxTMkNf",
+            "R2F0ZVB1c2gSDgoGbWV0aG9kGAEgASgJEgwKBGJvZHkYAiABKAwiIAoOUHJl",
+            "c2VuY2VVcGRhdGUSDgoGb25saW5lGAEgASgIIjIKDVByZXNlbmNlU3RhdGUS",
+            "EQoJcGxheWVyX2lkGAEgASgJEg4KBm9ubGluZRgCIAEoCCIHCgVFbXB0eSI4",
+            "ChJBY2NvdW50Q3JlZGVudGlhbHMSEAoIdXNlcm5hbWUYASABKAkSEAoIcGFz",
+            "c3dvcmQYAiABKAkiVQoLTG9naW5SZXN1bHQSEQoJcGxheWVyX2lkGAEgASgJ",
+            "EhUKDXNlc3Npb25fdG9rZW4YAiABKAkSHAoUZXhwaXJlc191bml4X3NlY29u",
+            "ZHMYAyABKAMiKwoSU2Vzc2lvbkNyZWRlbnRpYWxzEhUKDXNlc3Npb25fdG9r",
+            "ZW4YASABKAkiQQoOUGxheWVySWRlbnRpdHkSEQoJcGxheWVyX2lkGAEgASgJ",
+            "EhwKFGV4cGlyZXNfdW5peF9zZWNvbmRzGAIgASgDImQKDVBsYXllclByb2Zp",
+            "bGUSEQoJcGxheWVyX2lkGAEgASgJEhQKDGRpc3BsYXlfbmFtZRgCIAEoCRIO",
+            "CgZwbGF5ZWQYAyABKAMSCwoDd29uGAQgASgDEg0KBWtpbGxzGAUgASgDIiEK",
+            "DFByb2ZpbGVRdWVyeRIRCglwbGF5ZXJfaWQYASABKAkiZQoOUGFydHlPcGVy",
+            "YXRpb24SEAoIcGFydHlfaWQYASABKAkSGAoQdGFyZ2V0X3BsYXllcl9pZBgC",
+            "IAEoCRINCgVyZWFkeRgDIAEoCBIYChBleHBlY3RlZF92ZXJzaW9uGAQgASgE",
+            "Ii8KC1BhcnR5TWVtYmVyEhEKCXBsYXllcl9pZBgBIAEoCRINCgVyZWFkeRgC",
+            "IAEoCCKPAQoKUGFydHlTdGF0ZRIQCghwYXJ0eV9pZBgBIAEoCRIRCglsZWFk",
+            "ZXJfaWQYAiABKAkSDwoHdmVyc2lvbhgDIAEoBBIxCgdtZW1iZXJzGAQgAygL",
+            "MiAuYWluYXRpdmUuYmFja2VuZC52MS5QYXJ0eU1lbWJlchIYChBxdWV1ZV9y",
+            "ZXF1ZXN0X2lkGAUgASgJIh0KDFNlcnZpY2VFcG9jaBINCgVlcG9jaBgBIAEo",
+            "CSJEChBQYXJ0eUludml0YXRpb25zEjAKB3BhcnRpZXMYASADKAsyHy5haW5h",
+            "dGl2ZS5iYWNrZW5kLnYxLlBhcnR5U3RhdGUiUAoOUGFydHlRdWV1ZURhdGES",
+            "EAoIcGFydHlfaWQYASABKAkSGAoQZXhwZWN0ZWRfdmVyc2lvbhgCIAEoBBIS",
+            "CgpyZXF1ZXN0X2lkGAMgASgJIqMBCgpRdWV1ZUVudHJ5EhIKCnJlcXVlc3Rf",
+            "aWQYASABKAkSEAoIcGFydHlfaWQYAiABKAkSFQoNcGFydHlfdmVyc2lvbhgD",
+            "IAEoBBISCgpwbGF5ZXJfaWRzGAQgAygJEhwKFGV4cGVjdGVkX21hdGNoX2Vw",
+            "b2NoGAUgASgJEiYKHmFkbWlzc2lvbl9leHBpcmVzX3VuaXhfc2Vjb25kcxgG",
+            "IAEoAyIgCgpNYXRjaFF1ZXJ5EhIKCnJlcXVlc3RfaWQYASABKAkijAEKC01h",
+            "dGNoU3RhdHVzEhIKCnJlcXVlc3RfaWQYASABKAkSDQoFc3RhdGUYAiABKAkS",
+            "EAoIbWF0Y2hfaWQYAyABKAkSNwoKYWxsb2NhdGlvbhgEIAEoCzIjLmFpbmF0",
+            "aXZlLmJhY2tlbmQudjEuUm9vbUFsbG9jYXRpb24SDwoHZmFpbHVyZRgFIAEo",
+            "CSI2Cg5BbGxvY2F0aW9uU3BlYxIQCghtYXRjaF9pZBgBIAEoCRISCgpwbGF5",
+            "ZXJfaWRzGAIgAygJIlgKCVJvb21RdWVyeRIPCgdyb29tX2lkGAEgASgJEhAK",
+            "CG1hdGNoX2lkGAIgASgJEhEKCXBhZ2Vfc2l6ZRgDIAEoDRIVCg1hZnRlcl9y",
+            "b29tX2lkGAQgASgJIvYBCg5Sb29tQWxsb2NhdGlvbhIVCg1hbGxvY2F0aW9u",
+            "X2lkGAEgASgJEhAKCG1hdGNoX2lkGAIgASgJEg8KB3Jvb21faWQYAyABKAkS",
+            "DwoHbm9kZV9pZBgEIAEoCRISCgpib290X2Vwb2NoGAUgASgJEg8KB2FkZHJl",
+            "c3MYBiABKAkSDQoFc3RhdGUYByABKAkSEgoKcGxheWVyX2lkcxgIIAMoCRIc",
+            "ChRjcmVhdGVkX3VuaXhfc2Vjb25kcxgJIAEoAxIZChFjb29yZGluYXRvcl9l",
+            "cG9jaBgKIAEoCRIYChBhdXRob3JpdHlfZmVuY2VkGAsgASgIInEKDldvcmtl",
+            "ckNhcGFjaXR5EhEKCXdvcmtlcl9pZBgBIAEoBRIXCg9hdmFpbGFibGVfcm9v",
+            "bXMYAiABKAUSGQoRbWFpbGJveF9hdmFpbGFibGUYAyABKAUSGAoQbGFzdF90",
+            "aWNrX21pY3JvcxgEIAEoAyLcAQoQQmF0dGxlTm9kZVJlcG9ydBIPCgdub2Rl",
+            "X2lkGAEgASgJEhIKCmJvb3RfZXBvY2gYAiABKAkSDwoHYWRkcmVzcxgDIAEo",
+            "CRIQCghkcmFpbmluZxgEIAEoCBIWCg5vdXRib3hfaGVhbHRoeRgFIAEoCBI0",
+            "Cgd3b3JrZXJzGAYgAygLMiMuYWluYXRpdmUuYmFja2VuZC52MS5Xb3JrZXJD",
+            "YXBhY2l0eRIyCgVyb29tcxgHIAMoCzIjLmFpbmF0aXZlLmJhY2tlbmQudjEu",
+            "Um9vbUFsbG9jYXRpb24iSgoPUm9vbVJlc2VydmF0aW9uEjcKCmFsbG9jYXRp",
+            "b24YASABKAsyIy5haW5hdGl2ZS5iYWNrZW5kLnYxLlJvb21BbGxvY2F0aW9u",
+            "ImUKDFJvb21DcmVhdGlvbhIVCg1hbGxvY2F0aW9uX2lkGAEgASgJEg8KB3Jv",
+            "b21faWQYAiABKAkSEgoKYm9vdF9lcG9jaBgDIAEoCRIZChFjb29yZGluYXRv",
+            "cl9lcG9jaBgEIAEoCSJ0CgtSb29tUmVsZWFzZRIVCg1hbGxvY2F0aW9uX2lk",
+            "GAEgASgJEg8KB3Jvb21faWQYAiABKAkSEgoKYm9vdF9lcG9jaBgDIAEoCRIO",
+            "CgZyZWFzb24YBCABKAkSGQoRY29vcmRpbmF0b3JfZXBvY2gYBSABKAkiaAoI",
+            "Um9vbUxpc3QSMgoFcm9vbXMYASADKAsyIy5haW5hdGl2ZS5iYWNrZW5kLnYx",
+            "LlJvb21BbGxvY2F0aW9uEhIKCmFsbG9jYXRpbmcYAiABKAgSFAoMbmV4dF9y",
+            "b29tX2lkGAMgASgJIjoKCURyYWluU3BlYxISCgpib290X2Vwb2NoGAEgASgJ",
+            "EhkKEWNvb3JkaW5hdG9yX2Vwb2NoGAIgASgJIkEKEENvb3JkaW5hdG9yRmVu",
+            "Y2USGQoRY29vcmRpbmF0b3JfZXBvY2gYASABKAkSEgoKYm9vdF9lcG9jaBgC",
+            "IAEoCSJYCgpUaWNrZXRTcGVjEhEKCXBsYXllcl9pZBgBIAEoCRI3CgphbGxv",
+            "Y2F0aW9uGAIgASgLMiMuYWluYXRpdmUuYmFja2VuZC52MS5Sb29tQWxsb2Nh",
+            "dGlvbiI7CgtFbnRyeVRpY2tldBIOCgZ0aWNrZXQYASABKAkSHAoUZXhwaXJl",
+            "c191bml4X3NlY29uZHMYAiABKAMiOAoPQmF0dGxlQWRtaXNzaW9uEhQKDGVu",
+            "dHJ5X3RpY2tldBgBIAEoCRIPCgdyb29tX2lkGAIgASgJIlQKCk1hdGNoUmVh",
+            "ZHkSMAoGc3RhdHVzGAEgASgLMiAuYWluYXRpdmUuYmFja2VuZC52MS5NYXRj",
+            "aFN0YXR1cxIUCgxlbnRyeV90aWNrZXQYAiABKAkiPQoMUGxheWVyUmVzdWx0",
+            "EhEKCXBsYXllcl9pZBgBIAEoCRILCgN3b24YAiABKAgSDQoFa2lsbHMYAyAB",
+            "KAUinQEKC01hdGNoUmVzdWx0EhAKCG1hdGNoX2lkGAEgASgJEg8KB3Jvb21f",
+            "aWQYAiABKAkSDwoHbm9kZV9pZBgDIAEoCRISCgpib290X2Vwb2NoGAQgASgJ",
+            "EjIKB3BsYXllcnMYBSADKAsyIS5haW5hdGl2ZS5iYWNrZW5kLnYxLlBsYXll",
+            "clJlc3VsdBISCgpjb21wbGV0aW9uGAYgASgJIiMKD1NldHRsZW1lbnRRdWVy",
+            "eRIQCghtYXRjaF9pZBgBIAEoCSJOChFTZXR0bGVtZW50UmVjZWlwdBIQCght",
+            "YXRjaF9pZBgBIAEoCRIUCgxwYXlsb2FkX2hhc2gYAiABKAkSEQoJY29uZmly",
+            "bWVkGAMgASgIQh+qAhxBaU5hdGl2ZS5Qcm90b2NvbC5CYWNrZW5kLlYxYgZw",
+            "cm90bzM="));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { },
           new pbr::GeneratedClrTypeInfo(null, null, new pbr::GeneratedClrTypeInfo[] {
-            new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.Backend.V1.ControlRequest), global::AiNative.Protocol.Backend.V1.ControlRequest.Parser, new[]{ "CorrelationId", "Method", "Body", "Credential", "DelegatedPlayerId", "TraceParent", "TraceState" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.Backend.V1.ControlResponse), global::AiNative.Protocol.Backend.V1.ControlResponse.Parser, new[]{ "CorrelationId", "Body", "Error" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.Backend.V1.ControlNotification), global::AiNative.Protocol.Backend.V1.ControlNotification.Parser, new[]{ "Method", "Body" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.Backend.V1.C2S_GateRequest), global::AiNative.Protocol.Backend.V1.C2S_GateRequest.Parser, new[]{ "CorrelationId", "Method", "Body", "Credential", "DelegatedPlayerId", "TraceParent", "TraceState" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.Backend.V1.S2C_GateResponse), global::AiNative.Protocol.Backend.V1.S2C_GateResponse.Parser, new[]{ "CorrelationId", "Body", "Error" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.Backend.V1.S2S_ControlRequest), global::AiNative.Protocol.Backend.V1.S2S_ControlRequest.Parser, new[]{ "CorrelationId", "Method", "Body", "Credential", "DelegatedPlayerId", "TraceParent", "TraceState" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.Backend.V1.S2S_ControlResponse), global::AiNative.Protocol.Backend.V1.S2S_ControlResponse.Parser, new[]{ "CorrelationId", "Body", "Error" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.Backend.V1.S2C_GatePush), global::AiNative.Protocol.Backend.V1.S2C_GatePush.Parser, new[]{ "Method", "Body" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.Backend.V1.PresenceUpdate), global::AiNative.Protocol.Backend.V1.PresenceUpdate.Parser, new[]{ "Online" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.Backend.V1.PresenceState), global::AiNative.Protocol.Backend.V1.PresenceState.Parser, new[]{ "PlayerId", "Online" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.Backend.V1.Empty), global::AiNative.Protocol.Backend.V1.Empty.Parser, null, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.Backend.V1.AccountRequest), global::AiNative.Protocol.Backend.V1.AccountRequest.Parser, new[]{ "Username", "Password" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.Backend.V1.AccountCredentials), global::AiNative.Protocol.Backend.V1.AccountCredentials.Parser, new[]{ "Username", "Password" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.Backend.V1.LoginResult), global::AiNative.Protocol.Backend.V1.LoginResult.Parser, new[]{ "PlayerId", "SessionToken", "ExpiresUnixSeconds" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.Backend.V1.SessionRequest), global::AiNative.Protocol.Backend.V1.SessionRequest.Parser, new[]{ "SessionToken" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.Backend.V1.SessionCredentials), global::AiNative.Protocol.Backend.V1.SessionCredentials.Parser, new[]{ "SessionToken" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.Backend.V1.PlayerIdentity), global::AiNative.Protocol.Backend.V1.PlayerIdentity.Parser, new[]{ "PlayerId", "ExpiresUnixSeconds" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.Backend.V1.PlayerProfile), global::AiNative.Protocol.Backend.V1.PlayerProfile.Parser, new[]{ "PlayerId", "DisplayName", "Played", "Won", "Kills" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.Backend.V1.ProfileRequest), global::AiNative.Protocol.Backend.V1.ProfileRequest.Parser, new[]{ "PlayerId" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.Backend.V1.PartyCommand), global::AiNative.Protocol.Backend.V1.PartyCommand.Parser, new[]{ "PartyId", "TargetPlayerId", "Ready", "ExpectedVersion" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.Backend.V1.ProfileQuery), global::AiNative.Protocol.Backend.V1.ProfileQuery.Parser, new[]{ "PlayerId" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.Backend.V1.PartyOperation), global::AiNative.Protocol.Backend.V1.PartyOperation.Parser, new[]{ "PartyId", "TargetPlayerId", "Ready", "ExpectedVersion" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.Backend.V1.PartyMember), global::AiNative.Protocol.Backend.V1.PartyMember.Parser, new[]{ "PlayerId", "Ready" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.Backend.V1.PartyState), global::AiNative.Protocol.Backend.V1.PartyState.Parser, new[]{ "PartyId", "LeaderId", "Version", "Members", "QueueRequestId" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.Backend.V1.ServiceEpoch), global::AiNative.Protocol.Backend.V1.ServiceEpoch.Parser, new[]{ "Epoch" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.Backend.V1.PartyInvitations), global::AiNative.Protocol.Backend.V1.PartyInvitations.Parser, new[]{ "Parties" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.Backend.V1.PartyQueueRequest), global::AiNative.Protocol.Backend.V1.PartyQueueRequest.Parser, new[]{ "PartyId", "ExpectedVersion", "RequestId" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.Backend.V1.PartyQueueData), global::AiNative.Protocol.Backend.V1.PartyQueueData.Parser, new[]{ "PartyId", "ExpectedVersion", "RequestId" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.Backend.V1.QueueEntry), global::AiNative.Protocol.Backend.V1.QueueEntry.Parser, new[]{ "RequestId", "PartyId", "PartyVersion", "PlayerIds", "ExpectedMatchEpoch", "AdmissionExpiresUnixSeconds" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.Backend.V1.MatchQuery), global::AiNative.Protocol.Backend.V1.MatchQuery.Parser, new[]{ "RequestId" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.Backend.V1.MatchStatus), global::AiNative.Protocol.Backend.V1.MatchStatus.Parser, new[]{ "RequestId", "State", "MatchId", "Allocation", "Failure" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.Backend.V1.AllocationRequest), global::AiNative.Protocol.Backend.V1.AllocationRequest.Parser, new[]{ "MatchId", "PlayerIds" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.Backend.V1.AllocationSpec), global::AiNative.Protocol.Backend.V1.AllocationSpec.Parser, new[]{ "MatchId", "PlayerIds" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.Backend.V1.RoomQuery), global::AiNative.Protocol.Backend.V1.RoomQuery.Parser, new[]{ "RoomId", "MatchId", "PageSize", "AfterRoomId" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.Backend.V1.RoomAllocation), global::AiNative.Protocol.Backend.V1.RoomAllocation.Parser, new[]{ "AllocationId", "MatchId", "RoomId", "NodeId", "BootEpoch", "Address", "State", "PlayerIds", "CreatedUnixSeconds", "CoordinatorEpoch", "AuthorityFenced" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.Backend.V1.WorkerCapacity), global::AiNative.Protocol.Backend.V1.WorkerCapacity.Parser, new[]{ "WorkerId", "AvailableRooms", "MailboxAvailable", "LastTickMicros" }, null, null, null, null),
@@ -137,9 +145,9 @@ namespace AiNative.Protocol.Backend.V1 {
             new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.Backend.V1.RoomCreation), global::AiNative.Protocol.Backend.V1.RoomCreation.Parser, new[]{ "AllocationId", "RoomId", "BootEpoch", "CoordinatorEpoch" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.Backend.V1.RoomRelease), global::AiNative.Protocol.Backend.V1.RoomRelease.Parser, new[]{ "AllocationId", "RoomId", "BootEpoch", "Reason", "CoordinatorEpoch" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.Backend.V1.RoomList), global::AiNative.Protocol.Backend.V1.RoomList.Parser, new[]{ "Rooms", "Allocating", "NextRoomId" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.Backend.V1.DrainRequest), global::AiNative.Protocol.Backend.V1.DrainRequest.Parser, new[]{ "BootEpoch", "CoordinatorEpoch" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.Backend.V1.DrainSpec), global::AiNative.Protocol.Backend.V1.DrainSpec.Parser, new[]{ "BootEpoch", "CoordinatorEpoch" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.Backend.V1.CoordinatorFence), global::AiNative.Protocol.Backend.V1.CoordinatorFence.Parser, new[]{ "CoordinatorEpoch", "BootEpoch" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.Backend.V1.TicketRequest), global::AiNative.Protocol.Backend.V1.TicketRequest.Parser, new[]{ "PlayerId", "Allocation" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.Backend.V1.TicketSpec), global::AiNative.Protocol.Backend.V1.TicketSpec.Parser, new[]{ "PlayerId", "Allocation" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.Backend.V1.EntryTicket), global::AiNative.Protocol.Backend.V1.EntryTicket.Parser, new[]{ "Ticket", "ExpiresUnixSeconds" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.Backend.V1.BattleAdmission), global::AiNative.Protocol.Backend.V1.BattleAdmission.Parser, new[]{ "EntryTicket", "RoomId" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.Backend.V1.MatchReady), global::AiNative.Protocol.Backend.V1.MatchReady.Parser, new[]{ "Status", "EntryTicket" }, null, null, null, null),
@@ -153,17 +161,20 @@ namespace AiNative.Protocol.Backend.V1 {
 
   }
   #region Messages
+  /// <summary>
+  /// 客户端 → 服务端。
+  /// </summary>
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
-  public sealed partial class ControlRequest : pb::IMessage<ControlRequest>
+  public sealed partial class C2S_GateRequest : pb::IMessage<C2S_GateRequest>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       , pb::IBufferMessage
   #endif
   {
-    private static readonly pb::MessageParser<ControlRequest> _parser = new pb::MessageParser<ControlRequest>(() => new ControlRequest());
+    private static readonly pb::MessageParser<C2S_GateRequest> _parser = new pb::MessageParser<C2S_GateRequest>(() => new C2S_GateRequest());
     private pb::UnknownFieldSet _unknownFields;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public static pb::MessageParser<ControlRequest> Parser { get { return _parser; } }
+    public static pb::MessageParser<C2S_GateRequest> Parser { get { return _parser; } }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -179,7 +190,7 @@ namespace AiNative.Protocol.Backend.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public ControlRequest() {
+    public C2S_GateRequest() {
       OnConstruction();
     }
 
@@ -187,7 +198,7 @@ namespace AiNative.Protocol.Backend.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public ControlRequest(ControlRequest other) : this() {
+    public C2S_GateRequest(C2S_GateRequest other) : this() {
       correlationId_ = other.correlationId_;
       method_ = other.method_;
       body_ = other.body_;
@@ -200,8 +211,8 @@ namespace AiNative.Protocol.Backend.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public ControlRequest Clone() {
-      return new ControlRequest(this);
+    public C2S_GateRequest Clone() {
+      return new C2S_GateRequest(this);
     }
 
     /// <summary>Field number for the "correlation_id" field.</summary>
@@ -255,6 +266,9 @@ namespace AiNative.Protocol.Backend.V1 {
     /// <summary>Field number for the "delegated_player_id" field.</summary>
     public const int DelegatedPlayerIdFieldNumber = 5;
     private string delegatedPlayerId_ = "";
+    /// <summary>
+    /// 在 C2S 信封中不作为身份依据；S2S 中必须纳入服务签名验证。
+    /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public string DelegatedPlayerId {
@@ -291,12 +305,12 @@ namespace AiNative.Protocol.Backend.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override bool Equals(object other) {
-      return Equals(other as ControlRequest);
+      return Equals(other as C2S_GateRequest);
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public bool Equals(ControlRequest other) {
+    public bool Equals(C2S_GateRequest other) {
       if (ReferenceEquals(other, null)) {
         return false;
       }
@@ -447,7 +461,7 @@ namespace AiNative.Protocol.Backend.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public void MergeFrom(ControlRequest other) {
+    public void MergeFrom(C2S_GateRequest other) {
       if (other == null) {
         return;
       }
@@ -573,17 +587,20 @@ namespace AiNative.Protocol.Backend.V1 {
 
   }
 
+  /// <summary>
+  /// 服务端 → 客户端；Response 为请求回复，Push 为主动推送。
+  /// </summary>
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
-  public sealed partial class ControlResponse : pb::IMessage<ControlResponse>
+  public sealed partial class S2C_GateResponse : pb::IMessage<S2C_GateResponse>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       , pb::IBufferMessage
   #endif
   {
-    private static readonly pb::MessageParser<ControlResponse> _parser = new pb::MessageParser<ControlResponse>(() => new ControlResponse());
+    private static readonly pb::MessageParser<S2C_GateResponse> _parser = new pb::MessageParser<S2C_GateResponse>(() => new S2C_GateResponse());
     private pb::UnknownFieldSet _unknownFields;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public static pb::MessageParser<ControlResponse> Parser { get { return _parser; } }
+    public static pb::MessageParser<S2C_GateResponse> Parser { get { return _parser; } }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -599,7 +616,7 @@ namespace AiNative.Protocol.Backend.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public ControlResponse() {
+    public S2C_GateResponse() {
       OnConstruction();
     }
 
@@ -607,7 +624,7 @@ namespace AiNative.Protocol.Backend.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public ControlResponse(ControlResponse other) : this() {
+    public S2C_GateResponse(S2C_GateResponse other) : this() {
       correlationId_ = other.correlationId_;
       body_ = other.body_;
       error_ = other.error_;
@@ -616,8 +633,8 @@ namespace AiNative.Protocol.Backend.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public ControlResponse Clone() {
-      return new ControlResponse(this);
+    public S2C_GateResponse Clone() {
+      return new S2C_GateResponse(this);
     }
 
     /// <summary>Field number for the "correlation_id" field.</summary>
@@ -659,12 +676,12 @@ namespace AiNative.Protocol.Backend.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override bool Equals(object other) {
-      return Equals(other as ControlResponse);
+      return Equals(other as S2C_GateResponse);
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public bool Equals(ControlResponse other) {
+    public bool Equals(S2C_GateResponse other) {
       if (ReferenceEquals(other, null)) {
         return false;
       }
@@ -763,7 +780,7 @@ namespace AiNative.Protocol.Backend.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public void MergeFrom(ControlResponse other) {
+    public void MergeFrom(S2C_GateResponse other) {
       if (other == null) {
         return;
       }
@@ -845,17 +862,20 @@ namespace AiNative.Protocol.Backend.V1 {
 
   }
 
+  /// <summary>
+  /// 服务间 RPC；身份由内部签名验证，不能接受客户端自报身份。
+  /// </summary>
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
-  public sealed partial class ControlNotification : pb::IMessage<ControlNotification>
+  public sealed partial class S2S_ControlRequest : pb::IMessage<S2S_ControlRequest>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       , pb::IBufferMessage
   #endif
   {
-    private static readonly pb::MessageParser<ControlNotification> _parser = new pb::MessageParser<ControlNotification>(() => new ControlNotification());
+    private static readonly pb::MessageParser<S2S_ControlRequest> _parser = new pb::MessageParser<S2S_ControlRequest>(() => new S2S_ControlRequest());
     private pb::UnknownFieldSet _unknownFields;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public static pb::MessageParser<ControlNotification> Parser { get { return _parser; } }
+    public static pb::MessageParser<S2S_ControlRequest> Parser { get { return _parser; } }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -871,7 +891,7 @@ namespace AiNative.Protocol.Backend.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public ControlNotification() {
+    public S2S_ControlRequest() {
       OnConstruction();
     }
 
@@ -879,7 +899,708 @@ namespace AiNative.Protocol.Backend.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public ControlNotification(ControlNotification other) : this() {
+    public S2S_ControlRequest(S2S_ControlRequest other) : this() {
+      correlationId_ = other.correlationId_;
+      method_ = other.method_;
+      body_ = other.body_;
+      credential_ = other.credential_;
+      delegatedPlayerId_ = other.delegatedPlayerId_;
+      traceParent_ = other.traceParent_;
+      traceState_ = other.traceState_;
+      _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public S2S_ControlRequest Clone() {
+      return new S2S_ControlRequest(this);
+    }
+
+    /// <summary>Field number for the "correlation_id" field.</summary>
+    public const int CorrelationIdFieldNumber = 1;
+    private string correlationId_ = "";
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public string CorrelationId {
+      get { return correlationId_; }
+      set {
+        correlationId_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+      }
+    }
+
+    /// <summary>Field number for the "method" field.</summary>
+    public const int MethodFieldNumber = 2;
+    private string method_ = "";
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public string Method {
+      get { return method_; }
+      set {
+        method_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+      }
+    }
+
+    /// <summary>Field number for the "body" field.</summary>
+    public const int BodyFieldNumber = 3;
+    private pb::ByteString body_ = pb::ByteString.Empty;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public pb::ByteString Body {
+      get { return body_; }
+      set {
+        body_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+      }
+    }
+
+    /// <summary>Field number for the "credential" field.</summary>
+    public const int CredentialFieldNumber = 4;
+    private string credential_ = "";
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public string Credential {
+      get { return credential_; }
+      set {
+        credential_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+      }
+    }
+
+    /// <summary>Field number for the "delegated_player_id" field.</summary>
+    public const int DelegatedPlayerIdFieldNumber = 5;
+    private string delegatedPlayerId_ = "";
+    /// <summary>
+    /// 在 C2S 信封中不作为身份依据；S2S 中必须纳入服务签名验证。
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public string DelegatedPlayerId {
+      get { return delegatedPlayerId_; }
+      set {
+        delegatedPlayerId_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+      }
+    }
+
+    /// <summary>Field number for the "trace_parent" field.</summary>
+    public const int TraceParentFieldNumber = 6;
+    private string traceParent_ = "";
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public string TraceParent {
+      get { return traceParent_; }
+      set {
+        traceParent_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+      }
+    }
+
+    /// <summary>Field number for the "trace_state" field.</summary>
+    public const int TraceStateFieldNumber = 7;
+    private string traceState_ = "";
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public string TraceState {
+      get { return traceState_; }
+      set {
+        traceState_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+      }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override bool Equals(object other) {
+      return Equals(other as S2S_ControlRequest);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool Equals(S2S_ControlRequest other) {
+      if (ReferenceEquals(other, null)) {
+        return false;
+      }
+      if (ReferenceEquals(other, this)) {
+        return true;
+      }
+      if (CorrelationId != other.CorrelationId) return false;
+      if (Method != other.Method) return false;
+      if (Body != other.Body) return false;
+      if (Credential != other.Credential) return false;
+      if (DelegatedPlayerId != other.DelegatedPlayerId) return false;
+      if (TraceParent != other.TraceParent) return false;
+      if (TraceState != other.TraceState) return false;
+      return Equals(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override int GetHashCode() {
+      int hash = 1;
+      if (CorrelationId.Length != 0) hash ^= CorrelationId.GetHashCode();
+      if (Method.Length != 0) hash ^= Method.GetHashCode();
+      if (Body.Length != 0) hash ^= Body.GetHashCode();
+      if (Credential.Length != 0) hash ^= Credential.GetHashCode();
+      if (DelegatedPlayerId.Length != 0) hash ^= DelegatedPlayerId.GetHashCode();
+      if (TraceParent.Length != 0) hash ^= TraceParent.GetHashCode();
+      if (TraceState.Length != 0) hash ^= TraceState.GetHashCode();
+      if (_unknownFields != null) {
+        hash ^= _unknownFields.GetHashCode();
+      }
+      return hash;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override string ToString() {
+      return pb::JsonFormatter.ToDiagnosticString(this);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void WriteTo(pb::CodedOutputStream output) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      output.WriteRawMessage(this);
+    #else
+      if (CorrelationId.Length != 0) {
+        output.WriteRawTag(10);
+        output.WriteString(CorrelationId);
+      }
+      if (Method.Length != 0) {
+        output.WriteRawTag(18);
+        output.WriteString(Method);
+      }
+      if (Body.Length != 0) {
+        output.WriteRawTag(26);
+        output.WriteBytes(Body);
+      }
+      if (Credential.Length != 0) {
+        output.WriteRawTag(34);
+        output.WriteString(Credential);
+      }
+      if (DelegatedPlayerId.Length != 0) {
+        output.WriteRawTag(42);
+        output.WriteString(DelegatedPlayerId);
+      }
+      if (TraceParent.Length != 0) {
+        output.WriteRawTag(50);
+        output.WriteString(TraceParent);
+      }
+      if (TraceState.Length != 0) {
+        output.WriteRawTag(58);
+        output.WriteString(TraceState);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(output);
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
+      if (CorrelationId.Length != 0) {
+        output.WriteRawTag(10);
+        output.WriteString(CorrelationId);
+      }
+      if (Method.Length != 0) {
+        output.WriteRawTag(18);
+        output.WriteString(Method);
+      }
+      if (Body.Length != 0) {
+        output.WriteRawTag(26);
+        output.WriteBytes(Body);
+      }
+      if (Credential.Length != 0) {
+        output.WriteRawTag(34);
+        output.WriteString(Credential);
+      }
+      if (DelegatedPlayerId.Length != 0) {
+        output.WriteRawTag(42);
+        output.WriteString(DelegatedPlayerId);
+      }
+      if (TraceParent.Length != 0) {
+        output.WriteRawTag(50);
+        output.WriteString(TraceParent);
+      }
+      if (TraceState.Length != 0) {
+        output.WriteRawTag(58);
+        output.WriteString(TraceState);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(ref output);
+      }
+    }
+    #endif
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public int CalculateSize() {
+      int size = 0;
+      if (CorrelationId.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(CorrelationId);
+      }
+      if (Method.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(Method);
+      }
+      if (Body.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeBytesSize(Body);
+      }
+      if (Credential.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(Credential);
+      }
+      if (DelegatedPlayerId.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(DelegatedPlayerId);
+      }
+      if (TraceParent.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(TraceParent);
+      }
+      if (TraceState.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(TraceState);
+      }
+      if (_unknownFields != null) {
+        size += _unknownFields.CalculateSize();
+      }
+      return size;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(S2S_ControlRequest other) {
+      if (other == null) {
+        return;
+      }
+      if (other.CorrelationId.Length != 0) {
+        CorrelationId = other.CorrelationId;
+      }
+      if (other.Method.Length != 0) {
+        Method = other.Method;
+      }
+      if (other.Body.Length != 0) {
+        Body = other.Body;
+      }
+      if (other.Credential.Length != 0) {
+        Credential = other.Credential;
+      }
+      if (other.DelegatedPlayerId.Length != 0) {
+        DelegatedPlayerId = other.DelegatedPlayerId;
+      }
+      if (other.TraceParent.Length != 0) {
+        TraceParent = other.TraceParent;
+      }
+      if (other.TraceState.Length != 0) {
+        TraceState = other.TraceState;
+      }
+      _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(pb::CodedInputStream input) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      input.ReadRawMessage(this);
+    #else
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+      if ((tag & 7) == 4) {
+        // Abort on any end group tag.
+        return;
+      }
+      switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, input);
+            break;
+          case 10: {
+            CorrelationId = input.ReadString();
+            break;
+          }
+          case 18: {
+            Method = input.ReadString();
+            break;
+          }
+          case 26: {
+            Body = input.ReadBytes();
+            break;
+          }
+          case 34: {
+            Credential = input.ReadString();
+            break;
+          }
+          case 42: {
+            DelegatedPlayerId = input.ReadString();
+            break;
+          }
+          case 50: {
+            TraceParent = input.ReadString();
+            break;
+          }
+          case 58: {
+            TraceState = input.ReadString();
+            break;
+          }
+        }
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalMergeFrom(ref pb::ParseContext input) {
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+      if ((tag & 7) == 4) {
+        // Abort on any end group tag.
+        return;
+      }
+      switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, ref input);
+            break;
+          case 10: {
+            CorrelationId = input.ReadString();
+            break;
+          }
+          case 18: {
+            Method = input.ReadString();
+            break;
+          }
+          case 26: {
+            Body = input.ReadBytes();
+            break;
+          }
+          case 34: {
+            Credential = input.ReadString();
+            break;
+          }
+          case 42: {
+            DelegatedPlayerId = input.ReadString();
+            break;
+          }
+          case 50: {
+            TraceParent = input.ReadString();
+            break;
+          }
+          case 58: {
+            TraceState = input.ReadString();
+            break;
+          }
+        }
+      }
+    }
+    #endif
+
+  }
+
+  /// <summary>
+  /// 服务间 RPC；身份由内部签名验证，不能接受客户端自报身份。
+  /// </summary>
+  [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
+  public sealed partial class S2S_ControlResponse : pb::IMessage<S2S_ControlResponse>
+  #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      , pb::IBufferMessage
+  #endif
+  {
+    private static readonly pb::MessageParser<S2S_ControlResponse> _parser = new pb::MessageParser<S2S_ControlResponse>(() => new S2S_ControlResponse());
+    private pb::UnknownFieldSet _unknownFields;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pb::MessageParser<S2S_ControlResponse> Parser { get { return _parser; } }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pbr::MessageDescriptor Descriptor {
+      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[3]; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    pbr::MessageDescriptor pb::IMessage.Descriptor {
+      get { return Descriptor; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public S2S_ControlResponse() {
+      OnConstruction();
+    }
+
+    partial void OnConstruction();
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public S2S_ControlResponse(S2S_ControlResponse other) : this() {
+      correlationId_ = other.correlationId_;
+      body_ = other.body_;
+      error_ = other.error_;
+      _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public S2S_ControlResponse Clone() {
+      return new S2S_ControlResponse(this);
+    }
+
+    /// <summary>Field number for the "correlation_id" field.</summary>
+    public const int CorrelationIdFieldNumber = 1;
+    private string correlationId_ = "";
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public string CorrelationId {
+      get { return correlationId_; }
+      set {
+        correlationId_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+      }
+    }
+
+    /// <summary>Field number for the "body" field.</summary>
+    public const int BodyFieldNumber = 2;
+    private pb::ByteString body_ = pb::ByteString.Empty;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public pb::ByteString Body {
+      get { return body_; }
+      set {
+        body_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+      }
+    }
+
+    /// <summary>Field number for the "error" field.</summary>
+    public const int ErrorFieldNumber = 3;
+    private string error_ = "";
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public string Error {
+      get { return error_; }
+      set {
+        error_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+      }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override bool Equals(object other) {
+      return Equals(other as S2S_ControlResponse);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool Equals(S2S_ControlResponse other) {
+      if (ReferenceEquals(other, null)) {
+        return false;
+      }
+      if (ReferenceEquals(other, this)) {
+        return true;
+      }
+      if (CorrelationId != other.CorrelationId) return false;
+      if (Body != other.Body) return false;
+      if (Error != other.Error) return false;
+      return Equals(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override int GetHashCode() {
+      int hash = 1;
+      if (CorrelationId.Length != 0) hash ^= CorrelationId.GetHashCode();
+      if (Body.Length != 0) hash ^= Body.GetHashCode();
+      if (Error.Length != 0) hash ^= Error.GetHashCode();
+      if (_unknownFields != null) {
+        hash ^= _unknownFields.GetHashCode();
+      }
+      return hash;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override string ToString() {
+      return pb::JsonFormatter.ToDiagnosticString(this);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void WriteTo(pb::CodedOutputStream output) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      output.WriteRawMessage(this);
+    #else
+      if (CorrelationId.Length != 0) {
+        output.WriteRawTag(10);
+        output.WriteString(CorrelationId);
+      }
+      if (Body.Length != 0) {
+        output.WriteRawTag(18);
+        output.WriteBytes(Body);
+      }
+      if (Error.Length != 0) {
+        output.WriteRawTag(26);
+        output.WriteString(Error);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(output);
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
+      if (CorrelationId.Length != 0) {
+        output.WriteRawTag(10);
+        output.WriteString(CorrelationId);
+      }
+      if (Body.Length != 0) {
+        output.WriteRawTag(18);
+        output.WriteBytes(Body);
+      }
+      if (Error.Length != 0) {
+        output.WriteRawTag(26);
+        output.WriteString(Error);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(ref output);
+      }
+    }
+    #endif
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public int CalculateSize() {
+      int size = 0;
+      if (CorrelationId.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(CorrelationId);
+      }
+      if (Body.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeBytesSize(Body);
+      }
+      if (Error.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(Error);
+      }
+      if (_unknownFields != null) {
+        size += _unknownFields.CalculateSize();
+      }
+      return size;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(S2S_ControlResponse other) {
+      if (other == null) {
+        return;
+      }
+      if (other.CorrelationId.Length != 0) {
+        CorrelationId = other.CorrelationId;
+      }
+      if (other.Body.Length != 0) {
+        Body = other.Body;
+      }
+      if (other.Error.Length != 0) {
+        Error = other.Error;
+      }
+      _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(pb::CodedInputStream input) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      input.ReadRawMessage(this);
+    #else
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+      if ((tag & 7) == 4) {
+        // Abort on any end group tag.
+        return;
+      }
+      switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, input);
+            break;
+          case 10: {
+            CorrelationId = input.ReadString();
+            break;
+          }
+          case 18: {
+            Body = input.ReadBytes();
+            break;
+          }
+          case 26: {
+            Error = input.ReadString();
+            break;
+          }
+        }
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalMergeFrom(ref pb::ParseContext input) {
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+      if ((tag & 7) == 4) {
+        // Abort on any end group tag.
+        return;
+      }
+      switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, ref input);
+            break;
+          case 10: {
+            CorrelationId = input.ReadString();
+            break;
+          }
+          case 18: {
+            Body = input.ReadBytes();
+            break;
+          }
+          case 26: {
+            Error = input.ReadString();
+            break;
+          }
+        }
+      }
+    }
+    #endif
+
+  }
+
+  /// <summary>
+  /// 服务端 → 客户端；Response 为请求回复，Push 为主动推送。
+  /// </summary>
+  [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
+  public sealed partial class S2C_GatePush : pb::IMessage<S2C_GatePush>
+  #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      , pb::IBufferMessage
+  #endif
+  {
+    private static readonly pb::MessageParser<S2C_GatePush> _parser = new pb::MessageParser<S2C_GatePush>(() => new S2C_GatePush());
+    private pb::UnknownFieldSet _unknownFields;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pb::MessageParser<S2C_GatePush> Parser { get { return _parser; } }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pbr::MessageDescriptor Descriptor {
+      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[4]; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    pbr::MessageDescriptor pb::IMessage.Descriptor {
+      get { return Descriptor; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public S2C_GatePush() {
+      OnConstruction();
+    }
+
+    partial void OnConstruction();
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public S2C_GatePush(S2C_GatePush other) : this() {
       method_ = other.method_;
       body_ = other.body_;
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
@@ -887,8 +1608,8 @@ namespace AiNative.Protocol.Backend.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public ControlNotification Clone() {
-      return new ControlNotification(this);
+    public S2C_GatePush Clone() {
+      return new S2C_GatePush(this);
     }
 
     /// <summary>Field number for the "method" field.</summary>
@@ -918,12 +1639,12 @@ namespace AiNative.Protocol.Backend.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override bool Equals(object other) {
-      return Equals(other as ControlNotification);
+      return Equals(other as S2C_GatePush);
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public bool Equals(ControlNotification other) {
+    public bool Equals(S2C_GatePush other) {
       if (ReferenceEquals(other, null)) {
         return false;
       }
@@ -1009,7 +1730,7 @@ namespace AiNative.Protocol.Backend.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public void MergeFrom(ControlNotification other) {
+    public void MergeFrom(S2C_GatePush other) {
       if (other == null) {
         return;
       }
@@ -1080,6 +1801,10 @@ namespace AiNative.Protocol.Backend.V1 {
 
   }
 
+  /// <summary>
+  /// 以下均为信封 body 中的公共业务数据，不独立决定发送方向。
+  /// 方法、请求体、返回体及服务职责见 Docs/Architecture/protocol-naming.md。
+  /// </summary>
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
   public sealed partial class PresenceUpdate : pb::IMessage<PresenceUpdate>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
@@ -1095,7 +1820,7 @@ namespace AiNative.Protocol.Backend.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[3]; }
+      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[5]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -1293,7 +2018,7 @@ namespace AiNative.Protocol.Backend.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[4]; }
+      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[6]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -1528,7 +2253,7 @@ namespace AiNative.Protocol.Backend.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[5]; }
+      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[7]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -1675,21 +2400,21 @@ namespace AiNative.Protocol.Backend.V1 {
   }
 
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
-  public sealed partial class AccountRequest : pb::IMessage<AccountRequest>
+  public sealed partial class AccountCredentials : pb::IMessage<AccountCredentials>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       , pb::IBufferMessage
   #endif
   {
-    private static readonly pb::MessageParser<AccountRequest> _parser = new pb::MessageParser<AccountRequest>(() => new AccountRequest());
+    private static readonly pb::MessageParser<AccountCredentials> _parser = new pb::MessageParser<AccountCredentials>(() => new AccountCredentials());
     private pb::UnknownFieldSet _unknownFields;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public static pb::MessageParser<AccountRequest> Parser { get { return _parser; } }
+    public static pb::MessageParser<AccountCredentials> Parser { get { return _parser; } }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[6]; }
+      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[8]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -1700,7 +2425,7 @@ namespace AiNative.Protocol.Backend.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public AccountRequest() {
+    public AccountCredentials() {
       OnConstruction();
     }
 
@@ -1708,7 +2433,7 @@ namespace AiNative.Protocol.Backend.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public AccountRequest(AccountRequest other) : this() {
+    public AccountCredentials(AccountCredentials other) : this() {
       username_ = other.username_;
       password_ = other.password_;
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
@@ -1716,8 +2441,8 @@ namespace AiNative.Protocol.Backend.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public AccountRequest Clone() {
-      return new AccountRequest(this);
+    public AccountCredentials Clone() {
+      return new AccountCredentials(this);
     }
 
     /// <summary>Field number for the "username" field.</summary>
@@ -1747,12 +2472,12 @@ namespace AiNative.Protocol.Backend.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override bool Equals(object other) {
-      return Equals(other as AccountRequest);
+      return Equals(other as AccountCredentials);
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public bool Equals(AccountRequest other) {
+    public bool Equals(AccountCredentials other) {
       if (ReferenceEquals(other, null)) {
         return false;
       }
@@ -1838,7 +2563,7 @@ namespace AiNative.Protocol.Backend.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public void MergeFrom(AccountRequest other) {
+    public void MergeFrom(AccountCredentials other) {
       if (other == null) {
         return;
       }
@@ -1924,7 +2649,7 @@ namespace AiNative.Protocol.Backend.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[7]; }
+      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[9]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -2182,21 +2907,21 @@ namespace AiNative.Protocol.Backend.V1 {
   }
 
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
-  public sealed partial class SessionRequest : pb::IMessage<SessionRequest>
+  public sealed partial class SessionCredentials : pb::IMessage<SessionCredentials>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       , pb::IBufferMessage
   #endif
   {
-    private static readonly pb::MessageParser<SessionRequest> _parser = new pb::MessageParser<SessionRequest>(() => new SessionRequest());
+    private static readonly pb::MessageParser<SessionCredentials> _parser = new pb::MessageParser<SessionCredentials>(() => new SessionCredentials());
     private pb::UnknownFieldSet _unknownFields;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public static pb::MessageParser<SessionRequest> Parser { get { return _parser; } }
+    public static pb::MessageParser<SessionCredentials> Parser { get { return _parser; } }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[8]; }
+      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[10]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -2207,7 +2932,7 @@ namespace AiNative.Protocol.Backend.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public SessionRequest() {
+    public SessionCredentials() {
       OnConstruction();
     }
 
@@ -2215,15 +2940,15 @@ namespace AiNative.Protocol.Backend.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public SessionRequest(SessionRequest other) : this() {
+    public SessionCredentials(SessionCredentials other) : this() {
       sessionToken_ = other.sessionToken_;
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public SessionRequest Clone() {
-      return new SessionRequest(this);
+    public SessionCredentials Clone() {
+      return new SessionCredentials(this);
     }
 
     /// <summary>Field number for the "session_token" field.</summary>
@@ -2241,12 +2966,12 @@ namespace AiNative.Protocol.Backend.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override bool Equals(object other) {
-      return Equals(other as SessionRequest);
+      return Equals(other as SessionCredentials);
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public bool Equals(SessionRequest other) {
+    public bool Equals(SessionCredentials other) {
       if (ReferenceEquals(other, null)) {
         return false;
       }
@@ -2319,7 +3044,7 @@ namespace AiNative.Protocol.Backend.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public void MergeFrom(SessionRequest other) {
+    public void MergeFrom(SessionCredentials other) {
       if (other == null) {
         return;
       }
@@ -2394,7 +3119,7 @@ namespace AiNative.Protocol.Backend.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[9]; }
+      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[11]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -2629,7 +3354,7 @@ namespace AiNative.Protocol.Backend.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[10]; }
+      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[12]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -2961,21 +3686,21 @@ namespace AiNative.Protocol.Backend.V1 {
   }
 
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
-  public sealed partial class ProfileRequest : pb::IMessage<ProfileRequest>
+  public sealed partial class ProfileQuery : pb::IMessage<ProfileQuery>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       , pb::IBufferMessage
   #endif
   {
-    private static readonly pb::MessageParser<ProfileRequest> _parser = new pb::MessageParser<ProfileRequest>(() => new ProfileRequest());
+    private static readonly pb::MessageParser<ProfileQuery> _parser = new pb::MessageParser<ProfileQuery>(() => new ProfileQuery());
     private pb::UnknownFieldSet _unknownFields;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public static pb::MessageParser<ProfileRequest> Parser { get { return _parser; } }
+    public static pb::MessageParser<ProfileQuery> Parser { get { return _parser; } }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[11]; }
+      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[13]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -2986,7 +3711,7 @@ namespace AiNative.Protocol.Backend.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public ProfileRequest() {
+    public ProfileQuery() {
       OnConstruction();
     }
 
@@ -2994,15 +3719,15 @@ namespace AiNative.Protocol.Backend.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public ProfileRequest(ProfileRequest other) : this() {
+    public ProfileQuery(ProfileQuery other) : this() {
       playerId_ = other.playerId_;
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public ProfileRequest Clone() {
-      return new ProfileRequest(this);
+    public ProfileQuery Clone() {
+      return new ProfileQuery(this);
     }
 
     /// <summary>Field number for the "player_id" field.</summary>
@@ -3020,12 +3745,12 @@ namespace AiNative.Protocol.Backend.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override bool Equals(object other) {
-      return Equals(other as ProfileRequest);
+      return Equals(other as ProfileQuery);
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public bool Equals(ProfileRequest other) {
+    public bool Equals(ProfileQuery other) {
       if (ReferenceEquals(other, null)) {
         return false;
       }
@@ -3098,7 +3823,7 @@ namespace AiNative.Protocol.Backend.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public void MergeFrom(ProfileRequest other) {
+    public void MergeFrom(ProfileQuery other) {
       if (other == null) {
         return;
       }
@@ -3159,21 +3884,21 @@ namespace AiNative.Protocol.Backend.V1 {
   }
 
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
-  public sealed partial class PartyCommand : pb::IMessage<PartyCommand>
+  public sealed partial class PartyOperation : pb::IMessage<PartyOperation>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       , pb::IBufferMessage
   #endif
   {
-    private static readonly pb::MessageParser<PartyCommand> _parser = new pb::MessageParser<PartyCommand>(() => new PartyCommand());
+    private static readonly pb::MessageParser<PartyOperation> _parser = new pb::MessageParser<PartyOperation>(() => new PartyOperation());
     private pb::UnknownFieldSet _unknownFields;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public static pb::MessageParser<PartyCommand> Parser { get { return _parser; } }
+    public static pb::MessageParser<PartyOperation> Parser { get { return _parser; } }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[12]; }
+      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[14]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -3184,7 +3909,7 @@ namespace AiNative.Protocol.Backend.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public PartyCommand() {
+    public PartyOperation() {
       OnConstruction();
     }
 
@@ -3192,7 +3917,7 @@ namespace AiNative.Protocol.Backend.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public PartyCommand(PartyCommand other) : this() {
+    public PartyOperation(PartyOperation other) : this() {
       partyId_ = other.partyId_;
       targetPlayerId_ = other.targetPlayerId_;
       ready_ = other.ready_;
@@ -3202,8 +3927,8 @@ namespace AiNative.Protocol.Backend.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public PartyCommand Clone() {
-      return new PartyCommand(this);
+    public PartyOperation Clone() {
+      return new PartyOperation(this);
     }
 
     /// <summary>Field number for the "party_id" field.</summary>
@@ -3257,12 +3982,12 @@ namespace AiNative.Protocol.Backend.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override bool Equals(object other) {
-      return Equals(other as PartyCommand);
+      return Equals(other as PartyOperation);
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public bool Equals(PartyCommand other) {
+    public bool Equals(PartyOperation other) {
       if (ReferenceEquals(other, null)) {
         return false;
       }
@@ -3374,7 +4099,7 @@ namespace AiNative.Protocol.Backend.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public void MergeFrom(PartyCommand other) {
+    public void MergeFrom(PartyOperation other) {
       if (other == null) {
         return;
       }
@@ -3482,7 +4207,7 @@ namespace AiNative.Protocol.Backend.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[13]; }
+      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[15]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -3717,7 +4442,7 @@ namespace AiNative.Protocol.Backend.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[14]; }
+      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[16]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -4052,7 +4777,7 @@ namespace AiNative.Protocol.Backend.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[15]; }
+      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[17]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -4250,7 +4975,7 @@ namespace AiNative.Protocol.Backend.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[16]; }
+      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[18]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -4423,21 +5148,21 @@ namespace AiNative.Protocol.Backend.V1 {
   }
 
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
-  public sealed partial class PartyQueueRequest : pb::IMessage<PartyQueueRequest>
+  public sealed partial class PartyQueueData : pb::IMessage<PartyQueueData>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       , pb::IBufferMessage
   #endif
   {
-    private static readonly pb::MessageParser<PartyQueueRequest> _parser = new pb::MessageParser<PartyQueueRequest>(() => new PartyQueueRequest());
+    private static readonly pb::MessageParser<PartyQueueData> _parser = new pb::MessageParser<PartyQueueData>(() => new PartyQueueData());
     private pb::UnknownFieldSet _unknownFields;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public static pb::MessageParser<PartyQueueRequest> Parser { get { return _parser; } }
+    public static pb::MessageParser<PartyQueueData> Parser { get { return _parser; } }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[17]; }
+      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[19]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -4448,7 +5173,7 @@ namespace AiNative.Protocol.Backend.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public PartyQueueRequest() {
+    public PartyQueueData() {
       OnConstruction();
     }
 
@@ -4456,7 +5181,7 @@ namespace AiNative.Protocol.Backend.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public PartyQueueRequest(PartyQueueRequest other) : this() {
+    public PartyQueueData(PartyQueueData other) : this() {
       partyId_ = other.partyId_;
       expectedVersion_ = other.expectedVersion_;
       requestId_ = other.requestId_;
@@ -4465,8 +5190,8 @@ namespace AiNative.Protocol.Backend.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public PartyQueueRequest Clone() {
-      return new PartyQueueRequest(this);
+    public PartyQueueData Clone() {
+      return new PartyQueueData(this);
     }
 
     /// <summary>Field number for the "party_id" field.</summary>
@@ -4508,12 +5233,12 @@ namespace AiNative.Protocol.Backend.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override bool Equals(object other) {
-      return Equals(other as PartyQueueRequest);
+      return Equals(other as PartyQueueData);
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public bool Equals(PartyQueueRequest other) {
+    public bool Equals(PartyQueueData other) {
       if (ReferenceEquals(other, null)) {
         return false;
       }
@@ -4612,7 +5337,7 @@ namespace AiNative.Protocol.Backend.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public void MergeFrom(PartyQueueRequest other) {
+    public void MergeFrom(PartyQueueData other) {
       if (other == null) {
         return;
       }
@@ -4709,7 +5434,7 @@ namespace AiNative.Protocol.Backend.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[18]; }
+      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[20]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -5081,7 +5806,7 @@ namespace AiNative.Protocol.Backend.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[19]; }
+      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[21]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -5279,7 +6004,7 @@ namespace AiNative.Protocol.Backend.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[20]; }
+      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[22]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -5620,21 +6345,21 @@ namespace AiNative.Protocol.Backend.V1 {
   }
 
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
-  public sealed partial class AllocationRequest : pb::IMessage<AllocationRequest>
+  public sealed partial class AllocationSpec : pb::IMessage<AllocationSpec>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       , pb::IBufferMessage
   #endif
   {
-    private static readonly pb::MessageParser<AllocationRequest> _parser = new pb::MessageParser<AllocationRequest>(() => new AllocationRequest());
+    private static readonly pb::MessageParser<AllocationSpec> _parser = new pb::MessageParser<AllocationSpec>(() => new AllocationSpec());
     private pb::UnknownFieldSet _unknownFields;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public static pb::MessageParser<AllocationRequest> Parser { get { return _parser; } }
+    public static pb::MessageParser<AllocationSpec> Parser { get { return _parser; } }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[21]; }
+      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[23]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -5645,7 +6370,7 @@ namespace AiNative.Protocol.Backend.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public AllocationRequest() {
+    public AllocationSpec() {
       OnConstruction();
     }
 
@@ -5653,7 +6378,7 @@ namespace AiNative.Protocol.Backend.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public AllocationRequest(AllocationRequest other) : this() {
+    public AllocationSpec(AllocationSpec other) : this() {
       matchId_ = other.matchId_;
       playerIds_ = other.playerIds_.Clone();
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
@@ -5661,8 +6386,8 @@ namespace AiNative.Protocol.Backend.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public AllocationRequest Clone() {
-      return new AllocationRequest(this);
+    public AllocationSpec Clone() {
+      return new AllocationSpec(this);
     }
 
     /// <summary>Field number for the "match_id" field.</summary>
@@ -5691,12 +6416,12 @@ namespace AiNative.Protocol.Backend.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override bool Equals(object other) {
-      return Equals(other as AllocationRequest);
+      return Equals(other as AllocationSpec);
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public bool Equals(AllocationRequest other) {
+    public bool Equals(AllocationSpec other) {
       if (ReferenceEquals(other, null)) {
         return false;
       }
@@ -5774,7 +6499,7 @@ namespace AiNative.Protocol.Backend.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public void MergeFrom(AllocationRequest other) {
+    public void MergeFrom(AllocationSpec other) {
       if (other == null) {
         return;
       }
@@ -5858,7 +6583,7 @@ namespace AiNative.Protocol.Backend.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[22]; }
+      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[24]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -6167,7 +6892,7 @@ namespace AiNative.Protocol.Backend.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[23]; }
+      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[25]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -6724,7 +7449,7 @@ namespace AiNative.Protocol.Backend.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[24]; }
+      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[26]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -7033,7 +7758,7 @@ namespace AiNative.Protocol.Backend.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[25]; }
+      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[27]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -7431,7 +8156,7 @@ namespace AiNative.Protocol.Backend.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[26]; }
+      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[28]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -7638,7 +8363,7 @@ namespace AiNative.Protocol.Backend.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[27]; }
+      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[29]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -7947,7 +8672,7 @@ namespace AiNative.Protocol.Backend.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[28]; }
+      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[30]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -8293,7 +9018,7 @@ namespace AiNative.Protocol.Backend.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[29]; }
+      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[31]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -8540,21 +9265,21 @@ namespace AiNative.Protocol.Backend.V1 {
   }
 
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
-  public sealed partial class DrainRequest : pb::IMessage<DrainRequest>
+  public sealed partial class DrainSpec : pb::IMessage<DrainSpec>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       , pb::IBufferMessage
   #endif
   {
-    private static readonly pb::MessageParser<DrainRequest> _parser = new pb::MessageParser<DrainRequest>(() => new DrainRequest());
+    private static readonly pb::MessageParser<DrainSpec> _parser = new pb::MessageParser<DrainSpec>(() => new DrainSpec());
     private pb::UnknownFieldSet _unknownFields;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public static pb::MessageParser<DrainRequest> Parser { get { return _parser; } }
+    public static pb::MessageParser<DrainSpec> Parser { get { return _parser; } }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[30]; }
+      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[32]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -8565,7 +9290,7 @@ namespace AiNative.Protocol.Backend.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public DrainRequest() {
+    public DrainSpec() {
       OnConstruction();
     }
 
@@ -8573,7 +9298,7 @@ namespace AiNative.Protocol.Backend.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public DrainRequest(DrainRequest other) : this() {
+    public DrainSpec(DrainSpec other) : this() {
       bootEpoch_ = other.bootEpoch_;
       coordinatorEpoch_ = other.coordinatorEpoch_;
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
@@ -8581,8 +9306,8 @@ namespace AiNative.Protocol.Backend.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public DrainRequest Clone() {
-      return new DrainRequest(this);
+    public DrainSpec Clone() {
+      return new DrainSpec(this);
     }
 
     /// <summary>Field number for the "boot_epoch" field.</summary>
@@ -8612,12 +9337,12 @@ namespace AiNative.Protocol.Backend.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override bool Equals(object other) {
-      return Equals(other as DrainRequest);
+      return Equals(other as DrainSpec);
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public bool Equals(DrainRequest other) {
+    public bool Equals(DrainSpec other) {
       if (ReferenceEquals(other, null)) {
         return false;
       }
@@ -8703,7 +9428,7 @@ namespace AiNative.Protocol.Backend.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public void MergeFrom(DrainRequest other) {
+    public void MergeFrom(DrainSpec other) {
       if (other == null) {
         return;
       }
@@ -8789,7 +9514,7 @@ namespace AiNative.Protocol.Backend.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[31]; }
+      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[33]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -9010,21 +9735,21 @@ namespace AiNative.Protocol.Backend.V1 {
   }
 
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
-  public sealed partial class TicketRequest : pb::IMessage<TicketRequest>
+  public sealed partial class TicketSpec : pb::IMessage<TicketSpec>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       , pb::IBufferMessage
   #endif
   {
-    private static readonly pb::MessageParser<TicketRequest> _parser = new pb::MessageParser<TicketRequest>(() => new TicketRequest());
+    private static readonly pb::MessageParser<TicketSpec> _parser = new pb::MessageParser<TicketSpec>(() => new TicketSpec());
     private pb::UnknownFieldSet _unknownFields;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public static pb::MessageParser<TicketRequest> Parser { get { return _parser; } }
+    public static pb::MessageParser<TicketSpec> Parser { get { return _parser; } }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[32]; }
+      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[34]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -9035,7 +9760,7 @@ namespace AiNative.Protocol.Backend.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public TicketRequest() {
+    public TicketSpec() {
       OnConstruction();
     }
 
@@ -9043,7 +9768,7 @@ namespace AiNative.Protocol.Backend.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public TicketRequest(TicketRequest other) : this() {
+    public TicketSpec(TicketSpec other) : this() {
       playerId_ = other.playerId_;
       allocation_ = other.allocation_ != null ? other.allocation_.Clone() : null;
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
@@ -9051,8 +9776,8 @@ namespace AiNative.Protocol.Backend.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public TicketRequest Clone() {
-      return new TicketRequest(this);
+    public TicketSpec Clone() {
+      return new TicketSpec(this);
     }
 
     /// <summary>Field number for the "player_id" field.</summary>
@@ -9082,12 +9807,12 @@ namespace AiNative.Protocol.Backend.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override bool Equals(object other) {
-      return Equals(other as TicketRequest);
+      return Equals(other as TicketSpec);
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public bool Equals(TicketRequest other) {
+    public bool Equals(TicketSpec other) {
       if (ReferenceEquals(other, null)) {
         return false;
       }
@@ -9173,7 +9898,7 @@ namespace AiNative.Protocol.Backend.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public void MergeFrom(TicketRequest other) {
+    public void MergeFrom(TicketSpec other) {
       if (other == null) {
         return;
       }
@@ -9268,7 +9993,7 @@ namespace AiNative.Protocol.Backend.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[33]; }
+      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[35]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -9503,7 +10228,7 @@ namespace AiNative.Protocol.Backend.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[34]; }
+      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[36]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -9738,7 +10463,7 @@ namespace AiNative.Protocol.Backend.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[35]; }
+      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[37]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -9982,7 +10707,7 @@ namespace AiNative.Protocol.Backend.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[36]; }
+      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[38]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -10254,7 +10979,7 @@ namespace AiNative.Protocol.Backend.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[37]; }
+      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[39]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -10626,7 +11351,7 @@ namespace AiNative.Protocol.Backend.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[38]; }
+      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[40]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -10824,7 +11549,7 @@ namespace AiNative.Protocol.Backend.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[39]; }
+      get { return global::AiNative.Protocol.Backend.V1.BackendReflection.Descriptor.MessageTypes[41]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]

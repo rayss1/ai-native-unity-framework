@@ -27,10 +27,10 @@ public sealed class GateService(
             || payload.Length > 65536
         )
             return ServiceReply.Reject("forbidden");
-        ControlRequest request;
+        C2S_GateRequest request;
         try
         {
-            request = ControlRequest.Parser.ParseFrom(payload.Span);
+            request = C2S_GateRequest.Parser.ParseFrom(payload.Span);
         }
         catch (InvalidProtocolBufferException)
         {
@@ -112,7 +112,7 @@ public sealed class GateService(
             ServiceReply validation = await rpc.CallAsync(
                 new(ServiceRole.Player),
                 ServiceMethods.ValidateSession,
-                new SessionRequest { SessionToken = request.Credential },
+                new SessionCredentials { SessionToken = request.Credential },
                 cancellationToken
             );
             if (!validation.Success)
@@ -228,7 +228,7 @@ public sealed class GateService(
                     var partyReply = await rpc.CallAsync(
                         new(ServiceRole.Lobby),
                         ServiceMethods.PartyGet,
-                        new PartyCommand { PartyId = connection.PartyId },
+                        new PartyOperation { PartyId = connection.PartyId },
                         ct,
                         connection.Player
                     );
@@ -317,7 +317,7 @@ public sealed class GateService(
             ServiceReply ticket = await rpc.CallAsync(
                 new(ServiceRole.Player),
                 ServiceMethods.IssueTicket,
-                new TicketRequest { PlayerId = player, Allocation = status.Allocation },
+                new TicketSpec { PlayerId = player, Allocation = status.Allocation },
                 ct,
                 player
             );

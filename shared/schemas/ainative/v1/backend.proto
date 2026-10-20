@@ -3,27 +3,52 @@ syntax = "proto3";
 package ainative.backend.v1;
 option csharp_namespace = "AiNative.Protocol.Backend.V1";
 
-message ControlRequest {
+// 客户端 → 服务端。
+message C2S_GateRequest {
   string correlation_id = 1;
   string method = 2;
   bytes body = 3;
   string credential = 4;
+  // 在 C2S 信封中不作为身份依据；S2S 中必须纳入服务签名验证。
   string delegated_player_id = 5;
   string trace_parent = 6;
   string trace_state = 7;
 }
 
-message ControlResponse {
+// 服务端 → 客户端；Response 为请求回复，Push 为主动推送。
+message S2C_GateResponse {
   string correlation_id = 1;
   bytes body = 2;
   string error = 3;
 }
 
-message ControlNotification {
+// 服务间 RPC；身份由内部签名验证，不能接受客户端自报身份。
+message S2S_ControlRequest {
+  string correlation_id = 1;
+  string method = 2;
+  bytes body = 3;
+  string credential = 4;
+  // 在 C2S 信封中不作为身份依据；S2S 中必须纳入服务签名验证。
+  string delegated_player_id = 5;
+  string trace_parent = 6;
+  string trace_state = 7;
+}
+
+// 服务间 RPC；身份由内部签名验证，不能接受客户端自报身份。
+message S2S_ControlResponse {
+  string correlation_id = 1;
+  bytes body = 2;
+  string error = 3;
+}
+
+// 服务端 → 客户端；Response 为请求回复，Push 为主动推送。
+message S2C_GatePush {
   string method = 1;
   bytes body = 2;
 }
 
+// 以下均为信封 body 中的公共业务数据，不独立决定发送方向。
+// 方法、请求体、返回体及服务职责见 Docs/Architecture/protocol-naming.md。
 message PresenceUpdate {
   bool online = 1;
 }
@@ -36,7 +61,7 @@ message PresenceState {
 message Empty {
 }
 
-message AccountRequest {
+message AccountCredentials {
   string username = 1;
   string password = 2;
 }
@@ -47,7 +72,7 @@ message LoginResult {
   int64 expires_unix_seconds = 3;
 }
 
-message SessionRequest {
+message SessionCredentials {
   string session_token = 1;
 }
 
@@ -64,11 +89,11 @@ message PlayerProfile {
   int64 kills = 5;
 }
 
-message ProfileRequest {
+message ProfileQuery {
   string player_id = 1;
 }
 
-message PartyCommand {
+message PartyOperation {
   string party_id = 1;
   string target_player_id = 2;
   bool ready = 3;
@@ -96,7 +121,7 @@ message PartyInvitations {
   repeated PartyState parties = 1;
 }
 
-message PartyQueueRequest {
+message PartyQueueData {
   string party_id = 1;
   uint64 expected_version = 2;
   string request_id = 3;
@@ -123,7 +148,7 @@ message MatchStatus {
   string failure = 5;
 }
 
-message AllocationRequest {
+message AllocationSpec {
   string match_id = 1;
   repeated string player_ids = 2;
 }
@@ -191,7 +216,7 @@ message RoomList {
   string next_room_id = 3;
 }
 
-message DrainRequest {
+message DrainSpec {
   string boot_epoch = 1;
   string coordinator_epoch = 2;
 }
@@ -201,7 +226,7 @@ message CoordinatorFence {
   string boot_epoch = 2;
 }
 
-message TicketRequest {
+message TicketSpec {
   string player_id = 1;
   RoomAllocation allocation = 2;
 }

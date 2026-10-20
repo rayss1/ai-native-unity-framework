@@ -83,7 +83,7 @@ public sealed class FantasyServiceRuntime : IServiceRpc, IClientNotifier, IAsync
             return ValueTask.CompletedTask;
         if (!_notifications.Wait(0))
             throw new ServiceException("unavailable");
-        byte[] packet = new ControlNotification
+        byte[] packet = new S2C_GatePush
         {
             Method = method,
             Body = ByteString.CopyFrom(payload.Span),
@@ -93,7 +93,7 @@ public sealed class FantasyServiceRuntime : IServiceRpc, IClientNotifier, IAsync
             try
             {
                 if (FantasyOuterSendBudget.Check(session))
-                    session.Send(new FantasyGateNotification { Payload = packet });
+                    session.Send(new S2C_FantasyGatePush { Payload = packet });
             }
             finally
             {
@@ -236,7 +236,7 @@ public sealed class FantasyServiceRuntime : IServiceRpc, IClientNotifier, IAsync
         TaskCompletionSource<ServiceReply> received = new(
             TaskCreationOptions.RunContinuationsAsynchronously
         );
-        ControlRequest request = new()
+        S2S_ControlRequest request = new()
         {
             CorrelationId = Guid.NewGuid().ToString("N"),
             Method = method,
@@ -253,11 +253,11 @@ public sealed class FantasyServiceRuntime : IServiceRpc, IClientNotifier, IAsync
                 long address = SceneConfigData.Instance.Get((uint)peer.SceneId).Address;
                 using IResponse response = await source.NetworkMessagingComponent.Call(
                     address,
-                    new FantasyControlRequest { Payload = request.ToByteArray() }
+                    new S2S_FantasyControlRequest { Payload = request.ToByteArray() }
                 );
-                if (response is not FantasyControlResponse control || control.ErrorCode != 0)
+                if (response is not S2S_FantasyControlResponse control || control.ErrorCode != 0)
                     throw new ServiceException("unavailable");
-                ControlResponse result = ControlResponse.Parser.ParseFrom(control.Payload);
+                S2S_ControlResponse result = S2S_ControlResponse.Parser.ParseFrom(control.Payload);
                 if (result.CorrelationId != request.CorrelationId)
                     throw new ServiceException("response-conflict");
                 received.TrySetResult(new(result.Body.ToByteArray(), result.Error));
@@ -290,79 +290,113 @@ public sealed class FantasyServiceRuntime : IServiceRpc, IClientNotifier, IAsync
     )
     {
         FantasyServiceRuntime? runtime = Volatile.Read(ref _current);
-        ControlResponse response = new() { Error = "unavailable" };
+        string correlationId = "";
         if (runtime is null || runtime._lifetime.IsCancellationRequested || payload.Length > 65536)
-            return response.ToByteArray();
-        ControlRequest request;
+            return EncodeControlResponse(outer, correlationId, "unavailable", ByteString.Empty);
+
+        string method;
+        string traceParent;
+        string traceState;
+        ReadOnlyMemory<byte> body;
+        ServiceCallContext context;
         try
         {
-            request = ControlRequest.Parser.ParseFrom(payload);
+            if (outer)
+            {
+                var request = C2S_GateRequest.Parser.ParseFrom(payload);
+                correlationId = request.CorrelationId;
+                if (runtime._role != ServiceRole.Gate)
+                    return EncodeControlResponse(
+                        outer,
+                        correlationId,
+                        "forbidden",
+                        ByteString.Empty
+                    );
+                context = new(ServiceRole.Client, connectionId);
+                method = request.Method;
+                traceParent = request.TraceParent;
+                traceState = request.TraceState;
+                // Gate validates the original client envelope. Client-supplied delegation
+                // fields never establish an authenticated internal-service identity.
+                body = payload;
+            }
+            else
+            {
+                var request = S2S_ControlRequest.Parser.ParseFrom(payload);
+                correlationId = request.CorrelationId;
+                if (!runtime._auth.TryAuthenticate(request, out context))
+                    return EncodeControlResponse(
+                        outer,
+                        correlationId,
+                        "forbidden",
+                        ByteString.Empty
+                    );
+                method = request.Method;
+                traceParent = request.TraceParent;
+                traceState = request.TraceState;
+                body = request.Body.Memory;
+            }
         }
         catch (InvalidProtocolBufferException)
         {
-            return response.ToByteArray();
-        }
-        response.CorrelationId = request.CorrelationId;
-        ServiceCallContext context;
-        if (outer)
-        {
-            if (runtime._role != ServiceRole.Gate)
-            {
-                response.Error = "forbidden";
-                return response.ToByteArray();
-            }
-            context = new(ServiceRole.Client, connectionId);
-            // Gate receives the entire envelope, including the client's opaque login credential.
-        }
-        else if (!runtime._auth.TryAuthenticate(request, out context))
-        {
-            response.Error = "forbidden";
-            return response.ToByteArray();
+            return EncodeControlResponse(outer, correlationId, "unavailable", ByteString.Empty);
         }
         if (!runtime._handlers.Wait(0))
-            return response.ToByteArray();
-        ActivityContext.TryParse(
-            request.TraceParent,
-            request.TraceState,
-            true,
-            out ActivityContext parent
-        );
+            return EncodeControlResponse(outer, correlationId, "unavailable", ByteString.Empty);
+        ActivityContext.TryParse(traceParent, traceState, true, out ActivityContext parent);
         using Activity? activity = ServiceDiagnostics.Activities.StartActivity(
-            ServiceDiagnostics.Method(request.Method),
+            ServiceDiagnostics.Method(method),
             ActivityKind.Server,
             parent
         );
         long started = Stopwatch.GetTimestamp();
+        string error = "unavailable";
+        ByteString responseBody = ByteString.Empty;
         try
         {
             if (runtime._handler is not null)
             {
                 ServiceReply reply = await runtime._handler.HandleAsync(
                     context,
-                    request.Method,
-                    outer ? request.ToByteArray() : request.Body.Memory,
+                    method,
+                    body,
                     runtime._lifetime.Token
                 );
-                response.Error = reply.Error;
-                response.Body = ByteString.CopyFrom(reply.Payload);
+                error = reply.Error;
+                responseBody = ByteString.CopyFrom(reply.Payload);
             }
         }
         catch (Exception)
         {
-            response.Error = "unavailable";
+            error = "unavailable";
         }
         finally
         {
             runtime._handlers.Release();
-            ServiceDiagnostics.RecordRpc(
-                request.Method,
-                runtime._role,
-                started,
-                response.Error.Length == 0
-            );
+            ServiceDiagnostics.RecordRpc(method, runtime._role, started, error.Length == 0);
         }
-        return response.ToByteArray();
+        return EncodeControlResponse(outer, correlationId, error, responseBody);
     }
+
+    private static byte[] EncodeControlResponse(
+        bool outer,
+        string correlationId,
+        string error,
+        ByteString body
+    ) =>
+        outer
+            ? new S2C_GateResponse
+            {
+                CorrelationId = correlationId,
+                Error = error,
+                Body = body,
+            }.ToByteArray()
+            : new S2S_ControlResponse
+            {
+                CorrelationId = correlationId,
+                Error = error,
+                Body = body,
+            }.ToByteArray();
 
     public async ValueTask DisposeAsync()
     {

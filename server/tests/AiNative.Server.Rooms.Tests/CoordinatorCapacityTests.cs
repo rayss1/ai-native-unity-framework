@@ -240,11 +240,7 @@ public sealed class CoordinatorCapacityTests
         coordinator.HandleAsync(
             new(ServiceRole.Match, "match"),
             ServiceMethods.Allocate,
-            new AllocationRequest
-            {
-                MatchId = match,
-                PlayerIds = { "player-" + match },
-            }.ToByteArray()
+            new AllocationSpec { MatchId = match, PlayerIds = { "player-" + match } }.ToByteArray()
         );
 
     private static async Task<RoomAllocation> Allocate(RoomCoordinator coordinator, string match)

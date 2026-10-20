@@ -997,7 +997,7 @@ internal sealed class ArenaCapacityRunner(
                         memberOrdinal
                     );
                     long joinStart = Stopwatch.GetTimestamp();
-                    JoinRoomResponse response = await fixture.Join(
+                    S2C_JoinRoomResponse response = await fixture.Join(
                         wire.Transport,
                         ready,
                         operation
@@ -1011,7 +1011,10 @@ internal sealed class ArenaCapacityRunner(
                         memberOrdinal
                     );
                     long snapshotStart = Stopwatch.GetTimestamp();
-                    Snapshot snapshot = await fixture.FreshSnapshot(wire.Transport, operation);
+                    S2C_SnapshotPush snapshot = await fixture.FreshSnapshot(
+                        wire.Transport,
+                        operation
+                    );
                     var client = new LoadClient(member, wire, response.EntityId, snapshot);
                     joined[index] = client;
                     RecordPhase(
@@ -1148,10 +1151,7 @@ internal sealed class ArenaCapacityRunner(
                                             (FantasyBackendProbe)connection
                                         ).CallAsync(
                                             ServiceMethods.Profile,
-                                            new ProfileRequest
-                                            {
-                                                PlayerId = playerId,
-                                            }.ToByteArray(),
+                                            new ProfileQuery { PlayerId = playerId }.ToByteArray(),
                                             sessionToken,
                                             ct
                                         );
@@ -1623,7 +1623,7 @@ internal sealed class ArenaCapacityRunner(
                         ) != ProtocolDecodeStatus.Accepted
                     )
                         continue;
-                    if (decoded.Message is Snapshot snapshot)
+                    if (decoded.Message is S2C_SnapshotPush snapshot)
                     {
                         client.Last = snapshot;
                         if (now >= measurementStart && now < measurementEnd)
@@ -1675,7 +1675,7 @@ internal sealed class ArenaCapacityRunner(
                         }
                     }
                     else if (
-                        decoded.Message is ReliableEvent reliable
+                        decoded.Message is S2C_ReliableEventPush reliable
                         && ReferenceEquals(client, room.Clients[0])
                     )
                     {
@@ -1769,7 +1769,7 @@ internal sealed class ArenaCapacityRunner(
                             enemy,
                             random.Next(2) == 0 ? 250 : -250
                         );
-                    var input = new InputCommand
+                    var input = new C2S_InputCommand
                     {
                         Sequence = sequence,
                         RoomTick = client.Last.RoomTick + 1,
@@ -1788,7 +1788,7 @@ internal sealed class ArenaCapacityRunner(
                     client.LookCommands[sequence] = look;
                     Check(
                         RealtimeProtocolCodec.TryEncode(
-                            MessageId.InputCommand,
+                            MessageId.C2SInputCommand,
                             input,
                             send,
                             out var channel,
@@ -1899,7 +1899,7 @@ internal sealed class ArenaCapacityRunner(
         public readonly int Slot = slot,
             Generation = generation;
         public Task Driver = Task.CompletedTask;
-        public volatile Snapshot? Final;
+        public volatile S2C_SnapshotPush? Final;
         public long InputEnded;
         public ulong MatchStartTick;
         public long LastFireTimestamp;
@@ -1948,7 +1948,7 @@ internal sealed class ArenaCapacityRunner(
         FailureScenarios.Fixture.PreparedMember member,
         FantasyKcpProbe wire,
         uint entity,
-        Snapshot snapshot
+        S2C_SnapshotPush snapshot
     ) : IAsyncDisposable
     {
         public readonly FailureScenarios.Fixture.PreparedMember Member = member;
@@ -1956,7 +1956,7 @@ internal sealed class ArenaCapacityRunner(
         public readonly LoginResult Login = member.login;
         public readonly FantasyKcpProbe Wire = wire;
         public readonly uint Entity = entity;
-        public Snapshot Last = snapshot;
+        public S2C_SnapshotPush Last = snapshot;
         public uint Sequence = snapshot.LastProcessedInputSequence,
             LastAck = snapshot.LastProcessedInputSequence;
         public uint FirstMeasuredInputSequence,

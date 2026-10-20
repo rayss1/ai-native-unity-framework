@@ -118,7 +118,7 @@ try
         Check(!privateCall.Success, "client-private-settlement-forbidden");
         ServiceReply foreignProfile = await gateA.CallAsync(
             ServiceMethods.Profile,
-            new ProfileRequest { PlayerId = b.login.PlayerId }.ToByteArray(),
+            new ProfileQuery { PlayerId = b.login.PlayerId }.ToByteArray(),
             a.login.SessionToken,
             ct
         );
@@ -156,7 +156,7 @@ try
             var second = await Join(battleB.Transport, readyB);
             await using SnapshotInputLoop inputA = new(battleA.Transport, ct);
             await using SnapshotInputLoop inputB = new(battleB.Transport, ct);
-            Snapshot snapshot;
+            S2C_SnapshotPush snapshot;
             do
             {
                 snapshot = await inputA.ReadAsync(TimeSpan.FromSeconds(10));
@@ -183,7 +183,7 @@ try
                         throw new TimeoutException("gate-restart-harness");
                     await Task.Delay(100, ct);
                 }
-                Snapshot continued = await inputA.ReadAsync(TimeSpan.FromSeconds(5));
+                S2C_SnapshotPush continued = await inputA.ReadAsync(TimeSpan.FromSeconds(5));
                 Check(
                     continued.RoomTick > snapshot.RoomTick,
                     "battle-continues-during-gate-restart"
@@ -201,7 +201,7 @@ try
                 PlayerProfile restoredProfile = (
                     await reconnectedGate.CallAsync(
                         ServiceMethods.Profile,
-                        new ProfileRequest { PlayerId = a.login.PlayerId }.ToByteArray(),
+                        new ProfileQuery { PlayerId = a.login.PlayerId }.ToByteArray(),
                         a.login.SessionToken,
                         ct
                     )
@@ -252,8 +252,8 @@ try
             );
             await Send(
                 invalid.Transport,
-                MessageId.LoginRequest,
-                new LoginRequest
+                MessageId.C2SLoginRequest,
+                new C2S_LoginRequest
                 {
                     ProtocolMajor = 1,
                     ClientBuild = "acceptance",
@@ -264,9 +264,9 @@ try
             bool rejected = false;
             try
             {
-                await Receive<LoginResponse>(
+                await Receive<S2C_LoginResponse>(
                     invalid.Transport,
-                    MessageId.LoginResponse,
+                    MessageId.S2CLoginResponse,
                     TimeSpan.FromSeconds(2)
                 );
             }
@@ -311,8 +311,8 @@ try
                 );
                 await Send(
                     stale.Transport,
-                    MessageId.LoginRequest,
-                    new LoginRequest
+                    MessageId.C2SLoginRequest,
+                    new C2S_LoginRequest
                     {
                         ProtocolMajor = 1,
                         ClientBuild = "acceptance",
@@ -323,9 +323,9 @@ try
                 bool fenced = false;
                 try
                 {
-                    await Receive<LoginResponse>(
+                    await Receive<S2C_LoginResponse>(
                         stale.Transport,
-                        MessageId.LoginResponse,
+                        MessageId.S2CLoginResponse,
                         TimeSpan.FromSeconds(2)
                     );
                 }
@@ -357,7 +357,9 @@ try
                 long expiry = claims.RootElement.GetProperty("Expiry").GetInt64();
                 while (DateTimeOffset.UtcNow.ToUnixTimeSeconds() <= expiry)
                     await Task.Delay(500, ct);
-                Snapshot active = await replacementInput.ReadAsync(TimeSpan.FromSeconds(10));
+                S2C_SnapshotPush active = await replacementInput.ReadAsync(
+                    TimeSpan.FromSeconds(10)
+                );
                 Check(
                     active.MatchPhase == ArenaMatchPhase.ArenaMatchActive,
                     "expiry-tested-in-live-room"
@@ -368,8 +370,8 @@ try
                 );
                 await Send(
                     expired.Transport,
-                    MessageId.LoginRequest,
-                    new LoginRequest
+                    MessageId.C2SLoginRequest,
+                    new C2S_LoginRequest
                     {
                         ProtocolMajor = 1,
                         ClientBuild = "acceptance",
@@ -380,9 +382,9 @@ try
                 bool expiryRejected = false;
                 try
                 {
-                    await Receive<LoginResponse>(
+                    await Receive<S2C_LoginResponse>(
                         expired.Transport,
-                        MessageId.LoginResponse,
+                        MessageId.S2CLoginResponse,
                         TimeSpan.FromSeconds(2)
                     );
                 }
@@ -441,7 +443,7 @@ try
                 {
                     ServiceReply reply = await profileGate.CallAsync(
                         ServiceMethods.Profile,
-                        new ProfileRequest { PlayerId = a.login.PlayerId }.ToByteArray(),
+                        new ProfileQuery { PlayerId = a.login.PlayerId }.ToByteArray(),
                         a.login.SessionToken,
                         token
                     );
@@ -453,7 +455,7 @@ try
             PlayerProfile stable = (
                 await profileGate.CallAsync(
                     ServiceMethods.Profile,
-                    new ProfileRequest { PlayerId = a.login.PlayerId }.ToByteArray(),
+                    new ProfileQuery { PlayerId = a.login.PlayerId }.ToByteArray(),
                     a.login.SessionToken,
                     ct
                 )
@@ -546,7 +548,7 @@ return exit;
 
 async Task<(LoginResult login, string request)> Queue(FantasyBackendProbe gate)
 {
-    var account = new AccountRequest
+    var account = new AccountCredentials
     {
         Username = "accept_" + Guid.NewGuid().ToString("N")[..16],
         Password = Guid.NewGuid().ToString("N"),
@@ -572,7 +574,7 @@ async Task<(LoginResult login, string request)> Queue(FantasyBackendProbe gate)
     party = (
         await gate.CallAsync(
             ServiceMethods.PartyReady,
-            new PartyCommand
+            new PartyOperation
             {
                 PartyId = party.PartyId,
                 ExpectedVersion = party.Version,
@@ -586,7 +588,7 @@ async Task<(LoginResult login, string request)> Queue(FantasyBackendProbe gate)
     (
         await gate.CallAsync(
             ServiceMethods.PartyQueue,
-            new PartyQueueRequest
+            new PartyQueueData
             {
                 PartyId = party.PartyId,
                 ExpectedVersion = party.Version,
@@ -618,12 +620,12 @@ async Task<MatchReady> Ready(FantasyBackendProbe gate, LoginResult login, string
     }
     throw new TimeoutException("match-ready-timeout");
 }
-async Task<JoinRoomResponse> Join(IRealtimeTransport transport, MatchReady ready)
+async Task<S2C_JoinRoomResponse> Join(IRealtimeTransport transport, MatchReady ready)
 {
     await Send(
         transport,
-        MessageId.LoginRequest,
-        new LoginRequest
+        MessageId.C2SLoginRequest,
+        new C2S_LoginRequest
         {
             ProtocolMajor = 1,
             ClientBuild = "acceptance",
@@ -631,9 +633,9 @@ async Task<JoinRoomResponse> Join(IRealtimeTransport transport, MatchReady ready
             GlobalRoomId = ready.Status.Allocation.RoomId,
         }
     );
-    LoginResponse login = await Receive<LoginResponse>(
+    S2C_LoginResponse login = await Receive<S2C_LoginResponse>(
         transport,
-        MessageId.LoginResponse,
+        MessageId.S2CLoginResponse,
         TimeSpan.FromSeconds(10)
     );
     Check(
@@ -643,12 +645,12 @@ async Task<JoinRoomResponse> Join(IRealtimeTransport transport, MatchReady ready
     );
     await Send(
         transport,
-        MessageId.JoinRoomRequest,
-        new JoinRoomRequest { SessionId = login.SessionId, RequestedRoom = 1 }
+        MessageId.C2SJoinRoomRequest,
+        new C2S_JoinRoomRequest { SessionId = login.SessionId, RequestedRoom = 1 }
     );
-    var joined = await Receive<JoinRoomResponse>(
+    var joined = await Receive<S2C_JoinRoomResponse>(
         transport,
-        MessageId.JoinRoomResponse,
+        MessageId.S2CJoinRoomResponse,
         TimeSpan.FromSeconds(10)
     );
     Check(joined.TickRate == 60 && joined.EntityId != 0, "join-tickrate-entity");
@@ -749,7 +751,7 @@ public sealed class SnapshotInputLoop : IAsyncDisposable
 {
     readonly IRealtimeTransport transport;
     readonly CancellationTokenSource stop;
-    readonly Channel<Snapshot> snapshots = Channel.CreateBounded<Snapshot>(
+    readonly Channel<S2C_SnapshotPush> snapshots = Channel.CreateBounded<S2C_SnapshotPush>(
         new BoundedChannelOptions(1)
         {
             FullMode = BoundedChannelFullMode.DropOldest,
@@ -759,9 +761,9 @@ public sealed class SnapshotInputLoop : IAsyncDisposable
     );
     int disposed;
     long sentInputs;
-    Snapshot? lastObservedSnapshot;
+    S2C_SnapshotPush? lastObservedSnapshot;
     public long SentInputs => Interlocked.Read(ref sentInputs);
-    public Snapshot? LastSnapshot => Volatile.Read(ref lastObservedSnapshot);
+    public S2C_SnapshotPush? LastSnapshot => Volatile.Read(ref lastObservedSnapshot);
     public Task Completion { get; }
 
     public SnapshotInputLoop(IRealtimeTransport transport, CancellationToken cancellationToken)
@@ -775,7 +777,7 @@ public sealed class SnapshotInputLoop : IAsyncDisposable
     {
         byte[] receive = new byte[1200],
             send = new byte[1200];
-        Snapshot? latest = null;
+        S2C_SnapshotPush? latest = null;
         uint sequence = 0;
         long lastSnapshot = 0,
             nextSend = 0;
@@ -799,7 +801,7 @@ public sealed class SnapshotInputLoop : IAsyncDisposable
                             receive.AsSpan(0, packet.WrittenBytes),
                             out var decoded
                         ) != ProtocolDecodeStatus.Accepted
-                        || decoded.Message is not Snapshot snapshot
+                        || decoded.Message is not S2C_SnapshotPush snapshot
                     )
                         continue;
                     if (latest is not null && snapshot.RoomTick < latest.RoomTick)
@@ -819,7 +821,7 @@ public sealed class SnapshotInputLoop : IAsyncDisposable
                     && Stopwatch.GetElapsedTime(lastSnapshot).TotalSeconds < 1
                 )
                 {
-                    InputCommand input = new()
+                    C2S_InputCommand input = new()
                     {
                         RoomTick = checked(latest.RoomTick + 2),
                         Sequence = checked(++sequence),
@@ -827,7 +829,7 @@ public sealed class SnapshotInputLoop : IAsyncDisposable
                     };
                     if (
                         !RealtimeProtocolCodec.TryEncode(
-                            MessageId.InputCommand,
+                            MessageId.C2SInputCommand,
                             input,
                             send,
                             out var channel,
@@ -862,7 +864,7 @@ public sealed class SnapshotInputLoop : IAsyncDisposable
         }
     }
 
-    public async Task<Snapshot> ReadAsync(TimeSpan timeout)
+    public async Task<S2C_SnapshotPush> ReadAsync(TimeSpan timeout)
     {
         using var wait = CancellationTokenSource.CreateLinkedTokenSource(stop.Token);
         wait.CancelAfter(timeout);
@@ -872,7 +874,7 @@ public sealed class SnapshotInputLoop : IAsyncDisposable
         }
         catch (OperationCanceledException) when (!stop.IsCancellationRequested)
         {
-            throw new TimeoutException("receive-Snapshot");
+            throw new TimeoutException("receive-S2C_SnapshotPush");
         }
     }
 

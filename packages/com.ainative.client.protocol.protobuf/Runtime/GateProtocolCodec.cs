@@ -13,10 +13,10 @@ namespace AiNative.Client.Protocol.Protobuf
         public const int MaxBody = 60000;
 
         public static byte[] Account(string username, string password) =>
-            Encode(new AccountRequest { Username = username, Password = password });
+            Encode(new AccountCredentials { Username = username, Password = password });
 
         public static byte[] ProfileRequest(string player) =>
-            Encode(new ProfileRequest { PlayerId = player });
+            Encode(new ProfileQuery { PlayerId = player });
 
         public static byte[] SettlementRequest(string match) =>
             Encode(new SettlementQuery { MatchId = match });
@@ -28,7 +28,7 @@ namespace AiNative.Client.Protocol.Protobuf
             ulong version = 0
         ) =>
             Encode(
-                new PartyCommand
+                new PartyOperation
                 {
                     PartyId = party,
                     TargetPlayerId = target,
@@ -39,7 +39,7 @@ namespace AiNative.Client.Protocol.Protobuf
 
         public static byte[] QueueRequest(string party, ulong version, string request) =>
             Encode(
-                new PartyQueueRequest
+                new PartyQueueData
                 {
                     PartyId = party,
                     ExpectedVersion = version,
@@ -57,7 +57,7 @@ namespace AiNative.Client.Protocol.Protobuf
             string correlation
         ) =>
             Encode(
-                new ControlRequest
+                new C2S_GateRequest
                 {
                     Method = method,
                     Body = ByteString.CopyFrom(body),
@@ -67,17 +67,17 @@ namespace AiNative.Client.Protocol.Protobuf
             );
 
         public static byte[] Envelope(byte[] request) =>
-            Encode(new GateRequestEnvelope { Payload = ByteString.CopyFrom(request) });
+            Encode(new C2S_GateTransportRequest { Payload = ByteString.CopyFrom(request) });
 
         public static (uint Error, byte[] Payload) ResponseEnvelope(byte[] bytes)
         {
-            var m = Parse(bytes, GateResponseEnvelope.Parser);
+            var m = Parse(bytes, S2C_GateTransportResponse.Parser);
             return (m.ErrorCode, m.Payload.ToByteArray());
         }
 
         public static (string Correlation, string Error, byte[] Payload) Response(byte[] bytes)
         {
-            var m = Parse(bytes, ControlResponse.Parser);
+            var m = Parse(bytes, S2C_GateResponse.Parser);
             return (m.CorrelationId, m.Error, m.Body.ToByteArray());
         }
 

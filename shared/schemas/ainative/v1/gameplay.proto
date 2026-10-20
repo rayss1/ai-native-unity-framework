@@ -5,16 +5,16 @@ option csharp_namespace = "AiNative.Protocol.V1";
 
 enum MessageId {
   MESSAGE_ID_UNSPECIFIED = 0;
-  MESSAGE_ID_LOGIN_REQUEST = 1000;
-  MESSAGE_ID_LOGIN_RESPONSE = 1001;
-  MESSAGE_ID_JOIN_ROOM_REQUEST = 1010;
-  MESSAGE_ID_JOIN_ROOM_RESPONSE = 1011;
-  MESSAGE_ID_INPUT_COMMAND = 1100;
-  MESSAGE_ID_SNAPSHOT = 1101;
-  MESSAGE_ID_RELIABLE_EVENT = 1102;
-  MESSAGE_ID_INPUT_BATCH = 1103;
-  MESSAGE_ID_RECONNECT_REQUEST = 1200;
-  MESSAGE_ID_RECONNECT_RESPONSE = 1201;
+  MESSAGE_ID_C2S_LOGIN_REQUEST = 1000;
+  MESSAGE_ID_S2C_LOGIN_RESPONSE = 1001;
+  MESSAGE_ID_C2S_JOIN_ROOM_REQUEST = 1010;
+  MESSAGE_ID_S2C_JOIN_ROOM_RESPONSE = 1011;
+  MESSAGE_ID_C2S_INPUT_COMMAND = 1100;
+  MESSAGE_ID_S2C_SNAPSHOT_PUSH = 1101;
+  MESSAGE_ID_S2C_RELIABLE_EVENT_PUSH = 1102;
+  MESSAGE_ID_C2S_INPUT_BATCH = 1103;
+  MESSAGE_ID_C2S_RECONNECT_REQUEST = 1200;
+  MESSAGE_ID_S2C_RECONNECT_RESPONSE = 1201;
 }
 
 enum ArenaButton {
@@ -54,7 +54,8 @@ enum ArenaCombatEventType {
   ARENA_EVENT_WEAPON_SWITCH = 5;
 }
 
-message LoginRequest {
+// 客户端 → 服务端。
+message C2S_LoginRequest {
   uint32 protocol_major = 1;
   string client_build = 2;
   string entry_ticket = 3;
@@ -62,7 +63,8 @@ message LoginRequest {
   reserved 100 to 199;
 }
 
-message LoginResponse {
+// 服务端 → 客户端；Response 为请求回复，Push 为主动推送。
+message S2C_LoginResponse {
   fixed64 session_id = 1;
   uint32 connection_epoch = 2;
   string global_room_id = 3;
@@ -71,20 +73,23 @@ message LoginResponse {
   reserved 100 to 199;
 }
 
-message JoinRoomRequest {
+// 客户端 → 服务端。
+message C2S_JoinRoomRequest {
   fixed64 session_id = 1;
   uint32 requested_room = 2;
   reserved 100 to 199;
 }
 
-message JoinRoomResponse {
+// 服务端 → 客户端；Response 为请求回复，Push 为主动推送。
+message S2C_JoinRoomResponse {
   uint32 room_id = 1;
   uint32 entity_id = 2;
   uint32 tick_rate = 3;
   reserved 100 to 199;
 }
 
-message InputCommand {
+// 客户端 → 服务端。
+message C2S_InputCommand {
   fixed64 room_tick = 1;
   uint32 sequence = 2;
   sint32 move_x_milli = 3;
@@ -97,11 +102,13 @@ message InputCommand {
   reserved 100 to 199;
 }
 
-message InputBatch {
-  repeated InputCommand commands = 1;
+// 客户端 → 服务端。
+message C2S_InputBatch {
+  repeated C2S_InputCommand commands = 1;
   reserved 100 to 199;
 }
 
+// 公共数据结构，嵌入快照或事件信封，不独立发送。
 message PlayerState {
   uint32 entity_id = 1;
   sint32 position_x_milli = 2;
@@ -120,6 +127,7 @@ message PlayerState {
   reserved 100 to 199;
 }
 
+// 公共数据结构，嵌入快照或事件信封，不独立发送。
 message PickupState {
   uint32 pickup_id = 1;
   ArenaPickupType pickup_type = 2;
@@ -131,7 +139,8 @@ message PickupState {
   reserved 100 to 199;
 }
 
-message Snapshot {
+// 服务端 → 客户端；Response 为请求回复，Push 为主动推送。
+message S2C_SnapshotPush {
   uint32 protocol_major = 1;
   fixed64 room_tick = 2;
   fixed64 baseline_tick = 3;
@@ -145,6 +154,7 @@ message Snapshot {
   reserved 100 to 199;
 }
 
+// 公共数据结构，嵌入快照或事件信封，不独立发送。
 message ArenaCombatEvent {
   ArenaCombatEventType event_type = 1;
   fixed64 event_tick = 2;
@@ -158,7 +168,8 @@ message ArenaCombatEvent {
   reserved 100 to 199;
 }
 
-message ReliableEvent {
+// 服务端 → 客户端；Response 为请求回复，Push 为主动推送。
+message S2C_ReliableEventPush {
   fixed64 room_tick = 1;
   uint32 sequence = 2;
   uint32 event_type = 3;
@@ -167,16 +178,18 @@ message ReliableEvent {
   reserved 100 to 199;
 }
 
-message ReconnectRequest {
+// 客户端 → 服务端。
+message C2S_ReconnectRequest {
   fixed64 session_id = 1;
   uint32 connection_epoch = 2;
   fixed64 last_received_tick = 3;
   reserved 100 to 199;
 }
 
-message ReconnectResponse {
+// 服务端 → 客户端；Response 为请求回复，Push 为主动推送。
+message S2C_ReconnectResponse {
   uint32 connection_epoch = 1;
   fixed64 resume_tick = 2;
-  Snapshot snapshot = 3;
+  S2C_SnapshotPush snapshot = 3;
   reserved 100 to 199;
 }

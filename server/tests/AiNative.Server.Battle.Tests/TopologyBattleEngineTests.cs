@@ -27,15 +27,17 @@ public class TopologyBattleEngineTests
     {
         await using var f = await Fixture.Create(100000);
         var player = await JoinPlayer(f, "p1", 20);
-        await f.Until(() => player.Latest<Snapshot>(MessageId.Snapshot).RoomTick >= 40);
+        await f.Until(() =>
+            player.Latest<S2C_SnapshotPush>(MessageId.S2CSnapshotPush).RoomTick >= 40
+        );
         player.Push(
-            MessageId.InputCommand,
-            new InputCommand { Sequence = 1, RoomTick = future ? ulong.MaxValue : 0 }
+            MessageId.C2SInputCommand,
+            new C2S_InputCommand { Sequence = 1, RoomTick = future ? ulong.MaxValue : 0 }
         );
         await f.Until(() => f.Engine.DroppedPackets == 1);
         AssertDropReasons(f, reason, 1);
         Assert.That(
-            player.Latest<Snapshot>(MessageId.Snapshot).LastProcessedInputSequence,
+            player.Latest<S2C_SnapshotPush>(MessageId.S2CSnapshotPush).LastProcessedInputSequence,
             Is.Zero
         );
     }
@@ -47,10 +49,10 @@ public class TopologyBattleEngineTests
         var player = await JoinPlayer(f, "p1", 20);
         await JoinPlayer(f, "p2", 21);
         await f.Until(() =>
-            player.Latest<Snapshot>(MessageId.Snapshot).MatchPhase
+            player.Latest<S2C_SnapshotPush>(MessageId.S2CSnapshotPush).MatchPhase
             == AiNative.Protocol.V1.ArenaMatchPhase.ArenaMatchFinished
         );
-        player.Push(MessageId.InputCommand, new InputCommand { Sequence = 1, RoomTick = 0 });
+        player.Push(MessageId.C2SInputCommand, new C2S_InputCommand { Sequence = 1, RoomTick = 0 });
         await f.Engine.PumpAsync();
         AssertDropReasons(f, "finishedRoom", 1);
     }
@@ -78,17 +80,19 @@ public class TopologyBattleEngineTests
         try
         {
             await blocked.Task.WaitAsync(TimeSpan.FromSeconds(3));
-            ulong tick = player.Latest<Snapshot>(MessageId.Snapshot).RoomTick;
+            ulong tick = player.Latest<S2C_SnapshotPush>(MessageId.S2CSnapshotPush).RoomTick;
             for (uint sequence = 1; sequence <= 257; sequence++)
                 player.Push(
-                    MessageId.InputCommand,
-                    new InputCommand { Sequence = sequence, RoomTick = tick }
+                    MessageId.C2SInputCommand,
+                    new C2S_InputCommand { Sequence = sequence, RoomTick = tick }
                 );
             for (int pump = 0; pump < 17; pump++)
                 await f.Engine.PumpAsync();
             AssertDropReasons(f, "commandQueueFull", 1);
             Assert.That(
-                player.Latest<Snapshot>(MessageId.Snapshot).LastProcessedInputSequence,
+                player
+                    .Latest<S2C_SnapshotPush>(MessageId.S2CSnapshotPush)
+                    .LastProcessedInputSequence,
                 Is.Zero
             );
         }
@@ -105,8 +109,8 @@ public class TopologyBattleEngineTests
         await using var f = await Fixture.Create(100000);
         var player = await JoinPlayer(f, "p1", 20);
         player.Push(
-            MessageId.InputCommand,
-            new InputCommand
+            MessageId.C2SInputCommand,
+            new C2S_InputCommand
             {
                 Sequence = 1,
                 RoomTick = ulong.MaxValue,
@@ -120,16 +124,16 @@ public class TopologyBattleEngineTests
     private static async Task<FakeTransport> JoinPlayer(Fixture f, string id, uint epoch)
     {
         var player = f.Connect(epoch);
-        player.Push(MessageId.LoginRequest, f.Login(id));
+        player.Push(MessageId.C2SLoginRequest, f.Login(id));
         await f.Engine.PumpAsync();
         player.Push(
-            MessageId.JoinRoomRequest,
-            new JoinRoomRequest
+            MessageId.C2SJoinRoomRequest,
+            new C2S_JoinRoomRequest
             {
-                SessionId = player.Latest<LoginResponse>(MessageId.LoginResponse).SessionId,
+                SessionId = player.Latest<S2C_LoginResponse>(MessageId.S2CLoginResponse).SessionId,
             }
         );
-        await f.Until(() => player.Has(MessageId.JoinRoomResponse));
+        await f.Until(() => player.Has(MessageId.S2CJoinRoomResponse));
         return player;
     }
 
@@ -139,22 +143,23 @@ public class TopologyBattleEngineTests
         await using var f = await Fixture.Create(100000);
         var player = await JoinPlayer(f, "p1", 20);
         player.Push(
-            MessageId.InputCommand,
-            new InputCommand
+            MessageId.C2SInputCommand,
+            new C2S_InputCommand
             {
                 Sequence = 1,
-                RoomTick = player.Latest<Snapshot>(MessageId.Snapshot).RoomTick,
+                RoomTick = player.Latest<S2C_SnapshotPush>(MessageId.S2CSnapshotPush).RoomTick,
             }
         );
         await f.Until(() =>
-            player.Latest<Snapshot>(MessageId.Snapshot).LastProcessedInputSequence == 1
+            player.Latest<S2C_SnapshotPush>(MessageId.S2CSnapshotPush).LastProcessedInputSequence
+            == 1
         );
         player.Push(
-            MessageId.InputCommand,
-            new InputCommand
+            MessageId.C2SInputCommand,
+            new C2S_InputCommand
             {
                 Sequence = 1,
-                RoomTick = player.Latest<Snapshot>(MessageId.Snapshot).RoomTick,
+                RoomTick = player.Latest<S2C_SnapshotPush>(MessageId.S2CSnapshotPush).RoomTick,
             }
         );
         await f.Until(() => f.Engine.DroppedPackets == 1);
@@ -193,8 +198,8 @@ public class TopologyBattleEngineTests
             await blocked.Task.WaitAsync(TimeSpan.FromSeconds(3));
             for (uint sequence = 1; sequence <= 128; sequence++)
                 player.Push(
-                    MessageId.InputCommand,
-                    new InputCommand { Sequence = sequence, RoomTick = ulong.MaxValue }
+                    MessageId.C2SInputCommand,
+                    new C2S_InputCommand { Sequence = sequence, RoomTick = ulong.MaxValue }
                 );
             for (int pump = 0; pump < 8; pump++)
                 await f.Engine.PumpAsync();
@@ -261,15 +266,15 @@ public class TopologyBattleEngineTests
         Clock clock = new();
         await using var f = await Fixture.Create(600, clock: clock);
         var bad = f.Connect(100);
-        bad.Push(MessageId.LoginRequest, f.Login("outsider"));
+        bad.Push(MessageId.C2SLoginRequest, f.Login("outsider"));
         await f.Engine.PumpAsync();
         await f.Engine.PumpAsync();
         Assert.That(bad.State, Is.EqualTo(TransportState.Closed));
         Assert.That(f.ConnectionCount, Is.Zero);
         var unjoined = f.Connect(101);
-        unjoined.Push(MessageId.LoginRequest, f.Login("p1"));
+        unjoined.Push(MessageId.C2SLoginRequest, f.Login("p1"));
         await f.Engine.PumpAsync();
-        Assert.That(unjoined.Has(MessageId.LoginResponse), Is.True);
+        Assert.That(unjoined.Has(MessageId.S2CLoginResponse), Is.True);
         clock.Advance(11);
         await f.Engine.PumpAsync();
         Assert.That(unjoined.State, Is.EqualTo(TransportState.Closed));
@@ -281,16 +286,16 @@ public class TopologyBattleEngineTests
         Assert.That(silent.State, Is.EqualTo(TransportState.Closed));
         Assert.That(f.ConnectionCount, Is.Zero);
         var joined = f.Connect(103);
-        joined.Push(MessageId.LoginRequest, f.Login("p1"));
+        joined.Push(MessageId.C2SLoginRequest, f.Login("p1"));
         await f.Engine.PumpAsync();
         joined.Push(
-            MessageId.JoinRoomRequest,
-            new JoinRoomRequest
+            MessageId.C2SJoinRoomRequest,
+            new C2S_JoinRoomRequest
             {
-                SessionId = joined.Latest<LoginResponse>(MessageId.LoginResponse).SessionId,
+                SessionId = joined.Latest<S2C_LoginResponse>(MessageId.S2CLoginResponse).SessionId,
             }
         );
-        await f.Until(() => joined.Has(MessageId.JoinRoomResponse));
+        await f.Until(() => joined.Has(MessageId.S2CJoinRoomResponse));
         clock.Advance(11);
         await f.Engine.PumpAsync();
         Assert.That(joined.State, Is.EqualTo(TransportState.Connected));
@@ -320,7 +325,7 @@ public class TopologyBattleEngineTests
             ).Success,
             Is.True
         );
-        var request = new AllocationRequest { MatchId = "second", PlayerIds = { "p3", "p4" } };
+        var request = new AllocationSpec { MatchId = "second", PlayerIds = { "p3", "p4" } };
         var released = (
             await coordinator.HandleAsync(
                 new(ServiceRole.Match, "match"),
@@ -397,12 +402,12 @@ public class TopologyBattleEngineTests
     {
         await using var f = await Fixture.Create(120, replay: true);
         var bad = f.Connect(1);
-        bad.Push(MessageId.JoinRoomRequest, new JoinRoomRequest { SessionId = 123 });
+        bad.Push(MessageId.C2SJoinRoomRequest, new C2S_JoinRoomRequest { SessionId = 123 });
         await f.Engine.PumpAsync();
         Assert.That(bad.Output, Is.Empty);
         bad.Push(
-            MessageId.LoginRequest,
-            new LoginRequest
+            MessageId.C2SLoginRequest,
+            new C2S_LoginRequest
             {
                 ProtocolMajor = 1,
                 GlobalRoomId = "room",
@@ -411,30 +416,32 @@ public class TopologyBattleEngineTests
         );
         await f.Engine.PumpAsync();
         Assert.That(bad.Output, Is.Empty);
-        bad.Push(MessageId.LoginRequest, f.Login("outsider"));
+        bad.Push(MessageId.C2SLoginRequest, f.Login("outsider"));
         await f.Engine.PumpAsync();
         Assert.That(bad.Output, Is.Empty);
         var a = f.Connect(2);
         var b = f.Connect(3);
-        a.Push(MessageId.LoginRequest, f.Login("p1"));
-        b.Push(MessageId.LoginRequest, f.Login("p2"));
+        a.Push(MessageId.C2SLoginRequest, f.Login("p1"));
+        b.Push(MessageId.C2SLoginRequest, f.Login("p2"));
         await f.Engine.PumpAsync();
-        var session = a.Latest<LoginResponse>(MessageId.LoginResponse).SessionId;
-        a.Push(MessageId.JoinRoomRequest, new JoinRoomRequest { SessionId = session });
+        var session = a.Latest<S2C_LoginResponse>(MessageId.S2CLoginResponse).SessionId;
+        a.Push(MessageId.C2SJoinRoomRequest, new C2S_JoinRoomRequest { SessionId = session });
         b.Push(
-            MessageId.JoinRoomRequest,
-            new JoinRoomRequest
+            MessageId.C2SJoinRoomRequest,
+            new C2S_JoinRoomRequest
             {
-                SessionId = b.Latest<LoginResponse>(MessageId.LoginResponse).SessionId,
+                SessionId = b.Latest<S2C_LoginResponse>(MessageId.S2CLoginResponse).SessionId,
             }
         );
-        await f.Until(() => a.Has(MessageId.JoinRoomResponse) && b.Has(MessageId.JoinRoomResponse));
-        var entity = a.Latest<JoinRoomResponse>(MessageId.JoinRoomResponse).EntityId;
-        var tick = a.Latest<Snapshot>(MessageId.Snapshot).RoomTick;
+        await f.Until(() =>
+            a.Has(MessageId.S2CJoinRoomResponse) && b.Has(MessageId.S2CJoinRoomResponse)
+        );
+        var entity = a.Latest<S2C_JoinRoomResponse>(MessageId.S2CJoinRoomResponse).EntityId;
+        var tick = a.Latest<S2C_SnapshotPush>(MessageId.S2CSnapshotPush).RoomTick;
         a.PacketEpoch = 999;
         a.Push(
-            MessageId.InputCommand,
-            new InputCommand
+            MessageId.C2SInputCommand,
+            new C2S_InputCommand
             {
                 Sequence = 1,
                 RoomTick = tick + 1,
@@ -443,20 +450,23 @@ public class TopologyBattleEngineTests
         );
         await f.Engine.PumpAsync();
         a.PacketEpoch = 2;
-        Assert.That(a.Latest<Snapshot>(MessageId.Snapshot).LastProcessedInputSequence, Is.Zero);
+        Assert.That(
+            a.Latest<S2C_SnapshotPush>(MessageId.S2CSnapshotPush).LastProcessedInputSequence,
+            Is.Zero
+        );
         a.Push(
-            MessageId.InputBatch,
-            new InputBatch
+            MessageId.C2SInputBatch,
+            new C2S_InputBatch
             {
                 Commands =
                 {
-                    new InputCommand
+                    new C2S_InputCommand
                     {
                         Sequence = 1,
                         RoomTick = tick + 1,
                         MoveXMilli = 1000,
                     },
-                    new InputCommand
+                    new C2S_InputCommand
                     {
                         Sequence = 2,
                         RoomTick = tick + 1,
@@ -465,25 +475,27 @@ public class TopologyBattleEngineTests
                 },
             }
         );
-        await f.Until(() => a.Latest<Snapshot>(MessageId.Snapshot).LastProcessedInputSequence == 2);
+        await f.Until(() =>
+            a.Latest<S2C_SnapshotPush>(MessageId.S2CSnapshotPush).LastProcessedInputSequence == 2
+        );
         var next = f.Connect(4);
-        next.Push(MessageId.LoginRequest, f.Login("p1"));
+        next.Push(MessageId.C2SLoginRequest, f.Login("p1"));
         await f.Engine.PumpAsync();
         Assert.That(
-            next.Latest<LoginResponse>(MessageId.LoginResponse).SessionId,
+            next.Latest<S2C_LoginResponse>(MessageId.S2CLoginResponse).SessionId,
             Is.EqualTo(session)
         );
-        next.Push(MessageId.ReconnectRequest, new ReconnectRequest { SessionId = session });
-        await f.Until(() => next.Has(MessageId.ReconnectResponse));
+        next.Push(MessageId.C2SReconnectRequest, new C2S_ReconnectRequest { SessionId = session });
+        await f.Until(() => next.Has(MessageId.S2CReconnectResponse));
         Assert.That(
-            next.Latest<ReconnectResponse>(MessageId.ReconnectResponse)
+            next.Latest<S2C_ReconnectResponse>(MessageId.S2CReconnectResponse)
                 .Snapshot.Players.Any(p => p.EntityId == entity),
             Is.True
         );
         await f.Engine.PumpAsync();
         Assert.That(a.State, Is.EqualTo(TransportState.Closed));
         await f.Until(() =>
-            next.Latest<Snapshot>(MessageId.Snapshot).MatchPhase
+            next.Latest<S2C_SnapshotPush>(MessageId.S2CSnapshotPush).MatchPhase
             == AiNative.Protocol.V1.ArenaMatchPhase.ArenaMatchFinished
         );
         await f.Engine.FlushResultsAsync();
@@ -516,16 +528,16 @@ public class TopologyBattleEngineTests
     {
         await using var f = await Fixture.Create(100000, replay: true);
         var a = f.Connect(10);
-        a.Push(MessageId.LoginRequest, f.Login("p1"));
+        a.Push(MessageId.C2SLoginRequest, f.Login("p1"));
         await f.Engine.PumpAsync();
         a.Push(
-            MessageId.JoinRoomRequest,
-            new JoinRoomRequest
+            MessageId.C2SJoinRoomRequest,
+            new C2S_JoinRoomRequest
             {
-                SessionId = a.Latest<LoginResponse>(MessageId.LoginResponse).SessionId,
+                SessionId = a.Latest<S2C_LoginResponse>(MessageId.S2CLoginResponse).SessionId,
             }
         );
-        await f.Until(() => a.Has(MessageId.JoinRoomResponse));
+        await f.Until(() => a.Has(MessageId.S2CJoinRoomResponse));
         var done = new TaskCompletionSource<long>(
             TaskCreationOptions.RunContinuationsAsynchronously
         );
@@ -632,31 +644,31 @@ public class TopologyBattleEngineTests
         await using var f = await Fixture.Create(30);
         var a = f.Connect(1);
         var b = f.Connect(2);
-        a.Push(MessageId.LoginRequest, f.Login("p1"));
-        b.Push(MessageId.LoginRequest, f.Login("p2"));
+        a.Push(MessageId.C2SLoginRequest, f.Login("p1"));
+        b.Push(MessageId.C2SLoginRequest, f.Login("p2"));
         await f.Engine.PumpAsync();
         a.Push(
-            MessageId.JoinRoomRequest,
-            new JoinRoomRequest
+            MessageId.C2SJoinRoomRequest,
+            new C2S_JoinRoomRequest
             {
-                SessionId = a.Latest<LoginResponse>(MessageId.LoginResponse).SessionId,
+                SessionId = a.Latest<S2C_LoginResponse>(MessageId.S2CLoginResponse).SessionId,
             }
         );
         b.Push(
-            MessageId.JoinRoomRequest,
-            new JoinRoomRequest
+            MessageId.C2SJoinRoomRequest,
+            new C2S_JoinRoomRequest
             {
-                SessionId = b.Latest<LoginResponse>(MessageId.LoginResponse).SessionId,
+                SessionId = b.Latest<S2C_LoginResponse>(MessageId.S2CLoginResponse).SessionId,
             }
         );
-        await f.Until(() => a.Has(MessageId.JoinRoomResponse));
+        await f.Until(() => a.Has(MessageId.S2CJoinRoomResponse));
         for (int i = 0; i < 10; i++)
             Assert.That(
                 await f.Outbox.StoreAsync(new MatchResult { MatchId = "prior" + i }),
                 Is.True
             );
         await f.Until(() =>
-            a.Latest<Snapshot>(MessageId.Snapshot).MatchPhase
+            a.Latest<S2C_SnapshotPush>(MessageId.S2CSnapshotPush).MatchPhase
             == AiNative.Protocol.V1.ArenaMatchPhase.ArenaMatchFinished
         );
         await f.Engine.FlushResultsAsync();
@@ -676,21 +688,21 @@ public class TopologyBattleEngineTests
         var a = f.Connect(1);
         var b = f.Connect(2);
         a.RejectFinalSnapshots = true;
-        a.Push(MessageId.LoginRequest, f.Login("p1"));
-        b.Push(MessageId.LoginRequest, f.Login("p2"));
+        a.Push(MessageId.C2SLoginRequest, f.Login("p1"));
+        b.Push(MessageId.C2SLoginRequest, f.Login("p2"));
         await f.Engine.PumpAsync();
         a.Push(
-            MessageId.JoinRoomRequest,
-            new JoinRoomRequest
+            MessageId.C2SJoinRoomRequest,
+            new C2S_JoinRoomRequest
             {
-                SessionId = a.Latest<LoginResponse>(MessageId.LoginResponse).SessionId,
+                SessionId = a.Latest<S2C_LoginResponse>(MessageId.S2CLoginResponse).SessionId,
             }
         );
         b.Push(
-            MessageId.JoinRoomRequest,
-            new JoinRoomRequest
+            MessageId.C2SJoinRoomRequest,
+            new C2S_JoinRoomRequest
             {
-                SessionId = b.Latest<LoginResponse>(MessageId.LoginResponse).SessionId,
+                SessionId = b.Latest<S2C_LoginResponse>(MessageId.S2CLoginResponse).SessionId,
             }
         );
         await f.Until(() => a.RejectedFinalSnapshots > 0);
@@ -715,7 +727,7 @@ public class TopologyBattleEngineTests
         );
         a.DrainCheck = barrier.Task;
         await f.Until(() =>
-            a.Latest<Snapshot>(MessageId.Snapshot).MatchPhase
+            a.Latest<S2C_SnapshotPush>(MessageId.S2CSnapshotPush).MatchPhase
             == AiNative.Protocol.V1.ArenaMatchPhase.ArenaMatchFinished
         );
         await f.Engine.FlushResultsAsync();
@@ -742,7 +754,7 @@ public class TopologyBattleEngineTests
         await JoinPlayer(f, "p2", 21);
         a.DrainCheck = new TaskCompletionSource<FantasySendDrainStatus>().Task;
         await f.Until(() =>
-            a.Latest<Snapshot>(MessageId.Snapshot).MatchPhase
+            a.Latest<S2C_SnapshotPush>(MessageId.S2CSnapshotPush).MatchPhase
             == AiNative.Protocol.V1.ArenaMatchPhase.ArenaMatchFinished
         );
         var terminal = (TerminalRoomDelivery)
@@ -773,7 +785,7 @@ public class TopologyBattleEngineTests
         await JoinPlayer(f, "p2", 21);
         a.DrainCheck = new TaskCompletionSource<FantasySendDrainStatus>().Task;
         await f.Until(() =>
-            a.Latest<Snapshot>(MessageId.Snapshot).MatchPhase
+            a.Latest<S2C_SnapshotPush>(MessageId.S2CSnapshotPush).MatchPhase
             == AiNative.Protocol.V1.ArenaMatchPhase.ArenaMatchFinished
         );
         await f.Engine.FlushResultsAsync();
@@ -1042,7 +1054,7 @@ public class TopologyBattleEngineTests
                 );
         }
 
-        public LoginRequest Login(string player) =>
+        public C2S_LoginRequest Login(string player) =>
             new()
             {
                 ProtocolMajor = 1,
@@ -1106,7 +1118,7 @@ public class TopologyBattleEngineTests
             byte[] bytes = new byte[2 + m.CalculateSize()];
             BinaryPrimitives.WriteUInt16LittleEndian(bytes, (ushort)id);
             m.WriteTo(bytes.AsSpan(2));
-            uint channel = id is MessageId.InputCommand or MessageId.InputBatch ? 2u : 0u;
+            uint channel = id is MessageId.C2SInputCommand or MessageId.C2SInputBatch ? 2u : 0u;
             _input.Enqueue(
                 (
                     bytes,
@@ -1146,8 +1158,8 @@ public class TopologyBattleEngineTests
             var id = (MessageId)BinaryPrimitives.ReadUInt16LittleEndian(payload.Span);
             if (
                 RejectFinalSnapshots
-                && id == MessageId.Snapshot
-                && Snapshot.Parser.ParseFrom(payload.Span[2..]).MatchPhase
+                && id == MessageId.S2CSnapshotPush
+                && S2C_SnapshotPush.Parser.ParseFrom(payload.Span[2..]).MatchPhase
                     == AiNative.Protocol.V1.ArenaMatchPhase.ArenaMatchFinished
             )
             {

@@ -198,7 +198,7 @@ internal static class ScenarioRunner
         long[] tickDurations = new long[options.MeasuredTicks];
         long[] gameplayDurations = new long[options.MeasuredTicks];
         uint[] lastInputSequence = new uint[BotCount];
-        InputCommand?[] pendingInputs = new InputCommand[BotCount];
+        C2S_InputCommand?[] pendingInputs = new C2S_InputCommand[BotCount];
         SimulatedLink[] upstream = new SimulatedLink[BotCount];
         SimulatedLink[] downstream = new SimulatedLink[BotCount];
         SyntheticRoom room = new(BotCount);
@@ -229,7 +229,7 @@ internal static class ScenarioRunner
         {
             for (int entity = 0; entity < BotCount; entity++)
             {
-                InputCommand command = new()
+                C2S_InputCommand command = new()
                 {
                     RoomTick = checked((ulong)tick),
                     Sequence = checked((uint)tick + 1),
@@ -243,7 +243,7 @@ internal static class ScenarioRunner
                     continue;
                 }
 
-                InputBatch batch = new();
+                C2S_InputBatch batch = new();
                 batch.Commands.Add(
                     pendingInputs[entity]
                         ?? throw new InvalidOperationException(
@@ -254,7 +254,7 @@ internal static class ScenarioRunner
                 pendingInputs[entity] = null;
                 if (
                     !RealtimeProtocolCodec.TryEncode(
-                        MessageId.InputBatch,
+                        MessageId.C2SInputBatch,
                         batch,
                         encodeBuffer,
                         out _,
@@ -263,7 +263,7 @@ internal static class ScenarioRunner
                 )
                 {
                     throw new InvalidOperationException(
-                        "The production codec rejected an acceptance InputBatch."
+                        "The production codec rejected an acceptance C2S_InputBatch."
                     );
                 }
 
@@ -304,14 +304,14 @@ internal static class ScenarioRunner
                                     packet,
                                     out DecodedProtocolMessage decoded
                                 ) != ProtocolDecodeStatus.Accepted
-                                || decoded.MessageId != MessageId.InputBatch
-                                || decoded.Message is not InputBatch batch
+                                || decoded.MessageId != MessageId.C2SInputBatch
+                                || decoded.Message is not C2S_InputBatch batch
                             )
                             {
                                 return;
                             }
 
-                            foreach (InputCommand input in batch.Commands)
+                            foreach (C2S_InputCommand input in batch.Commands)
                             {
                                 if (input.Sequence > lastInputSequence[capturedEntity])
                                 {
@@ -333,10 +333,10 @@ internal static class ScenarioRunner
 
             if ((tick + 1) % SnapshotIntervalTicks == 0)
             {
-                Snapshot snapshot = room.CreateSnapshot(checked((ulong)tick + 1));
+                S2C_SnapshotPush snapshot = room.CreateSnapshot(checked((ulong)tick + 1));
                 if (
                     !RealtimeProtocolCodec.TryEncode(
-                        MessageId.Snapshot,
+                        MessageId.S2CSnapshotPush,
                         snapshot,
                         encodeBuffer,
                         out _,
@@ -345,7 +345,7 @@ internal static class ScenarioRunner
                 )
                 {
                     throw new InvalidOperationException(
-                        "The 64-player Snapshot exceeded the production codec MTU."
+                        "The 64-player S2C_SnapshotPush exceeded the production codec MTU."
                     );
                 }
 

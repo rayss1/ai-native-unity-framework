@@ -10,7 +10,7 @@ public sealed class RealtimeProtocolCodecTests
     [Test]
     public void InputRoundTripUsesTheSequencedUnreliableChannel()
     {
-        InputCommand input = new()
+        C2S_InputCommand input = new()
         {
             RoomTick = 42,
             Sequence = 7,
@@ -22,7 +22,7 @@ public sealed class RealtimeProtocolCodecTests
         Span<byte> frame = stackalloc byte[RealtimeProtocolCodec.MaxDatagramBytes];
 
         bool encoded = RealtimeProtocolCodec.TryEncode(
-            MessageId.InputCommand,
+            MessageId.C2SInputCommand,
             input,
             frame,
             out TransportChannel channel,
@@ -43,17 +43,17 @@ public sealed class RealtimeProtocolCodecTests
             Assert.That(channel.Delivery, Is.EqualTo(TransportDelivery.Unreliable));
             Assert.That(channel.Ordering, Is.EqualTo(TransportOrdering.Sequenced));
             Assert.That(status, Is.EqualTo(ProtocolDecodeStatus.Accepted));
-            Assert.That(decoded.MessageId, Is.EqualTo(MessageId.InputCommand));
-            Assert.That((InputCommand)decoded.Message, Is.EqualTo(input));
+            Assert.That(decoded.MessageId, Is.EqualTo(MessageId.C2SInputCommand));
+            Assert.That((C2S_InputCommand)decoded.Message, Is.EqualTo(input));
         });
     }
 
     [Test]
     public void TwoFrameInputBatchUsesTheSequencedUnreliableChannelAndFitsOneDatagram()
     {
-        InputBatch batch = new();
+        C2S_InputBatch batch = new();
         batch.Commands.Add(
-            new InputCommand
+            new C2S_InputCommand
             {
                 RoomTick = 42,
                 Sequence = 7,
@@ -62,7 +62,7 @@ public sealed class RealtimeProtocolCodecTests
             }
         );
         batch.Commands.Add(
-            new InputCommand
+            new C2S_InputCommand
             {
                 RoomTick = 43,
                 Sequence = 8,
@@ -74,7 +74,7 @@ public sealed class RealtimeProtocolCodecTests
         Span<byte> frame = stackalloc byte[RealtimeProtocolCodec.MaxDatagramBytes];
 
         bool encoded = RealtimeProtocolCodec.TryEncode(
-            MessageId.InputBatch,
+            MessageId.C2SInputBatch,
             batch,
             frame,
             out TransportChannel channel,
@@ -92,15 +92,15 @@ public sealed class RealtimeProtocolCodecTests
             Assert.That(channel.Ordering, Is.EqualTo(TransportOrdering.Sequenced));
             Assert.That(writtenBytes, Is.LessThan(96));
             Assert.That(status, Is.EqualTo(ProtocolDecodeStatus.Accepted));
-            Assert.That(decoded.MessageId, Is.EqualTo(MessageId.InputBatch));
-            Assert.That((InputBatch)decoded.Message, Is.EqualTo(batch));
+            Assert.That(decoded.MessageId, Is.EqualTo(MessageId.C2SInputBatch));
+            Assert.That((C2S_InputBatch)decoded.Message, Is.EqualTo(batch));
         });
     }
 
     [Test]
     public void SnapshotFrameForSixtyFourPlayersFitsTheDatagramBudget()
     {
-        Snapshot snapshot = new()
+        S2C_SnapshotPush snapshot = new()
         {
             ProtocolMajor = 1,
             RoomTick = 60,
@@ -124,7 +124,7 @@ public sealed class RealtimeProtocolCodecTests
 
         Span<byte> frame = stackalloc byte[RealtimeProtocolCodec.MaxDatagramBytes];
         bool encoded = RealtimeProtocolCodec.TryEncode(
-            MessageId.Snapshot,
+            MessageId.S2CSnapshotPush,
             snapshot,
             frame,
             out TransportChannel channel,
@@ -144,8 +144,8 @@ public sealed class RealtimeProtocolCodecTests
     {
         Span<byte> destination = stackalloc byte[64];
         bool wrongType = RealtimeProtocolCodec.TryEncode(
-            MessageId.Snapshot,
-            new InputCommand(),
+            MessageId.S2CSnapshotPush,
+            new C2S_InputCommand(),
             destination,
             out _,
             out _

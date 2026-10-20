@@ -21,9 +21,9 @@ namespace AiNative.Client.Prediction.Tests
             return bytes;
         }
 
-        private static Wire.Snapshot Snapshot(int count = 1, bool arena = true)
+        private static Wire.S2C_SnapshotPush Snapshot(int count = 1, bool arena = true)
         {
-            var snapshot = new Wire.Snapshot
+            var snapshot = new Wire.S2C_SnapshotPush
             {
                 ProtocolMajor = 1,
                 RoomTick = 100,
@@ -88,7 +88,7 @@ namespace AiNative.Client.Prediction.Tests
             );
             byte[] frame = new byte[64];
             Assert.That(codec.TryEncodeInput(input, frame, out int written), Is.True);
-            var message = Wire.InputCommand.Parser.ParseFrom(frame.AsSpan(2, written - 2));
+            var message = Wire.C2S_InputCommand.Parser.ParseFrom(frame.AsSpan(2, written - 2));
             Assert.That(message.Sequence, Is.EqualTo(42));
             Assert.That(message.MoveXMilli, Is.EqualTo(-1000));
             Assert.That(message.LookPitchMilli, Is.EqualTo(500));
@@ -315,7 +315,7 @@ namespace AiNative.Client.Prediction.Tests
                 ).WrittenBytes
                 : legacy.PrepareInput(103, 0, 0, input).WrittenBytes;
             Assert.That(
-                Wire.InputCommand.Parser.ParseFrom(input.AsSpan(2, written - 2)).Sequence,
+                Wire.C2S_InputCommand.Parser.ParseFrom(input.AsSpan(2, written - 2)).Sequence,
                 Is.EqualTo(2)
             );
         }
@@ -400,7 +400,7 @@ namespace AiNative.Client.Prediction.Tests
         {
             using var codec = new ProtobufBattleProtocolCodec();
             var output = new BattlePacketBuffer();
-            var response = new Wire.ReconnectResponse
+            var response = new Wire.S2C_ReconnectResponse
             {
                 ConnectionEpoch = 2,
                 ResumeTick = 100,
@@ -441,7 +441,7 @@ namespace AiNative.Client.Prediction.Tests
         {
             using var codec = new ProtobufBattleProtocolCodec();
             var output = new BattlePacketBuffer();
-            var e = new Wire.ReliableEvent
+            var e = new Wire.S2C_ReliableEventPush
             {
                 RoomTick = 100,
                 Sequence = 10,
@@ -494,24 +494,24 @@ namespace AiNative.Client.Prediction.Tests
                 ),
                 Is.True
             );
-            var login = Wire.LoginRequest.Parser.ParseFrom(bytes.AsSpan(2, n - 2));
+            var login = Wire.C2S_LoginRequest.Parser.ParseFrom(bytes.AsSpan(2, n - 2));
             Assert.That(login.ProtocolMajor, Is.EqualTo(1));
             Assert.That(login.EntryTicket, Is.EqualTo("ticket"));
             Assert.That(codec.TryEncodeJoin(7, 2, bytes, out n), Is.True);
             Assert.That(
-                Wire.JoinRoomRequest.Parser.ParseFrom(bytes.AsSpan(2, n - 2)).SessionId,
+                Wire.C2S_JoinRoomRequest.Parser.ParseFrom(bytes.AsSpan(2, n - 2)).SessionId,
                 Is.EqualTo(7)
             );
             Assert.That(codec.TryEncodeReconnect(7, 2, 100, bytes, out n), Is.True);
             Assert.That(
-                Wire.ReconnectRequest.Parser.ParseFrom(bytes.AsSpan(2, n - 2)).LastReceivedTick,
+                Wire.C2S_ReconnectRequest.Parser.ParseFrom(bytes.AsSpan(2, n - 2)).LastReceivedTick,
                 Is.EqualTo(100)
             );
             Assert.That(
                 codec.TryDecode(
                     Frame(
                         1001,
-                        new Wire.LoginResponse
+                        new Wire.S2C_LoginResponse
                         {
                             SessionId = 7,
                             ConnectionEpoch = 2,
@@ -527,7 +527,7 @@ namespace AiNative.Client.Prediction.Tests
                 codec.TryDecode(
                     Frame(
                         1011,
-                        new Wire.JoinRoomResponse
+                        new Wire.S2C_JoinRoomResponse
                         {
                             RoomId = 2,
                             EntityId = 1,
@@ -592,7 +592,7 @@ namespace AiNative.Client.Prediction.Tests
                 kind == "reconnect"
                     ? Frame(
                         1201,
-                        new Wire.ReconnectResponse
+                        new Wire.S2C_ReconnectResponse
                         {
                             ConnectionEpoch = 2,
                             ResumeTick = 100,
@@ -602,7 +602,7 @@ namespace AiNative.Client.Prediction.Tests
                 : kind == "event"
                     ? Frame(
                         1102,
-                        new Wire.ReliableEvent
+                        new Wire.S2C_ReliableEventPush
                         {
                             RoomTick = 100,
                             Sequence = 10,

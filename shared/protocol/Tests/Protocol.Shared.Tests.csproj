@@ -15,6 +15,7 @@
     </PackageReference>
   </ItemGroup>
   <ItemGroup>
+    <EmbeddedResource Include="Fixtures/before-direction-names.pb" />
     <ProjectReference Include="../Protocol.Shared.csproj" />
   </ItemGroup>
 </Project>

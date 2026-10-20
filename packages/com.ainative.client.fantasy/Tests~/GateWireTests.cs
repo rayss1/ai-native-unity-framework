@@ -17,17 +17,19 @@ public sealed class GateWireTests
     public void Generated_business_requests_preserve_server_contracts()
     {
         Assert.That(
-            AccountRequest.Parser.ParseFrom(GateProtocolCodec.Account("user", "password")).Password,
+            AccountCredentials
+                .Parser.ParseFrom(GateProtocolCodec.Account("user", "password"))
+                .Password,
             Is.EqualTo("password")
         );
-        var party = PartyCommand.Parser.ParseFrom(
+        var party = PartyOperation.Parser.ParseFrom(
             GateProtocolCodec.PartyRequest("party", "target", true, 42)
         );
         Assert.That(
             (party.PartyId, party.TargetPlayerId, party.Ready, party.ExpectedVersion),
             Is.EqualTo(("party", "target", true, 42UL))
         );
-        var queue = PartyQueueRequest.Parser.ParseFrom(
+        var queue = PartyQueueData.Parser.ParseFrom(
             GateProtocolCodec.QueueRequest("party", 42, "queue")
         );
         Assert.That(
@@ -132,20 +134,20 @@ public sealed class GateWireTests
     {
         byte[] request = GateWire.Request(
             "player.profile",
-            new ProfileRequest { PlayerId = "p1" }.ToByteArray(),
+            new ProfileQuery { PlayerId = "p1" }.ToByteArray(),
             "test-session",
             "c1"
         );
-        ControlRequest decoded = ControlRequest.Parser.ParseFrom(request);
+        S2S_ControlRequest decoded = S2S_ControlRequest.Parser.ParseFrom(request);
         Assert.That(
             (decoded.Method, decoded.CorrelationId, decoded.Credential),
             Is.EqualTo(("player.profile", "c1", "test-session"))
         );
-        Assert.That(ProfileRequest.Parser.ParseFrom(decoded.Body).PlayerId, Is.EqualTo("p1"));
+        Assert.That(ProfileQuery.Parser.ParseFrom(decoded.Body).PlayerId, Is.EqualTo("p1"));
         byte[] frame = GateFrame.Encode(
             268435633u,
             17,
-            new GateRequestEnvelope { Payload = ByteString.CopyFrom(request) }.ToByteArray()
+            new C2S_GateTransportRequest { Payload = ByteString.CopyFrom(request) }.ToByteArray()
         );
         Assert.That(
             BinaryPrimitives.ReadUInt32LittleEndian(frame.AsSpan(4)),
@@ -212,11 +214,14 @@ public sealed class GateWireTests
     public void Response_must_match_correlation_and_propagate_service_rejection()
     {
         Assert.Throws<InvalidDataException>(() =>
-            GateWire.Response(new ControlResponse { CorrelationId = "other" }.ToByteArray(), "mine")
+            GateWire.Response(
+                new S2S_ControlResponse { CorrelationId = "other" }.ToByteArray(),
+                "mine"
+            )
         );
         GateCallException denied = Assert.Throws<GateCallException>(() =>
             GateWire.Response(
-                new ControlResponse
+                new S2S_ControlResponse
                 {
                     CorrelationId = "mine",
                     Error = "unauthorized",

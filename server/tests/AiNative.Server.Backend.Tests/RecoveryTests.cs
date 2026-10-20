@@ -30,7 +30,7 @@ public sealed class RecoveryTests
                     f,
                     login.PlayerId,
                     ServiceMethods.PartyGet,
-                    new PartyCommand { PartyId = party.PartyId }
+                    new PartyOperation { PartyId = party.PartyId }
                 )
             )
                 .Read(PartyState.Parser)
@@ -50,7 +50,7 @@ public sealed class RecoveryTests
                 f,
                 login.PlayerId,
                 ServiceMethods.PartyGet,
-                new PartyCommand { PartyId = party.PartyId }
+                new PartyOperation { PartyId = party.PartyId }
             )
         ).Read(PartyState.Parser);
         Assert.That(cleared.QueueRequestId, Is.Empty);
@@ -60,7 +60,11 @@ public sealed class RecoveryTests
                     f,
                     login.PlayerId,
                     ServiceMethods.PartyLeave,
-                    new PartyCommand { PartyId = party.PartyId, ExpectedVersion = cleared.Version }
+                    new PartyOperation
+                    {
+                        PartyId = party.PartyId,
+                        ExpectedVersion = cleared.Version,
+                    }
                 )
             ).Success,
             Is.True
@@ -71,7 +75,7 @@ public sealed class RecoveryTests
                     f,
                     login.PlayerId,
                     ServiceMethods.PartyGet,
-                    new PartyCommand { PartyId = party.PartyId }
+                    new PartyOperation { PartyId = party.PartyId }
                 )
             ).Error,
             Is.EqualTo("party_not_found")
@@ -102,7 +106,7 @@ public sealed class RecoveryTests
                 f,
                 login.PlayerId,
                 ServiceMethods.PartyQueue,
-                new PartyQueueRequest
+                new PartyQueueData
                 {
                     PartyId = party.PartyId,
                     ExpectedVersion = party.Version,
@@ -116,7 +120,7 @@ public sealed class RecoveryTests
                 f,
                 login.PlayerId,
                 ServiceMethods.PartyGet,
-                new PartyCommand { PartyId = party.PartyId }
+                new PartyOperation { PartyId = party.PartyId }
             )
         ).Read(PartyState.Parser);
         Assert.That(cleared.QueueRequestId, Is.Empty);
@@ -137,7 +141,7 @@ public sealed class RecoveryTests
                     f,
                     login.PlayerId,
                     ServiceMethods.PartyQueue,
-                    new PartyQueueRequest
+                    new PartyQueueData
                     {
                         PartyId = cleared.PartyId,
                         ExpectedVersion = cleared.Version,
@@ -150,7 +154,7 @@ public sealed class RecoveryTests
                 f,
                 login.PlayerId,
                 ServiceMethods.PartyReady,
-                new PartyCommand
+                new PartyOperation
                 {
                     PartyId = cleared.PartyId,
                     ExpectedVersion = cleared.Version,
@@ -163,7 +167,7 @@ public sealed class RecoveryTests
                     f,
                     login.PlayerId,
                     ServiceMethods.PartyQueue,
-                    new PartyQueueRequest
+                    new PartyQueueData
                     {
                         PartyId = cleared.PartyId,
                         ExpectedVersion = cleared.Version,
@@ -306,7 +310,7 @@ public sealed class RecoveryTests
             await f.CallAsync(
                 "leader",
                 ServiceMethods.PartyCreate,
-                new PartyCommand(),
+                new PartyOperation(),
                 leader.SessionToken
             )
         ).Read(PartyState.Parser);
@@ -314,7 +318,7 @@ public sealed class RecoveryTests
             await f.CallAsync(
                 "leader",
                 ServiceMethods.PartyInvite,
-                new PartyCommand
+                new PartyOperation
                 {
                     PartyId = party.PartyId,
                     ExpectedVersion = party.Version,
@@ -342,7 +346,7 @@ public sealed class RecoveryTests
             await f.CallAsync(
                 "member",
                 ServiceMethods.PartyAccept,
-                new PartyCommand
+                new PartyOperation
                 {
                     PartyId = invites.Parties[0].PartyId,
                     ExpectedVersion = invites.Parties[0].Version,
@@ -354,7 +358,7 @@ public sealed class RecoveryTests
             await f.CallAsync(
                 "leader",
                 ServiceMethods.PartyReady,
-                new PartyCommand
+                new PartyOperation
                 {
                     PartyId = party.PartyId,
                     ExpectedVersion = party.Version,
@@ -367,7 +371,7 @@ public sealed class RecoveryTests
             await f.CallAsync(
                 "member",
                 ServiceMethods.PartyReady,
-                new PartyCommand
+                new PartyOperation
                 {
                     PartyId = party.PartyId,
                     ExpectedVersion = party.Version,
@@ -379,7 +383,7 @@ public sealed class RecoveryTests
         await f.CallAsync(
             "leader",
             ServiceMethods.PartyQueue,
-            new PartyQueueRequest
+            new PartyQueueData
             {
                 PartyId = party.PartyId,
                 ExpectedVersion = party.Version,
@@ -391,7 +395,7 @@ public sealed class RecoveryTests
             await f.CallAsync(
                 "member",
                 ServiceMethods.PartyGet,
-                new PartyCommand { PartyId = party.PartyId },
+                new PartyOperation { PartyId = party.PartyId },
                 member.SessionToken
             )
         ).Read(PartyState.Parser);
@@ -429,7 +433,7 @@ public sealed class RecoveryTests
             await f.CallAsync(
                 "leader",
                 ServiceMethods.PartyGet,
-                new PartyCommand { PartyId = party.PartyId },
+                new PartyOperation { PartyId = party.PartyId },
                 leader.SessionToken
             )
         ).Read(PartyState.Parser);
@@ -437,7 +441,7 @@ public sealed class RecoveryTests
             await f.CallAsync(
                 "leader",
                 ServiceMethods.PartyReady,
-                new PartyCommand
+                new PartyOperation
                 {
                     PartyId = party.PartyId,
                     ExpectedVersion = party.Version,
@@ -450,7 +454,7 @@ public sealed class RecoveryTests
             await f.CallAsync(
                 "member",
                 ServiceMethods.PartyReady,
-                new PartyCommand
+                new PartyOperation
                 {
                     PartyId = party.PartyId,
                     ExpectedVersion = party.Version,
@@ -462,7 +466,7 @@ public sealed class RecoveryTests
         await f.CallAsync(
             "leader",
             ServiceMethods.PartyQueue,
-            new PartyQueueRequest
+            new PartyQueueData
             {
                 PartyId = party.PartyId,
                 ExpectedVersion = party.Version,
@@ -489,14 +493,14 @@ public sealed class RecoveryTests
             await lobby.HandleAsync(
                 gate,
                 ServiceMethods.PartyCreate,
-                new PartyCommand().ToByteArray()
+                new PartyOperation().ToByteArray()
             )
         ).Read(PartyState.Parser);
         party = (
             await lobby.HandleAsync(
                 gate,
                 ServiceMethods.PartyReady,
-                new PartyCommand
+                new PartyOperation
                 {
                     PartyId = party.PartyId,
                     ExpectedVersion = party.Version,
@@ -504,7 +508,7 @@ public sealed class RecoveryTests
                 }.ToByteArray()
             )
         ).Read(PartyState.Parser);
-        var request = new PartyQueueRequest
+        var request = new PartyQueueData
         {
             PartyId = party.PartyId,
             ExpectedVersion = party.Version,
@@ -524,7 +528,7 @@ public sealed class RecoveryTests
                 await lobby.HandleAsync(
                     gate,
                     ServiceMethods.PartyLeave,
-                    new PartyCommand
+                    new PartyOperation
                     {
                         PartyId = party.PartyId,
                         ExpectedVersion = party.Version,
@@ -544,7 +548,7 @@ public sealed class RecoveryTests
             await f.CallAsync(
                 "leader",
                 ServiceMethods.PartyCreate,
-                new PartyCommand(),
+                new PartyOperation(),
                 login.SessionToken
             )
         ).Read(PartyState.Parser);
@@ -552,7 +556,7 @@ public sealed class RecoveryTests
             f,
             login.PlayerId,
             ServiceMethods.PartyInvite,
-            new PartyCommand
+            new PartyOperation
             {
                 PartyId = party.PartyId,
                 ExpectedVersion = party.Version,
@@ -595,13 +599,13 @@ public sealed class RecoveryTests
                 await lobby.HandleAsync(
                     context,
                     ServiceMethods.PartyCreate,
-                    new PartyCommand().ToByteArray()
+                    new PartyOperation().ToByteArray()
                 )
             ).Read(PartyState.Parser);
             await lobby.HandleAsync(
                 context,
                 ServiceMethods.PartyInvite,
-                new PartyCommand
+                new PartyOperation
                 {
                     PartyId = party.PartyId,
                     ExpectedVersion = party.Version,
@@ -669,7 +673,7 @@ sealed class RecoveryFixture : IDisposable
         Gate.HandleAsync(
             new(ServiceRole.Client, connection),
             method,
-            new ControlRequest
+            new C2S_GateRequest
             {
                 Method = method,
                 Credential = token,
@@ -682,7 +686,7 @@ sealed class RecoveryFixture : IDisposable
             await CallAsync(
                 connection,
                 ServiceMethods.RegisterAccount,
-                new AccountRequest { Username = username, Password = "valid-password" }
+                new AccountCredentials { Username = username, Password = "valid-password" }
             )
         ).Read(LoginResult.Parser);
 
@@ -696,7 +700,7 @@ sealed class RecoveryFixture : IDisposable
             await CallAsync(
                 connection,
                 ServiceMethods.PartyCreate,
-                new PartyCommand(),
+                new PartyOperation(),
                 login.SessionToken
             )
         ).Read(PartyState.Parser);
@@ -704,7 +708,7 @@ sealed class RecoveryFixture : IDisposable
             await CallAsync(
                 connection,
                 ServiceMethods.PartyReady,
-                new PartyCommand
+                new PartyOperation
                 {
                     PartyId = party.PartyId,
                     ExpectedVersion = party.Version,
@@ -716,7 +720,7 @@ sealed class RecoveryFixture : IDisposable
         await CallAsync(
             connection,
             ServiceMethods.PartyQueue,
-            new PartyQueueRequest
+            new PartyQueueData
             {
                 PartyId = party.PartyId,
                 ExpectedVersion = party.Version,

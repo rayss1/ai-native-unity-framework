@@ -108,7 +108,7 @@ public sealed class GateServiceTests
             await fixture.Router.Player.HandleAsync(
                 new(ServiceRole.Gate, "gate"),
                 ServiceMethods.RegisterAccount,
-                new AccountRequest
+                new AccountCredentials
                 {
                     Username = "second",
                     Password = "valid-password",
@@ -118,11 +118,11 @@ public sealed class GateServiceTests
         var delayed = new DelayedPresenceRpc(fixture.Router, first.PlayerId);
         var gate = new GateService(delayed, fixture.Notifications, fixture.Clock);
         static byte[] Request(string token) =>
-            new ControlRequest
+            new C2S_GateRequest
             {
                 Method = ServiceMethods.PartyCreate,
                 Credential = token,
-                Body = ByteString.CopyFrom(new PartyCommand().ToByteArray()),
+                Body = ByteString.CopyFrom(new PartyOperation().ToByteArray()),
             }.ToByteArray();
         var slow = gate.HandleAsync(
                 new(ServiceRole.Client, "shared"),
@@ -173,7 +173,7 @@ public sealed class GateServiceTests
         var login = await fixture.RegisterAsync();
         var response = await fixture.CallAsync(
             ServiceMethods.PartyCreate,
-            new PartyCommand(),
+            new PartyOperation(),
             login.SessionToken,
             delegated: "victim",
             contextPlayer: "victim"
@@ -196,7 +196,7 @@ public sealed class GateServiceTests
         fixture.RestartGate();
         var own = await fixture.CallAsync(
             ServiceMethods.Profile,
-            new ProfileRequest { PlayerId = login.PlayerId },
+            new ProfileQuery { PlayerId = login.PlayerId },
             login.SessionToken
         );
         Assert.That(own.Read(PlayerProfile.Parser).PlayerId, Is.EqualTo(login.PlayerId));
@@ -205,7 +205,7 @@ public sealed class GateServiceTests
             (
                 await fixture.CallAsync(
                     ServiceMethods.Profile,
-                    new ProfileRequest { PlayerId = "victim" },
+                    new ProfileQuery { PlayerId = "victim" },
                     login.SessionToken
                 )
             ).Error,
@@ -215,7 +215,7 @@ public sealed class GateServiceTests
             (
                 await fixture.CallAsync(
                     ServiceMethods.Profile,
-                    new ProfileRequest { PlayerId = login.PlayerId },
+                    new ProfileQuery { PlayerId = login.PlayerId },
                     "tampered-token"
                 )
             ).Error,
@@ -226,7 +226,7 @@ public sealed class GateServiceTests
             (
                 await fixture.CallAsync(
                     ServiceMethods.Profile,
-                    new ProfileRequest { PlayerId = login.PlayerId },
+                    new ProfileQuery { PlayerId = login.PlayerId },
                     login.SessionToken
                 )
             ).Error,
@@ -314,7 +314,7 @@ public sealed class GateServiceTests
             await fixture.Lobby.HandleAsync(
                 new(ServiceRole.Gate, "gate", login.PlayerId),
                 ServiceMethods.PartyGet,
-                new PartyCommand { PartyId = fixture.PartyId }.ToByteArray()
+                new PartyOperation { PartyId = fixture.PartyId }.ToByteArray()
             )
         ).Read(PartyState.Parser);
         Assert.That(party.Members.Single().PlayerId, Is.EqualTo(login.PlayerId));
@@ -361,7 +361,7 @@ public sealed class GateServiceTests
     public async Task Account_attempt_limit_blocks_sixth_attempt_and_resets_each_minute()
     {
         using var fixture = new GateFixture();
-        var bad = new AccountRequest { Username = "missing", Password = "valid-password" };
+        var bad = new AccountCredentials { Username = "missing", Password = "valid-password" };
         for (var i = 0; i < 5; i++)
             Assert.That(
                 (await fixture.CallAsync(ServiceMethods.Login, bad)).Error,
@@ -382,7 +382,7 @@ public sealed class GateServiceTests
     public async Task Mismatched_control_method_and_nonclient_ingress_are_rejected()
     {
         using var fixture = new GateFixture();
-        var request = new ControlRequest { Method = ServiceMethods.Allocate };
+        var request = new C2S_GateRequest { Method = ServiceMethods.Allocate };
         Assert.That(
             (
                 await fixture.Gate.HandleAsync(
@@ -438,7 +438,7 @@ sealed class GateFixture : IDisposable
         string connection = "client"
     )
     {
-        var request = new ControlRequest
+        var request = new C2S_GateRequest
         {
             Method = method,
             Credential = token,
@@ -456,20 +456,20 @@ sealed class GateFixture : IDisposable
         (
             await CallAsync(
                 ServiceMethods.RegisterAccount,
-                new AccountRequest { Username = "player", Password = "valid-password" }
+                new AccountCredentials { Username = "player", Password = "valid-password" }
             )
         ).Read(LoginResult.Parser);
 
     public async Task<string> QueueAsync(LoginResult login)
     {
         var party = (
-            await CallAsync(ServiceMethods.PartyCreate, new PartyCommand(), login.SessionToken)
+            await CallAsync(ServiceMethods.PartyCreate, new PartyOperation(), login.SessionToken)
         ).Read(PartyState.Parser);
         PartyId = party.PartyId;
         party = (
             await CallAsync(
                 ServiceMethods.PartyReady,
-                new PartyCommand
+                new PartyOperation
                 {
                     PartyId = party.PartyId,
                     ExpectedVersion = party.Version,
@@ -481,7 +481,7 @@ sealed class GateFixture : IDisposable
         return (
             await CallAsync(
                 ServiceMethods.PartyQueue,
-                new PartyQueueRequest
+                new PartyQueueData
                 {
                     PartyId = party.PartyId,
                     ExpectedVersion = party.Version,
@@ -545,7 +545,7 @@ sealed class GateRouter : IServiceRpc
         if (method == ServiceMethods.Allocate)
         {
             InternalCalls++;
-            var request = AllocationRequest.Parser.ParseFrom(payload.Span);
+            var request = AllocationSpec.Parser.ParseFrom(payload.Span);
             Room = new()
             {
                 AllocationId = "allocation",
