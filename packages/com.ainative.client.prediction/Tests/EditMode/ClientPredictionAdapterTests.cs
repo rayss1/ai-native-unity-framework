@@ -1,3 +1,5 @@
+using AiNative.Client.Protocol.Protobuf;
+using AiNative.Client.Protocol;
 using System;
 using AiNative.Gameplay;
 using AiNative.Realtime;
@@ -28,7 +30,7 @@ namespace AiNative.Client.Prediction.Tests
         [Test]
         public void ArenaInitializationContinuesAcknowledgedSequenceAndAlignsClientTick()
         {
-            var adapter = new ArenaClientPredictionAdapter(new FakeRealtimeTransport(), 1);
+            var adapter = new ArenaClientPredictionAdapter(new FakeRealtimeTransport(), new ProtobufBattleProtocolCodec(), 1);
             var state = new ArenaPlayerState(100, 0, 0, 0) { LastProcessedInputSequence = 20 };
             adapter.Initialize(state);
             var result = adapter.PrepareInput(1, 1000, 0, 0, 0, ArenaButtons.None, ArenaWeaponId.Machinegun, new byte[64]);
@@ -41,7 +43,7 @@ namespace AiNative.Client.Prediction.Tests
         [TestCase(ulong.MaxValue)]
         public void ArenaWireTickUsesAuthorityWhileUnacknowledgedPredictionKeepsAdvancing(ulong callerTick)
         {
-            var adapter = new ArenaClientPredictionAdapter(new FakeRealtimeTransport(), 1);
+            var adapter = new ArenaClientPredictionAdapter(new FakeRealtimeTransport(), new ProtobufBattleProtocolCodec(), 1);
             adapter.Initialize(new ArenaPlayerState(100, 0, 0, 0));
             byte[] frame = new byte[ArenaClientProtocolV1.MaxInputFrameBytes];
             for (int index = 0; index < 5; index++)
@@ -91,6 +93,7 @@ namespace AiNative.Client.Prediction.Tests
             FakeRealtimeTransport maximumTransport = new FakeRealtimeTransport();
             ClientPredictionAdapter maximumAdapter = new ClientPredictionAdapter(
                 maximumTransport,
+                new ProtobufBattleProtocolCodec(),
                 7,
                 16);
             byte[] maximumBaseline = ProtocolFrameFixtures.Snapshot(
@@ -102,14 +105,14 @@ namespace AiNative.Client.Prediction.Tests
             maximumAdapter.ApplyPacket(
                 maximumBaseline,
                 ProtocolFrameFixtures.Packet(maximumBaseline, SnapshotChannel, 1));
-            byte[] exactBuffer = new byte[ClientPredictionAdapter.RequiredInputBufferBytes];
+            byte[] exactBuffer = new byte[64];
             PredictionPrepareResult maximum = maximumAdapter.PrepareInput(
                 ulong.MaxValue,
                 int.MinValue,
                 int.MaxValue,
                 exactBuffer);
             Assert.That(maximum.Status, Is.EqualTo(PredictionPrepareStatus.Prepared));
-            Assert.That(maximum.WrittenBytes, Is.EqualTo(exactBuffer.Length));
+            Assert.That(maximum.WrittenBytes, Is.EqualTo(29));
         }
 
         [Test]
@@ -190,7 +193,7 @@ namespace AiNative.Client.Prediction.Tests
         public void MissingPlayerAndProtocolMismatchFailClosed()
         {
             FakeRealtimeTransport transport = new FakeRealtimeTransport();
-            ClientPredictionAdapter adapter = new ClientPredictionAdapter(transport, 7);
+            ClientPredictionAdapter adapter = new ClientPredictionAdapter(transport, new ProtobufBattleProtocolCodec(), 7);
             byte[] missing = ProtocolFrameFixtures.Snapshot(7, 10, 0, 0, 0, includePlayer: false);
             byte[] incompatible = ProtocolFrameFixtures.Snapshot(7, 10, 0, 0, 0, protocolMajor: 2);
 
@@ -279,7 +282,7 @@ namespace AiNative.Client.Prediction.Tests
         {
             FakeRealtimeTransport transport = new FakeRealtimeTransport();
             ClientPredictionAdapter adapter = InitializedAdapter(transport, 7, 1, 1024);
-            byte[] inputBuffer = new byte[ClientPredictionAdapter.RequiredInputBufferBytes];
+            byte[] inputBuffer = new byte[64];
             for (ulong tick = 1; tick <= 2000; tick++)
             {
                 adapter.PrepareInput(tick, 1, -1, inputBuffer);
@@ -299,16 +302,16 @@ namespace AiNative.Client.Prediction.Tests
                 secondAcknowledgement,
                 ProtocolFrameFixtures.Packet(secondAcknowledgement, SnapshotChannel, 1));
             PredictionPrepareStatus lastStatus = PredictionPrepareStatus.NotInitialized;
-            _ = GC.GetAllocatedBytesForCurrentThread();
-            long before = GC.GetAllocatedBytesForCurrentThread();
 
-            for (ulong tick = 3001; tick <= 4000; tick++)
+            using var allocationMeter = new CalibratedAllocationMeter(); allocationMeter.RequireSupported(); allocationMeter.Begin();
+
+            for (ulong tick = 3001; tick <= 13000; tick++)
             {
                 lastStatus = adapter.PrepareInput(tick, 1, -1, inputBuffer)
                     .Status;
             }
 
-            long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+            long allocated = allocationMeter.End();
             for (ulong tick = 4001; tick <= 5000; tick++)
             {
                 adapter.PrepareInput(tick, 1, -1, inputBuffer);
@@ -325,8 +328,7 @@ namespace AiNative.Client.Prediction.Tests
             uint connectionEpoch,
             int capacity = 16)
         {
-            ClientPredictionAdapter adapter = new ClientPredictionAdapter(
-                transport,
+            ClientPredictionAdapter adapter = new ClientPredictionAdapter(transport, new ProtobufBattleProtocolCodec(),
                 entityId,
                 capacity);
             byte[] baseline = ProtocolFrameFixtures.Snapshot(entityId, 10, 0, 0, 0);

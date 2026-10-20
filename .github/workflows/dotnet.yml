@@ -84,6 +84,9 @@ jobs:
           dotnet build tools/ProtocolCodegen/ProtocolCodegen.csproj --configuration Release --no-restore -p:GenerateProtocol=true
           git diff --exit-code -- shared/generated/csharp
 
+      - name: Verify packaged Unity protocol assemblies
+        run: python3 tools/ProtocolCodegen/package_unity.py --check
+
       - name: Build
         run: dotnet build AiNative.sln --configuration Release --no-restore
 

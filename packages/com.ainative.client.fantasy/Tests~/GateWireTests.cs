@@ -3,8 +3,10 @@ using System.Net.Security;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using AiNative.Client.Fantasy;
+using AiNative.Client.Protocol.Protobuf;
 using AiNative.Protocol.Backend.V1;
 using Google.Protobuf;
+using AiNative.Protocol.Transport.V1;
 using NUnit.Framework;
 
 namespace AiNative.Client.Gate.Tests;
@@ -12,13 +14,85 @@ namespace AiNative.Client.Gate.Tests;
 public sealed class GateWireTests
 {
     [Test]
+    public void Generated_business_requests_preserve_server_contracts()
+    {
+        Assert.That(AccountRequest.Parser.ParseFrom(GateProtocolCodec.Account("user", "password")).Password, Is.EqualTo("password"));
+        var party = PartyCommand.Parser.ParseFrom(GateProtocolCodec.PartyRequest("party", "target", true, 42));
+        Assert.That((party.PartyId, party.TargetPlayerId, party.Ready, party.ExpectedVersion), Is.EqualTo(("party", "target", true, 42UL)));
+        var queue = PartyQueueRequest.Parser.ParseFrom(GateProtocolCodec.QueueRequest("party", 42, "queue"));
+        Assert.That((queue.PartyId, queue.ExpectedVersion, queue.RequestId), Is.EqualTo(("party", 42UL, "queue")));
+        Assert.That(MatchQuery.Parser.ParseFrom(GateProtocolCodec.MatchRequest("queue")).RequestId, Is.EqualTo("queue"));
+        Assert.That(SettlementQuery.Parser.ParseFrom(GateProtocolCodec.SettlementRequest("match")).MatchId, Is.EqualTo("match"));
+    }
+
+    [Test]
+    public void Party_and_invitation_limits_are_preserved()
+    {
+        PartyState party = new() { PartyId = "party", Version = 9 };
+        for (int i = 0; i < 64; i++) party.Members.Add(new PartyMember { PlayerId = "p" + i, Ready = true });
+        Assert.That(GateWire.Party(party.ToByteArray()).Members.Length, Is.EqualTo(64));
+        party.Members.Add(new PartyMember());
+        Assert.Throws<InvalidDataException>(() => GateWire.Party(party.ToByteArray()));
+        PartyInvitations invitations = new();
+        for (int i = 0; i < 64; i++) invitations.Parties.Add(new PartyState());
+        Assert.That(GateProtocolCodec.Invitations(invitations.ToByteArray()).Length, Is.EqualTo(64));
+        invitations.Parties.Add(new PartyState());
+        Assert.Throws<InvalidDataException>(() => GateProtocolCodec.Invitations(invitations.ToByteArray()));
+    }
+
+    [Test]
+    public void Queue_status_maps_without_wrapping_and_reparsing_message()
+    {
+        var status = new MatchStatus { RequestId = "q", State = "Queued" };
+        var result = GateWire.Match(status.ToByteArray(), queueResponse: true);
+        Assert.That((result.RequestId, result.State, result.EntryTicket), Is.EqualTo(("q", "Queued", "")));
+    }
+
+    [Test]
+    public void Bounded_fields_are_enforced_in_nested_messages()
+    {
+        using MemoryStream fields = new();
+        using (CodedOutputStream output = new(fields, leaveOpen: true))
+        {
+            for (int i = 0; i < 1025; i++) { output.WriteTag(99, WireFormat.WireType.Varint); output.WriteUInt32(1); }
+        }
+        Assert.Throws<InvalidDataException>(() => GateWire.Profile(fields.ToArray()));
+        using MemoryStream party = new();
+        using (CodedOutputStream output = new(party, leaveOpen: true))
+        {
+            output.WriteTag(4, WireFormat.WireType.LengthDelimited); output.WriteBytes(ByteString.CopyFrom(fields.ToArray()));
+        }
+        Assert.Throws<InvalidDataException>(() => GateWire.Party(party.ToArray()));
+    }
+
+    [TestCase(new byte[] { 0x08, 0x01 })] // player_id must be a string
+    [TestCase(new byte[] { 0x22, 0x02, 0x08, 0x01 })] // nested member player_id must be a string
+    public void Wrong_known_field_wire_type_is_rejected(byte[] bytes)
+    {
+        Assert.Throws<InvalidDataException>(() => GateWire.Party(bytes));
+    }
+
+    [Test]
+    public void Body_limits_negative_statistics_and_envelope_overflow_are_rejected()
+    {
+        Assert.Throws<InvalidDataException>(() => GateProtocolCodec.Account(new string('x', GateWire.MaxBody), "password"));
+        Assert.Throws<InvalidDataException>(() => GateWire.Profile(new byte[GateWire.MaxBody + 1]));
+        Assert.Throws<InvalidDataException>(() => GateWire.Profile(new PlayerProfile { Played = -1 }.ToByteArray()));
+        using MemoryStream stream = new();
+        using (CodedOutputStream output = new(stream, leaveOpen: true))
+        {
+            output.WriteTag(1, WireFormat.WireType.Varint); output.WriteUInt64(1UL << 32);
+        }
+        Assert.Throws<InvalidDataException>(() => GateProtocolCodec.ResponseEnvelope(stream.ToArray()));
+    }
+    [Test]
     public void Request_uses_existing_control_contract_and_outer_RPC_opcode()
     {
         byte[] request = GateWire.Request("player.profile", new ProfileRequest { PlayerId = "p1" }.ToByteArray(), "test-session", "c1");
         ControlRequest decoded = ControlRequest.Parser.ParseFrom(request);
         Assert.That((decoded.Method, decoded.CorrelationId, decoded.Credential), Is.EqualTo(("player.profile", "c1", "test-session")));
         Assert.That(ProfileRequest.Parser.ParseFrom(decoded.Body).PlayerId, Is.EqualTo("p1"));
-        byte[] frame = GateWire.Frame(268435633u, 17, GateWire.Bytes(1, request));
+        byte[] frame = GateFrame.Encode(268435633u, 17, new GateRequestEnvelope { Payload = ByteString.CopyFrom(request) }.ToByteArray());
         Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(frame.AsSpan(4)), Is.EqualTo(268435633u));
         Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(frame.AsSpan(8)), Is.EqualTo(17u));
         Assert.That(BinaryPrimitives.ReadInt32LittleEndian(frame), Is.EqualTo(frame.Length - 20));
@@ -40,6 +114,7 @@ public sealed class GateWireTests
         Assert.That((parsed.Played, parsed.Won, parsed.Kills), Is.EqualTo((3L, 2L, 4L)));
     }
 
+    [TestCase(new byte[] { 0x0A, 0x01, 0xFF })]
     [TestCase(new byte[] { 0x0A, 0x7F, 0x01 })]
     [TestCase(new byte[] { 0x0F })]
     [TestCase(new byte[] { 0x08, 0x80 })]

@@ -1,13 +1,8 @@
+using AiNative.Client.Protocol;
 using System;
 using AiNative.Gameplay;
 namespace AiNative.Client.Prediction
 {
-    public readonly struct ArenaSnapshotPlayer
-    {
-        public ArenaSnapshotPlayer(uint entityId, ArenaPlayerState state) { EntityId = entityId; State = state; }
-        public uint EntityId { get; }
-        public ArenaPlayerState State { get; }
-    }
     public readonly struct ArenaRemotePose
     {
         public ArenaRemotePose(uint entityId, double x, double y, double z, double yaw, bool alive)
@@ -30,18 +25,18 @@ namespace AiNative.Client.Prediction
         public const int HistoryCapacity = 16;
         public const int DelayTicks = 6;
         public const int TeleportMillimetres = 5000;
-        private readonly uint[] _ids = new uint[ArenaClientProtocolV1.MaxSnapshotPlayers];
-        private readonly int[] _counts = new int[ArenaClientProtocolV1.MaxSnapshotPlayers];
-        private readonly int[] _heads = new int[ArenaClientProtocolV1.MaxSnapshotPlayers];
-        private readonly ArenaPlayerState[] _history = new ArenaPlayerState[ArenaClientProtocolV1.MaxSnapshotPlayers * HistoryCapacity];
+        private readonly uint[] _ids = new uint[BattlePacketBuffer.MaxArenaPlayers];
+        private readonly int[] _counts = new int[BattlePacketBuffer.MaxArenaPlayers];
+        private readonly int[] _heads = new int[BattlePacketBuffer.MaxArenaPlayers];
+        private readonly ArenaPlayerState[] _history = new ArenaPlayerState[BattlePacketBuffer.MaxArenaPlayers * HistoryCapacity];
         private long _latestTick = -1;
         private double _renderTick;
         private bool _rebuffering;
 
-        public bool ApplySnapshot(ReadOnlySpan<byte> frame, uint localEntityId)
+        public bool ApplySnapshot(ReadOnlySpan<ArenaSnapshotPlayer> players, long tick, uint localEntityId)
         {
-            Span<ArenaSnapshotPlayer> players = stackalloc ArenaSnapshotPlayer[ArenaClientProtocolV1.MaxSnapshotPlayers];
-            if (localEntityId == 0 || !ArenaClientProtocolV1.TryDecodePlayers(frame, players, out int count, out long tick) || tick <= _latestTick) return false;
+            int count = players.Length;
+            if (localEntityId == 0 || count > BattlePacketBuffer.MaxArenaPlayers || tick <= _latestTick) return false;
             // All validation completes before membership or history changes.
             for (int slot = 0; slot < _ids.Length; slot++)
             {
@@ -76,7 +71,7 @@ namespace AiNative.Client.Prediction
         /// <summary>Supply capacity for eight players. Invalid time is treated as zero; starvation holds latest authority.</summary>
         public int Advance(float deltaSeconds, Span<ArenaRemotePose> output)
         {
-            if (output.Length < ArenaClientProtocolV1.MaxSnapshotPlayers) throw new ArgumentException("Eight pose slots are required.", nameof(output));
+            if (output.Length < BattlePacketBuffer.MaxArenaPlayers) throw new ArgumentException("Eight pose slots are required.", nameof(output));
             if (_latestTick < 0) return 0;
             if (float.IsNaN(deltaSeconds) || float.IsInfinity(deltaSeconds) || deltaSeconds < 0) deltaSeconds = 0;
             // After starvation hold the monotonic cursor until the delayed window has rebuilt.

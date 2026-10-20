@@ -98,15 +98,15 @@ namespace AiNative.Client.Prediction.Tests
                 smoother.Advance(state, 1f / 60f);
             }
 
-            _ = GC.GetAllocatedBytesForCurrentThread();
-            long before = GC.GetAllocatedBytesForCurrentThread();
+
+            using var allocationMeter = new CalibratedAllocationMeter(); allocationMeter.RequireSupported(); allocationMeter.Begin();
             PresentationPosition last = default;
             for (int index = 0; index < 1000; index++)
             {
                 last = smoother.Advance(state, 1f / 60f);
             }
 
-            long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+            long allocated = allocationMeter.End();
             Assert.That(last.XMillimetres, Is.Zero);
             Assert.That(allocated, Is.Zero);
         }

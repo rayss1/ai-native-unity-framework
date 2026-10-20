@@ -262,6 +262,23 @@ namespace AiNative.Client.Editor
             }
 
             File.Copy(licenseSource, Path.Combine(outputDirectory, "Fantasy-LICENSE.txt"), true);
+
+            UnityEditor.PackageManager.PackageInfo protobufPackage =
+                UnityEditor.PackageManager.PackageInfo.FindForAssembly(
+                    typeof(AiNative.Client.Protocol.Protobuf.ProtobufBattleProtocolCodec).Assembly);
+            if (protobufPackage == null)
+                throw new InvalidOperationException("Protobuf package must resolve before distribution.");
+            string notices = Path.Combine(protobufPackage.resolvedPath, "ThirdPartyNotices~");
+            string protobufLicense = Path.Combine(notices, "Google.Protobuf.LICENSE");
+            string dependencyLock = Path.Combine(notices, "dependencies.lock.json");
+            if (!File.Exists(protobufLicense) || !File.Exists(dependencyLock))
+                throw new FileNotFoundException("Protobuf license and pinned dependency identity are required.");
+            string protobufLicenseText = File.ReadAllText(protobufLicense);
+            if (!protobufLicenseText.Contains("Redistribution and use in source and binary forms") ||
+                !protobufLicenseText.Contains("Google"))
+                throw new InvalidDataException("Protobuf BSD license must preserve upstream terms.");
+            File.Copy(protobufLicense, Path.Combine(outputDirectory, "Google.Protobuf-LICENSE.txt"), true);
+            File.Copy(dependencyLock, Path.Combine(outputDirectory, "PROTOCOL-DEPENDENCIES.json"), true);
         }
 
         private static string FindFantasyUnityLicense()

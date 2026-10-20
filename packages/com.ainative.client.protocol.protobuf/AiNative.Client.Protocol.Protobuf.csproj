@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <AssemblyName>AiNative.Client.Protocol.Protobuf</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Runtime/**/*.cs" />
+    <ProjectReference Include="../com.ainative.client.protocol/AiNative.Client.Protocol.csproj" />
+    <ProjectReference Include="../../shared/protocol/Protocol.Shared.csproj" />
+  </ItemGroup>
+</Project>

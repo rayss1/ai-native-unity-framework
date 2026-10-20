@@ -1,3 +1,5 @@
+using AiNative.Client.Protocol.Protobuf;
+using AiNative.Client.Protocol;
 using System;
 using AiNative.Protocol.V1;
 using AiNative.Realtime;
@@ -101,7 +103,7 @@ namespace AiNative.Client.Prediction.Tests
             uint entityId,
             uint connectionEpoch)
         {
-            ClientPredictionAdapter adapter = new ClientPredictionAdapter(transport, entityId, 16);
+            ClientPredictionAdapter adapter = new ClientPredictionAdapter(transport, new ProtobufBattleProtocolCodec(), entityId, 16);
             Snapshot snapshot = new Snapshot
             {
                 ProtocolMajor = 1,

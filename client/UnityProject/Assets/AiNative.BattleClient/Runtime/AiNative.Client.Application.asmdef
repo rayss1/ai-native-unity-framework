@@ -8,7 +8,9 @@
     "AiNative.Realtime",
     "UnityEngine.UI",
     "Unity.InputSystem",
-    "AiNative.Client.Character"
+    "AiNative.Client.Character",
+    "AiNative.Client.Protocol",
+    "AiNative.Client.Protocol.Protobuf"
   ],
   "autoReferenced": true
 }

@@ -4,6 +4,7 @@ using System.Net.Sockets;
 using AiNative.Client.Fantasy;
 using AiNative.Protocol.Backend.V1;
 using Google.Protobuf;
+using AiNative.Protocol.Transport.V1;
 using NUnit.Framework;
 
 namespace AiNative.Client.Gate.Tests;
@@ -24,11 +25,11 @@ public sealed class GateBackendSessionTests
                 {
                     byte[] header = new byte[20]; await stream.ReadExactlyAsync(header);
                     byte[] body = new byte[BinaryPrimitives.ReadInt32LittleEndian(header)]; await stream.ReadExactlyAsync(body);
-                    ControlRequest request = ControlRequest.Parser.ParseFrom(GateWire.Data(GateWire.Read(body), 1));
+                    ControlRequest request = ControlRequest.Parser.ParseFrom(GateRequestEnvelope.Parser.ParseFrom(body).Payload);
                     ControlResponse reply = new() { CorrelationId = request.CorrelationId };
                     if (i == 0) reply.Body = ByteString.CopyFrom(new LoginResult { PlayerId = "self", SessionToken = "rejected-session", ExpiresUnixSeconds = DateTimeOffset.UtcNow.AddMinutes(5).ToUnixTimeSeconds() }.ToByteArray());
                     else { Assert.That(request.Method, Is.EqualTo("player.profile")); Interlocked.Increment(ref profileRequests); reply.Error = "invalid_session"; }
-                    await stream.WriteAsync(GateWire.Frame(402653361u, BinaryPrimitives.ReadUInt32LittleEndian(header.AsSpan(8)), GateWire.Bytes(2, reply.ToByteArray())));
+                    await stream.WriteAsync(GateFrame.Encode(402653361u, BinaryPrimitives.ReadUInt32LittleEndian(header.AsSpan(8)), new GateResponseEnvelope { Payload = reply.ToByteString() }.ToByteArray()));
                 }
             }
             catch (EndOfStreamException) { }
@@ -57,7 +58,7 @@ public sealed class GateBackendSessionTests
             {
                 byte[] header = new byte[20]; await stream.ReadExactlyAsync(header);
                 byte[] body = new byte[BinaryPrimitives.ReadInt32LittleEndian(header)]; await stream.ReadExactlyAsync(body);
-                ControlRequest request = ControlRequest.Parser.ParseFrom(GateWire.Data(GateWire.Read(body), 1));
+                ControlRequest request = ControlRequest.Parser.ParseFrom(GateRequestEnvelope.Parser.ParseFrom(body).Payload);
                 byte[] reply;
                 if (i == 0)
                 {
@@ -79,7 +80,7 @@ public sealed class GateBackendSessionTests
                     Assert.That(SettlementQuery.Parser.ParseFrom(request.Body).MatchId, Is.EqualTo("match-self"));
                     reply = new SettlementReceipt { MatchId = "match-self", Confirmed = true, PayloadHash = "authority-hash" }.ToByteArray();
                 }
-                byte[] frame = GateWire.Frame(402653361u, BinaryPrimitives.ReadUInt32LittleEndian(header.AsSpan(8)), GateWire.Bytes(2, new ControlResponse { CorrelationId = request.CorrelationId, Body = ByteString.CopyFrom(reply) }.ToByteArray()));
+                byte[] frame = GateFrame.Encode(402653361u, BinaryPrimitives.ReadUInt32LittleEndian(header.AsSpan(8)), new GateResponseEnvelope { Payload = new ControlResponse { CorrelationId = request.CorrelationId, Body = ByteString.CopyFrom(reply) }.ToByteString() }.ToByteArray());
                 await stream.WriteAsync(frame);
             }
         });

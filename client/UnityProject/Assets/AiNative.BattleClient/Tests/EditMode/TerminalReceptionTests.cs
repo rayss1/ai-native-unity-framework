@@ -1,3 +1,5 @@
+using AiNative.Client.Protocol.Protobuf;
+using AiNative.Client.Protocol;
 using System;
 using System.Collections.Generic;
 using AiNative.Client.Prediction;
@@ -135,7 +137,7 @@ namespace AiNative.Client.Application.Tests
         }
         private static BattleClientSession ActiveSession(FakeTransport transport)
         {
-            var session = new BattleClientSession("127.0.0.1", 22000, "terminal-test", 4, new FakeConnector(transport));
+            var session = new BattleClientSession(new ProtobufBattleProtocolCodec(), "127.0.0.1", 22000, "terminal-test", 4, new FakeConnector(transport));
             session.Start(); session.Pump(0);
             transport.Enqueue(TestFrames.Login(42, 1), BattleClientProtocolV1.ControlChannel, 1);
             transport.Enqueue(TestFrames.Join(1, 7, 60), BattleClientProtocolV1.ControlChannel, 1);

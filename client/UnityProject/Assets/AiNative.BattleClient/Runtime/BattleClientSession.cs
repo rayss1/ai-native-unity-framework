@@ -1,3 +1,4 @@
+using AiNative.Client.Protocol;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -116,8 +117,15 @@ namespace AiNative.Client.Application
         private readonly ArenaRemotePresentation _remotePresentation = new ArenaRemotePresentation();
         private readonly PresentationCorrectionSmoother _presentation =
             new PresentationCorrectionSmoother();
-        private readonly byte[] _receiveBuffer = new byte[BattleClientProtocolV1.MaxFrameBytes];
-        private readonly byte[] _controlBuffer = new byte[BattleClientProtocolV1.MaxFrameBytes];
+        private readonly IBattleProtocolCodec _codec;
+        private readonly BattlePacketBuffer _decoded = new BattlePacketBuffer();
+        private readonly byte[] _receiveBuffer;
+        private readonly byte[] _controlBuffer;
+        // Transport owns this memory until completion, independently of ring clears on reconnect.
+        private readonly byte[] _inputSendBuffer;
+        private Task<SendResult> _pendingInputSend;
+        private int _pendingInputLength;
+        private ulong _inputGeneration, _pendingInputGeneration;
         private CancellationTokenSource _connectCancellation;
         private Task<BattleTransportConnection> _connectTask;
         private ClientPredictionAdapter _prediction;
@@ -169,11 +177,11 @@ namespace AiNative.Client.Application
             // The room owns the sequence. Preserve its watermark across same-allocation reconnects.
         }
 
-        private void ApplyCombatEvent(ReadOnlySpan<byte> frame, in ReceivedPacket packet)
+        private void ApplyCombatEvent(BattlePacketBuffer message, in ReceivedPacket packet)
         {
+            var item = message.CombatEvent;
             if (packet.ConnectionEpoch != _connectionEpoch ||
-                !packet.Channel.Equals(ArenaCombatEventProtocolV1.EventChannel) ||
-                !ArenaCombatEventProtocolV1.TryDecode(frame, out var item) ||
+                !packet.Channel.Equals(_codec.EventChannel) ||
                 (_hasCombatSequence && (unchecked((int)(item.Sequence - _lastCombatSequence)) <= 0 || item.Tick < _lastCombatTick))) return;
             _hasCombatSequence = true; _lastCombatSequence = item.Sequence; _lastCombatTick = item.Tick;
             if (_combatEventCount == CombatEventCapacity)
@@ -186,26 +194,29 @@ namespace AiNative.Client.Application
         }
 
         public BattleClientSession(
+            IBattleProtocolCodec codec,
             string host,
             int port,
             string clientBuild = "ws26",
             int inputRingCapacity = DefaultInputRingCapacity)
-            : this(host, port, clientBuild, inputRingCapacity, new FantasyBattleTransportConnector())
+            : this(codec, host, port, clientBuild, inputRingCapacity, new FantasyBattleTransportConnector())
         {
         }
 
         public BattleClientSession(
+            IBattleProtocolCodec codec,
             string host,
             int port,
             BattleAdmissionInfo admission,
             string clientBuild = "topology",
             int inputRingCapacity = DefaultInputRingCapacity)
-            : this(host, port, clientBuild, inputRingCapacity, new FantasyBattleTransportConnector(),
+            : this(codec, host, port, clientBuild, inputRingCapacity, new FantasyBattleTransportConnector(),
                 admission ?? throw new ArgumentNullException(nameof(admission)))
         {
         }
 
         internal BattleClientSession(
+            IBattleProtocolCodec codec,
             string host,
             int port,
             string clientBuild,
@@ -215,12 +226,16 @@ namespace AiNative.Client.Application
         {
             if (string.IsNullOrWhiteSpace(host)) throw new ArgumentException("Host is required.", nameof(host));
             if (port is < 1 or > 65535) throw new ArgumentOutOfRangeException(nameof(port));
+            _codec = codec ?? throw new ArgumentNullException(nameof(codec));
+            _receiveBuffer = new byte[codec.MaximumFrameBytes];
+            _controlBuffer = new byte[codec.MaximumFrameBytes];
+            _inputSendBuffer = new byte[codec.MaximumInputFrameBytes];
             _connector = connector ?? throw new ArgumentNullException(nameof(connector));
             _admission = admission;
             _host = host;
             _port = port;
             _clientBuild = clientBuild ?? string.Empty;
-            _inputRing = new InputFrameRing(inputRingCapacity, Math.Max(ClientPredictionAdapter.RequiredInputBufferBytes, ArenaClientPredictionAdapter.RequiredInputBufferBytes));
+            _inputRing = new InputFrameRing(inputRingCapacity, codec.MaximumInputFrameBytes);
             State = BattleClientState.Connecting;
         }
 
@@ -482,7 +497,7 @@ namespace AiNative.Client.Application
             ClearCombatEvents();
             _topologyReconnecting = true;
             // Unsent commands from the suspended owner must never cross the new authenticated connection.
-            _inputRing.Clear();
+            ClearInputRing();
             if (_prediction != null) _ = _prediction.DisposeAsync();
             if (_arenaPrediction != null) _ = _arenaPrediction.DisposeAsync();
             _prediction = null; _arenaPrediction = null;
@@ -546,10 +561,13 @@ namespace AiNative.Client.Application
 
             if (_arenaPrediction is not null) await _arenaPrediction.DisposeAsync();
             await _transportSlot.DisposeAsync();
+            _codec.Dispose();
+            if (_pendingInputSend != null) _ = ObserveAbandonedInputSend(_pendingInputSend);
         }
 
         private void BeginConnect()
         {
+            _codec.Reset();
             _connectCancellation?.Dispose();
             _connectCancellation = new CancellationTokenSource();
             _phaseElapsedSeconds = 0;
@@ -603,7 +621,7 @@ namespace AiNative.Client.Application
             {
                 _awaitingReconnectResponse = true;
                 _phaseElapsedSeconds = 0;
-                if (!BattleClientProtocolV1.TryEncodeReconnect(
+                if (!_codec.TryEncodeReconnect(
                         _sessionId,
                         _connectionEpoch,
                         _lastReceivedTick,
@@ -619,9 +637,9 @@ namespace AiNative.Client.Application
 
             State = BattleClientState.LoggingIn;
             _phaseElapsedSeconds = 0;
-            if (!BattleClientProtocolV1.TryEncodeLogin(
+            if (!_codec.TryEncodeLogin(
                     _clientBuild,
-                    _admission,
+                    new BattleAdmission(_admission?.RoomId ?? "", _admission?.EntryTicket ?? ""),
                     _controlBuffer,
                     out int loginBytes) ||
                 !TrySendControl(loginBytes))
@@ -636,7 +654,7 @@ namespace AiNative.Client.Application
             try
             {
                 ValueTask<SendResult> pending = _transportSlot.SendAsync(
-                    BattleClientProtocolV1.ControlChannel,
+                    _codec.ControlChannel,
                     _controlBuffer.AsMemory(0, frameBytes));
                 return pending.IsCompletedSuccessfully &&
                        pending.Result.Status == SendStatus.Accepted &&
@@ -668,59 +686,57 @@ namespace AiNative.Client.Application
                 }
 
                 ReadOnlySpan<byte> frame = _receiveBuffer.AsSpan(0, packet.WrittenBytes);
-                ushort messageId = BattleClientProtocolV1.ReadMessageId(frame);
+                if (_codec.TryDecode(frame, _decoded) != BattleDecodeStatus.Accepted) continue;
+                BattleMessageKind messageId = _decoded.Kind;
                 if (receiveOnly)
                 {
                     if (_prediction != null && (State is BattleClientState.Active or BattleClientState.Faulted) &&
-                        messageId == BattleClientProtocolV1.SnapshotMessageId)
-                        ApplySnapshot(frame, packet);
+                        messageId == BattleMessageKind.Snapshot)
+                        ApplySnapshot(_decoded, packet);
                     else if (_prediction != null && (State is BattleClientState.Active or BattleClientState.Faulted) &&
-                             messageId == ArenaCombatEventProtocolV1.MessageId)
-                        ApplyCombatEvent(frame, packet);
+                             messageId == BattleMessageKind.CombatEvent)
+                        ApplyCombatEvent(_decoded, packet);
                     continue;
                 }
                 if (State == BattleClientState.LoggingIn &&
-                    packet.Channel.Equals(BattleClientProtocolV1.ControlChannel) &&
-                    messageId == BattleClientProtocolV1.LoginResponseMessageId)
+                    packet.Channel.Equals(_codec.ControlChannel) &&
+                    messageId == BattleMessageKind.LoginResponse)
                 {
-                    HandleLogin(frame);
+                    HandleLogin(_decoded);
                 }
                 else if (State == BattleClientState.JoiningRoom &&
                          packet.ConnectionEpoch == _connectionEpoch &&
-                         packet.Channel.Equals(BattleClientProtocolV1.ControlChannel) &&
-                         messageId == BattleClientProtocolV1.JoinRoomResponseMessageId)
+                         packet.Channel.Equals(_codec.ControlChannel) &&
+                         messageId == BattleMessageKind.JoinResponse)
                 {
-                    HandleJoin(frame);
+                    HandleJoin(_decoded);
                 }
                 else if (State == BattleClientState.Reconnecting &&
-                         packet.Channel.Equals(BattleClientProtocolV1.ControlChannel) &&
-                         messageId == BattleClientProtocolV1.ReconnectResponseMessageId)
+                         packet.Channel.Equals(_codec.ControlChannel) &&
+                         messageId == BattleMessageKind.ReconnectResponse)
                 {
-                    HandleReconnect(frame, packet);
+                    HandleReconnect(_decoded, packet);
                 }
-                else if (State == BattleClientState.Active && messageId == ArenaCombatEventProtocolV1.MessageId)
+                else if (State == BattleClientState.Active && messageId == BattleMessageKind.CombatEvent)
                 {
-                    ApplyCombatEvent(frame, packet);
+                    ApplyCombatEvent(_decoded, packet);
                 }
                 else if (State == BattleClientState.Active &&
-                         messageId == BattleClientProtocolV1.SnapshotMessageId)
+                         messageId == BattleMessageKind.Snapshot)
                 {
-                    ApplySnapshot(frame, packet);
+                    ApplySnapshot(_decoded, packet);
                 }
             }
             // Budget exhaustion is not proof of an empty queue; preserve it for the next frame.
             return false;
         }
 
-        private void HandleLogin(ReadOnlySpan<byte> frame)
+        private void HandleLogin(BattlePacketBuffer message)
         {
-            if (!BattleClientProtocolV1.TryDecodeLoginResponse(
-                    frame,
-                    out ulong sessionId,
-                    out uint epoch,
-                    out string globalRoomId,
-                    out string bootEpoch,
-                    out ulong roomTick) ||
+            ulong sessionId = message.SessionId, roomTick = message.Tick;
+            uint epoch = message.ConnectionEpoch;
+            string globalRoomId = message.GlobalRoomId, bootEpoch = message.BootEpoch;
+            if (
                 (_admission is not null &&
                  (!string.Equals(globalRoomId, _admission.RoomId, StringComparison.Ordinal) ||
                   !string.Equals(bootEpoch, _admission.BootEpoch, StringComparison.Ordinal))) ||
@@ -736,7 +752,7 @@ namespace AiNative.Client.Application
             if (_admission is not null) _lastReceivedTick = roomTick;
             State = BattleClientState.JoiningRoom;
             _phaseElapsedSeconds = 0;
-            if (!BattleClientProtocolV1.TryEncodeJoin(
+            if (!_codec.TryEncodeJoin(
                     sessionId,
                     RoomId,
                     _controlBuffer,
@@ -748,13 +764,10 @@ namespace AiNative.Client.Application
             }
         }
 
-        private void HandleJoin(ReadOnlySpan<byte> frame)
+        private void HandleJoin(BattlePacketBuffer message)
         {
-            if (!BattleClientProtocolV1.TryDecodeJoinResponse(
-                    frame,
-                    out uint roomId,
-                    out uint entityId,
-                    out uint tickRate) ||
+            uint roomId = message.RoomId, entityId = message.EntityId, tickRate = message.TickRate;
+            if (
                 (_admission is null && roomId != RoomId) || tickRate != TickRate)
             {
                 Fail("Malformed or incompatible join-room response.");
@@ -764,38 +777,41 @@ namespace AiNative.Client.Application
             _remotePresentation.Reset();
             _entityId = entityId;
             _localRoomId = roomId;
-            _prediction = new ClientPredictionAdapter(_transportSlot, entityId);
+            _prediction = new ClientPredictionAdapter(_transportSlot, _codec, entityId);
             _topologyReconnecting = false;
             _reconnectAttempts = 0;
             State = BattleClientState.Active;
             _phaseElapsedSeconds = 0;
         }
 
-        private void HandleReconnect(ReadOnlySpan<byte> frame, in ReceivedPacket packet)
+        private void HandleReconnect(BattlePacketBuffer message, in ReceivedPacket packet)
         {
-            if (!BattleClientProtocolV1.TryDecodeReconnectResponse(
-                    frame,
-                    out uint epoch,
-                    out ulong resumeTick) ||
-                epoch <= _connectionEpoch ||
-                !_transportSlot.TryAdvanceConnectionEpoch(epoch))
+            uint epoch = message.ConnectionEpoch;
+            ulong resumeTick = message.Tick;
+            // Validate the whole snapshot before advancing connection state.
+            if (IsArenaFinished || epoch <= _connectionEpoch || !message.TryGetPlayer(_entityId, out var player) ||
+                resumeTick < _lastReceivedTick || message.Acknowledgement < _lastAcknowledgedSequence ||
+                (_arenaPrediction != null && !message.HasArenaData))
             {
-                ScheduleReconnectRetry("Malformed reconnect response or stale connection epoch.");
+                ScheduleReconnectRetry("Malformed reconnect response or stale snapshot.");
                 return;
             }
-
+            bool replaySafe = _arenaPrediction != null
+                ? _arenaPrediction.CanReplaySafely(player.State)
+                : player.State.Tick >= 0 && _prediction != null && _prediction.CanReplaySafely(ToKinematic(player.State));
+            if (!replaySafe)
+            {
+                ScheduleReconnectRetry("Reconnect snapshot exceeds safe prediction numeric ranges.");
+                return;
+            }
+            if (!_transportSlot.TryAdvanceConnectionEpoch(epoch))
+            { ScheduleReconnectRetry("Reconnect epoch was rejected."); return; }
             if (_arenaPrediction is not null)
             {
-                Span<byte> snapshot = stackalloc byte[ArenaClientProtocolV1.MaxDatagramBytes];
-                if (!ArenaClientProtocolV1.TryExtractReconnectSnapshot(frame, snapshot, out int length) ||
-                    !ArenaClientProtocolV1.TryDecodeSnapshot(snapshot.Slice(0, length), _entityId, out var arena) || !arena.HasArenaData || (ulong)arena.State.Tick < _lastReceivedTick || (ulong)arena.State.Tick != resumeTick)
-                {
-                    ScheduleReconnectRetry("Arena reconnect snapshot was rejected.");
-                    return;
-                }
-                ReceivedPacket arenaPacket = new ReceivedPacket(ArenaClientProtocolV1.SnapshotChannel, length, length, packet.Sequence, epoch);
+                ReceivedPacket arenaPacket = new ReceivedPacket(_codec.ControlChannel, packet.WrittenBytes, packet.RequiredBytes, packet.Sequence, epoch);
+                if (!ApplySnapshot(message, arenaPacket, reconnect: true))
+                { ScheduleReconnectRetry("Reconnect Arena snapshot was rejected."); return; }
                 _connectionEpoch = epoch;
-                ApplySnapshot(snapshot.Slice(0, length), arenaPacket);
                 _awaitingReconnectResponse = false;
                 _reconnectAttempts = 0;
                 State = BattleClientState.Active;
@@ -808,7 +824,7 @@ namespace AiNative.Client.Application
                 packet.RequiredBytes,
                 packet.Sequence,
                 epoch);
-            SnapshotApplyResult applied = _prediction.ApplyPacket(frame, rebound);
+            SnapshotApplyResult applied = _prediction.ApplyDecoded(message, rebound);
             if (applied.Status is not (SnapshotApplyStatus.Initialized or SnapshotApplyStatus.Reconciled))
             {
                 ScheduleReconnectRetry("Reconnect snapshot was rejected: " + applied.Status);
@@ -819,33 +835,31 @@ namespace AiNative.Client.Application
 
             _connectionEpoch = epoch;
             _lastReceivedTick = resumeTick;
+            _lastAcknowledgedSequence = message.Acknowledgement;
             _awaitingReconnectResponse = false;
             _reconnectAttempts = 0;
             State = BattleClientState.Active;
         }
 
-        private void ApplySnapshot(ReadOnlySpan<byte> frame, in ReceivedPacket packet)
+        private bool ApplySnapshot(BattlePacketBuffer message, in ReceivedPacket packet, bool reconnect = false)
         {
-            if (IsArenaFinished) return;
-            if (packet.ConnectionEpoch != _connectionEpoch || !packet.Channel.Equals(BattleClientProtocolV1.SnapshotChannel)) return;
-            if (_admission is not null &&
-                (!BattleClientProtocolV1.TryReadSnapshotMetadata(frame, out ulong admittedTick, out uint admittedAcknowledgement) ||
-                 admittedTick < _lastReceivedTick || admittedAcknowledgement < _lastAcknowledgedSequence)) return;
-            if (ArenaClientProtocolV1.TryDecodeSnapshot(frame, _entityId, out DecodedArenaSnapshot arena) && arena.HasArenaData)
+            if (IsArenaFinished) return false;
+            if ((!reconnect && packet.ConnectionEpoch != _connectionEpoch) ||
+                !packet.Channel.Equals(reconnect ? _codec.ControlChannel : _codec.SnapshotChannel)) return false;
+            if (message.Tick < _lastReceivedTick || message.Acknowledgement < _lastAcknowledgedSequence) return false;
+            if (!message.TryGetPlayer(_entityId, out var arena)) return false;
+            if (message.HasArenaData)
             {
-                Span<ArenaSnapshotPlayer> validatedPlayers = stackalloc ArenaSnapshotPlayer[ArenaClientProtocolV1.MaxSnapshotPlayers];
-                if (!ArenaClientProtocolV1.TryDecodePlayers(frame, validatedPlayers, out _, out _)) return;
-                if ((ulong)arena.State.Tick < _lastReceivedTick || arena.Acknowledgement < _lastAcknowledgedSequence) return;
-                _arenaPrediction ??= new ArenaClientPredictionAdapter(_transportSlot, _entityId);
-                ArenaSnapshotApplyResult result = _arenaPrediction.ApplySnapshot(frame, packet);
-                if (result.Status is not (ArenaSnapshotApplyStatus.Initialized or ArenaSnapshotApplyStatus.Reconciled)) return;
-                _remotePresentation.ApplySnapshot(frame, _entityId);
+                _arenaPrediction ??= new ArenaClientPredictionAdapter(_transportSlot, _codec, _entityId);
+                ArenaSnapshotApplyResult result = _arenaPrediction.ApplyDecoded(message, packet);
+                if (result.Status is not (ArenaSnapshotApplyStatus.Initialized or ArenaSnapshotApplyStatus.Reconciled)) return false;
+                _remotePresentation.ApplySnapshot(message.PlayerSpan, (long)message.Tick, _entityId);
                 bool finished = arena.Phase == ArenaMatchPhase.Finished;
                 if (finished)
                 {
                     // The terminal authority state supersedes every unacknowledged local command.
                     _arenaPrediction.Initialize(arena.State);
-                    _inputRing.Clear();
+                    ClearInputRing();
                 }
                 _arenaState = finished ? arena.State : result.State;
                 _arenaPhase = arena.Phase;
@@ -856,59 +870,92 @@ namespace AiNative.Client.Application
                 _lastAcknowledgedSequence = arena.Acknowledgement;
                 if (finished || result.Status == ArenaSnapshotApplyStatus.Initialized) _presentation.Initialize(ToKinematic(_arenaState));
                 else _presentation.ApplyReconciliation(result.Reconciliation);
-                return;
+                return true;
             }
-            if (_arenaPrediction is not null) return;
-            SnapshotApplyResult applied = _prediction.ApplyPacket(frame, packet);
+            if (_arenaPrediction is not null) return false;
+            SnapshotApplyResult applied = _prediction.ApplyDecoded(message, packet);
             if (applied.Status is SnapshotApplyStatus.Initialized or SnapshotApplyStatus.Reconciled)
             {
                 ApplyPresentationReconciliation(applied);
                 _connectionEpoch = applied.ConnectionEpoch;
-                if (BattleClientProtocolV1.TryReadSnapshotMetadata(
-                        frame,
-                        out ulong tick,
-                        out uint acknowledgement))
-                {
-                    _lastReceivedTick = tick;
-                    _lastAcknowledgedSequence = acknowledgement;
-                }
+                _lastReceivedTick = message.Tick;
+                _lastAcknowledgedSequence = message.Acknowledgement;
+                return true;
             }
+            return false;
+        }
+
+        private void ClearInputRing()
+        {
+            _inputRing.Clear();
+            _inputGeneration++;
+        }
+
+        private static async Task ObserveAbandonedInputSend(Task<SendResult> send)
+        {
+            try { await send; }
+            catch (Exception) { /* Transport disposal may cancel or fault its outstanding send. */ }
         }
 
         private void FlushInputRing()
         {
+            if (_pendingInputSend != null)
+            {
+                if (!_pendingInputSend.IsCompleted) return;
+                Task<SendResult> completed = _pendingInputSend;
+                _pendingInputSend = null;
+                try
+                {
+                    SendResult result = completed.GetAwaiter().GetResult();
+                    if (_pendingInputGeneration == _inputGeneration && !CompleteInputSend(result, _pendingInputLength)) return;
+                }
+                catch (Exception)
+                {
+                    if (_pendingInputGeneration == _inputGeneration) { _sendFailed = true; return; }
+                }
+            }
             int budget = _inputRing.Count;
             while (budget-- > 0 && _inputRing.TryPeek(out byte[] frame, out int length))
             {
-                ValueTask<SendResult> pending;
                 try
                 {
-                    pending = _transportSlot.SendAsync(
-                        BattleClientProtocolV1.InputChannel,
-                        frame.AsMemory(0, length));
+                    ulong generation = _inputGeneration;
+                    frame.AsSpan(0, length).CopyTo(_inputSendBuffer);
+                    ValueTask<SendResult> pending = _transportSlot.SendAsync(
+                        _codec.InputChannel, _inputSendBuffer.AsMemory(0, length));
+                    if (!pending.IsCompletedSuccessfully)
+                    {
+                        // Consume this ValueTask exactly once. No retry or buffer reuse before completion.
+                        _pendingInputLength = length;
+                        _pendingInputGeneration = generation;
+                        _pendingInputSend = pending.AsTask();
+                        return;
+                    }
+                    if (generation != _inputGeneration || !CompleteInputSend(pending.Result, length)) return;
                 }
                 catch (Exception)
                 {
                     _sendFailed = true;
                     return;
                 }
-
-                if (!pending.IsCompletedSuccessfully) return;
-                SendResult result = pending.Result;
-                if (result.Status == SendStatus.WouldBlock) return;
-                _inputRing.Pop();
-                if (result.Status != SendStatus.Accepted || result.AcceptedBytes != length)
-                {
-                    _droppedInputFrames++;
-                    if (result.Status is SendStatus.Closed or SendStatus.Faulted)
-                    {
-                        _sendFailed = true;
-                        return;
-                    }
-                }
             }
         }
 
+        private bool CompleteInputSend(SendResult result, int length)
+        {
+            if (result.Status == SendStatus.WouldBlock) return false;
+            _inputRing.Pop();
+            if (result.Status != SendStatus.Accepted || result.AcceptedBytes != length)
+            {
+                _droppedInputFrames++;
+                if (result.Status is SendStatus.Closed or SendStatus.Faulted)
+                {
+                    _sendFailed = true;
+                    return false;
+                }
+            }
+            return true;
+        }
         private void BeginReconnect()
         {
             if (IsArenaFinished) return;
@@ -925,6 +972,7 @@ namespace AiNative.Client.Application
             }
             State = BattleClientState.Reconnecting;
             _sendFailed = false;
+            ClearInputRing();
             _presentation.ResetState();
             _remotePresentation.Reset();
             ClearCombatEvents();

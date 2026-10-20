@@ -47,7 +47,7 @@ Rows are consumers and columns are dependencies.
 - Core abstractions reference Shared; optional implementations reference Core abstractions and their third-party SDK.
 - The Unity application Composition Root references selected implementation packages. Core never references them back.
 - An optional package missing from `Packages/manifest.json` and package manifests contributes no assembly reference.
-- `com.ainative.client.prediction` is the first concrete package under `packages`: it depends only on Shared Gameplay/Realtime contracts; generated Protobuf compatibility code is confined to its Unity-ignored `.NET` test source.
+- Per ADR-0019, `com.ainative.client.protocol` owns client codec contracts and depends only on Shared Gameplay/Realtime. Prediction depends on those contracts, never the Protobuf implementation. `com.ainative.client.protocol.protobuf` owns generated-message mapping and depends inward on the contract. The application selects and injects the implementation. Gate depends on the Protobuf facade; generated types do not escape its business API. Tests may reference implementation assemblies explicitly.
 - `com.ainative.client.fantasy` is the only Client package allowed to reference `Fantasy` namespaces. Its Runtime assembly depends on `AiNative.Realtime` and pinned `Fantasy.Unity`; Fantasy Session, generated registration, KCP, and socket types terminate there. The prediction package and Unity application Composition Root consume only project-owned contracts and application state.
 
 ### Server

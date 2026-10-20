@@ -1,0 +1,21 @@
+{
+  "name": "AiNative.Client.Protocol.Protobuf",
+  "rootNamespace": "AiNative.Client.Protocol.Protobuf",
+  "references": [
+    "AiNative.Client.Protocol",
+    "AiNative.Gameplay",
+    "AiNative.Realtime"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": true,
+  "precompiledReferences": [
+    "AiNative.Protocol.dll",
+    "Google.Protobuf.dll"
+  ],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": true
+}

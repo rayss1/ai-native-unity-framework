@@ -1,3 +1,5 @@
+using AiNative.Client.Protocol.Protobuf;
+using AiNative.Client.Protocol;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -486,7 +488,7 @@ namespace AiNative.Client.Application
                 if (_match.EntryTicket.Length > 0)
                 {
                     int split = _match.Address.LastIndexOf(':'); if (split < 1 || !int.TryParse(_match.Address.Substring(split + 1), out int port)) throw new InvalidDataException("invalid-battle-address");
-                    Battle = new BattleClientSession(_match.Address.Substring(0, split), port, new BattleAdmissionInfo(_match.RoomId, _match.BootEpoch, _match.EntryTicket, _match.NodeId, PlayerId));
+                    Battle = new BattleClientSession(new ProtobufBattleProtocolCodec(), _match.Address.Substring(0, split), port, new BattleAdmissionInfo(_match.RoomId, _match.BootEpoch, _match.EntryTicket, _match.NodeId, PlayerId));
                     Battle.Start(); State = "Battle";
                 }
                 return;

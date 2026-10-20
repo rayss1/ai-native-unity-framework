@@ -7,7 +7,7 @@ function Must-Reject([scriptblock]$Action,[string]$Message) {
     throw "Accepted invalid source/profile: $Message"
 }
 $current='bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
-foreach ($item in @(@('Baseline',95),@('Candidate',147),@('TerminalDelivery',164),@('Current',166),@('Development',241))) {
+foreach ($item in @(@('Baseline',95),@('Candidate',147),@('TerminalDelivery',164),@('Current',166),@('Development',294))) {
     $commit=if($item[0] -eq 'Baseline'){'c9098be7e2a44efc42182a87aca2551648993705'}else{$current}
     $profile=Assert-AiNativeEditModeProfile -Profile $item[0] -Commit $commit -ExpectedPassed $item[1]
     if($profile.EditModePassed -ne $item[1]){throw 'Profile total differs from named inventory'}
@@ -21,7 +21,8 @@ $root=Join-Path ([IO.Path]::GetFullPath("$PSScriptRoot/../../..")) ('artifacts/s
 New-Item -ItemType Directory -Path $root | Out-Null
 Set-Content -LiteralPath (Join-Path $root 'one.cs') 'original source'
 $sourcePaths=@('one.cs','server/vendor/Fantasy')
-function git { $global:LASTEXITCODE=0; return $sourcePaths }
+$deletedPaths=@()
+function git { $global:LASTEXITCODE=0; if ($args -contains '--deleted') { return $deletedPaths }; return $sourcePaths }
 $manifest=Get-AiNativeSourceManifest -Root $root
 [void](Assert-AiNativeSourceManifest -Root $root -ExpectedSha256 $manifest.sha256)
 Set-Content -LiteralPath (Join-Path $root 'one.cs') 'modified source'
@@ -30,6 +31,12 @@ Set-Content -LiteralPath (Join-Path $root 'one.cs') 'original source'
 Set-Content -LiteralPath (Join-Path $root 'two.cs') 'new source'
 $sourcePaths+= 'two.cs'
 Must-Reject { Assert-AiNativeSourceManifest -Root $root -ExpectedSha256 $manifest.sha256 } 'manifest mismatch'
+$sourcePaths=@('one.cs','removed.cs'); $deletedPaths=@('removed.cs')
+$withDeletion=Get-AiNativeSourceManifest -Root $root
+if (@($withDeletion.files | Where-Object { $_.path -eq 'removed.cs' -and $_.sha256 -eq 'deleted' }).Count -ne 1) { throw 'Tracked deletion not bound to source identity' }
+Set-Content -LiteralPath (Join-Path $root 'removed.cs') 'restored source'
+$deletedPaths=@()
+Must-Reject { Assert-AiNativeSourceManifest -Root $root -ExpectedSha256 $withDeletion.sha256 } 'manifest mismatch'
 $sourcePaths=@('missing.cs')
 Must-Reject { Get-AiNativeSourceManifest -Root $root } 'file is missing'
 $sourcePaths=@('../outside.cs')

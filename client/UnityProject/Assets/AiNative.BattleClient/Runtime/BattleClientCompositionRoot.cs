@@ -1,3 +1,5 @@
+using AiNative.Client.Protocol.Protobuf;
+using AiNative.Client.Protocol;
 using System;
 using System.IO;
 using AiNative.Gameplay;
@@ -43,7 +45,7 @@ namespace AiNative.Client.Application
         private Light _arenaLight;
         private GUIStyle _hudStyle;
         private ArenaRemoteVisualPool _remoteVisuals;
-        private readonly ArenaRemotePose[] _remotePoses = new ArenaRemotePose[ArenaClientProtocolV1.MaxSnapshotPlayers];
+        private readonly ArenaRemotePose[] _remotePoses = new ArenaRemotePose[BattlePacketBuffer.MaxArenaPlayers];
 
         public BattleClientSession Session => _topology != null ? _topology.Battle : _session;
 
@@ -83,7 +85,7 @@ namespace AiNative.Client.Application
             }
 #endif
             _launch = BattleClientLaunchOptions.Parse(arguments);
-            _session = new BattleClientSession(
+            _session = new BattleClientSession(new ProtobufBattleProtocolCodec(),
                 _launch.Host,
                 _launch.Port,
                 global::UnityEngine.Application.version);

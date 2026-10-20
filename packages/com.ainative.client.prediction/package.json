@@ -6,7 +6,8 @@
   "unity": "6000.3",
   "dependencies": {
     "com.ainative.gameplay": "0.1.0",
-    "com.ainative.realtime": "0.1.0"
+    "com.ainative.realtime": "0.1.0",
+    "com.ainative.client.protocol": "0.1.0"
   },
   "author": {
     "name": "AI-Native Unity Framework"

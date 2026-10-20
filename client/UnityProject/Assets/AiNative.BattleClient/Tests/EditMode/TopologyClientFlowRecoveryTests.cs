@@ -1,3 +1,5 @@
+using AiNative.Client.Protocol.Protobuf;
+using AiNative.Client.Protocol;
 using System;
 using System.Buffers.Binary;
 using System.Collections.Concurrent;
@@ -104,7 +106,7 @@ namespace AiNative.Client.Application.Tests
             var match = new GateMatch(); SetProperty(match, "MatchId", "original-match"); SetProperty(match, "RoomId", "original-room");
             SetProperty(match, "BootEpoch", "original-boot"); SetProperty(match, "NodeId", "original-node");
             SetField(flow, "_match", match); SetField(flow, "_requestId", "original-request");
-            SetProperty(flow, "Battle", new BattleClientSession("127.0.0.1", 22000, new BattleAdmissionInfo("original-room", "original-boot", "ticket", "original-node", "original-player")));
+            SetProperty(flow, "Battle", new BattleClientSession(new ProtobufBattleProtocolCodec(), "127.0.0.1", 22000, new BattleAdmissionInfo("original-room", "original-boot", "ticket", "original-node", "original-player")));
             SetProperty(flow, "State", "Battle");
             return flow;
         }
@@ -169,7 +171,7 @@ namespace AiNative.Client.Application.Tests
             {
                 var flow = CreateFlow(owner, gate.Options, backend, true);
                 var transport = new FakeTransport();
-                var battle = new BattleClientSession("127.0.0.1", 22000, "fixture", 4, new FakeConnector(transport), new BattleAdmissionInfo("original-room", "original-boot", "ticket", "original-node", "original-player"));
+                var battle = new BattleClientSession(new ProtobufBattleProtocolCodec(), "127.0.0.1", 22000, "fixture", 4, new FakeConnector(transport), new BattleAdmissionInfo("original-room", "original-boot", "ticket", "original-node", "original-player"));
                 SetProperty(flow, "Battle", battle); SetProperty(flow, "Reconnected", true);
                 battle.Start(); battle.Pump(0);
                 transport.Enqueue(TestFrames.Login(42, 1, "original-room", "original-boot"), BattleClientProtocolV1.ControlChannel, 1);
@@ -333,7 +335,7 @@ namespace AiNative.Client.Application.Tests
 
         private static BattleClientSession ActiveBattle(FakeTransport transport, FakeConnector connector)
         {
-            var battle = new BattleClientSession("127.0.0.1", 22000, "fixture", 4, connector, new BattleAdmissionInfo("original-room", "original-boot", "ticket", "original-node", "original-player"));
+            var battle = new BattleClientSession(new ProtobufBattleProtocolCodec(), "127.0.0.1", 22000, "fixture", 4, connector, new BattleAdmissionInfo("original-room", "original-boot", "ticket", "original-node", "original-player"));
             battle.Start(); battle.Pump(0);
             transport.Enqueue(TestFrames.Login(42, 1, "original-room", "original-boot"), BattleClientProtocolV1.ControlChannel, 1);
             transport.Enqueue(TestFrames.Join(19, 7, 60), BattleClientProtocolV1.ControlChannel, 1);

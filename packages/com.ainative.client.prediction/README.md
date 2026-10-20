@@ -2,8 +2,7 @@
 
 This Unity-ready package connects the project-owned `IRealtimeTransport` and
 `ClientPredictionHistory` contracts without exposing Unity, Fantasy, or generated
-Protobuf types. It targets protocol v1 InputCommand, Snapshot, and
-ReconnectResponse frames.
+Protobuf types. Its injected `IBattleProtocolCodec` handles input, snapshot and reconnect wire messages. See [client API migration](../../Docs/Architecture/client-protocol-codecs.md).
 
 Create the adapter after JoinRoom supplies the local entity ID. Route complete
 Snapshot-channel and ReconnectResponse control frames into `ApplyPacket`. Call
@@ -27,9 +26,7 @@ drops. `ResetDiagnostics` starts a new measurement window without resetting the
 session, transport, connection epoch, input sequence, or prediction history.
 Histogram storage is allocated with the adapter and does not grow per Snapshot.
 
-Runtime code contains no Google.Protobuf dependency. The .NET-only compatibility
-tests compare emitted and accepted bytes with the tracked generated Protobuf
-types; Unity EditMode tests use fixed protocol fixtures.
+Runtime code contains no Google.Protobuf dependency. Explicit codec injection selects the wire implementation. Tests compare generated Protobuf bytes and exercise an alternate test format, including warmed prediction and replay allocation checks.
 
 ## Arena input sending and migration
 
@@ -52,7 +49,7 @@ regression test makes the old broken behavior visible.
 
 ## Arena remote players
 
-`ArenaRemotePresentation.ApplySnapshot` decodes the existing full snapshot after
+`ArenaRemotePresentation.ApplySnapshot` consumes validated player values and a Tick after
 the application checks admission and connection epoch. It excludes the local
 entity, rejects stale/invalid frames, and maintains at most eight entities with
 sixteen historical samples each. Call `Advance` once per rendered frame with an

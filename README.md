@@ -3,7 +3,9 @@ An AI-native full-stack Unity game development framework for autonomous AI agent
 
 See [current progress and remaining gates](Docs/Architecture/current-status.md) for the single current status entry. Dated reports retain their original source/platform limits.
 
-The [2026-10-15 P0 validation](Docs/Architecture/p0-validation-2026-10-15.md) repairs local SDK/submodule alignment, portable tool tests, Unity CI checkout and Android build-host path checks. The current source uses the explicit `Development` validation profile (198 EditMode cases); `Current` retains the historical 166-case inventory. This is macOS worktree evidence, not release qualification.
+The [client protocol migration](Docs/Architecture/client-protocol-codecs.md) introduces explicit codec injection, generated Protobuf Gate/battle messages and one decoded snapshot for prediction/presentation. See its [current validation record](Docs/Architecture/client-protocol-validation-2026-10-20.md) for allocation measurements and platform limits.
+
+The [2026-10-15 P0 validation](Docs/Architecture/p0-validation-2026-10-15.md) repairs local SDK/submodule alignment, portable tool tests, Unity CI checkout and Android build-host path checks. That historical source used 198 EditMode cases; the current `Development` inventory is maintained in the validation tools, while `Current` retains the historical 166-case inventory. This is macOS worktree evidence, not release qualification.
 
 The [2026-10-08 development validation](Docs/Architecture/validation-2026-10-08.json) passed 532 .NET tests (including real PostgreSQL), 166 Unity EditMode tests, three legacy KCP PlayMode tests, and Windows x64 Mono Player build/reconnect smoke. It binds an uncommitted source snapshot; release and other-platform gates remain separate.
 

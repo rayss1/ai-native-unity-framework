@@ -1,3 +1,4 @@
+using AiNative.Client.Protocol;
 using System;
 using System.Buffers.Binary;
 using AiNative.Gameplay;
@@ -5,32 +6,6 @@ using AiNative.Realtime;
 
 namespace AiNative.Client.Prediction
 {
-    public readonly struct DecodedArenaSnapshot
-    {
-        public DecodedArenaSnapshot(
-            ArenaPlayerState state,
-            ArenaMatchPhase phase,
-            uint remainingTicks,
-            uint leaderEntityId,
-            uint acknowledgement,
-            bool hasArenaData = true)
-        {
-            State = state;
-            Phase = phase;
-            RemainingTicks = remainingTicks;
-            LeaderEntityId = leaderEntityId;
-            Acknowledgement = acknowledgement;
-            HasArenaData = hasArenaData;
-        }
-
-        public bool HasArenaData { get; }
-        public ArenaPlayerState State { get; }
-        public ArenaMatchPhase Phase { get; }
-        public uint RemainingTicks { get; }
-        public uint LeaderEntityId { get; }
-        public uint Acknowledgement { get; }
-    }
-
     public static class ArenaClientProtocolV1
     {
         public const int HeaderBytes = sizeof(ushort);

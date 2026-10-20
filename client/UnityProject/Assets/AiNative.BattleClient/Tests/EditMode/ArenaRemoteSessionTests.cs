@@ -1,3 +1,5 @@
+using AiNative.Client.Protocol.Protobuf;
+using AiNative.Client.Protocol;
 using System;
 using System.Collections.Generic;
 using AiNative.Client.Prediction;
@@ -11,7 +13,7 @@ namespace AiNative.Client.Application.Tests
         public void RemoteMembershipRejectsStaleEpochAndMalformedSnapshotsAndClearsOnReconnect()
         {
             var initial = new FakeTransport(); var replacement = new FakeTransport();
-            var session = new BattleClientSession("127.0.0.1", 22000, "test", 4, new FakeConnector(initial, replacement),
+            var session = new BattleClientSession(new ProtobufBattleProtocolCodec(), "127.0.0.1", 22000, "test", 4, new FakeConnector(initial, replacement),
                 new BattleAdmissionInfo("r", "e", "t"));
             var poses = new ArenaRemotePose[8];
             try
@@ -49,7 +51,7 @@ namespace AiNative.Client.Application.Tests
         public void LegacySnapshotWithMoreThanEightPlayersStillInitializesLocalPrediction()
         {
             var transport = new FakeTransport();
-            var session = new BattleClientSession("127.0.0.1", 22000, "test", 4, new FakeConnector(transport));
+            var session = new BattleClientSession(new ProtobufBattleProtocolCodec(), "127.0.0.1", 22000, "test", 4, new FakeConnector(transport));
             try
             {
                 session.Start(); session.Pump(0);

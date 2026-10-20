@@ -10,6 +10,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Runtime/**/*.cs" />
+    <ProjectReference Include="../com.ainative.client.protocol/AiNative.Client.Protocol.csproj" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../shared/gameplay/Gameplay.Shared.csproj" />

@@ -1,3 +1,4 @@
+using AiNative.Client.Protocol;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -13,6 +14,7 @@ namespace AiNative.Client.Prediction
         BufferTooSmall = 2,
         SequenceExhausted = 3,
         Disposed = 4,
+        ArithmeticOverflow = 5,
     }
 
     public readonly struct ArenaPredictionPrepareResult
@@ -69,13 +71,17 @@ namespace AiNative.Client.Prediction
     /// </summary>
     public sealed class ArenaClientPredictionAdapter : IAsyncDisposable
     {
-        public const int RequiredInputBufferBytes = ArenaClientProtocolV1.MaxInputFrameBytes;
+        public int RequiredInputBufferBytes => _codec.MaximumInputFrameBytes;
+        private readonly IBattleProtocolCodec _codec;
+        private readonly BattlePacketBuffer _decoded = new BattlePacketBuffer();
 
         private readonly IRealtimeTransport _transport;
         private readonly ArenaPredictionHistory _history;
         private readonly bool _ownsTransport;
         private readonly uint _entityId;
         private ulong _authoritativeTick;
+        private uint _authoritativeAcknowledgement;
+        private uint _connectionEpoch;
         private uint _nextSequence = 1;
         private bool _initialized;
         private bool _disposed;
@@ -85,11 +91,13 @@ namespace AiNative.Client.Prediction
 
         public ArenaClientPredictionAdapter(
             IRealtimeTransport transport,
+            IBattleProtocolCodec codec,
             uint entityId,
             int historyCapacity = 256,
             bool ownsTransport = false)
         {
             _transport = transport ?? throw new ArgumentNullException(nameof(transport));
+            _codec = codec ?? throw new ArgumentNullException(nameof(codec));
             if (entityId == 0) throw new ArgumentOutOfRangeException(nameof(entityId));
             _entityId = entityId;
             _history = new ArenaPredictionHistory(historyCapacity);
@@ -108,6 +116,7 @@ namespace AiNative.Client.Prediction
             if (_disposed) return;
             _history.Initialize(state);
             _authoritativeTick = checked((ulong)state.Tick);
+            _authoritativeAcknowledgement = state.LastProcessedInputSequence;
             _initialized = true;
             EnsureSequenceAfter(state.LastProcessedInputSequence);
         }
@@ -129,15 +138,15 @@ namespace AiNative.Client.Prediction
             if (destination.Length < RequiredInputBufferBytes) return new ArenaPredictionPrepareResult(ArenaPredictionPrepareStatus.BufferTooSmall, 0, default, false);
             if (_nextSequence == 0) return new ArenaPredictionPrepareResult(ArenaPredictionPrepareStatus.SequenceExhausted, 0, default, false);
 
+            if (!CanReplaySafely(_history.Current))
+                return new ArenaPredictionPrepareResult(ArenaPredictionPrepareStatus.ArithmeticOverflow, 0, default, false);
             uint sequence = _nextSequence;
             clientTick = checked(_authoritativeTick + 1);
             ArenaInput input = new(sequence, clientTick, moveXMilli, moveZMilli, lookYawMilli, lookPitchMilli, buttons, weapon);
+            if (!_codec.TryEncodeInput(input, destination, out int writtenBytes))
+                return new ArenaPredictionPrepareResult(ArenaPredictionPrepareStatus.BufferTooSmall, 0, default, false);
             ArenaPlayerState predicted = _history.Predict(input, out bool droppedOldest);
             _nextSequence = sequence == uint.MaxValue ? 0 : sequence + 1;
-            if (!ArenaClientProtocolV1.TryEncodeInput(input, destination, out int writtenBytes))
-            {
-                throw new InvalidOperationException("The arena protocol input buffer contract was violated.");
-            }
 
             return new ArenaPredictionPrepareResult(ArenaPredictionPrepareStatus.Prepared, writtenBytes, predicted, droppedOldest);
         }
@@ -159,7 +168,7 @@ namespace AiNative.Client.Prediction
                 return new ValueTask<SendResult>(new SendResult(SendStatus.PayloadTooLarge, 0));
             if (cancellationToken.IsCancellationRequested)
                 return new ValueTask<SendResult>(Task.FromCanceled<SendResult>(cancellationToken));
-            return _transport.SendAsync(ArenaClientProtocolV1.InputChannel, frame, cancellationToken);
+            return _transport.SendAsync(_codec.InputChannel, frame, cancellationToken);
         }
 
         public ArenaSnapshotApplyResult ApplySnapshot(ReadOnlySpan<byte> frame, in ReceivedPacket packet)
@@ -170,18 +179,42 @@ namespace AiNative.Client.Prediction
                 return new ArenaSnapshotApplyResult(ArenaSnapshotApplyStatus.Malformed, default, default);
             }
 
-            if (!ArenaClientProtocolV1.TryDecodeSnapshot(frame.Slice(0, packet.WrittenBytes), _entityId, out DecodedArenaSnapshot decoded))
-            {
-                return new ArenaSnapshotApplyResult(ArenaSnapshotApplyStatus.Malformed, default, default);
-            }
-
-            if (!packet.Channel.Equals(ArenaClientProtocolV1.SnapshotChannel))
-            {
+            if (!packet.Channel.Equals(_codec.SnapshotChannel) && !packet.Channel.Equals(_codec.ControlChannel))
                 return new ArenaSnapshotApplyResult(ArenaSnapshotApplyStatus.WrongChannel, default, default);
-            }
+            if (_codec.TryDecode(frame.Slice(0, packet.WrittenBytes), _decoded) != BattleDecodeStatus.Accepted)
+                return new ArenaSnapshotApplyResult(ArenaSnapshotApplyStatus.Malformed, default, default);
+            return ApplyDecoded(_decoded, packet);
+        }
 
+        public ArenaSnapshotApplyResult ApplyDecoded(BattlePacketBuffer message, in ReceivedPacket packet)
+        {
+            if (_disposed) return new ArenaSnapshotApplyResult(ArenaSnapshotApplyStatus.Disposed, default, default);
+            bool reconnect = message.Kind == BattleMessageKind.ReconnectResponse;
+            if (!packet.Channel.Equals(reconnect ? _codec.ControlChannel : _codec.SnapshotChannel))
+                return new ArenaSnapshotApplyResult(ArenaSnapshotApplyStatus.WrongChannel, default, default);
+            uint epoch = reconnect ? message.ConnectionEpoch : packet.ConnectionEpoch;
+            if (epoch == 0 || epoch < _connectionEpoch || (reconnect && epoch != packet.ConnectionEpoch))
+                return new ArenaSnapshotApplyResult(ArenaSnapshotApplyStatus.Malformed, default, default);
+            if (message.Kind != BattleMessageKind.Snapshot && message.Kind != BattleMessageKind.ReconnectResponse)
+                return new ArenaSnapshotApplyResult(ArenaSnapshotApplyStatus.Malformed, default, default);
+            if (!message.TryGetPlayer(_entityId, out DecodedArenaSnapshot decoded))
+                return new ArenaSnapshotApplyResult(ArenaSnapshotApplyStatus.PlayerMissing, default, default);
+            if (decoded.State.Tick < 0) return new ArenaSnapshotApplyResult(ArenaSnapshotApplyStatus.Malformed, default, default);
+            if (_initialized && ((ulong)decoded.State.Tick < _authoritativeTick || decoded.Acknowledgement < _authoritativeAcknowledgement))
+            {
+                var current = _history.Current;
+                var kinematic = new KinematicState(current.Tick, current.LastProcessedInputSequence, current.PositionXMillimetres, current.PositionZMillimetres);
+                var stale = new ReconciliationResult(ReconciliationStatus.StaleSnapshotIgnored, kinematic, kinematic, 0, 0, 0, 0);
+                return new ArenaSnapshotApplyResult(ArenaSnapshotApplyStatus.Reconciled, current, stale);
+            }
+            // Shared history commits its ring before replay. Reject only states whose
+            // numeric ranges cannot safely accommodate pending replay and a next step.
+            if (!CanReplaySafely(decoded.State))
+                return new ArenaSnapshotApplyResult(ArenaSnapshotApplyStatus.Malformed, default, default);
             _acceptedSnapshots++;
-            _authoritativeTick = Math.Max(_authoritativeTick, checked((ulong)decoded.State.Tick));
+            _authoritativeTick = checked((ulong)decoded.State.Tick);
+            _authoritativeAcknowledgement = decoded.Acknowledgement;
+            _connectionEpoch = epoch;
             if (!_initialized)
             {
                 _history.Initialize(decoded.State);
@@ -197,6 +230,35 @@ namespace AiNative.Client.Prediction
             return new ArenaSnapshotApplyResult(ArenaSnapshotApplyStatus.Reconciled, _history.Current, reconciliation);
         }
 
+        /// <summary>Pure numeric admission check, also used before committing a transport epoch.
+        /// Call and apply on the owner thread without preparing intervening inputs.</summary>
+        public bool CanReplaySafely(in ArenaPlayerState state)
+        {
+            if (_disposed) return false;
+            long steps = (_initialized ? _history.Count : 0) + 1L;
+            if (state.Tick < 0 || state.Tick > long.MaxValue - steps) return false;
+            long horizontalSpeed = Math.Max(ArenaMovement.MaximumGroundSpeedMillimetresPerSecond,
+                Math.Max(Math.Abs((long)state.VelocityXMillimetresPerSecond), Math.Abs((long)state.VelocityZMillimetresPerSecond)));
+            // Accelerate subtracts the current velocity from a bounded target.
+            if (horizontalSpeed > int.MaxValue - ArenaMovement.MaximumGroundSpeedMillimetresPerSecond) return false;
+            long verticalSpeed = Math.Max(Math.Abs((long)state.VelocityYMillimetresPerSecond), ArenaMovement.JumpSpeedMillimetresPerSecond) +
+                steps * (ArenaMovement.GravityMillimetresPerSecondSquared / ArenaMovement.TickRate);
+            if (verticalSpeed > int.MaxValue) return false;
+            long horizontalMargin = steps * (horizontalSpeed / ArenaMovement.TickRate + 1) +
+                ArenaTrainingMap.HalfExtent + ArenaTrainingMap.PlayerRadius;
+            long verticalMargin = steps * (verticalSpeed / ArenaMovement.TickRate + 1) + ArenaTrainingMap.PlayerHeight;
+            long x = state.PositionXMillimetres, y = state.PositionYMillimetres, z = state.PositionZMillimetres;
+            if (x < int.MinValue + horizontalMargin || x > int.MaxValue - horizontalMargin ||
+                z < int.MinValue + horizontalMargin || z > int.MaxValue - horizontalMargin ||
+                y < int.MinValue + verticalMargin || y > int.MaxValue - verticalMargin) return false;
+            if (!_initialized) return true;
+            var current = _history.Current;
+            return Math.Abs(x - current.PositionXMillimetres) + horizontalMargin <= int.MaxValue &&
+                Math.Abs(z - current.PositionZMillimetres) + horizontalMargin <= int.MaxValue &&
+                Math.Abs((long)current.PositionXMillimetres) + ArenaTrainingMap.HalfExtent < int.MaxValue &&
+                Math.Abs((long)current.PositionZMillimetres) + ArenaTrainingMap.HalfExtent < int.MaxValue;
+        }
+
         public ValueTask DisposeAsync()
         {
             if (_disposed) return default;
@@ -206,6 +268,7 @@ namespace AiNative.Client.Prediction
 
         private void EnsureSequenceAfter(uint acknowledgement)
         {
+            if (_nextSequence == 0) return; // Exhaustion is terminal for this session.
             if (acknowledgement == uint.MaxValue)
             {
                 _nextSequence = 0;
@@ -213,7 +276,7 @@ namespace AiNative.Client.Prediction
             }
 
             uint candidate = acknowledgement + 1;
-            if (_nextSequence == 0 || candidate > _nextSequence) _nextSequence = candidate;
+            if (candidate > _nextSequence) _nextSequence = candidate;
         }
     }
 }

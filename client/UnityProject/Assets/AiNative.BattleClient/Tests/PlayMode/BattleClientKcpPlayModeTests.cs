@@ -1,3 +1,5 @@
+using AiNative.Client.Protocol.Protobuf;
+using AiNative.Client.Protocol;
 using System;
 using System.Collections;
 using NUnit.Framework;
@@ -181,7 +183,7 @@ namespace AiNative.Client.Application.PlayModeTests
                 Assert.Fail("AINATIVE_WS26_PORT must be a valid integer port.");
             }
 
-            return new BattleClientSession(host, port, "ws26-playmode");
+            return new BattleClientSession(new ProtobufBattleProtocolCodec(), host, port, "ws26-playmode");
         }
 
         private static IEnumerator Dispose(BattleClientSession session)

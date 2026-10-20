@@ -1,3 +1,4 @@
+using AiNative.Client.Protocol;
 using System;
 using System.Collections.Generic;
 using AiNative.Gameplay;

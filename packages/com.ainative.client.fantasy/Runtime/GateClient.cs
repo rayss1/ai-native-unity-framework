@@ -1,4 +1,5 @@
 using System;
+using AiNative.Client.Protocol.Protobuf;
 using System.Buffers.Binary;
 using System.IO;
 using System.Net.Security;
@@ -19,6 +20,7 @@ namespace AiNative.Client.Fantasy
         private int _pending;
         private int _closed;
         private uint _rpc;
+        private readonly byte[] _header = new byte[20];
         public bool IsConnected => Volatile.Read(ref _closed) == 0;
         private FantasyGateClient(TcpClient socket, Stream stream, int timeout) { _socket = socket; _stream = stream; _timeout = timeout; }
 
@@ -62,9 +64,9 @@ namespace AiNative.Client.Fantasy
                 using var cancellation = deadline.Token.Register(Dispose);
                 uint rpc = ++_rpc; if (rpc == 0) rpc = ++_rpc;
                 string correlation = Guid.NewGuid().ToString("N");
-                byte[] request = GateWire.Frame(268435633u, rpc, GateWire.Bytes(1, GateWire.Request(method, payload, credential, correlation)));
+                byte[] request = GateFrame.Encode(268435633u, rpc, GateProtocolCodec.Envelope(GateWire.Request(method, payload, credential, correlation)));
                 await _stream.WriteAsync(request, 0, request.Length, deadline.Token).ConfigureAwait(false);
-                byte[] header = new byte[20];
+                byte[] header = _header;
                 for (int skipped = 0; skipped <= 64; ++skipped)
                 {
                     await ReadExactlyAsync(header, deadline.Token).ConfigureAwait(false);
@@ -73,8 +75,8 @@ namespace AiNative.Client.Fantasy
                     byte[] body = new byte[Math.Max(length, 0)]; await ReadExactlyAsync(body, deadline.Token).ConfigureAwait(false);
                     if (opcode == 134217905u) continue; // Notifications are advisory; application queries authoritative state.
                     if (opcode != 402653361u || receivedRpc != rpc) throw new InvalidDataException("gate-response-identity");
-                    var envelope = GateWire.Read(body); if (GateWire.Value(envelope, 1) != 0) throw new GateCallException("unavailable");
-                    return GateWire.Response(GateWire.Data(envelope, 2), correlation);
+                    var envelope = GateProtocolCodec.ResponseEnvelope(body); if (envelope.Error != 0) throw new GateCallException("unavailable");
+                    return GateWire.Response(envelope.Payload, correlation);
                 }
                 throw new InvalidDataException("gate-notification-limit");
             }

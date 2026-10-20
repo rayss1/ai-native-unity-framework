@@ -3,7 +3,8 @@
   "rootNamespace": "AiNative.Client.Prediction",
   "references": [
     "AiNative.Gameplay",
-    "AiNative.Realtime"
+    "AiNative.Realtime",
+    "AiNative.Client.Protocol"
   ],
   "includePlatforms": [],
   "excludePlatforms": [],

@@ -3,7 +3,9 @@
   "rootNamespace": "AiNative.Client.Fantasy",
   "references": [
     "AiNative.Realtime",
-    "Fantasy.Unity"
+    "Fantasy.Unity",
+    "AiNative.Client.Protocol",
+    "AiNative.Client.Protocol.Protobuf"
   ],
   "includePlatforms": [],
   "excludePlatforms": [],
