@@ -12,6 +12,32 @@ namespace AiNative.Client.Application.PlayModeTests
     public sealed class ArenaRemoteVisualTests
     {
         [UnityTest]
+        public IEnumerator AimSelectsNearestVisibleBodyAndIgnoresDeadPlayers()
+        {
+            Type type = typeof(BattleClientCompositionRoot).Assembly.GetType("AiNative.Client.Application.ArenaRemoteVisualPool");
+            var pool = (IDisposable)Activator.CreateInstance(type, new object[] { Resources.Load<Material>("BattleClient/Player") });
+            var apply = type.GetMethod("Apply");
+            var aim = type.GetMethod("AimPoint");
+            var poses = new[] { new ArenaRemotePose(1, 0, 0, 10000, 0, true), new ArenaRemotePose(2, 0, 0, 5000, 0, true) };
+            var ray = new Ray(new Vector3(.3f, 1.2f, -2), Vector3.forward);
+            try
+            {
+                apply.Invoke(pool, new object[] { poses, 2 });
+                var point = (Vector3)aim.Invoke(pool, new object[] { ray, 100f });
+                Assert.That(point.z, Is.InRange(4.5f, 5f));
+                poses[1] = new ArenaRemotePose(2, 0, 0, 5000, 0, false);
+                apply.Invoke(pool, new object[] { poses, 2 });
+                point = (Vector3)aim.Invoke(pool, new object[] { ray, 100f });
+                Assert.That(point.z, Is.InRange(9.5f, 10f));
+                apply.Invoke(pool, new object[] { poses, 0 });
+                point = (Vector3)aim.Invoke(pool, new object[] { ray, 100f });
+                Assert.That(point, Is.EqualTo(ray.GetPoint(100)));
+            }
+            finally { pool.Dispose(); }
+            yield return null;
+        }
+
+        [UnityTest]
         public IEnumerator RemoteVisualPoolPositionsHidesAndDestroysOwnedObjects()
         {
             // Reflection keeps the application-only implementation out of the public framework API.

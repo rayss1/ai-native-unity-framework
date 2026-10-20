@@ -55,11 +55,13 @@ namespace AiNative.Client.Application.PlayModeTests
                         int yawDelta = (yaw - own.YawMillidegrees) % 360000;
                         if (yawDelta > 180000) yawDelta -= 360000;
                         if (yawDelta < -180000) yawDelta += 360000;
-                        int x = distance > 15000 ? (int)(dx / distance * 1000) : 0;
-                        int z = distance > 15000 ? (int)(dz / distance * 1000) : 0;
+                        // Leave the protected spawn bays through the south lane before exchanging fire.
+                        bool inLane = own.PositionZMillimetres < -16000 && target.PositionZMillimetres < -16000;
+                        int x = inLane && distance > 15000 ? (int)(dx / distance * 1000) : 0;
+                        int z = own.PositionZMillimetres > -17000 ? -1000 : 0;
                         shooter.PredictAndQueueArenaInput(shooter.LastReceivedTick + 1, x, z, yawDelta, -own.PitchMillidegrees,
-                            distance < 20000 && !kill ? ArenaButtons.Fire : ArenaButtons.None, ArenaWeaponId.Machinegun);
-                        victim.PredictAndQueueArenaInput(victim.LastReceivedTick + 1, 0, 0, 0, 0, ArenaButtons.None, ArenaWeaponId.Machinegun);
+                            inLane && distance < 20000 && !kill ? ArenaButtons.Fire : ArenaButtons.None, ArenaWeaponId.Machinegun);
+                        victim.PredictAndQueueArenaInput(victim.LastReceivedTick + 1, 0, target.PositionZMillimetres > -17000 ? -1000 : 0, 0, 0, ArenaButtons.None, ArenaWeaponId.Machinegun);
                     }
                     int count = shooter.DrainCombatEvents(events);
                     for (int i = 0; i < count; i++)

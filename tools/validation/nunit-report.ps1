@@ -93,14 +93,16 @@ function Get-AiNativeEditModeFixtureCounts {
     }
     if ($Profile -eq 'Development') {
         $fixtures['AiNative.Client.Application.Tests.TopologyClientFlowRecoveryTests']=24
-        $fixtures['AiNative.Client.Application.Tests.TopologyUiFlowTests']=17
+        $fixtures['AiNative.Client.Application.Tests.TopologyUiFlowTests']=20
         $fixtures['AiNative.Client.Application.Tests.LocalMultiplayerTests']=3
         $fixtures['AiNative.Client.Character.Tests.CharacterActionContractTests']=1
         $fixtures['AiNative.Client.Application.Tests.AndroidBattleClientBuildTests']=16
         $fixtures['AiNative.Client.Prediction.Tests.ArenaRemotePresentationTests']=12
         $fixtures['AiNative.Client.Prediction.Tests.ArenaCombatEventProtocolTests']=9
-        $fixtures['AiNative.Client.Application.Tests.NetworkCharacterInputTests']=8
+        $fixtures['AiNative.Client.Application.Tests.NetworkCharacterInputTests']=12
         $fixtures['AiNative.Client.Application.Tests.BattleCombatEventTests']=4
+        $fixtures['AiNative.Gameplay.Tests.ArenaHitGeometryTests']=6
+        $fixtures['AiNative.Gameplay.Tests.ArenaTrainingMapTests']=7
     }
     return $fixtures
 }

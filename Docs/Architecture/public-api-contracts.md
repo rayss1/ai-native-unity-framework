@@ -26,6 +26,25 @@ feedback while preserving event sequence deduplication. No event applies local d
 
 See [P1 integration](p1-network-character.md) for controls, asset generation and validation limits.
 
+### Arena hit geometry (2026-10-16 repair)
+
+`ArenaHitGeometry` is a pure Shared math helper, in millimetres. `RayCapsule` takes a ray origin
+relative to target feet, a unit direction and a maximum distance; it returns the nearest nonnegative
+intersection with the upright capsule (radius 450, cap centres at 450 and 1350). The shot origin
+height is 600. Server hitscan uses historical poses and retains lifetime/protection checks. Client
+presentation may use this geometry to choose a camera aim point, but cannot authorize damage.
+No wire fields or message identities change. The gameplay source fingerprint includes this helper;
+old rule replays require their matching build, and fail closed under the new verifier.
+
+`ArenaTrainingMap` defines the immutable training-ground v1 AABBs and spawn points in millimetres.
+`GetObstacle` returns value copies; `Raycast` accepts a unit direction and range, returning the nearest
+box/floor distance (optional padding supplies projectile sweeps). `Occluded` tests a finite segment.
+`ResolveMovement` applies conservative upright-box collision in stable Y/X/Z order, including support
+and grounded state; callers use it through `ArenaMovement.Step` on both prediction and authority.
+The 40m boundary is shared, and its source participates in the replay gameplay fingerprint.
+Client `ArenaTrainingGroundPresentation` owns only geometry/material construction and destruction;
+visual Collider queries do not become server authority. No wire fields or external physics types are added.
+
 ### Local character rifle prototype
 
 Owner: `com.ainative.client.character`. Unity main thread only; no Shared or wire changes.

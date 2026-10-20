@@ -110,10 +110,8 @@ namespace AiNative.Client.Application
             _orbitCamera = cameraObject.AddComponent<CharacterOrbitCamera>();
             _orbitCamera.ConfigurePresentation(transform);
             if (_topology != null) _topology.CharacterCamera = _orbitCamera;
-            _floorVisual = GameObject.CreatePrimitive(PrimitiveType.Plane);
-            _floorVisual.name = "ArenaGreyboxFloor";
-            _floorVisual.transform.localScale = Vector3.one * 13f;
-            _floorVisual.GetComponent<Renderer>().sharedMaterial = LoadGreyboxMaterial("Floor");
+            _floorVisual = new GameObject("ArenaTrainingGround");
+            _floorVisual.AddComponent<ArenaTrainingGroundPresentation>();
             GameObject lightObject = new GameObject("ArenaGreyboxLight");
             _arenaLight = lightObject.AddComponent<Light>();
             _arenaLight.type = LightType.Directional;
@@ -342,17 +340,26 @@ namespace AiNative.Client.Application
             _feedbackUntil = Time.unscaledTime + 2;
         }
 
+        internal Vector3 GetAimPoint()
+        {
+            Vector3 direction = Quaternion.Euler(_orbitCamera.Pitch, _orbitCamera.Yaw, 0) * Vector3.forward;
+            var ray = new Ray(_playerCamera.transform.position, direction);
+            float range = 100;
+            Vector3 origin = ray.origin * 1000f;
+            if (ArenaTrainingMap.Raycast(origin.x, origin.y, origin.z, direction.x, direction.y, direction.z,
+                range * 1000d, out double distance)) range = (float)(distance / 1000d);
+            Vector3 point = _remoteVisuals != null ? _remoteVisuals.AimPoint(ray, range) : ray.GetPoint(range);
+            return ray.GetPoint(Mathf.Min(range, Vector3.Dot(point - ray.origin, ray.direction)));
+        }
+
         private void DrawCharacterHud()
         {
             var session = Session;
             if (session == null || !session.TryGetArenaState(out var state) || session.ArenaPhase == ArenaMatchPhase.Finished) return;
             if (_topology != null) GUI.Label(new Rect(16, Screen.height - 50, 1000, 24), "WASD 移动  |  按住右键转向/瞄准  |  左键开火  |  Space 跳跃  |  1/2/3 武器");
             if (Time.unscaledTime < _feedbackUntil) GUI.Label(new Rect(Screen.width / 2 - 100, Screen.height / 2 + 35, 260, 30), _combatFeedback);
-            // Display the server ray direction from its defined +0.6m origin. No local hit or damage query.
-            var origin = new Vector3(state.PositionXMillimetres, state.PositionYMillimetres + 600, state.PositionZMillimetres) / 1000f;
-            var forward = Quaternion.Euler(-state.PitchMillidegrees / 1000f, state.YawMillidegrees / 1000f, 0) * Vector3.forward;
-            Vector3 point = _playerCamera.WorldToScreenPoint(origin + forward * 30);
-            if (point.z > 0) GUI.Label(new Rect(point.x - 6, Screen.height - point.y - 10, 24, 24), "+");
+            GUI.Label(new Rect(Screen.width / 2 - 6, Screen.height / 2 - 10, 24, 24), "+");
+            GUI.Label(new Rect(16, Screen.height - 75, 800, 24), "R 换弹 · 空仓自动换弹（2秒）· 备用弹不限");
         }
 
         private async void OnDestroy()

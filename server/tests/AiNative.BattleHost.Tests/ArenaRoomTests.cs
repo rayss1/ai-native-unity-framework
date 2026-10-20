@@ -60,6 +60,7 @@ public sealed class ArenaRoomTests
         Assert.That(room.TryJoin(out uint shooter), Is.True);
         Assert.That(room.TryJoin(out uint target), Is.True);
 
+        PlaceInOpenLane(room);
         for (uint sequence = 1; sequence <= ArenaRoom.RespawnProtectionTicks + 1; sequence++)
         {
             room.SubmitInput(shooter, new ArenaInput(
@@ -85,6 +86,7 @@ public sealed class ArenaRoomTests
         Assert.That(room.TryJoin(out uint shooter), Is.True);
         Assert.That(room.TryJoin(out uint target), Is.True);
 
+        PlaceInOpenLane(room);
         for (uint sequence = 1; sequence <= ArenaRoom.RespawnProtectionTicks + 1; sequence++)
         {
             room.SubmitInput(shooter, new ArenaInput(
@@ -134,7 +136,7 @@ public sealed class ArenaRoomTests
         Assert.That(room.SubmitInput(id, new ArenaInput(uint.MaxValue, 1, 0, 0, 0, 0, ArenaButtons.None, ArenaWeaponId.None)), Is.True);
         room.TickOnce(); room.TryGetPlayer(id, out var first);
         Assert.That(first.LastProcessedInputSequence, Is.EqualTo(1));
-        Assert.That(first.PositionXMillimetres, Is.EqualTo(-47984));
+        Assert.That(first.PositionXMillimetres, Is.EqualTo(-15984));
         room.TickOnce(); Assert.That(room.TryGetPlayer(id, out var last), Is.True);
         Assert.That(last.LastProcessedInputSequence, Is.EqualTo(uint.MaxValue));
     }
@@ -206,12 +208,13 @@ public sealed class ArenaRoomTests
     public void RocketTravelsTwentyFiveMetresPerSecondBeforeImpact()
     {
         ArenaRoom room = new(); room.TryJoin(out uint shooter); room.TryJoin(out uint target);
+        PlaceInOpenLane(room);
         room.SubmitInput(shooter, new ArenaInput(1, 1, 0, 0, 90000, 0, ArenaButtons.Fire, ArenaWeaponId.Rocket));
         for (int i = 0; i < 120; i++) room.TickOnce();
         var events = new ArenaCombatEventRecord[256]; int count = room.DrainEvents(events);
         var hits = events.Take(count).Where(e => e.Kind == ArenaCombatEventKind.Hit && e.TargetEntityId == target).ToArray();
         Assert.That(hits.Length, Is.EqualTo(1));
-        Assert.That(hits[0].Tick, Is.InRange(110UL, 117UL));
+        Assert.That(hits[0].Tick, Is.InRange(74UL, 80UL));
     }
     [Test]
     public void BoundedInputIntakeRejectsOverflowWithoutLosingAcceptedCommands()
@@ -251,4 +254,9 @@ public sealed class ArenaRoomTests
             Assert.That(history.Reconcile(authoritative).Status, Is.EqualTo(ReconciliationStatus.Matched));
         }
     }
-}
+    private static void PlaceInOpenLane(ArenaRoom room)
+    {
+        var players = (ArenaPlayerState[])typeof(ArenaRoom).GetField("_players",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(room)!;
+        players[0].PositionZMillimetres = players[1].PositionZMillimetres = -17000;
+    }}

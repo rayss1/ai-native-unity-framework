@@ -57,7 +57,7 @@ namespace AiNative.Client.Editor
             Label("Intro", content, "使用不同账号，在多个客户端中一起进入对局。", 20, 35);
             Label("UsernameLabel", content, "账号 · 3–32 位字母、数字或下划线", 18, 28);
             v.Username = Field("Username", content, "请输入账号");
-            Label("PasswordLabel", content, "密码 · 12–128 位", 18, 28);
+            Label("PasswordLabel", content, "密码 · 6–32 位", 18, 28);
             v.Password = Field("Password", content, "请输入密码", true);
             Label("Privacy", content, "密码仅在本次会话中使用，不写入本机文件。", 16, 26);
             var row = Row("Authentication", content); v.Login = Button("Login", row, "登录", true); v.Register = Button("Register", row, "注册新账号");
@@ -181,7 +181,7 @@ namespace AiNative.Client.Editor
         private static InputField Field(string name, Transform parent, string placeholder, bool password = false)
         {
             var rt = Box(name, parent, new Color(.035f, .055f, .083f)); Height(rt.gameObject, 48);
-            var field = rt.gameObject.AddComponent<InputField>(); field.targetGraphic = rt.GetComponent<Image>(); field.characterLimit = password ? 128 : 256;
+            var field = rt.gameObject.AddComponent<InputField>(); field.targetGraphic = rt.GetComponent<Image>(); field.characterLimit = password ? 32 : 256;
             var text = Label("Text", rt, "", 20, 44); Stretch(text.rectTransform, 12); field.textComponent = text;
             var hint = Label("Placeholder", rt, placeholder, 18, 44); Stretch(hint.rectTransform, 12); hint.color = new Color(.5f, .57f, .67f); field.placeholder = hint;
             field.contentType = password ? InputField.ContentType.Password : InputField.ContentType.Standard; return field;

@@ -16,8 +16,10 @@ public sealed class ArenaReplayTests
         var events = new ArenaCombatEventRecord[256]; int respawns = 0;
         for (uint sequence = 1; sequence <= 400; sequence++)
         {
-            Submit(shooter, new ArenaInput(sequence, game.Tick + 1, 0, 0, sequence == 1 ? 90000 : 0, 0, ArenaButtons.Fire, ArenaWeaponId.Machinegun));
-            Submit(target, new ArenaInput(sequence, game.Tick + 1, 0, 0, 0, 0, ArenaButtons.None, ArenaWeaponId.None));
+            // Exit the spawn screens into the south lane before exercising lethal fire.
+            Submit(shooter, new ArenaInput(sequence, game.Tick + 1, 0, sequence <= 40 ? -1000 : 0,
+                sequence == 1 ? 90000 : 0, 0, sequence > 50 ? ArenaButtons.Fire : ArenaButtons.None, ArenaWeaponId.Machinegun));
+            Submit(target, new ArenaInput(sequence, game.Tick + 1, 0, sequence <= 40 ? -1000 : 0, 0, 0, ArenaButtons.None, ArenaWeaponId.None));
             game.TickOnce(); capture.RecordTick(game.Tick, game.ComputeStateHash());
             game.TryGetPlayer(target, out var state);
             Assert.That(state.LastProcessedInputSequence, Is.EqualTo(sequence));

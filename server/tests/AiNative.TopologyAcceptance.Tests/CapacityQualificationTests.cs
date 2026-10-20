@@ -284,6 +284,10 @@ public class CapacityQualificationTests
                 random = new Random(unchecked(20261002 + rotations * 104729));
             }
             sequence++;
+            // Exercise empty magazines deterministically after warmup: map geometry and
+            // respawns can otherwise keep every magazine topped up throughout the run.
+            if (elapsed == 3601)
+                Array.Clear(ammo);
             for (int i = 0; i < 8; i++)
             {
                 var self = State(i); var enemy = Enumerable.Range(0, 8).Where(n => n != i && states[n].Alive)
