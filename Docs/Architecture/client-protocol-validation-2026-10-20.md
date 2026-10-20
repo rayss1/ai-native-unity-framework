@@ -56,3 +56,7 @@ Android 最终源码清单 SHA-256：`60a1774f9949c3e36e882e2bbf57c98c3e6d33d5ac
 Android 真机未连接，因此设备通信未验收。真实双客户端拓扑需要固定 PostgreSQL 和完整服务环境，本次尚未完成；不能拿旧版本的双客户端成绩替代。Windows Player 和 Android ARM64 IL2CPP 的本次构建已通过，不能替代真机通信与性能验收。公网、弱网、长时间负载及 Linux 跨平台 DLL 可复现性仍需对应环境验证。
 
 完成剩余平台检查后再按负责人要求提交和发起 PR。整体回滚方式见 [ADR-0019](../ADR/0019-client-protocol-codecs.md)。
+
+## 提交时的打包复现修正
+
+提交后发现 SDK 自动把 Git SHA 写入生成协议 DLL 的 AssemblyInformationalVersion，导致每次提交都会改变 DLL 哈希。打包脚本现已禁用这个字段的 Git SHA 后缀，源码身份继续由依赖锁保存；协议生成源码、运行库和消息行为未变化。重新生成的 DLL 只有构建元数据变化，提交后再次执行打包检查。上述 Unity/Player/APK 证据对应修正前的程序集信息版本；未因这项元数据修正重跑平台测试，不宣称这些旧产物是最新提交的字节级相同构建。

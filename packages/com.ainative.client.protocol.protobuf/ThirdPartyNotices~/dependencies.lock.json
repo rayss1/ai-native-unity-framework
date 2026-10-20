@@ -1,6 +1,6 @@
 {
   "artifactsSha256": {
-    "AiNative.Protocol.dll": "f6cf50a338572e0826bef8cd1d70529bd7d4030939f7445281b62e707b0f5c28",
+    "AiNative.Protocol.dll": "47ee765db68f82fba6875d95ccb65b7c7f40c83f154d1bd07929d309fefa3ed1",
     "Google.Protobuf.dll": "67fd69447f2e8eeb45c4c27375e4625f0bb93c22fa9774ba9795f10a15cb190f"
   },
   "dependencies": {
@@ -37,7 +37,7 @@
     "shared/schemas/ainative/v1/gameplay.proto": "f06bc8ccf7d0b757f2c122904da8c6e46bd3a822404856f931d3d3403747265d",
     "shared/schemas/ainative/v1/gate_envelope.proto": "02837203d3ec2984392a6e3b49ed2be4c24cfde51b0e12863ce2ac473495379c",
     "tools/ProtocolCodegen/ProtocolCodegen.csproj": "fc93026316c3907da0ce5ae036ec0fb38ee4a1a6864c3b1704776fb728dcb284",
-    "tools/ProtocolCodegen/package_unity.py": "239bc401c08f9cc78d4e0835d20ecbff41dda982853cdbc276c362698ac25789"
+    "tools/ProtocolCodegen/package_unity.py": "f8ff31170def8e0f16bd2d9859e1c90a3abb58a88652f5bef7a4c4d27ed2ea7b"
   },
   "targetFramework": "netstandard2.1",
   "unityProvided": [

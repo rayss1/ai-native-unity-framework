@@ -46,6 +46,7 @@ def main():
         '<TargetFramework>netstandard2.1</TargetFramework><AssemblyName>AiNative.Protocol</AssemblyName>'
         '<EnableDefaultCompileItems>false</EnableDefaultCompileItems><DebugType>none</DebugType>'
         '<Deterministic>true</Deterministic><ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>'
+        '<IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>'
         '<Nullable>enable</Nullable><ImplicitUsings>disable</ImplicitUsings>'
         '<PathMap>$(MSBuildProjectDirectory)=/_/</PathMap>'
         '</PropertyGroup><ItemGroup>' + compile_items +
