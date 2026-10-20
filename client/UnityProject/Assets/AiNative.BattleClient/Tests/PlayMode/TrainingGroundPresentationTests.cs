@@ -18,7 +18,10 @@ namespace AiNative.Client.Application.PlayModeTests
                 root.AddComponent<ArenaTrainingGroundPresentation>();
                 yield return null; // Decorative colliders are disabled immediately and destroyed at frame end.
                 Physics.SyncTransforms();
-                Assert.That(root.GetComponentsInChildren<Collider>().Length, Is.EqualTo(ArenaTrainingMap.ObstacleCount + 1));
+                Assert.That(
+                    root.GetComponentsInChildren<Collider>().Length,
+                    Is.EqualTo(ArenaTrainingMap.ObstacleCount + 1)
+                );
                 for (int i = 0; i < ArenaTrainingMap.ObstacleCount; i++)
                 {
                     ArenaMapBox expected = ArenaTrainingMap.GetObstacle(i);
@@ -36,16 +39,29 @@ namespace AiNative.Client.Application.PlayModeTests
                     Assert.That(actual.max.z, Is.EqualTo(expected.MaxZ / 1000f).Within(.0001f));
                 }
                 var floor = root.transform.Find("TrainingDeck");
-                Assert.That(floor.GetComponent<BoxCollider>().bounds.max.y, Is.EqualTo(0).Within(.0001f));
+                Assert.That(
+                    floor.GetComponent<BoxCollider>().bounds.max.y,
+                    Is.EqualTo(0).Within(.0001f)
+                );
                 Assert.That(floor.localScale.x, Is.EqualTo(ArenaTrainingMap.HalfExtent / 500f));
                 ownedMaterial = floor.GetComponent<Renderer>().sharedMaterial;
-                Assert.That(ownedMaterial, Is.Not.SameAs(Resources.Load<Material>("BattleClient/Floor")));
+                Assert.That(
+                    ownedMaterial,
+                    Is.Not.SameAs(Resources.Load<Material>("BattleClient/Floor"))
+                );
             }
-            finally { Object.Destroy(root); }
+            finally
+            {
+                Object.Destroy(root);
+            }
             yield return null;
             yield return null;
             Assert.That(root == null, Is.True);
-            Assert.That(ownedMaterial == null, Is.True, "Runtime material copies must be released with the arena.");
+            Assert.That(
+                ownedMaterial == null,
+                Is.True,
+                "Runtime material copies must be released with the arena."
+            );
         }
     }
 }

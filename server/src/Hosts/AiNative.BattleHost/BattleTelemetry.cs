@@ -15,7 +15,8 @@ internal sealed record BattleTelemetryIdentity(
     string FantasyCommit,
     string ProtocolIdentity,
     string ConfigurationIdentity,
-    int RoomCount)
+    int RoomCount
+)
 {
     public IEnumerable<KeyValuePair<string, object>> ResourceAttributes
     {
@@ -30,7 +31,8 @@ internal sealed record BattleTelemetryIdentity(
             yield return new("ainative.room.count", RoomCount);
             yield return new(
                 "ainative.room.capacity",
-                checked(RoomCount * BattleHostCapacitySettings.BotsPerRoom));
+                checked(RoomCount * BattleHostCapacitySettings.BotsPerRoom)
+            );
         }
     }
 }
@@ -42,31 +44,41 @@ internal sealed record BattleTelemetrySettings(
     int MetricExportIntervalMilliseconds,
     int TraceQueueSize,
     int TraceExportDelayMilliseconds,
-    int TraceExportBatchSize)
+    int TraceExportBatchSize
+)
 {
     public static BattleTelemetrySettings Create(
         IConfiguration configuration,
         string contentRootPath,
-        BattleHostCapacitySettings? capacitySettings = null)
+        BattleHostCapacitySettings? capacitySettings = null
+    )
     {
         capacitySettings ??= new BattleHostCapacitySettings(1);
         string? endpointValue = configuration["OTEL_EXPORTER_OTLP_ENDPOINT"];
         Uri? endpoint = null;
-        if (!string.IsNullOrWhiteSpace(endpointValue) &&
-            (!Uri.TryCreate(endpointValue, UriKind.Absolute, out endpoint) ||
-             endpoint.Scheme is not ("http" or "https")))
+        if (
+            !string.IsNullOrWhiteSpace(endpointValue)
+            && (
+                !Uri.TryCreate(endpointValue, UriKind.Absolute, out endpoint)
+                || endpoint.Scheme is not ("http" or "https")
+            )
+        )
         {
-            throw new InvalidOperationException("OTEL_EXPORTER_OTLP_ENDPOINT must be an absolute HTTP(S) URI.");
+            throw new InvalidOperationException(
+                "OTEL_EXPORTER_OTLP_ENDPOINT must be an absolute HTTP(S) URI."
+            );
         }
 
         string deployment = BoundedToken(
             configuration["AINATIVE_DEPLOYMENT_ENVIRONMENT"] ?? "development",
             "AINATIVE_DEPLOYMENT_ENVIRONMENT",
-            32);
+            32
+        );
         string instance = BoundedToken(
             configuration["AINATIVE_SERVICE_INSTANCE_ID"] ?? Environment.MachineName,
             "AINATIVE_SERVICE_INSTANCE_ID",
-            128);
+            128
+        );
         string configurationIdentity = ResolveConfigurationIdentity(configuration, contentRootPath);
         BattleTelemetryIdentity identity = new(
             deployment,
@@ -75,38 +87,44 @@ internal sealed record BattleTelemetrySettings(
             FixedIdentity(configuration, "AINATIVE_FANTASY_COMMIT", 40),
             FixedIdentity(configuration, "AINATIVE_PROTOCOL_IDENTITY", 64),
             configurationIdentity,
-            capacitySettings.RoomCount);
+            capacitySettings.RoomCount
+        );
 
         int exportTimeout = BoundedInteger(
             configuration,
             "AINATIVE_OTEL_EXPORT_TIMEOUT_MILLISECONDS",
             defaultValue: 10_000,
             minimum: 100,
-            maximum: 30_000);
+            maximum: 30_000
+        );
         int metricInterval = BoundedInteger(
             configuration,
             "AINATIVE_OTEL_METRIC_EXPORT_INTERVAL_MILLISECONDS",
             defaultValue: 60_000,
             minimum: 1_000,
-            maximum: 60_000);
+            maximum: 60_000
+        );
         int traceQueue = BoundedInteger(
             configuration,
             "AINATIVE_OTEL_TRACE_QUEUE_SIZE",
             defaultValue: 2_048,
             minimum: 128,
-            maximum: 8_192);
+            maximum: 8_192
+        );
         int traceDelay = BoundedInteger(
             configuration,
             "AINATIVE_OTEL_TRACE_EXPORT_DELAY_MILLISECONDS",
             defaultValue: 5_000,
             minimum: 100,
-            maximum: 60_000);
+            maximum: 60_000
+        );
         int traceBatch = BoundedInteger(
             configuration,
             "AINATIVE_OTEL_TRACE_EXPORT_BATCH_SIZE",
             defaultValue: 512,
             minimum: 1,
-            maximum: traceQueue);
+            maximum: traceQueue
+        );
 
         return new BattleTelemetrySettings(
             identity,
@@ -115,22 +133,25 @@ internal sealed record BattleTelemetrySettings(
             metricInterval,
             traceQueue,
             traceDelay,
-            traceBatch);
+            traceBatch
+        );
     }
 
-    public OtlpExporterOptions CreateExporterOptions() => new()
-    {
-        Endpoint = Endpoint!,
-        Protocol = OtlpExportProtocol.Grpc,
-        TimeoutMilliseconds = ExportTimeoutMilliseconds,
-    };
+    public OtlpExporterOptions CreateExporterOptions() =>
+        new()
+        {
+            Endpoint = Endpoint!,
+            Protocol = OtlpExportProtocol.Grpc,
+            TimeoutMilliseconds = ExportTimeoutMilliseconds,
+        };
 
     private static int BoundedInteger(
         IConfiguration configuration,
         string key,
         int defaultValue,
         int minimum,
-        int maximum)
+        int maximum
+    )
     {
         int value = configuration.GetValue(key, defaultValue);
         if (value < minimum || value > maximum)
@@ -143,13 +164,17 @@ internal sealed record BattleTelemetrySettings(
 
     private static string BoundedToken(string value, string key, int maximumLength)
     {
-        if (string.IsNullOrWhiteSpace(value) ||
-            value.Length > maximumLength ||
-            value.Any(character =>
-                !(char.IsAsciiLetterOrDigit(character) || character is '-' or '_' or '.' or ':')))
+        if (
+            string.IsNullOrWhiteSpace(value)
+            || value.Length > maximumLength
+            || value.Any(character =>
+                !(char.IsAsciiLetterOrDigit(character) || character is '-' or '_' or '.' or ':')
+            )
+        )
         {
             throw new InvalidOperationException(
-                $"{key} must contain 1-{maximumLength} ASCII letters, digits, '.', '_', '-', or ':'.");
+                $"{key} must contain 1-{maximumLength} ASCII letters, digits, '.', '_', '-', or ':'."
+            );
         }
 
         return value;
@@ -157,15 +182,20 @@ internal sealed record BattleTelemetrySettings(
 
     private static string ResolveConfigurationIdentity(
         IConfiguration configuration,
-        string contentRootPath)
+        string contentRootPath
+    )
     {
         string? configured = configuration["AINATIVE_CONFIGURATION_IDENTITY"];
         if (!string.IsNullOrWhiteSpace(configured))
         {
-            if (configured.Length != 64 || configured.Any(character => !char.IsAsciiHexDigit(character)))
+            if (
+                configured.Length != 64
+                || configured.Any(character => !char.IsAsciiHexDigit(character))
+            )
             {
                 throw new InvalidOperationException(
-                    "AINATIVE_CONFIGURATION_IDENTITY must be a 64-character SHA-256 identity.");
+                    "AINATIVE_CONFIGURATION_IDENTITY must be a 64-character SHA-256 identity."
+                );
             }
 
             return configured.ToLowerInvariant();
@@ -177,13 +207,12 @@ internal sealed record BattleTelemetrySettings(
             return "unrecorded";
         }
 
-        return Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(configPath))).ToLowerInvariant();
+        return Convert
+            .ToHexString(SHA256.HashData(File.ReadAllBytes(configPath)))
+            .ToLowerInvariant();
     }
 
-    private static string FixedIdentity(
-        IConfiguration configuration,
-        string key,
-        int length)
+    private static string FixedIdentity(IConfiguration configuration, string key, int length)
     {
         string? value = configuration[key];
         if (string.IsNullOrWhiteSpace(value))
@@ -193,7 +222,9 @@ internal sealed record BattleTelemetrySettings(
 
         if (value.Length != length || value.Any(character => !char.IsAsciiHexDigit(character)))
         {
-            throw new InvalidOperationException($"{key} must be a {length}-character hexadecimal identity.");
+            throw new InvalidOperationException(
+                $"{key} must be a {length}-character hexadecimal identity."
+            );
         }
 
         return value.ToLowerInvariant();
@@ -210,7 +241,8 @@ internal readonly record struct TelemetryExportSnapshot(
     long TraceRecordsDropped,
     int ProjectMetricSeries,
     long ProjectMetricTagViolations,
-    long ProjectMetricSeriesOverflow);
+    long ProjectMetricSeriesOverflow
+);
 
 internal sealed class TelemetryExportHealth(bool exporterConfigured)
 {
@@ -244,7 +276,8 @@ internal sealed class TelemetryExportHealth(bool exporterConfigured)
             Interlocked.Read(ref _traceRecordsDropped),
             seriesCount,
             Interlocked.Read(ref _projectMetricTagViolations),
-            Interlocked.Read(ref _projectMetricSeriesOverflow));
+            Interlocked.Read(ref _projectMetricSeriesOverflow)
+        );
     }
 
     public void RecordMetricExport(ExportResult result)
@@ -317,7 +350,8 @@ internal sealed class TelemetryExportHealth(bool exporterConfigured)
 internal sealed class TrackingMetricExporter(
     BaseExporter<Metric> inner,
     TelemetryExportHealth health,
-    TimeProvider? timeProvider = null) : BaseExporter<Metric>
+    TimeProvider? timeProvider = null
+) : BaseExporter<Metric>
 {
     private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
     private long _lastFailureTimestamp;
@@ -329,8 +363,10 @@ internal sealed class TrackingMetricExporter(
         health.ObserveMetricBatch(ref observed);
         // The periodic reader serializes exports. Keep observing cardinality during an
         // outage, but bound repeated connection failures on its background thread.
-        if (_retryDelaySeconds > 0 &&
-            _timeProvider.GetElapsedTime(_lastFailureTimestamp).TotalSeconds < _retryDelaySeconds)
+        if (
+            _retryDelaySeconds > 0
+            && _timeProvider.GetElapsedTime(_lastFailureTimestamp).TotalSeconds < _retryDelaySeconds
+        )
         {
             health.RecordMetricExportBackoff();
             return ExportResult.Failure;
@@ -373,7 +409,8 @@ internal sealed class TrackingMetricExporter(
 
 internal sealed class TrackingActivityExporter(
     BaseExporter<Activity> inner,
-    TelemetryExportHealth health) : BaseExporter<Activity>
+    TelemetryExportHealth health
+) : BaseExporter<Activity>
 {
     public override ExportResult Export(in Batch<Activity> batch)
     {
@@ -421,20 +458,23 @@ internal sealed class BoundedActivityExportProcessor : BaseProcessor<Activity>
         int queueSize,
         int exportDelayMilliseconds,
         int exporterTimeoutMilliseconds,
-        int exportBatchSize)
+        int exportBatchSize
+    )
     {
         _exporter = exporter;
         _health = health;
         _exportDelayMilliseconds = exportDelayMilliseconds;
         _exportBatchSize = exportBatchSize;
         _shutdownTimeoutMilliseconds = exporterTimeoutMilliseconds;
-        _queue = Channel.CreateBounded<Activity>(new BoundedChannelOptions(queueSize)
-        {
-            FullMode = BoundedChannelFullMode.Wait,
-            SingleReader = true,
-            SingleWriter = false,
-            AllowSynchronousContinuations = false,
-        });
+        _queue = Channel.CreateBounded<Activity>(
+            new BoundedChannelOptions(queueSize)
+            {
+                FullMode = BoundedChannelFullMode.Wait,
+                SingleReader = true,
+                SingleWriter = false,
+                AllowSynchronousContinuations = false,
+            }
+        );
         _worker = Task.Run(ExportAsync);
     }
 
@@ -479,7 +519,8 @@ internal sealed class BoundedActivityExportProcessor : BaseProcessor<Activity>
                     _ => DisposeResources(),
                     CancellationToken.None,
                     TaskContinuationOptions.ExecuteSynchronously,
-                    TaskScheduler.Default);
+                    TaskScheduler.Default
+                );
             }
         }
 
@@ -533,9 +574,7 @@ internal sealed class BoundedActivityExportProcessor : BaseProcessor<Activity>
                 }
             }
         }
-        catch (OperationCanceledException) when (_abort.IsCancellationRequested)
-        {
-        }
+        catch (OperationCanceledException) when (_abort.IsCancellationRequested) { }
         finally
         {
             int abandoned = 0;
@@ -554,9 +593,10 @@ internal sealed class BoundedActivityExportProcessor : BaseProcessor<Activity>
 
     private bool WaitForDrain(int timeoutMilliseconds)
     {
-        long deadline = timeoutMilliseconds == Timeout.Infinite
-            ? long.MaxValue
-            : Environment.TickCount64 + timeoutMilliseconds;
+        long deadline =
+            timeoutMilliseconds == Timeout.Infinite
+                ? long.MaxValue
+                : Environment.TickCount64 + timeoutMilliseconds;
         while (Interlocked.Read(ref _pendingItems) > 0)
         {
             if (Environment.TickCount64 >= deadline)
@@ -576,8 +616,8 @@ internal sealed class BoundedActivityExportProcessor : BaseProcessor<Activity>
         {
             return task.Wait(timeoutMilliseconds);
         }
-        catch (AggregateException exception) when (
-            exception.InnerExceptions.All(inner => inner is OperationCanceledException))
+        catch (AggregateException exception)
+            when (exception.InnerExceptions.All(inner => inner is OperationCanceledException))
         {
             return false;
         }

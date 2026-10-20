@@ -12,13 +12,13 @@ namespace AiNative.Client.Prediction
 
     public readonly struct PresentationCorrectionOptions
     {
-        public PresentationCorrectionOptions(
-            float smoothingSeconds,
-            int snapThresholdMillimetres)
+        public PresentationCorrectionOptions(float smoothingSeconds, int snapThresholdMillimetres)
         {
-            if (float.IsNaN(smoothingSeconds) ||
-                float.IsInfinity(smoothingSeconds) ||
-                smoothingSeconds <= 0)
+            if (
+                float.IsNaN(smoothingSeconds)
+                || float.IsInfinity(smoothingSeconds)
+                || smoothingSeconds <= 0
+            )
             {
                 throw new ArgumentOutOfRangeException(nameof(smoothingSeconds));
             }
@@ -59,7 +59,8 @@ namespace AiNative.Client.Prediction
             long smoothedCorrections,
             long snappedCorrections,
             bool isSmoothing,
-            int residualMillimetres)
+            int residualMillimetres
+        )
         {
             SmoothedCorrections = smoothedCorrections;
             SnappedCorrections = snappedCorrections;
@@ -91,18 +92,21 @@ namespace AiNative.Client.Prediction
         private bool _initialized;
 
         public PresentationCorrectionSmoother()
-            : this(PresentationCorrectionOptions.Default)
-        {
-        }
+            : this(PresentationCorrectionOptions.Default) { }
 
         public PresentationCorrectionSmoother(in PresentationCorrectionOptions options)
         {
-            if (float.IsNaN(options.SmoothingSeconds) ||
-                float.IsInfinity(options.SmoothingSeconds) ||
-                options.SmoothingSeconds <= 0 ||
-                options.SnapThresholdMillimetres <= 0)
+            if (
+                float.IsNaN(options.SmoothingSeconds)
+                || float.IsInfinity(options.SmoothingSeconds)
+                || options.SmoothingSeconds <= 0
+                || options.SnapThresholdMillimetres <= 0
+            )
             {
-                throw new ArgumentException("Presentation correction options are invalid.", nameof(options));
+                throw new ArgumentException(
+                    "Presentation correction options are invalid.",
+                    nameof(options)
+                );
             }
 
             _options = options;
@@ -115,7 +119,8 @@ namespace AiNative.Client.Prediction
                 _smoothedCorrections,
                 _snappedCorrections,
                 _remainingSeconds > 0,
-                CalculateMagnitude(_residualXMillimetres, _residualZMillimetres));
+                CalculateMagnitude(_residualXMillimetres, _residualZMillimetres)
+            );
 
         public void Initialize(in KinematicState state)
         {
@@ -140,7 +145,8 @@ namespace AiNative.Client.Prediction
         }
 
         public PresentationCorrectionAction ApplyReconciliation(
-            in ReconciliationResult reconciliation)
+            in ReconciliationResult reconciliation
+        )
         {
             if (!_initialized)
             {
@@ -148,31 +154,37 @@ namespace AiNative.Client.Prediction
                 return PresentationCorrectionAction.Snapped;
             }
 
-            if (reconciliation.Status == ReconciliationStatus.StaleSnapshotIgnored ||
-                reconciliation.Status == ReconciliationStatus.Matched)
+            if (
+                reconciliation.Status == ReconciliationStatus.StaleSnapshotIgnored
+                || reconciliation.Status == ReconciliationStatus.Matched
+            )
             {
                 return PresentationCorrectionAction.None;
             }
 
-            if (reconciliation.Status == ReconciliationStatus.AuthoritativeAhead ||
-                reconciliation.Status == ReconciliationStatus.HistoryMiss)
+            if (
+                reconciliation.Status == ReconciliationStatus.AuthoritativeAhead
+                || reconciliation.Status == ReconciliationStatus.HistoryMiss
+            )
             {
                 Snap();
                 return PresentationCorrectionAction.Snapped;
             }
 
-            double correctionX = (double)reconciliation.After.PositionXMillimetres -
-                                 reconciliation.Before.PositionXMillimetres;
-            double correctionZ = (double)reconciliation.After.PositionZMillimetres -
-                                 reconciliation.Before.PositionZMillimetres;
+            double correctionX =
+                (double)reconciliation.After.PositionXMillimetres
+                - reconciliation.Before.PositionXMillimetres;
+            double correctionZ =
+                (double)reconciliation.After.PositionZMillimetres
+                - reconciliation.Before.PositionZMillimetres;
             double candidateResidualX = _residualXMillimetres - correctionX;
             double candidateResidualZ = _residualZMillimetres - correctionZ;
             int correctionMagnitude = CalculateMagnitude(correctionX, correctionZ);
-            int residualMagnitude = CalculateMagnitude(
-                candidateResidualX,
-                candidateResidualZ);
-            if (correctionMagnitude > _options.SnapThresholdMillimetres ||
-                residualMagnitude > _options.SnapThresholdMillimetres)
+            int residualMagnitude = CalculateMagnitude(candidateResidualX, candidateResidualZ);
+            if (
+                correctionMagnitude > _options.SnapThresholdMillimetres
+                || residualMagnitude > _options.SnapThresholdMillimetres
+            )
             {
                 Snap();
                 return PresentationCorrectionAction.Snapped;
@@ -185,13 +197,9 @@ namespace AiNative.Client.Prediction
             return PresentationCorrectionAction.Smoothed;
         }
 
-        public PresentationPosition Advance(
-            in KinematicState simulationState,
-            float deltaSeconds)
+        public PresentationPosition Advance(in KinematicState simulationState, float deltaSeconds)
         {
-            if (float.IsNaN(deltaSeconds) ||
-                float.IsInfinity(deltaSeconds) ||
-                deltaSeconds < 0)
+            if (float.IsNaN(deltaSeconds) || float.IsInfinity(deltaSeconds) || deltaSeconds < 0)
             {
                 throw new ArgumentOutOfRangeException(nameof(deltaSeconds));
             }
@@ -220,7 +228,8 @@ namespace AiNative.Client.Prediction
 
             return new PresentationPosition(
                 simulationState.PositionXMillimetres + _residualXMillimetres,
-                simulationState.PositionZMillimetres + _residualZMillimetres);
+                simulationState.PositionZMillimetres + _residualZMillimetres
+            );
         }
 
         private void Snap()

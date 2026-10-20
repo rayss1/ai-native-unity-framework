@@ -9,9 +9,12 @@ internal static class FantasyKcpLoopbackProbe
 {
     public static async Task<FantasyKcpProbeResult> RunAsync(
         FantasyKcpGateway gateway,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken
+    )
     {
-        using CancellationTokenSource timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        using CancellationTokenSource timeout = CancellationTokenSource.CreateLinkedTokenSource(
+            cancellationToken
+        );
         timeout.CancelAfter(TimeSpan.FromSeconds(12));
 
         LoginResponse login;
@@ -24,27 +27,34 @@ internal static class FantasyKcpLoopbackProbe
                 probe,
                 MessageId.LoginRequest,
                 new LoginRequest { ProtocolMajor = 1, ClientBuild = "kcp-loopback-probe" },
-                timeout.Token);
+                timeout.Token
+            );
             login = await ReceiveAsync<LoginResponse>(
                 probe,
                 MessageId.LoginResponse,
-                timeout.Token);
+                timeout.Token
+            );
 
             await SendAsync(
                 probe,
                 MessageId.JoinRoomRequest,
                 new JoinRoomRequest { SessionId = login.SessionId, RequestedRoom = 1 },
-                timeout.Token);
+                timeout.Token
+            );
             join = await ReceiveAsync<JoinRoomResponse>(
                 probe,
                 MessageId.JoinRoomResponse,
-                timeout.Token);
+                timeout.Token
+            );
 
             Snapshot baseline = await ReceiveAsync<Snapshot>(
                 probe,
                 MessageId.Snapshot,
-                timeout.Token);
-            PlayerState baselinePlayer = baseline.Players.First(player => player.EntityId == join.EntityId);
+                timeout.Token
+            );
+            PlayerState baselinePlayer = baseline.Players.First(player =>
+                player.EntityId == join.EntityId
+            );
 
             await SendAsync(
                 probe,
@@ -56,25 +66,27 @@ internal static class FantasyKcpLoopbackProbe
                     MoveXMilli = 1000,
                     MoveYMilli = -500,
                 },
-                timeout.Token);
+                timeout.Token
+            );
             do
             {
-                snapshot = await ReceiveAsync<Snapshot>(
-                    probe,
-                    MessageId.Snapshot,
-                    timeout.Token);
-            }
-            while (snapshot.Players.First(player => player.EntityId == join.EntityId).PositionXMilli <
-                   baselinePlayer.PositionXMilli + 25);
+                snapshot = await ReceiveAsync<Snapshot>(probe, MessageId.Snapshot, timeout.Token);
+            } while (
+                snapshot.Players.First(player => player.EntityId == join.EntityId).PositionXMilli
+                < baselinePlayer.PositionXMilli + 25
+            );
 
             if (snapshot.LastProcessedInputSequence != 1)
             {
                 throw new InvalidOperationException(
-                    "Fantasy KCP snapshot did not acknowledge the processed prediction input.");
+                    "Fantasy KCP snapshot did not acknowledge the processed prediction input."
+                );
             }
         }
 
-        await using FantasyKcpProbe reconnectProbe = await gateway.ConnectLoopbackProbeAsync(timeout.Token);
+        await using FantasyKcpProbe reconnectProbe = await gateway.ConnectLoopbackProbeAsync(
+            timeout.Token
+        );
         await SendAsync(
             reconnectProbe,
             MessageId.ReconnectRequest,
@@ -84,18 +96,24 @@ internal static class FantasyKcpLoopbackProbe
                 ConnectionEpoch = login.ConnectionEpoch,
                 LastReceivedTick = snapshot.RoomTick,
             },
-            timeout.Token);
+            timeout.Token
+        );
         ReconnectResponse reconnect = await ReceiveAsync<ReconnectResponse>(
             reconnectProbe,
             MessageId.ReconnectResponse,
-            timeout.Token);
+            timeout.Token
+        );
 
-        if (reconnect.ConnectionEpoch == login.ConnectionEpoch ||
-            reconnect.Snapshot is null ||
-            reconnect.ResumeTick < snapshot.RoomTick ||
-            reconnect.Snapshot.LastProcessedInputSequence != 1)
+        if (
+            reconnect.ConnectionEpoch == login.ConnectionEpoch
+            || reconnect.Snapshot is null
+            || reconnect.ResumeTick < snapshot.RoomTick
+            || reconnect.Snapshot.LastProcessedInputSequence != 1
+        )
         {
-            throw new InvalidOperationException("Fantasy KCP reconnect returned an invalid epoch or snapshot.");
+            throw new InvalidOperationException(
+                "Fantasy KCP reconnect returned an invalid epoch or snapshot."
+            );
         }
 
         return new FantasyKcpProbeResult(
@@ -106,14 +124,16 @@ internal static class FantasyKcpLoopbackProbe
             join.EntityId,
             snapshot.RoomTick,
             reconnect.ResumeTick,
-            snapshot.LastProcessedInputSequence);
+            snapshot.LastProcessedInputSequence
+        );
     }
 
     internal static Task SendAsync(
         FantasyKcpProbe probe,
         MessageId messageId,
         Google.Protobuf.IMessage message,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken
+    )
     {
         byte[] sendBuffer = new byte[RealtimeProtocolCodec.MaxDatagramBytes];
         return SendAsync(probe, messageId, message, sendBuffer, cancellationToken);
@@ -124,33 +144,43 @@ internal static class FantasyKcpLoopbackProbe
         MessageId messageId,
         Google.Protobuf.IMessage message,
         byte[] sendBuffer,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken
+    )
     {
-        if (!RealtimeProtocolCodec.TryEncode(
+        if (
+            !RealtimeProtocolCodec.TryEncode(
                 messageId,
                 message,
                 sendBuffer,
                 out TransportChannel channel,
-                out int writtenBytes))
+                out int writtenBytes
+            )
+        )
         {
-            throw new InvalidOperationException($"Could not encode the KCP loopback {messageId} message.");
+            throw new InvalidOperationException(
+                $"Could not encode the KCP loopback {messageId} message."
+            );
         }
 
         SendResult send = await probe.Transport.SendAsync(
             channel,
             sendBuffer.AsMemory(0, writtenBytes),
-            cancellationToken);
+            cancellationToken
+        );
         if (send.Status != SendStatus.Accepted)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            throw new InvalidOperationException($"KCP loopback {messageId} send failed with {send.Status}.");
+            throw new InvalidOperationException(
+                $"KCP loopback {messageId} send failed with {send.Status}."
+            );
         }
     }
 
     internal static async Task<TMessage> ReceiveAsync<TMessage>(
         FantasyKcpProbe probe,
         MessageId expectedMessageId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken
+    )
         where TMessage : class, Google.Protobuf.IMessage
     {
         byte[] receiveBuffer = new byte[RealtimeProtocolCodec.MaxDatagramBytes];
@@ -160,11 +190,14 @@ internal static class FantasyKcpLoopbackProbe
             {
                 ProtocolDecodeStatus status = RealtimeProtocolCodec.TryDecode(
                     receiveBuffer.AsSpan(0, packet.WrittenBytes),
-                    out DecodedProtocolMessage decoded);
-                if (packet.IsComplete &&
-                    status == ProtocolDecodeStatus.Accepted &&
-                    decoded.MessageId == expectedMessageId &&
-                    decoded.Message is TMessage response)
+                    out DecodedProtocolMessage decoded
+                );
+                if (
+                    packet.IsComplete
+                    && status == ProtocolDecodeStatus.Accepted
+                    && decoded.MessageId == expectedMessageId
+                    && decoded.Message is TMessage response
+                )
                 {
                     return response;
                 }
@@ -185,4 +218,5 @@ internal readonly record struct FantasyKcpProbeResult(
     uint EntityId,
     ulong SnapshotTick,
     ulong ResumeTick,
-    uint LastProcessedInputSequence);
+    uint LastProcessedInputSequence
+);

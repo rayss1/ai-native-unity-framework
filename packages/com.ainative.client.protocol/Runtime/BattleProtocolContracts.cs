@@ -4,28 +4,71 @@ using AiNative.Realtime;
 
 namespace AiNative.Client.Protocol
 {
-    public enum BattleMessageKind { Unknown, LoginResponse, JoinResponse, Snapshot, ReconnectResponse, CombatEvent }
-    public enum BattleDecodeStatus { Accepted, FrameTooShort, FrameTooLarge, UnknownMessage, MalformedPayload, ProtocolMismatch, PlayerMissing, Disposed }
+    public enum BattleMessageKind
+    {
+        Unknown,
+        LoginResponse,
+        JoinResponse,
+        Snapshot,
+        ReconnectResponse,
+        CombatEvent,
+    }
+
+    public enum BattleDecodeStatus
+    {
+        Accepted,
+        FrameTooShort,
+        FrameTooLarge,
+        UnknownMessage,
+        MalformedPayload,
+        ProtocolMismatch,
+        PlayerMissing,
+        Disposed,
+    }
 
     public readonly struct BattleAdmission
     {
-        public BattleAdmission(string roomId, string entryTicket) { RoomId = roomId; EntryTicket = entryTicket; }
+        public BattleAdmission(string roomId, string entryTicket)
+        {
+            RoomId = roomId;
+            EntryTicket = entryTicket;
+        }
+
         public string RoomId { get; }
         public string EntryTicket { get; }
     }
 
     public readonly struct ArenaSnapshotPlayer
     {
-        public ArenaSnapshotPlayer(uint entityId, ArenaPlayerState state) { EntityId = entityId; State = state; }
+        public ArenaSnapshotPlayer(uint entityId, ArenaPlayerState state)
+        {
+            EntityId = entityId;
+            State = state;
+        }
+
         public uint EntityId { get; }
         public ArenaPlayerState State { get; }
     }
 
     public readonly struct DecodedArenaSnapshot
     {
-        public DecodedArenaSnapshot(ArenaPlayerState state, ArenaMatchPhase phase, uint remainingTicks,
-            uint leaderEntityId, uint acknowledgement, bool hasArenaData = true)
-        { State = state; Phase = phase; RemainingTicks = remainingTicks; LeaderEntityId = leaderEntityId; Acknowledgement = acknowledgement; HasArenaData = hasArenaData; }
+        public DecodedArenaSnapshot(
+            ArenaPlayerState state,
+            ArenaMatchPhase phase,
+            uint remainingTicks,
+            uint leaderEntityId,
+            uint acknowledgement,
+            bool hasArenaData = true
+        )
+        {
+            State = state;
+            Phase = phase;
+            RemainingTicks = remainingTicks;
+            LeaderEntityId = leaderEntityId;
+            Acknowledgement = acknowledgement;
+            HasArenaData = hasArenaData;
+        }
+
         public ArenaPlayerState State { get; }
         public ArenaMatchPhase Phase { get; }
         public uint RemainingTicks { get; }
@@ -34,14 +77,43 @@ namespace AiNative.Client.Protocol
         public bool HasArenaData { get; }
     }
 
-    public enum ArenaPresentationEventKind : byte { Fire, Hit, Kill, Respawn, Pickup, WeaponSwitch }
+    public enum ArenaPresentationEventKind : byte
+    {
+        Fire,
+        Hit,
+        Kill,
+        Respawn,
+        Pickup,
+        WeaponSwitch,
+    }
+
     public readonly struct ArenaPresentationEvent
     {
-        public ArenaPresentationEvent(ArenaPresentationEventKind kind, uint sequence, ulong tick,
-            uint sourceEntityId, uint targetEntityId, ArenaWeaponId weapon, int damage,
-            int positionXMillimetres, int positionYMillimetres, int positionZMillimetres)
-        { Kind = kind; Sequence = sequence; Tick = tick; SourceEntityId = sourceEntityId; TargetEntityId = targetEntityId;
-          Weapon = weapon; Damage = damage; PositionXMillimetres = positionXMillimetres; PositionYMillimetres = positionYMillimetres; PositionZMillimetres = positionZMillimetres; }
+        public ArenaPresentationEvent(
+            ArenaPresentationEventKind kind,
+            uint sequence,
+            ulong tick,
+            uint sourceEntityId,
+            uint targetEntityId,
+            ArenaWeaponId weapon,
+            int damage,
+            int positionXMillimetres,
+            int positionYMillimetres,
+            int positionZMillimetres
+        )
+        {
+            Kind = kind;
+            Sequence = sequence;
+            Tick = tick;
+            SourceEntityId = sourceEntityId;
+            TargetEntityId = targetEntityId;
+            Weapon = weapon;
+            Damage = damage;
+            PositionXMillimetres = positionXMillimetres;
+            PositionYMillimetres = positionYMillimetres;
+            PositionZMillimetres = positionZMillimetres;
+        }
+
         public ArenaPresentationEventKind Kind { get; }
         public uint Sequence { get; }
         public ulong Tick { get; }
@@ -64,15 +136,25 @@ namespace AiNative.Client.Protocol
         public readonly ArenaSnapshotPlayer[] Players = new ArenaSnapshotPlayer[MaxPlayers];
         public readonly ArenaPickupState[] Pickups = new ArenaPickupState[MaxPickups];
         public BattleMessageKind Kind;
-        public int PlayerCount, PickupCount;
-        public ulong Tick, SessionId;
-        public uint Acknowledgement, ConnectionEpoch, RoomId, EntityId, TickRate, RemainingTicks, LeaderEntityId;
-        public string GlobalRoomId = "", BootEpoch = "";
+        public int PlayerCount,
+            PickupCount;
+        public ulong Tick,
+            SessionId;
+        public uint Acknowledgement,
+            ConnectionEpoch,
+            RoomId,
+            EntityId,
+            TickRate,
+            RemainingTicks,
+            LeaderEntityId;
+        public string GlobalRoomId = "",
+            BootEpoch = "";
         public bool HasArenaData;
         public ArenaMatchPhase Phase;
         public ArenaPresentationEvent CombatEvent;
         public ReadOnlySpan<ArenaSnapshotPlayer> PlayerSpan => Players.AsSpan(0, PlayerCount);
         public ReadOnlySpan<ArenaPickupState> PickupSpan => Pickups.AsSpan(0, PickupCount);
+
         public bool TryGetPlayer(uint id, out DecodedArenaSnapshot snapshot)
         {
             for (int i = 0; i < PlayerCount; i++)
@@ -80,10 +162,18 @@ namespace AiNative.Client.Protocol
                 {
                     var state = Players[i].State;
                     state.LastProcessedInputSequence = Acknowledgement;
-                    snapshot = new DecodedArenaSnapshot(state, Phase, RemainingTicks, LeaderEntityId, Acknowledgement, HasArenaData);
+                    snapshot = new DecodedArenaSnapshot(
+                        state,
+                        Phase,
+                        RemainingTicks,
+                        LeaderEntityId,
+                        Acknowledgement,
+                        HasArenaData
+                    );
                     return true;
                 }
-            snapshot = default; return false;
+            snapshot = default;
+            return false;
         }
     }
 
@@ -99,10 +189,31 @@ namespace AiNative.Client.Protocol
         TransportChannel SnapshotChannel { get; }
         TransportChannel EventChannel { get; }
         bool TryEncodeInput(in ArenaInput input, Span<byte> destination, out int writtenBytes);
-        bool TryEncodeLegacyInput(ulong tick, in KinematicInput input, Span<byte> destination, out int writtenBytes);
-        bool TryEncodeLogin(string clientBuild, in BattleAdmission admission, Span<byte> destination, out int writtenBytes);
-        bool TryEncodeJoin(ulong sessionId, uint roomId, Span<byte> destination, out int writtenBytes);
-        bool TryEncodeReconnect(ulong sessionId, uint epoch, ulong lastTick, Span<byte> destination, out int writtenBytes);
+        bool TryEncodeLegacyInput(
+            ulong tick,
+            in KinematicInput input,
+            Span<byte> destination,
+            out int writtenBytes
+        );
+        bool TryEncodeLogin(
+            string clientBuild,
+            in BattleAdmission admission,
+            Span<byte> destination,
+            out int writtenBytes
+        );
+        bool TryEncodeJoin(
+            ulong sessionId,
+            uint roomId,
+            Span<byte> destination,
+            out int writtenBytes
+        );
+        bool TryEncodeReconnect(
+            ulong sessionId,
+            uint epoch,
+            ulong lastTick,
+            Span<byte> destination,
+            out int writtenBytes
+        );
         BattleDecodeStatus TryDecode(ReadOnlySpan<byte> frame, BattlePacketBuffer destination);
         void Reset();
     }

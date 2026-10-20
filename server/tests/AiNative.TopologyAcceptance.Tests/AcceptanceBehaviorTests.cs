@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using System.Buffers.Binary;
+using System.Collections.Concurrent;
 using System.Reflection;
 using AiNative.Protocol.V1;
 using AiNative.Realtime;
@@ -20,12 +20,13 @@ public class AcceptanceBehaviorTests
     [Test]
     public void GateAndDeadlineCanTargetTenMinuteDeployment()
     {
-        Func<string, string?> env = key => key switch
-        {
-            "AINATIVE_ACCEPTANCE_GATE_ADDRESS" => "172.28.0.11:23001",
-            "AINATIVE_ACCEPTANCE_DEADLINE_SECONDS" => "780",
-            _ => null
-        };
+        Func<string, string?> env = key =>
+            key switch
+            {
+                "AINATIVE_ACCEPTANCE_GATE_ADDRESS" => "172.28.0.11:23001",
+                "AINATIVE_ACCEPTANCE_DEADLINE_SECONDS" => "780",
+                _ => null,
+            };
         dynamic options = Feature("AcceptanceOptions").GetMethod("Load")!.Invoke(null, [env])!;
         Assert.That((string)options.GateAddress, Is.EqualTo("172.28.0.11:23001"));
         Assert.That((TimeSpan)options.Deadline, Is.EqualTo(TimeSpan.FromSeconds(780)));
@@ -36,12 +37,16 @@ public class AcceptanceBehaviorTests
     [TestCase("nan")]
     public void InvalidDeadlineIsRejectedBeforeStartingRuntime(string value)
     {
-        Func<string, string?> env = key => key == "AINATIVE_ACCEPTANCE_DEADLINE_SECONDS" ? value : null;
-        var error = Assert.Throws<TargetInvocationException>(() => Feature("AcceptanceOptions").GetMethod("Load")!.Invoke(null, [env]));
+        Func<string, string?> env = key =>
+            key == "AINATIVE_ACCEPTANCE_DEADLINE_SECONDS" ? value : null;
+        var error = Assert.Throws<TargetInvocationException>(() =>
+            Feature("AcceptanceOptions").GetMethod("Load")!.Invoke(null, [env])
+        );
         Assert.That(error!.InnerException, Is.TypeOf<ArgumentException>());
     }
 
-    static dynamic Start(FakeTransport transport, CancellationToken ct = default) => Activator.CreateInstance(Feature("SnapshotInputLoop"), transport, ct)!;
+    static dynamic Start(FakeTransport transport, CancellationToken ct = default) =>
+        Activator.CreateInstance(Feature("SnapshotInputLoop"), transport, ct)!;
 
     [Test]
     public async Task InputsFollowEachConnectionsAuthoritativeTickAndSequence()
@@ -58,7 +63,10 @@ public class AcceptanceBehaviorTests
             await Until(() => transport.Inputs.Any(x => x.RoomTick == 202));
             Assert.That(transport.Inputs.First(x => x.RoomTick == 202).Sequence, Is.EqualTo(81));
         }
-        finally { await (ValueTask)loop.DisposeAsync(); }
+        finally
+        {
+            await (ValueTask)loop.DisposeAsync();
+        }
         int stopped = transport.Inputs.Count;
         await Task.Delay(150);
         Assert.That(transport.Inputs.Count, Is.EqualTo(stopped));
@@ -68,7 +76,9 @@ public class AcceptanceBehaviorTests
     public async Task FinishedSnapshotEndsInputLoopAndIsStillAvailableToConsumer()
     {
         var transport = new FakeTransport();
-        transport.Enqueue(new Snapshot { RoomTick = 36000, MatchPhase = ArenaMatchPhase.ArenaMatchFinished });
+        transport.Enqueue(
+            new Snapshot { RoomTick = 36000, MatchPhase = ArenaMatchPhase.ArenaMatchFinished }
+        );
         dynamic loop = Start(transport);
         try
         {
@@ -79,7 +89,10 @@ public class AcceptanceBehaviorTests
             Assert.That((ulong)loop.LastSnapshot.RoomTick, Is.EqualTo(36000));
             Assert.That(transport.Inputs, Is.Empty);
         }
-        finally { await (ValueTask)loop.DisposeAsync(); }
+        finally
+        {
+            await (ValueTask)loop.DisposeAsync();
+        }
     }
 
     [Test]
@@ -98,7 +111,9 @@ public class AcceptanceBehaviorTests
     public async Task OrdinaryDisposeStillPropagatesPeerLossSendFailure(SendStatus status)
     {
         dynamic loop = await FailedLoop(new FakeTransport { SendOutcome = status });
-        var failure = Assert.CatchAsync<InvalidOperationException>(async () => await (ValueTask)loop.DisposeAsync());
+        var failure = Assert.CatchAsync<InvalidOperationException>(async () =>
+            await (ValueTask)loop.DisposeAsync()
+        );
         Assert.That(failure!.Message, Is.EqualTo("continuous-input-send"));
     }
 
@@ -113,9 +128,16 @@ public class AcceptanceBehaviorTests
             await StopAfterVerifiedPeerLoss(loop);
             throw new InvalidOperationException("expected-room-lost-after-battle-restart");
         });
-        Assert.That(failure!.Message, Is.EqualTo("expected-room-lost-after-battle-restart"),
-            "A verified peer-loss send failure must not replace the explicit expected termination during await-using cleanup.");
-        Assert.That(((Task)loop.Completion).IsFaulted, Is.True, "Cleanup must still observe the original pump failure.");
+        Assert.That(
+            failure!.Message,
+            Is.EqualTo("expected-room-lost-after-battle-restart"),
+            "A verified peer-loss send failure must not replace the explicit expected termination during await-using cleanup."
+        );
+        Assert.That(
+            ((Task)loop.Completion).IsFaulted,
+            Is.True,
+            "Cleanup must still observe the original pump failure."
+        );
     }
 
     [TestCase(SendStatus.WouldBlock)]
@@ -124,19 +146,31 @@ public class AcceptanceBehaviorTests
     public async Task VerifiedPeerLossCleanupDoesNotSuppressOtherSendRejections(SendStatus status)
     {
         dynamic loop = await FailedLoop(new FakeTransport { SendOutcome = status });
-        var failure = Assert.ThrowsAsync<InvalidOperationException>(async () => await StopAfterVerifiedPeerLoss(loop));
+        var failure = Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await StopAfterVerifiedPeerLoss(loop)
+        );
         Assert.That(failure!.Message, Is.EqualTo("continuous-input-send"));
     }
 
     [TestCase(false)]
     [TestCase(true)]
-    public async Task VerifiedPeerLossCleanupDoesNotSuppressOtherExceptionsEvenWithMatchingMessage(bool matchingMessage)
+    public async Task VerifiedPeerLossCleanupDoesNotSuppressOtherExceptionsEvenWithMatchingMessage(
+        bool matchingMessage
+    )
     {
-        Exception expected = matchingMessage ? new InvalidOperationException("continuous-input-send") : new IOException("transport-bug");
+        Exception expected = matchingMessage
+            ? new InvalidOperationException("continuous-input-send")
+            : new IOException("transport-bug");
         dynamic loop = await FailedLoop(new FakeTransport { SendFailure = expected });
         Exception? observed = null;
-        try { await StopAfterVerifiedPeerLoss(loop); }
-        catch (Exception error) { observed = error; }
+        try
+        {
+            await StopAfterVerifiedPeerLoss(loop);
+        }
+        catch (Exception error)
+        {
+            observed = error;
+        }
         Assert.That(observed, Is.SameAs(expected));
     }
 
@@ -151,7 +185,11 @@ public class AcceptanceBehaviorTests
 
     static async Task StopAfterVerifiedPeerLoss(object loop)
     {
-        MethodInfo? cleanup = loop.GetType().GetMethod("StopAfterVerifiedPeerLossAsync", BindingFlags.Instance | BindingFlags.NonPublic);
+        MethodInfo? cleanup = loop.GetType()
+            .GetMethod(
+                "StopAfterVerifiedPeerLossAsync",
+                BindingFlags.Instance | BindingFlags.NonPublic
+            );
         // Exercise the original strict cleanup when the dedicated verified-loss path is absent.
         // This keeps the regression observable as the original exception-masking behavior.
         await (ValueTask)(cleanup?.Invoke(loop, null) ?? ((IAsyncDisposable)loop).DisposeAsync());
@@ -162,22 +200,37 @@ public class AcceptanceBehaviorTests
     {
         int calls = 0;
         Func<CancellationToken, Task<AiNative.Protocol.Backend.V1.PlayerProfile?>> probe = _ =>
-            Task.FromResult<AiNative.Protocol.Backend.V1.PlayerProfile?>(++calls == 1 ? null : new() { Played = 1 });
-        var task = (Task<AiNative.Protocol.Backend.V1.PlayerProfile>)Feature("AcceptanceSettlementPolling")
-            .GetMethod("WaitAsync")!.Invoke(null, [probe, CancellationToken.None])!;
+            Task.FromResult<AiNative.Protocol.Backend.V1.PlayerProfile?>(
+                ++calls == 1 ? null : new() { Played = 1 }
+            );
+        var task =
+            (Task<AiNative.Protocol.Backend.V1.PlayerProfile>)
+                Feature("AcceptanceSettlementPolling")
+                    .GetMethod("WaitAsync")!
+                    .Invoke(null, [probe, CancellationToken.None])!;
         int immediateCalls = calls;
         var profile = await task.WaitAsync(TimeSpan.FromSeconds(2));
-        Assert.That(immediateCalls, Is.EqualTo(1), "The first read must run immediately; an unconfirmed reply must yield before retry.");
-        Assert.That(calls, Is.EqualTo(2)); Assert.That(profile.Played, Is.EqualTo(1));
+        Assert.That(
+            immediateCalls,
+            Is.EqualTo(1),
+            "The first read must run immediately; an unconfirmed reply must yield before retry."
+        );
+        Assert.That(calls, Is.EqualTo(2));
+        Assert.That(profile.Played, Is.EqualTo(1));
     }
 
     [Test]
     public async Task SettlementPollingSurvivesUnavailablePlayerThenRequiresExactlyOne()
     {
         int calls = 0;
-        Func<CancellationToken, Task<AiNative.Protocol.Backend.V1.PlayerProfile?>> probe = _ => Task.FromResult(++calls < 3 ? null : new AiNative.Protocol.Backend.V1.PlayerProfile { Played = 1 });
+        Func<CancellationToken, Task<AiNative.Protocol.Backend.V1.PlayerProfile?>> probe = _ =>
+            Task.FromResult(
+                ++calls < 3 ? null : new AiNative.Protocol.Backend.V1.PlayerProfile { Played = 1 }
+            );
         Type type = Feature("AcceptanceSettlementPolling");
-        var task = (Task<AiNative.Protocol.Backend.V1.PlayerProfile>)type.GetMethod("WaitAsync")!.Invoke(null, [probe, CancellationToken.None])!;
+        var task =
+            (Task<AiNative.Protocol.Backend.V1.PlayerProfile>)
+                type.GetMethod("WaitAsync")!.Invoke(null, [probe, CancellationToken.None])!;
         Assert.That((await task.WaitAsync(TimeSpan.FromSeconds(2))).Played, Is.EqualTo(1));
         Assert.That(calls, Is.EqualTo(3));
     }
@@ -185,7 +238,8 @@ public class AcceptanceBehaviorTests
     static async Task Until(Func<bool> predicate)
     {
         using var deadline = new CancellationTokenSource(2000);
-        while (!predicate()) await Task.Delay(10, deadline.Token);
+        while (!predicate())
+            await Task.Delay(10, deadline.Token);
     }
 
     sealed class FakeTransport : IRealtimeTransport
@@ -196,6 +250,7 @@ public class AcceptanceBehaviorTests
         public SendStatus SendOutcome = SendStatus.Accepted;
         public Exception? SendFailure;
         public TransportState State => TransportState.Connected;
+
         public void Enqueue(Snapshot snapshot)
         {
             byte[] bytes = new byte[2 + snapshot.CalculateSize()];
@@ -203,21 +258,38 @@ public class AcceptanceBehaviorTests
             snapshot.WriteTo(bytes.AsSpan(2));
             packets.Enqueue(bytes);
         }
+
         public bool TryReceive(Span<byte> destination, out ReceivedPacket packet)
         {
             if (packets.TryDequeue(out var bytes))
             {
-                bytes.CopyTo(destination); packet = new(default, bytes.Length, bytes.Length, 0, 0); return true;
+                bytes.CopyTo(destination);
+                packet = new(default, bytes.Length, bytes.Length, 0, 0);
+                return true;
             }
-            packet = new(default, 0, 0, 0, 0); return AlwaysReadable;
+            packet = new(default, 0, 0, 0, 0);
+            return AlwaysReadable;
         }
-        public ValueTask<SendResult> SendAsync(TransportChannel channel, ReadOnlyMemory<byte> payload, CancellationToken cancellationToken = default)
+
+        public ValueTask<SendResult> SendAsync(
+            TransportChannel channel,
+            ReadOnlyMemory<byte> payload,
+            CancellationToken cancellationToken = default
+        )
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (SendFailure is not null) throw SendFailure;
-            if (BinaryPrimitives.ReadUInt16LittleEndian(payload.Span) == (ushort)MessageId.InputCommand) Inputs.Enqueue(InputCommand.Parser.ParseFrom(payload.Span[2..]));
-            return ValueTask.FromResult(new SendResult(SendOutcome, SendOutcome == SendStatus.Accepted ? payload.Length : 0));
+            if (SendFailure is not null)
+                throw SendFailure;
+            if (
+                BinaryPrimitives.ReadUInt16LittleEndian(payload.Span)
+                == (ushort)MessageId.InputCommand
+            )
+                Inputs.Enqueue(InputCommand.Parser.ParseFrom(payload.Span[2..]));
+            return ValueTask.FromResult(
+                new SendResult(SendOutcome, SendOutcome == SendStatus.Accepted ? payload.Length : 0)
+            );
         }
+
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 }

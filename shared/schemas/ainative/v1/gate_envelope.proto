@@ -1,7 +1,15 @@
 syntax = "proto3";
+
 package ainative.transport.v1;
 option csharp_namespace = "AiNative.Protocol.Transport.V1";
+
 // Wire mirror of the pinned FantasyGate envelopes in FantasyControlEnvelope.cs.
 // Opcodes and the 20-byte TCP header remain transport metadata.
-message GateRequestEnvelope { bytes payload = 1; }
-message GateResponseEnvelope { uint32 error_code = 1; bytes payload = 2; }
+message GateRequestEnvelope {
+  bytes payload = 1;
+}
+
+message GateResponseEnvelope {
+  uint32 error_code = 1;
+  bytes payload = 2;
+}

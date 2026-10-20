@@ -17,7 +17,8 @@ internal enum ProtocolDecodeStatus : byte
 internal readonly record struct DecodedProtocolMessage(
     MessageId MessageId,
     TransportChannel Channel,
-    IMessage Message);
+    IMessage Message
+);
 
 internal static class RealtimeProtocolCodec
 {
@@ -27,29 +28,34 @@ internal static class RealtimeProtocolCodec
     private static readonly TransportChannel ControlChannel = new(
         0,
         TransportDelivery.Reliable,
-        TransportOrdering.Ordered);
+        TransportOrdering.Ordered
+    );
 
     private static readonly TransportChannel SnapshotChannel = new(
         1,
         TransportDelivery.Unreliable,
-        TransportOrdering.Sequenced);
+        TransportOrdering.Sequenced
+    );
 
     private static readonly TransportChannel InputChannel = new(
         2,
         TransportDelivery.Unreliable,
-        TransportOrdering.Sequenced);
+        TransportOrdering.Sequenced
+    );
 
     private static readonly TransportChannel EventChannel = new(
         3,
         TransportDelivery.Reliable,
-        TransportOrdering.Ordered);
+        TransportOrdering.Ordered
+    );
 
     public static bool TryEncode(
         MessageId messageId,
         IMessage message,
         Span<byte> destination,
         out TransportChannel channel,
-        out int writtenBytes)
+        out int writtenBytes
+    )
     {
         ArgumentNullException.ThrowIfNull(message);
         channel = default;
@@ -75,7 +81,8 @@ internal static class RealtimeProtocolCodec
 
     public static ProtocolDecodeStatus TryDecode(
         ReadOnlySpan<byte> frame,
-        out DecodedProtocolMessage decoded)
+        out DecodedProtocolMessage decoded
+    )
     {
         decoded = default;
         if (frame.Length < HeaderBytes)
@@ -134,33 +141,35 @@ internal static class RealtimeProtocolCodec
         }
     }
 
-    private static bool IsExpectedType(MessageId messageId, IMessage message) => messageId switch
-    {
-        MessageId.LoginRequest => message is LoginRequest,
-        MessageId.LoginResponse => message is LoginResponse,
-        MessageId.JoinRoomRequest => message is JoinRoomRequest,
-        MessageId.JoinRoomResponse => message is JoinRoomResponse,
-        MessageId.InputCommand => message is InputCommand,
-        MessageId.InputBatch => message is InputBatch,
-        MessageId.Snapshot => message is Snapshot,
-        MessageId.ReliableEvent => message is ReliableEvent,
-        MessageId.ReconnectRequest => message is ReconnectRequest,
-        MessageId.ReconnectResponse => message is ReconnectResponse,
-        _ => false,
-    };
+    private static bool IsExpectedType(MessageId messageId, IMessage message) =>
+        messageId switch
+        {
+            MessageId.LoginRequest => message is LoginRequest,
+            MessageId.LoginResponse => message is LoginResponse,
+            MessageId.JoinRoomRequest => message is JoinRoomRequest,
+            MessageId.JoinRoomResponse => message is JoinRoomResponse,
+            MessageId.InputCommand => message is InputCommand,
+            MessageId.InputBatch => message is InputBatch,
+            MessageId.Snapshot => message is Snapshot,
+            MessageId.ReliableEvent => message is ReliableEvent,
+            MessageId.ReconnectRequest => message is ReconnectRequest,
+            MessageId.ReconnectResponse => message is ReconnectResponse,
+            _ => false,
+        };
 
-    private static IMessage Parse(MessageId messageId, ReadOnlySpan<byte> payload) => messageId switch
-    {
-        MessageId.LoginRequest => LoginRequest.Parser.ParseFrom(payload),
-        MessageId.LoginResponse => LoginResponse.Parser.ParseFrom(payload),
-        MessageId.JoinRoomRequest => JoinRoomRequest.Parser.ParseFrom(payload),
-        MessageId.JoinRoomResponse => JoinRoomResponse.Parser.ParseFrom(payload),
-        MessageId.InputCommand => InputCommand.Parser.ParseFrom(payload),
-        MessageId.InputBatch => InputBatch.Parser.ParseFrom(payload),
-        MessageId.Snapshot => Snapshot.Parser.ParseFrom(payload),
-        MessageId.ReliableEvent => ReliableEvent.Parser.ParseFrom(payload),
-        MessageId.ReconnectRequest => ReconnectRequest.Parser.ParseFrom(payload),
-        MessageId.ReconnectResponse => ReconnectResponse.Parser.ParseFrom(payload),
-        _ => throw new InvalidOperationException($"Unknown message ID: {messageId}."),
-    };
+    private static IMessage Parse(MessageId messageId, ReadOnlySpan<byte> payload) =>
+        messageId switch
+        {
+            MessageId.LoginRequest => LoginRequest.Parser.ParseFrom(payload),
+            MessageId.LoginResponse => LoginResponse.Parser.ParseFrom(payload),
+            MessageId.JoinRoomRequest => JoinRoomRequest.Parser.ParseFrom(payload),
+            MessageId.JoinRoomResponse => JoinRoomResponse.Parser.ParseFrom(payload),
+            MessageId.InputCommand => InputCommand.Parser.ParseFrom(payload),
+            MessageId.InputBatch => InputBatch.Parser.ParseFrom(payload),
+            MessageId.Snapshot => Snapshot.Parser.ParseFrom(payload),
+            MessageId.ReliableEvent => ReliableEvent.Parser.ParseFrom(payload),
+            MessageId.ReconnectRequest => ReconnectRequest.Parser.ParseFrom(payload),
+            MessageId.ReconnectResponse => ReconnectResponse.Parser.ParseFrom(payload),
+            _ => throw new InvalidOperationException($"Unknown message ID: {messageId}."),
+        };
 }

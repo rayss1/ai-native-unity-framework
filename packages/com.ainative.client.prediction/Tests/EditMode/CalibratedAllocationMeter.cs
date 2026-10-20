@@ -29,49 +29,82 @@ namespace AiNative.Client.Prediction.Tests
 #else
             true;
 #endif
+
         public CalibratedAllocationMeter()
         {
 #if UNITY_5_3_OR_NEWER
-            recorder = new ProfilerRecorder(ProfilerCategory.Memory, "GC.Alloc", 1,
-                ProfilerRecorderOptions.WrapAroundWhenCapacityReached | ProfilerRecorderOptions.SumAllSamplesInFrame |
-                ProfilerRecorderOptions.CollectOnlyOnCurrentThread);
-            if (!recorder.Valid) return;
+            recorder = new ProfilerRecorder(
+                ProfilerCategory.Memory,
+                "GC.Alloc",
+                1,
+                ProfilerRecorderOptions.WrapAroundWhenCapacityReached
+                    | ProfilerRecorderOptions.SumAllSamplesInFrame
+                    | ProfilerRecorderOptions.CollectOnlyOnCurrentThread
+            );
+            if (!recorder.Valid)
+                return;
 #endif
             // Warm the measurement/allocator methods before checking an empty interval.
-            Begin(); AllocateKnownArray(); EndRaw();
-            Begin(); long empty = EndRaw();
-            Begin(); AllocateKnownArray(); long known = EndRaw();
+            Begin();
+            AllocateKnownArray();
+            EndRaw();
+            Begin();
+            long empty = EndRaw();
+            Begin();
+            AllocateKnownArray();
+            long known = EndRaw();
             IsSupported = empty == 0 && known >= (MeasuresBytes ? 1024 : 1);
         }
+
         [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void AllocateKnownArray() { GC.KeepAlive(new byte[1024]); }
+        private static void AllocateKnownArray()
+        {
+            GC.KeepAlive(new byte[1024]);
+        }
+
         public void RequireSupported()
         {
-            if (!IsSupported) Assert.Ignore("Allocation result UNVERIFIED: calibrated meter failed known-allocation or empty-interval checks: " + Source);
+            if (!IsSupported)
+                Assert.Ignore(
+                    "Allocation result UNVERIFIED: calibrated meter failed known-allocation or empty-interval checks: "
+                        + Source
+                );
         }
+
         public void Begin()
         {
 #if UNITY_5_3_OR_NEWER
-            if (!recorder.Valid) return;
-            recorder.Reset(); recorder.Start();
+            if (!recorder.Valid)
+                return;
+            recorder.Reset();
+            recorder.Start();
 #else
             baseline = GC.GetAllocatedBytesForCurrentThread();
 #endif
         }
+
         private long EndRaw()
         {
 #if UNITY_5_3_OR_NEWER
-            if (!recorder.Valid) return -1;
+            if (!recorder.Valid)
+                return -1;
             recorder.Stop();
             // Synchronous test intervals never cross a frame. SumAllSamplesInFrame aggregates
             // all allocation events into one sample, so event count cannot saturate the ring.
-            if (recorder.Count > 1) return -1;
+            if (recorder.Count > 1)
+                return -1;
             return recorder.Count == 0 ? 0 : recorder.GetSample(0).Count;
 #else
             return GC.GetAllocatedBytesForCurrentThread() - baseline;
 #endif
         }
-        public long End() { long value = EndRaw(); return IsSupported ? value : -1; }
+
+        public long End()
+        {
+            long value = EndRaw();
+            return IsSupported ? value : -1;
+        }
+
         public void Dispose()
         {
 #if UNITY_5_3_OR_NEWER

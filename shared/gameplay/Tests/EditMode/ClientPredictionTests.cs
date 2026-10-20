@@ -28,8 +28,7 @@ namespace AiNative.Gameplay.Tests
             history.Predict(new KinematicInput(2, 0, 1000), out _);
             history.Predict(new KinematicInput(3, 1000, 0), out _);
 
-            ReconciliationResult result = history.Reconcile(
-                new KinematicState(101, 1, 40, 0));
+            ReconciliationResult result = history.Reconcile(new KinematicState(101, 1, 40, 0));
 
             Assert.That(result.Status, Is.EqualTo(ReconciliationStatus.Corrected));
             Assert.That(result.ErrorXMillimetres, Is.EqualTo(-10));
@@ -46,9 +45,7 @@ namespace AiNative.Gameplay.Tests
             ClientPredictionHistory history = new ClientPredictionHistory(16);
             history.Initialize(new KinematicState(20, 10, 0, 0));
             history.Predict(new KinematicInput(11, 1000, 0), out _);
-            KinematicState predicted = history.Predict(
-                new KinematicInput(12, 0, 1000),
-                out _);
+            KinematicState predicted = history.Predict(new KinematicInput(12, 0, 1000), out _);
 
             ReconciliationResult result = history.Reconcile(predicted);
 
@@ -69,7 +66,8 @@ namespace AiNative.Gameplay.Tests
             history.Predict(new KinematicInput(2, 1000, 0), out bool secondDrop);
             KinematicState current = history.Predict(
                 new KinematicInput(3, 1000, 0),
-                out bool thirdDrop);
+                out bool thirdDrop
+            );
 
             ReconciliationResult result = history.Reconcile(initial);
 
@@ -123,7 +121,8 @@ namespace AiNative.Gameplay.Tests
             {
                 KinematicState predicted = history.Predict(
                     new KinematicInput(++sequence, 1000, -500),
-                    out _);
+                    out _
+                );
                 history.Reconcile(predicted);
             }
 
@@ -133,7 +132,8 @@ namespace AiNative.Gameplay.Tests
             {
                 KinematicState predicted = history.Predict(
                     new KinematicInput(++sequence, 1000, -500),
-                    out _);
+                    out _
+                );
                 history.Reconcile(predicted);
             }
 

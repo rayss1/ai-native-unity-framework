@@ -43,7 +43,10 @@ public sealed class CoordinatorCapacityTests
         await Report(coordinator, rpc, "node-a");
         rpc.OutboxHealth["node-a"] = true; // Recovery has not been reported in a new heartbeat.
 
-        Assert.That((await Request(coordinator, "blocked")).Error, Is.EqualTo("capacity-unavailable"));
+        Assert.That(
+            (await Request(coordinator, "blocked")).Error,
+            Is.EqualTo("capacity-unavailable")
+        );
         Assert.That(store.Rooms, Is.Empty);
         await Report(coordinator, rpc, "node-a");
         Assert.That((await Allocate(coordinator, "recovered")).State, Is.EqualTo("Ready"));
@@ -60,7 +63,10 @@ public sealed class CoordinatorCapacityTests
         await Report(coordinator, rpc, "node-a");
         clock.Now = clock.Now.AddSeconds(21);
 
-        Assert.That((await Request(coordinator, "expired")).Error, Is.EqualTo("capacity-unavailable"));
+        Assert.That(
+            (await Request(coordinator, "expired")).Error,
+            Is.EqualTo("capacity-unavailable")
+        );
         Assert.That(store.Rooms, Is.Empty);
     }
 
@@ -76,8 +82,11 @@ public sealed class CoordinatorCapacityTests
         rpc.Restart("node-a");
         rpc.FailCreationOn = null;
 
-        Assert.That((await Request(coordinator, "fresh")).Error, Is.EqualTo("capacity-unavailable"),
-            "A refresh against the old boot must reject the changed identity until its authenticated heartbeat.");
+        Assert.That(
+            (await Request(coordinator, "fresh")).Error,
+            Is.EqualTo("capacity-unavailable"),
+            "A refresh against the old boot must reject the changed identity until its authenticated heartbeat."
+        );
         RoomAllocation beforeHeartbeat = await Allocate(coordinator, "uncertain");
         Assert.That(beforeHeartbeat.State, Is.EqualTo("Reserved"));
         Assert.That(beforeHeartbeat.RoomId, Is.EqualTo(pending.RoomId));
@@ -111,8 +120,13 @@ public sealed class CoordinatorCapacityTests
         Task<ServiceReply> admission = Request(coordinator, "replacement").AsTask();
         try
         {
-            Task finished = await Task.WhenAny(admission, rpc.FenceEntered.Task).WaitAsync(TimeSpan.FromSeconds(2));
-            Assert.That(finished, Is.SameAs(admission), "A healthy slot was already found before reaching the blocked node.");
+            Task finished = await Task.WhenAny(admission, rpc.FenceEntered.Task)
+                .WaitAsync(TimeSpan.FromSeconds(2));
+            Assert.That(
+                finished,
+                Is.SameAs(admission),
+                "A healthy slot was already found before reaching the blocked node."
+            );
             Assert.That((await admission).Read(RoomAllocation.Parser).State, Is.EqualTo("Ready"));
         }
         finally
@@ -140,7 +154,11 @@ public sealed class CoordinatorCapacityTests
         Assert.That(second.State, Is.EqualTo("Ready"));
         Assert.That(second.NodeId, Is.EqualTo("node-b"));
         Assert.That(exhausted.Error, Is.EqualTo("capacity-unavailable"));
-        Assert.That(store.Rooms, Has.Count.EqualTo(2), "No ownership should be persisted for an exhausted admission.");
+        Assert.That(
+            store.Rooms,
+            Has.Count.EqualTo(2),
+            "No ownership should be persisted for an exhausted admission."
+        );
     }
 
     [Test]
@@ -158,8 +176,13 @@ public sealed class CoordinatorCapacityTests
 
         Assert.That(replacement.State, Is.EqualTo("Ready"));
         Assert.That(replacement.RoomId, Is.Not.EqualTo(first.RoomId));
-        RoomAllocation old = (await coordinator.HandleAsync(new(ServiceRole.Match, "match"), ServiceMethods.RoomGet,
-            new RoomQuery { RoomId = first.RoomId }.ToByteArray())).Read(RoomAllocation.Parser);
+        RoomAllocation old = (
+            await coordinator.HandleAsync(
+                new(ServiceRole.Match, "match"),
+                ServiceMethods.RoomGet,
+                new RoomQuery { RoomId = first.RoomId }.ToByteArray()
+            )
+        ).Read(RoomAllocation.Parser);
         Assert.That(old.State, Is.EqualTo("Released"));
     }
 
@@ -195,15 +218,35 @@ public sealed class CoordinatorCapacityTests
         await Report(coordinator, rpc, "node-a"); // One occupied slot is already reflected in AvailableRooms.
 
         Assert.That((await Allocate(coordinator, "second")).State, Is.EqualTo("Ready"));
-        Assert.That((await Request(coordinator, "third")).Error, Is.EqualTo("capacity-unavailable"));
+        Assert.That(
+            (await Request(coordinator, "third")).Error,
+            Is.EqualTo("capacity-unavailable")
+        );
     }
 
     private static async Task Report(RoomCoordinator coordinator, CapacityRpc rpc, string node) =>
-        Assert.That((await coordinator.HandleAsync(new(ServiceRole.Battle, node), ServiceMethods.NodeReport,
-            rpc.Inventory(node).ToByteArray())).Success, Is.True);
+        Assert.That(
+            (
+                await coordinator.HandleAsync(
+                    new(ServiceRole.Battle, node),
+                    ServiceMethods.NodeReport,
+                    rpc.Inventory(node).ToByteArray()
+                )
+            ).Success,
+            Is.True
+        );
+
     private static ValueTask<ServiceReply> Request(RoomCoordinator coordinator, string match) =>
-        coordinator.HandleAsync(new(ServiceRole.Match, "match"), ServiceMethods.Allocate,
-            new AllocationRequest { MatchId = match, PlayerIds = { "player-" + match } }.ToByteArray());
+        coordinator.HandleAsync(
+            new(ServiceRole.Match, "match"),
+            ServiceMethods.Allocate,
+            new AllocationRequest
+            {
+                MatchId = match,
+                PlayerIds = { "player-" + match },
+            }.ToByteArray()
+        );
+
     private static async Task<RoomAllocation> Allocate(RoomCoordinator coordinator, string match)
     {
         ServiceReply reply = await Request(coordinator, match);
@@ -214,15 +257,30 @@ public sealed class CoordinatorCapacityTests
     private sealed class Store : IAllocationStore
     {
         public readonly Dictionary<string, RoomAllocation> Rooms = [];
-        public ValueTask<IReadOnlyList<RoomAllocation>> LoadAsync(CancellationToken cancellationToken = default) =>
-            ValueTask.FromResult<IReadOnlyList<RoomAllocation>>(Rooms.Values.Select(room => room.Clone()).ToArray());
-        public ValueTask SaveAsync(RoomAllocation room, CancellationToken cancellationToken = default)
-        { Rooms[room.RoomId] = room.Clone(); return ValueTask.CompletedTask; }
+
+        public ValueTask<IReadOnlyList<RoomAllocation>> LoadAsync(
+            CancellationToken cancellationToken = default
+        ) =>
+            ValueTask.FromResult<IReadOnlyList<RoomAllocation>>(
+                Rooms.Values.Select(room => room.Clone()).ToArray()
+            );
+
+        public ValueTask SaveAsync(
+            RoomAllocation room,
+            CancellationToken cancellationToken = default
+        )
+        {
+            Rooms[room.RoomId] = room.Clone();
+            return ValueTask.CompletedTask;
+        }
     }
 
     private sealed class CapacityRpc(params (string Node, int Slots)[] capacities) : IServiceRpc
     {
-        private readonly Dictionary<string, int> slots = capacities.ToDictionary(item => item.Node, item => item.Slots);
+        private readonly Dictionary<string, int> slots = capacities.ToDictionary(
+            item => item.Node,
+            item => item.Slots
+        );
         private readonly Dictionary<string, RoomAllocation> rooms = [];
         public string? FailCreationOn;
         public string? BlockFenceOn;
@@ -230,30 +288,66 @@ public sealed class CoordinatorCapacityTests
         public string FenceFailure = "reject";
         public readonly Dictionary<string, bool> OutboxHealth = [];
         private readonly Dictionary<string, string> boots = [];
-        public readonly TaskCompletionSource<bool> FenceEntered = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        public readonly TaskCompletionSource<ServiceReply> FenceReleased = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public readonly TaskCompletionSource<bool> FenceEntered = new(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        public readonly TaskCompletionSource<ServiceReply> FenceReleased = new(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+
         public void Complete(RoomAllocation room) => rooms.Remove(room.RoomId);
+
         public void Restart(string node)
         {
-            foreach (string room in rooms.Values.Where(room => room.NodeId == node).Select(room => room.RoomId).ToArray()) rooms.Remove(room);
+            foreach (
+                string room in rooms
+                    .Values.Where(room => room.NodeId == node)
+                    .Select(room => room.RoomId)
+                    .ToArray()
+            )
+                rooms.Remove(room);
             boots[node] = "restarted-" + node;
         }
-        public BattleNodeReport Inventory(string node) => new()
-        {
-            NodeId = node, BootEpoch = boots.GetValueOrDefault(node, "boot-" + node), Address = "127.0.0.1:22000",
-            OutboxHealthy = OutboxHealth.GetValueOrDefault(node, true),
-            Workers = { new WorkerCapacity { WorkerId = 0, AvailableRooms = slots[node] - rooms.Values.Count(room => room.NodeId == node), MailboxAvailable = 32 } },
-            Rooms = { rooms.Values.Where(room => room.NodeId == node).Select(room => room.Clone()) }
-        };
-        public ValueTask<ServiceReply> CallAsync(ServiceTarget target, string method, ReadOnlyMemory<byte> payload,
-            CancellationToken cancellationToken = default, string playerId = "")
+
+        public BattleNodeReport Inventory(string node) =>
+            new()
+            {
+                NodeId = node,
+                BootEpoch = boots.GetValueOrDefault(node, "boot-" + node),
+                Address = "127.0.0.1:22000",
+                OutboxHealthy = OutboxHealth.GetValueOrDefault(node, true),
+                Workers =
+                {
+                    new WorkerCapacity
+                    {
+                        WorkerId = 0,
+                        AvailableRooms =
+                            slots[node] - rooms.Values.Count(room => room.NodeId == node),
+                        MailboxAvailable = 32,
+                    },
+                },
+                Rooms =
+                {
+                    rooms.Values.Where(room => room.NodeId == node).Select(room => room.Clone()),
+                },
+            };
+
+        public ValueTask<ServiceReply> CallAsync(
+            ServiceTarget target,
+            string method,
+            ReadOnlyMemory<byte> payload,
+            CancellationToken cancellationToken = default,
+            string playerId = ""
+        )
         {
             if (method == ServiceMethods.Fence)
             {
                 if (target.NodeId == FailFenceOn)
                 {
-                    if (FenceFailure == "timeout") throw new TimeoutException();
-                    if (FenceFailure == "unavailable") throw new ServiceException("unavailable");
+                    if (FenceFailure == "timeout")
+                        throw new TimeoutException();
+                    if (FenceFailure == "unavailable")
+                        throw new ServiceException("unavailable");
                     return ValueTask.FromResult(ServiceReply.Reject("unavailable"));
                 }
                 if (target.NodeId == BlockFenceOn)
@@ -276,15 +370,18 @@ public sealed class CoordinatorCapacityTests
             }
             if (method == ServiceMethods.Create)
             {
-                if (target.NodeId == FailCreationOn) throw new TimeoutException();
+                if (target.NodeId == FailCreationOn)
+                    throw new TimeoutException();
                 rooms[RoomCreation.Parser.ParseFrom(payload.Span).RoomId].State = "Ready";
             }
             return ValueTask.FromResult(ServiceReply.From(new Empty()));
         }
     }
+
     private sealed class Clock : TimeProvider
     {
         public DateTimeOffset Now = DateTimeOffset.Parse("2026-10-03T00:00:00Z");
+
         public override DateTimeOffset GetUtcNow() => Now;
     }
 }

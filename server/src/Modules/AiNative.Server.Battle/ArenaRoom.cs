@@ -23,7 +23,8 @@ internal readonly record struct ArenaCombatEventRecord(
     int Damage,
     int PositionXMillimetres,
     int PositionYMillimetres,
-    int PositionZMillimetres);
+    int PositionZMillimetres
+);
 
 internal sealed class ArenaRoom
 {
@@ -54,7 +55,10 @@ internal sealed class ArenaRoom
     private readonly int[] _inputHeads = new int[MaxPlayers];
     private readonly int[] _inputCounts = new int[MaxPlayers];
     private readonly bool[] _occupied = new bool[MaxPlayers];
-    private readonly HistoricalPlayer[,] _history = new HistoricalPlayer[HistoryCapacity, MaxPlayers];
+    private readonly HistoricalPlayer[,] _history = new HistoricalPlayer[
+        HistoryCapacity,
+        MaxPlayers
+    ];
     private readonly ulong[] _historyTicks = new ulong[HistoryCapacity];
     private readonly bool[] _historyValid = new bool[HistoryCapacity];
     private readonly ulong[] _lifetimes = new ulong[MaxPlayers];
@@ -77,7 +81,8 @@ internal sealed class ArenaRoom
 
     public ArenaRoom(int matchLengthTicks = MatchLengthTicks)
     {
-        if (matchLengthTicks < 1) throw new ArgumentOutOfRangeException(nameof(matchLengthTicks));
+        if (matchLengthTicks < 1)
+            throw new ArgumentOutOfRangeException(nameof(matchLengthTicks));
         _matchLengthTicks = matchLengthTicks;
         for (int index = 0; index < _pickups.Length; index++)
         {
@@ -106,19 +111,45 @@ internal sealed class ArenaRoom
         for (int index = 0; index < MaxPlayers; index++)
         {
             ArenaPlayerState state = _players[index];
-            BinaryPrimitives.WriteInt32LittleEndian(canonical[offset..], state.PositionXMillimetres);
-            BinaryPrimitives.WriteInt32LittleEndian(canonical[(offset + 4)..], state.PositionYMillimetres);
-            BinaryPrimitives.WriteInt32LittleEndian(canonical[(offset + 8)..], state.PositionZMillimetres);
-            BinaryPrimitives.WriteInt32LittleEndian(canonical[(offset + 12)..], state.VelocityXMillimetresPerSecond);
-            BinaryPrimitives.WriteInt32LittleEndian(canonical[(offset + 16)..], state.VelocityYMillimetresPerSecond);
-            BinaryPrimitives.WriteInt32LittleEndian(canonical[(offset + 20)..], state.VelocityZMillimetresPerSecond);
+            BinaryPrimitives.WriteInt32LittleEndian(
+                canonical[offset..],
+                state.PositionXMillimetres
+            );
+            BinaryPrimitives.WriteInt32LittleEndian(
+                canonical[(offset + 4)..],
+                state.PositionYMillimetres
+            );
+            BinaryPrimitives.WriteInt32LittleEndian(
+                canonical[(offset + 8)..],
+                state.PositionZMillimetres
+            );
+            BinaryPrimitives.WriteInt32LittleEndian(
+                canonical[(offset + 12)..],
+                state.VelocityXMillimetresPerSecond
+            );
+            BinaryPrimitives.WriteInt32LittleEndian(
+                canonical[(offset + 16)..],
+                state.VelocityYMillimetresPerSecond
+            );
+            BinaryPrimitives.WriteInt32LittleEndian(
+                canonical[(offset + 20)..],
+                state.VelocityZMillimetresPerSecond
+            );
             BinaryPrimitives.WriteInt32LittleEndian(canonical[(offset + 24)..], state.Health);
             BinaryPrimitives.WriteInt32LittleEndian(canonical[(offset + 28)..], state.Armor);
-            BinaryPrimitives.WriteInt32LittleEndian(canonical[(offset + 32)..], state.YawMillidegrees);
-            BinaryPrimitives.WriteInt32LittleEndian(canonical[(offset + 36)..], state.PitchMillidegrees);
+            BinaryPrimitives.WriteInt32LittleEndian(
+                canonical[(offset + 32)..],
+                state.YawMillidegrees
+            );
+            BinaryPrimitives.WriteInt32LittleEndian(
+                canonical[(offset + 36)..],
+                state.PitchMillidegrees
+            );
             BinaryPrimitives.WriteUInt32LittleEndian(canonical[(offset + 40)..], state.Kills);
-            BinaryPrimitives.WriteUInt32LittleEndian(canonical[(offset + 44)..],
-                !_occupied[index] ? 0U : 1U);
+            BinaryPrimitives.WriteUInt32LittleEndian(
+                canonical[(offset + 44)..],
+                !_occupied[index] ? 0U : 1U
+            );
             offset += 48;
             WriteHashValue(canonical, ref offset, state.Tick);
             WriteHashValue(canonical, ref offset, (long)state.Weapon);
@@ -138,11 +169,18 @@ internal sealed class ArenaRoom
             WriteHashValue(canonical, ref offset, _inputCounts[index]);
             for (int pending = 0; pending < _inputCounts[index]; pending++)
             {
-                var input = _pendingInputs[index, (_inputHeads[index] + pending) % InputQueueCapacity];
-                WriteHashValue(canonical, ref offset, input.Sequence); WriteHashValue(canonical, ref offset, (long)input.ClientTick);
-                WriteHashValue(canonical, ref offset, input.MoveXMilli); WriteHashValue(canonical, ref offset, input.MoveZMilli);
-                WriteHashValue(canonical, ref offset, input.LookYawMilli); WriteHashValue(canonical, ref offset, input.LookPitchMilli);
-                WriteHashValue(canonical, ref offset, (long)input.Buttons); WriteHashValue(canonical, ref offset, (long)input.Weapon);
+                var input = _pendingInputs[
+                    index,
+                    (_inputHeads[index] + pending) % InputQueueCapacity
+                ];
+                WriteHashValue(canonical, ref offset, input.Sequence);
+                WriteHashValue(canonical, ref offset, (long)input.ClientTick);
+                WriteHashValue(canonical, ref offset, input.MoveXMilli);
+                WriteHashValue(canonical, ref offset, input.MoveZMilli);
+                WriteHashValue(canonical, ref offset, input.LookYawMilli);
+                WriteHashValue(canonical, ref offset, input.LookPitchMilli);
+                WriteHashValue(canonical, ref offset, (long)input.Buttons);
+                WriteHashValue(canonical, ref offset, (long)input.Weapon);
             }
         }
 
@@ -172,23 +210,40 @@ internal sealed class ArenaRoom
         foreach (var projectile in _projectiles)
         {
             WriteHashValue(canonical, ref offset, projectile.SourceEntityId);
-            WriteHashValue(canonical, ref offset, projectile.X); WriteHashValue(canonical, ref offset, projectile.Y); WriteHashValue(canonical, ref offset, projectile.Z);
-            WriteHashValue(canonical, ref offset, projectile.VelocityX); WriteHashValue(canonical, ref offset, projectile.VelocityY); WriteHashValue(canonical, ref offset, projectile.VelocityZ);
+            WriteHashValue(canonical, ref offset, projectile.X);
+            WriteHashValue(canonical, ref offset, projectile.Y);
+            WriteHashValue(canonical, ref offset, projectile.Z);
+            WriteHashValue(canonical, ref offset, projectile.VelocityX);
+            WriteHashValue(canonical, ref offset, projectile.VelocityY);
+            WriteHashValue(canonical, ref offset, projectile.VelocityZ);
             WriteHashValue(canonical, ref offset, projectile.RemainingTicks);
         }
         return StateHasher.ComputeHash(canonical[..offset]);
     }
 
     private static void WriteHashValue(Span<byte> bytes, ref int offset, long value)
-    { BinaryPrimitives.WriteInt64LittleEndian(bytes[offset..], value); offset += 8; }
+    {
+        BinaryPrimitives.WriteInt64LittleEndian(bytes[offset..], value);
+        offset += 8;
+    }
 
-    public int RemainingTicks => Phase == ArenaMatchPhase.Active
-        ? Math.Max(0, _matchLengthTicks - checked((int)Math.Min(Tick - _matchStartTick, (ulong)_matchLengthTicks)))
-        : Phase == ArenaMatchPhase.Waiting ? _matchLengthTicks : 0;
+    public int RemainingTicks =>
+        Phase == ArenaMatchPhase.Active
+            ? Math.Max(
+                0,
+                _matchLengthTicks
+                    - checked((int)Math.Min(Tick - _matchStartTick, (ulong)_matchLengthTicks))
+            )
+        : Phase == ArenaMatchPhase.Waiting ? _matchLengthTicks
+        : 0;
 
     public bool TryJoin(out uint entityId)
     {
-        if (Phase == ArenaMatchPhase.Finished) { entityId = 0; return false; }
+        if (Phase == ArenaMatchPhase.Finished)
+        {
+            entityId = 0;
+            return false;
+        }
         for (int index = 0; index < MaxPlayers; index++)
         {
             if (_occupied[index])
@@ -209,7 +264,8 @@ internal sealed class ArenaRoom
             _ammo[index, 0] = ArenaWeaponRules.Machinegun.MagazineSize;
             _ammo[index, 1] = ArenaWeaponRules.Shotgun.MagazineSize;
             _ammo[index, 2] = ArenaWeaponRules.Rocket.MagazineSize;
-            for (int weapon = 0; weapon < 3; weapon++) _reloadUntil[index, weapon] = 0;
+            for (int weapon = 0; weapon < 3; weapon++)
+                _reloadUntil[index, weapon] = 0;
             _connectedCount++;
             entityId = checked((uint)index + 1);
             if (Phase == ArenaMatchPhase.Waiting && _connectedCount >= 2)
@@ -250,23 +306,32 @@ internal sealed class ArenaRoom
 
     public bool SubmitInput(uint entityId, in ArenaInput input)
     {
-        if (input.ClientTick > Tick + 1 ||
-            (Tick > input.ClientTick && Tick - input.ClientTick > LagCompensationTicks))
+        if (
+            input.ClientTick > Tick + 1
+            || (Tick > input.ClientTick && Tick - input.ClientTick > LagCompensationTicks)
+        )
         {
             RejectedInputAgeCount++;
             return false;
         }
-        if (!TryGetIndex(entityId, out int index) || !_occupied[index] ||
-            input.Sequence <= _lastInputSequences[index] ||
-            _inputCounts[index] == InputQueueCapacity ||
-            input.MoveXMilli is < -1000 or > 1000 || input.MoveZMilli is < -1000 or > 1000 ||
-            input.LookYawMilli is < -360000 or > 360000 || input.LookPitchMilli is < -180000 or > 180000 ||
-            (uint)input.Weapon > 3 || ((uint)input.Buttons & ~31u) != 0)
+        if (
+            !TryGetIndex(entityId, out int index)
+            || !_occupied[index]
+            || input.Sequence <= _lastInputSequences[index]
+            || _inputCounts[index] == InputQueueCapacity
+            || input.MoveXMilli is < -1000 or > 1000
+            || input.MoveZMilli is < -1000 or > 1000
+            || input.LookYawMilli is < -360000 or > 360000
+            || input.LookPitchMilli is < -180000 or > 180000
+            || (uint)input.Weapon > 3
+            || ((uint)input.Buttons & ~31u) != 0
+        )
         {
             return false;
         }
 
-        _pendingInputs[index, (_inputHeads[index] + _inputCounts[index]) % InputQueueCapacity] = input;
+        _pendingInputs[index, (_inputHeads[index] + _inputCounts[index]) % InputQueueCapacity] =
+            input;
         _inputCounts[index]++;
         _lastInputSequences[index] = input.Sequence;
         return true;
@@ -294,7 +359,10 @@ internal sealed class ArenaRoom
                 // Skipping consumption here permanently accumulates latency at equal send/Tick rates.
                 if (_inputCounts[index] > 0)
                 {
-                    _players[index].LastProcessedInputSequence = _pendingInputs[index, _inputHeads[index]].Sequence;
+                    _players[index].LastProcessedInputSequence = _pendingInputs[
+                        index,
+                        _inputHeads[index]
+                    ].Sequence;
                     _inputHeads[index] = (_inputHeads[index] + 1) % InputQueueCapacity;
                     _inputCounts[index]--;
                 }
@@ -306,18 +374,21 @@ internal sealed class ArenaRoom
                 continue;
             }
 
-            ArenaInput input = _inputCounts[index] > 0 ? _pendingInputs[index, _inputHeads[index]] : default;
+            ArenaInput input =
+                _inputCounts[index] > 0 ? _pendingInputs[index, _inputHeads[index]] : default;
             uint previousAcknowledgement = _players[index].LastProcessedInputSequence;
             _players[index] = ArenaMovement.Step(_players[index], input);
             _players[index].Tick = checked((long)Tick);
-            if (_inputCounts[index] == 0) _players[index].LastProcessedInputSequence = previousAcknowledgement;
+            if (_inputCounts[index] == 0)
+                _players[index].LastProcessedInputSequence = previousAcknowledgement;
             if (input.Weapon != ArenaWeaponId.None && input.Weapon != _players[index].Weapon)
             {
                 SwitchWeapon(index, input.Weapon);
             }
 
             UpdateReloads(index);
-            if ((input.Buttons & ArenaButtons.Reload) != 0) BeginReload(index);
+            if ((input.Buttons & ArenaButtons.Reload) != 0)
+                BeginReload(index);
             if ((input.Buttons & ArenaButtons.Fire) != 0)
             {
                 Fire(index, input);
@@ -333,7 +404,10 @@ internal sealed class ArenaRoom
 
         TickProjectiles();
         UpdateLeader();
-        if (Phase == ArenaMatchPhase.Active && (Tick - _matchStartTick >= (ulong)_matchLengthTicks || LeaderScore() >= ScoreLimit))
+        if (
+            Phase == ArenaMatchPhase.Active
+            && (Tick - _matchStartTick >= (ulong)_matchLengthTicks || LeaderScore() >= ScoreLimit)
+        )
         {
             Phase = ArenaMatchPhase.Finished;
         }
@@ -400,7 +474,11 @@ internal sealed class ArenaRoom
 
     private void AddEvent(ArenaCombatEventRecord record)
     {
-        if (_events.Count == MaximumEvents) { DroppedEventCount++; return; }
+        if (_events.Count == MaximumEvents)
+        {
+            DroppedEventCount++;
+            return;
+        }
         _events.Add(record);
     }
 
@@ -412,17 +490,27 @@ internal sealed class ArenaRoom
         for (int player = 0; player < MaxPlayers; player++)
         {
             ArenaPlayerState state = _players[player];
-            _history[frame, player] = new HistoricalPlayer(state.PositionXMillimetres,
-                state.PositionYMillimetres, state.PositionZMillimetres, _occupied[player],
-                state.Alive, _protectedUntilTicks[player], _lifetimes[player]);
+            _history[frame, player] = new HistoricalPlayer(
+                state.PositionXMillimetres,
+                state.PositionYMillimetres,
+                state.PositionZMillimetres,
+                _occupied[player],
+                state.Alive,
+                _protectedUntilTicks[player],
+                _lifetimes[player]
+            );
         }
     }
 
     private void BeginReload(int index)
     {
         int weapon = (int)_players[index].Weapon - 1;
-        if ((uint)weapon >= 3u || _reloadUntil[index, weapon] != 0 ||
-            _ammo[index, weapon] == ArenaWeaponRules.Get(_players[index].Weapon).MagazineSize) return;
+        if (
+            (uint)weapon >= 3u
+            || _reloadUntil[index, weapon] != 0
+            || _ammo[index, weapon] == ArenaWeaponRules.Get(_players[index].Weapon).MagazineSize
+        )
+            return;
         _reloadUntil[index, weapon] = Tick + ReloadTicks;
     }
 
@@ -430,7 +518,8 @@ internal sealed class ArenaRoom
     {
         for (int weapon = 0; weapon < 3; weapon++)
         {
-            if (_reloadUntil[index, weapon] == 0 || Tick < _reloadUntil[index, weapon]) continue;
+            if (_reloadUntil[index, weapon] == 0 || Tick < _reloadUntil[index, weapon])
+                continue;
             _ammo[index, weapon] = ArenaWeaponRules.Get((ArenaWeaponId)(weapon + 1)).MagazineSize;
             _reloadUntil[index, weapon] = 0;
         }
@@ -441,15 +530,22 @@ internal sealed class ArenaRoom
         ArenaWeaponId weapon = _players[shooterIndex].Weapon;
         ArenaWeaponDefinition definition = ArenaWeaponRules.Get(weapon);
         int weaponIndex = checked((int)weapon - 1);
-        if ((uint)weaponIndex >= 3u || _reloadUntil[shooterIndex, weaponIndex] != 0) return;
+        if ((uint)weaponIndex >= 3u || _reloadUntil[shooterIndex, weaponIndex] != 0)
+            return;
         if (_ammo[shooterIndex, weaponIndex] <= 0)
         {
             BeginReload(shooterIndex);
             return;
         }
 
-        ulong cooldownTicks = Math.Max(1UL, checked(60UL * 60UL / (ulong)definition.RoundsPerMinute));
-        if (_lastFireTicks[shooterIndex] != 0 && Tick < _lastFireTicks[shooterIndex] + cooldownTicks)
+        ulong cooldownTicks = Math.Max(
+            1UL,
+            checked(60UL * 60UL / (ulong)definition.RoundsPerMinute)
+        );
+        if (
+            _lastFireTicks[shooterIndex] != 0
+            && Tick < _lastFireTicks[shooterIndex] + cooldownTicks
+        )
         {
             return;
         }
@@ -461,9 +557,14 @@ internal sealed class ArenaRoom
             HistoricalPlayer past = _history[historicalFrame, shooterIndex];
             // Queue delay cannot extend the allowed window. Tick-1 is the
             // committed boundary from which this simulation step started.
-            if (Tick - 1 - input.ClientTick > LagCompensationTicks ||
-                !_historyValid[historicalFrame] || _historyTicks[historicalFrame] != input.ClientTick ||
-                !past.Present || !past.Alive || past.Lifetime != _lifetimes[shooterIndex])
+            if (
+                Tick - 1 - input.ClientTick > LagCompensationTicks
+                || !_historyValid[historicalFrame]
+                || _historyTicks[historicalFrame] != input.ClientTick
+                || !past.Present
+                || !past.Alive
+                || past.Lifetime != _lifetimes[shooterIndex]
+            )
             {
                 RejectedShotHistoryCount++;
                 return;
@@ -473,34 +574,64 @@ internal sealed class ArenaRoom
         _ammo[shooterIndex, weaponIndex]--;
         ArenaPlayerState shooter = _players[shooterIndex];
         uint sourceId = checked((uint)shooterIndex + 1);
-        AddEvent(new ArenaCombatEventRecord(
-            ArenaCombatEventKind.Fire,
-            Tick,
-            sourceId,
-            0,
-            weapon,
-            0,
-            shooter.PositionXMillimetres,
-            shooter.PositionYMillimetres,
-            shooter.PositionZMillimetres));
+        AddEvent(
+            new ArenaCombatEventRecord(
+                ArenaCombatEventKind.Fire,
+                Tick,
+                sourceId,
+                0,
+                weapon,
+                0,
+                shooter.PositionXMillimetres,
+                shooter.PositionYMillimetres,
+                shooter.PositionZMillimetres
+            )
+        );
 
         if (weapon == ArenaWeaponId.Rocket)
         {
-            _projectiles.Add(new ArenaProjectile(
-                sourceId,
-                shooter.PositionXMillimetres,
-                shooter.PositionYMillimetres + 600,
-                shooter.PositionZMillimetres,
-                (int)((long)ForwardX(shooter.YawMillidegrees, shooter.PitchMillidegrees) * RocketSpeedMillimetresPerSecond / 1000000),
-                (int)((long)ForwardY(shooter.PitchMillidegrees) * RocketSpeedMillimetresPerSecond / 1000000),
-                (int)((long)ForwardZ(shooter.YawMillidegrees, shooter.PitchMillidegrees) * RocketSpeedMillimetresPerSecond / 1000000),
-                RocketLifetimeTicks));
+            _projectiles.Add(
+                new ArenaProjectile(
+                    sourceId,
+                    shooter.PositionXMillimetres,
+                    shooter.PositionYMillimetres + 600,
+                    shooter.PositionZMillimetres,
+                    (int)(
+                        (long)ForwardX(shooter.YawMillidegrees, shooter.PitchMillidegrees)
+                        * RocketSpeedMillimetresPerSecond
+                        / 1000000
+                    ),
+                    (int)(
+                        (long)ForwardY(shooter.PitchMillidegrees)
+                        * RocketSpeedMillimetresPerSecond
+                        / 1000000
+                    ),
+                    (int)(
+                        (long)ForwardZ(shooter.YawMillidegrees, shooter.PitchMillidegrees)
+                        * RocketSpeedMillimetresPerSecond
+                        / 1000000
+                    ),
+                    RocketLifetimeTicks
+                )
+            );
             return;
         }
 
         int pellets = weapon == ArenaWeaponId.Shotgun ? 10 : 1;
         int damage = checked(definition.Damage * pellets);
-        if (TryFindRayTarget(shooterIndex, historicalFrame, input.ClientTick, definition.RangeMillimetres, weapon == ArenaWeaponId.Shotgun ? 7000 : 0, out int targetIndex, out int hitX, out int hitY, out int hitZ))
+        if (
+            TryFindRayTarget(
+                shooterIndex,
+                historicalFrame,
+                input.ClientTick,
+                definition.RangeMillimetres,
+                weapon == ArenaWeaponId.Shotgun ? 7000 : 0,
+                out int targetIndex,
+                out int hitX,
+                out int hitY,
+                out int hitZ
+            )
+        )
         {
             ApplyDamage(shooterIndex, targetIndex, damage, weapon, hitX, hitY, hitZ);
         }
@@ -515,17 +646,46 @@ internal sealed class ArenaRoom
             double stepY = projectile.VelocityY / ArenaMovement.TickRate;
             double stepZ = projectile.VelocityZ / ArenaMovement.TickRate;
             double length = Math.Sqrt(stepX * stepX + stepY * stepY + stepZ * stepZ);
-            double dx = stepX / length, dy = stepY / length, dz = stepZ / length;
-            bool impact = ArenaTrainingMap.Raycast(projectile.X, projectile.Y, projectile.Z,
-                dx, dy, dz, length, out double nearest, RocketCollisionRadiusMillimetres);
+            double dx = stepX / length,
+                dy = stepY / length,
+                dz = stepZ / length;
+            bool impact = ArenaTrainingMap.Raycast(
+                projectile.X,
+                projectile.Y,
+                projectile.Z,
+                dx,
+                dy,
+                dz,
+                length,
+                out double nearest,
+                RocketCollisionRadiusMillimetres
+            );
             for (int target = 0; target < MaxPlayers; target++)
             {
-                if (!_occupied[target] || !_players[target].Alive || (uint)(target + 1) == projectile.SourceEntityId) continue;
+                if (
+                    !_occupied[target]
+                    || !_players[target].Alive
+                    || (uint)(target + 1) == projectile.SourceEntityId
+                )
+                    continue;
                 var player = _players[target];
-                if (ArenaHitGeometry.RayCapsule(projectile.X - player.PositionXMillimetres,
-                    projectile.Y - player.PositionYMillimetres, projectile.Z - player.PositionZMillimetres,
-                    dx, dy, dz, Math.Min(length, nearest), out double hit, RocketCollisionRadiusMillimetres))
-                { nearest = hit; impact = true; }
+                if (
+                    ArenaHitGeometry.RayCapsule(
+                        projectile.X - player.PositionXMillimetres,
+                        projectile.Y - player.PositionYMillimetres,
+                        projectile.Z - player.PositionZMillimetres,
+                        dx,
+                        dy,
+                        dz,
+                        Math.Min(length, nearest),
+                        out double hit,
+                        RocketCollisionRadiusMillimetres
+                    )
+                )
+                {
+                    nearest = hit;
+                    impact = true;
+                }
             }
             double travel = impact ? Math.Max(0, nearest - 1) : length;
             projectile.X += (int)Math.Round(dx * travel);
@@ -537,7 +697,8 @@ internal sealed class ArenaRoom
                 Explode(projectile.SourceEntityId, projectile.X, projectile.Y, projectile.Z);
                 _projectiles.RemoveAt(index);
             }
-            else _projectiles[index] = projectile;
+            else
+                _projectiles[index] = projectile;
         }
     }
 
@@ -551,15 +712,27 @@ internal sealed class ArenaRoom
                 continue;
             }
 
-            int distance = DistanceMillimetres(_players[targetIndex].PositionXMillimetres - x,
+            int distance = DistanceMillimetres(
+                _players[targetIndex].PositionXMillimetres - x,
                 _players[targetIndex].PositionYMillimetres - y,
-                _players[targetIndex].PositionZMillimetres - z);
+                _players[targetIndex].PositionZMillimetres - z
+            );
             int damage = ArenaCombatRules.RocketDamageAtDistance(
                 distance,
-                targetIndex == sourceIndex);
-            if (damage > 0 && Tick >= _protectedUntilTicks[targetIndex] &&
-                !ArenaTrainingMap.Occluded(x, y, z, _players[targetIndex].PositionXMillimetres,
-                    _players[targetIndex].PositionYMillimetres + ArenaHitGeometry.ShotHeight, _players[targetIndex].PositionZMillimetres))
+                targetIndex == sourceIndex
+            );
+            if (
+                damage > 0
+                && Tick >= _protectedUntilTicks[targetIndex]
+                && !ArenaTrainingMap.Occluded(
+                    x,
+                    y,
+                    z,
+                    _players[targetIndex].PositionXMillimetres,
+                    _players[targetIndex].PositionYMillimetres + ArenaHitGeometry.ShotHeight,
+                    _players[targetIndex].PositionZMillimetres
+                )
+            )
             {
                 ApplyDamage(sourceIndex, targetIndex, damage, ArenaWeaponId.Rocket, x, y, z);
             }
@@ -575,17 +748,29 @@ internal sealed class ArenaRoom
         out int targetIndex,
         out int hitX,
         out int hitY,
-        out int hitZ)
+        out int hitZ
+    )
     {
         ArenaPlayerState shooter = _players[shooterIndex];
-        HistoricalPlayer origin = historicalFrame >= 0 ? _history[historicalFrame, shooterIndex] :
-            new HistoricalPlayer(shooter.PositionXMillimetres, shooter.PositionYMillimetres,
-                shooter.PositionZMillimetres, true, true, 0, _lifetimes[shooterIndex]);
+        HistoricalPlayer origin =
+            historicalFrame >= 0
+                ? _history[historicalFrame, shooterIndex]
+                : new HistoricalPlayer(
+                    shooter.PositionXMillimetres,
+                    shooter.PositionYMillimetres,
+                    shooter.PositionZMillimetres,
+                    true,
+                    true,
+                    0,
+                    _lifetimes[shooterIndex]
+                );
         double forwardX = ForwardX(shooter.YawMillidegrees, shooter.PitchMillidegrees) / 1000000d;
         double forwardY = ForwardY(shooter.PitchMillidegrees) / 1000000d;
         double forwardZ = ForwardZ(shooter.YawMillidegrees, shooter.PitchMillidegrees) / 1000000d;
         double length = Math.Sqrt(forwardX * forwardX + forwardY * forwardY + forwardZ * forwardZ);
-        forwardX /= length; forwardY /= length; forwardZ /= length;
+        forwardX /= length;
+        forwardY /= length;
+        forwardZ /= length;
         double minimumDistance = double.MaxValue;
         targetIndex = -1;
         hitX = hitY = hitZ = 0;
@@ -593,41 +778,99 @@ internal sealed class ArenaRoom
 
         for (int candidate = 0; candidate < MaxPlayers; candidate++)
         {
-            if (candidate == shooterIndex || !_occupied[candidate] ||
-                !_players[candidate].Alive || Tick < _protectedUntilTicks[candidate])
+            if (
+                candidate == shooterIndex
+                || !_occupied[candidate]
+                || !_players[candidate].Alive
+                || Tick < _protectedUntilTicks[candidate]
+            )
             {
                 continue;
             }
 
             ArenaPlayerState current = _players[candidate];
-            HistoricalPlayer target = historicalFrame >= 0 ? _history[historicalFrame, candidate] :
-                new HistoricalPlayer(current.PositionXMillimetres, current.PositionYMillimetres,
-                    current.PositionZMillimetres, true, true, _protectedUntilTicks[candidate], _lifetimes[candidate]);
-            if (historicalFrame >= 0 && (!target.Present || !target.Alive ||
-                target.Lifetime != _lifetimes[candidate] || queryTick < target.ProtectedUntil)) continue;
+            HistoricalPlayer target =
+                historicalFrame >= 0
+                    ? _history[historicalFrame, candidate]
+                    : new HistoricalPlayer(
+                        current.PositionXMillimetres,
+                        current.PositionYMillimetres,
+                        current.PositionZMillimetres,
+                        true,
+                        true,
+                        _protectedUntilTicks[candidate],
+                        _lifetimes[candidate]
+                    );
+            if (
+                historicalFrame >= 0
+                && (
+                    !target.Present
+                    || !target.Alive
+                    || target.Lifetime != _lifetimes[candidate]
+                    || queryTick < target.ProtectedUntil
+                )
+            )
+                continue;
             double x = target.X - origin.X;
             double y = target.Y - origin.Y;
             double z = target.Z - origin.Z;
-            bool intersects = ArenaHitGeometry.RayCapsule(-x, ArenaHitGeometry.ShotHeight - y, -z,
-                forwardX, forwardY, forwardZ, rangeMillimetres, out double distance);
+            bool intersects = ArenaHitGeometry.RayCapsule(
+                -x,
+                ArenaHitGeometry.ShotHeight - y,
+                -z,
+                forwardX,
+                forwardY,
+                forwardZ,
+                rangeMillimetres,
+                out double distance
+            );
             if (!intersects)
             {
                 // Preserve the shotgun's existing aim-assist cone, measured to torso height.
-                if (coneMillidegrees == 0) continue;
-                y += (ArenaHitGeometry.LowerCenter + ArenaHitGeometry.UpperCenter) / 2d - ArenaHitGeometry.ShotHeight;
+                if (coneMillidegrees == 0)
+                    continue;
+                y +=
+                    (ArenaHitGeometry.LowerCenter + ArenaHitGeometry.UpperCenter) / 2d
+                    - ArenaHitGeometry.ShotHeight;
                 distance = Math.Sqrt(x * x + y * y + z * z);
-                if (distance <= 0 || distance > rangeMillimetres ||
-                    (x * forwardX + y * forwardY + z * forwardZ) / distance < minimumDot) continue;
+                if (
+                    distance <= 0
+                    || distance > rangeMillimetres
+                    || (x * forwardX + y * forwardY + z * forwardZ) / distance < minimumDot
+                )
+                    continue;
             }
             double endX = origin.X + forwardX * distance;
             double endY = origin.Y + ArenaHitGeometry.ShotHeight + forwardY * distance;
             double endZ = origin.Z + forwardZ * distance;
-            if (ArenaTrainingMap.Raycast(origin.X, origin.Y + ArenaHitGeometry.ShotHeight, origin.Z,
-                forwardX, forwardY, forwardZ, distance, out _)) continue;
+            if (
+                ArenaTrainingMap.Raycast(
+                    origin.X,
+                    origin.Y + ArenaHitGeometry.ShotHeight,
+                    origin.Z,
+                    forwardX,
+                    forwardY,
+                    forwardZ,
+                    distance,
+                    out _
+                )
+            )
+                continue;
             // Shotgun assist must never select a centre hidden behind a different wall than its aim ray.
-            if (!intersects && ArenaTrainingMap.Occluded(origin.X, origin.Y + ArenaHitGeometry.ShotHeight, origin.Z,
-                target.X, target.Y + 900, target.Z)) continue;
-            if (distance >= minimumDistance) continue;
+            if (
+                !intersects
+                && ArenaTrainingMap.Occluded(
+                    origin.X,
+                    origin.Y + ArenaHitGeometry.ShotHeight,
+                    origin.Z,
+                    target.X,
+                    target.Y + 900,
+                    target.Z
+                )
+            )
+                continue;
+            if (distance >= minimumDistance)
+                continue;
             minimumDistance = distance;
             targetIndex = candidate;
             hitX = (int)Math.Round(endX);
@@ -638,30 +881,24 @@ internal sealed class ArenaRoom
         return targetIndex >= 0;
     }
 
-    private void ApplyDamage(int sourceIndex, int targetIndex, int damage, ArenaWeaponId weapon, int x, int y, int z)
+    private void ApplyDamage(
+        int sourceIndex,
+        int targetIndex,
+        int damage,
+        ArenaWeaponId weapon,
+        int x,
+        int y,
+        int z
+    )
     {
         ArenaPlayerState target = _players[targetIndex];
         int healthDamage = ArenaCombatRules.ApplyDamage(ref target, damage);
         _players[targetIndex] = target;
         uint sourceId = checked((uint)sourceIndex + 1);
         uint targetId = checked((uint)targetIndex + 1);
-        AddEvent(new ArenaCombatEventRecord(
-            ArenaCombatEventKind.Hit,
-            Tick,
-            sourceId,
-            targetId,
-            weapon,
-            healthDamage,
-            x,
-            y,
-            z));
-
-        if (!target.Alive)
-        {
-            _deathTicks[targetIndex] = Tick;
-            _players[sourceIndex].Kills++;
-            AddEvent(new ArenaCombatEventRecord(
-                ArenaCombatEventKind.Kill,
+        AddEvent(
+            new ArenaCombatEventRecord(
+                ArenaCombatEventKind.Hit,
                 Tick,
                 sourceId,
                 targetId,
@@ -669,7 +906,27 @@ internal sealed class ArenaRoom
                 healthDamage,
                 x,
                 y,
-                z));
+                z
+            )
+        );
+
+        if (!target.Alive)
+        {
+            _deathTicks[targetIndex] = Tick;
+            _players[sourceIndex].Kills++;
+            AddEvent(
+                new ArenaCombatEventRecord(
+                    ArenaCombatEventKind.Kill,
+                    Tick,
+                    sourceId,
+                    targetId,
+                    weapon,
+                    healthDamage,
+                    x,
+                    y,
+                    z
+                )
+            );
         }
     }
 
@@ -684,17 +941,21 @@ internal sealed class ArenaRoom
         _ammo[index, 0] = ArenaWeaponRules.Machinegun.MagazineSize;
         _ammo[index, 1] = ArenaWeaponRules.Shotgun.MagazineSize;
         _ammo[index, 2] = ArenaWeaponRules.Rocket.MagazineSize;
-        for (int weapon = 0; weapon < 3; weapon++) _reloadUntil[index, weapon] = 0;
-        AddEvent(new ArenaCombatEventRecord(
-            ArenaCombatEventKind.Respawn,
-            Tick,
-            checked((uint)index + 1),
-            0,
-            _players[index].Weapon,
-            0,
-            x,
-            y,
-            z));
+        for (int weapon = 0; weapon < 3; weapon++)
+            _reloadUntil[index, weapon] = 0;
+        AddEvent(
+            new ArenaCombatEventRecord(
+                ArenaCombatEventKind.Respawn,
+                Tick,
+                checked((uint)index + 1),
+                0,
+                _players[index].Weapon,
+                0,
+                x,
+                y,
+                z
+            )
+        );
     }
 
     private int ChooseSpawnPoint(int playerIndex)
@@ -712,10 +973,14 @@ internal sealed class ArenaRoom
                     continue;
                 }
 
-                nearest = Math.Min(nearest, DistanceMillimetres(
-                    _players[candidate].PositionXMillimetres - x,
-                    _players[candidate].PositionYMillimetres - y,
-                    _players[candidate].PositionZMillimetres - z));
+                nearest = Math.Min(
+                    nearest,
+                    DistanceMillimetres(
+                        _players[candidate].PositionXMillimetres - x,
+                        _players[candidate].PositionYMillimetres - y,
+                        _players[candidate].PositionZMillimetres - z
+                    )
+                );
             }
 
             if (nearest > bestDistance)
@@ -744,17 +1009,21 @@ internal sealed class ArenaRoom
                 pickup.Active = true;
             }
 
-            if (DistanceMillimetres(
+            if (
+                DistanceMillimetres(
                     player.PositionXMillimetres - pickup.X,
                     player.PositionYMillimetres - pickup.Y,
-                    player.PositionZMillimetres - pickup.Z) > 1000)
+                    player.PositionZMillimetres - pickup.Z
+                ) > 1000
+            )
             {
                 continue;
             }
 
-            bool applied = pickup.Type == ArenaPickupType.Health
-                ? player.Health < ArenaCombatRules.MaximumHealth
-                : player.Armor < ArenaCombatRules.MaximumArmor;
+            bool applied =
+                pickup.Type == ArenaPickupType.Health
+                    ? player.Health < ArenaCombatRules.MaximumHealth
+                    : player.Armor < ArenaCombatRules.MaximumArmor;
             if (!applied)
             {
                 continue;
@@ -762,26 +1031,37 @@ internal sealed class ArenaRoom
 
             if (pickup.Type == ArenaPickupType.Health)
             {
-                player.Health = Math.Min(ArenaCombatRules.MaximumHealth, player.Health + ArenaCombatRules.HealthPickup);
+                player.Health = Math.Min(
+                    ArenaCombatRules.MaximumHealth,
+                    player.Health + ArenaCombatRules.HealthPickup
+                );
             }
             else
             {
-                player.Armor = Math.Min(ArenaCombatRules.MaximumArmor, player.Armor + ArenaCombatRules.ArmorPickup);
+                player.Armor = Math.Min(
+                    ArenaCombatRules.MaximumArmor,
+                    player.Armor + ArenaCombatRules.ArmorPickup
+                );
             }
 
             pickup.Active = false;
             pickup.RespawnTick = checked(Tick + PickupRespawnTicks);
             _players[playerIndex] = player;
-            AddEvent(new ArenaCombatEventRecord(
-                ArenaCombatEventKind.Pickup,
-                Tick,
-                checked((uint)playerIndex + 1),
-                checked((uint)pickup.Id),
-                ArenaWeaponId.None,
-                pickup.Type == ArenaPickupType.Health ? ArenaCombatRules.HealthPickup : ArenaCombatRules.ArmorPickup,
-                pickup.X,
-                pickup.Y,
-                pickup.Z));
+            AddEvent(
+                new ArenaCombatEventRecord(
+                    ArenaCombatEventKind.Pickup,
+                    Tick,
+                    checked((uint)playerIndex + 1),
+                    checked((uint)pickup.Id),
+                    ArenaWeaponId.None,
+                    pickup.Type == ArenaPickupType.Health
+                        ? ArenaCombatRules.HealthPickup
+                        : ArenaCombatRules.ArmorPickup,
+                    pickup.X,
+                    pickup.Y,
+                    pickup.Z
+                )
+            );
             _pickups[index] = pickup;
         }
     }
@@ -794,16 +1074,19 @@ internal sealed class ArenaRoom
         }
 
         _players[playerIndex].Weapon = weapon;
-        AddEvent(new ArenaCombatEventRecord(
-            ArenaCombatEventKind.WeaponSwitch,
-            Tick,
-            checked((uint)playerIndex + 1),
-            0,
-            weapon,
-            0,
-            _players[playerIndex].PositionXMillimetres,
-            _players[playerIndex].PositionYMillimetres,
-            _players[playerIndex].PositionZMillimetres));
+        AddEvent(
+            new ArenaCombatEventRecord(
+                ArenaCombatEventKind.WeaponSwitch,
+                Tick,
+                checked((uint)playerIndex + 1),
+                0,
+                weapon,
+                0,
+                _players[playerIndex].PositionXMillimetres,
+                _players[playerIndex].PositionYMillimetres,
+                _players[playerIndex].PositionZMillimetres
+            )
+        );
     }
 
     private void UpdateLeader()
@@ -827,33 +1110,53 @@ internal sealed class ArenaRoom
         LeaderEntityId = leader;
     }
 
-    private uint LeaderScore()
-        => LeaderEntityId == 0 || !TryGetPlayer(LeaderEntityId, out ArenaPlayerState state) ? 0 : state.Kills;
+    private uint LeaderScore() =>
+        LeaderEntityId == 0 || !TryGetPlayer(LeaderEntityId, out ArenaPlayerState state)
+            ? 0
+            : state.Kills;
 
-    private static int DistanceMillimetres(int x, int y, int z)
-        => checked((int)Math.Sqrt((double)(x * (long)x + y * (long)y + z * (long)z)));
+    private static int DistanceMillimetres(int x, int y, int z) =>
+        checked((int)Math.Sqrt((double)(x * (long)x + y * (long)y + z * (long)z)));
 
-    private static int ForwardX(int yawMillidegrees, int pitchMillidegrees)
-        => checked((int)(Math.Sin(yawMillidegrees / 1000d * Math.PI / 180d) *
-                         Math.Cos(pitchMillidegrees / 1000d * Math.PI / 180d) * 1000000d));
+    private static int ForwardX(int yawMillidegrees, int pitchMillidegrees) =>
+        checked(
+            (int)(
+                Math.Sin(yawMillidegrees / 1000d * Math.PI / 180d)
+                * Math.Cos(pitchMillidegrees / 1000d * Math.PI / 180d)
+                * 1000000d
+            )
+        );
 
-    private static int ForwardY(int pitchMillidegrees)
-        => checked((int)(Math.Sin(pitchMillidegrees / 1000d * Math.PI / 180d) * 1000000d));
+    private static int ForwardY(int pitchMillidegrees) =>
+        checked((int)(Math.Sin(pitchMillidegrees / 1000d * Math.PI / 180d) * 1000000d));
 
-    private static int ForwardZ(int yawMillidegrees, int pitchMillidegrees)
-        => checked((int)(Math.Cos(yawMillidegrees / 1000d * Math.PI / 180d) *
-                         Math.Cos(pitchMillidegrees / 1000d * Math.PI / 180d) * 1000000d));
+    private static int ForwardZ(int yawMillidegrees, int pitchMillidegrees) =>
+        checked(
+            (int)(
+                Math.Cos(yawMillidegrees / 1000d * Math.PI / 180d)
+                * Math.Cos(pitchMillidegrees / 1000d * Math.PI / 180d)
+                * 1000000d
+            )
+        );
 
     private static bool TryGetIndex(uint entityId, out int index)
     {
         index = -1;
-        if (entityId is < 1 or > MaxPlayers) return false;
+        if (entityId is < 1 or > MaxPlayers)
+            return false;
         index = (int)entityId - 1;
         return true;
     }
 
-    private readonly record struct HistoricalPlayer(int X, int Y, int Z, bool Present,
-        bool Alive, ulong ProtectedUntil, ulong Lifetime);
+    private readonly record struct HistoricalPlayer(
+        int X,
+        int Y,
+        int Z,
+        bool Present,
+        bool Alive,
+        ulong ProtectedUntil,
+        ulong Lifetime
+    );
 
     private sealed class ArenaPickupRuntime
     {
@@ -880,7 +1183,16 @@ internal sealed class ArenaRoom
 
     private struct ArenaProjectile
     {
-        public ArenaProjectile(uint sourceEntityId, int x, int y, int z, int velocityX, int velocityY, int velocityZ, int remainingTicks)
+        public ArenaProjectile(
+            uint sourceEntityId,
+            int x,
+            int y,
+            int z,
+            int velocityX,
+            int velocityY,
+            int velocityZ,
+            int remainingTicks
+        )
         {
             SourceEntityId = sourceEntityId;
             X = x;

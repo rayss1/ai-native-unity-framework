@@ -10,7 +10,11 @@ public sealed class ArchitectureValidatorTests
     [SetUp]
     public void SetUp()
     {
-        _fixtureRoot = Path.Combine(Path.GetTempPath(), "ainative-architecture-tests", Guid.NewGuid().ToString("N"));
+        _fixtureRoot = Path.Combine(
+            Path.GetTempPath(),
+            "ainative-architecture-tests",
+            Guid.NewGuid().ToString("N")
+        );
         Directory.CreateDirectory(_fixtureRoot);
     }
 
@@ -27,9 +31,18 @@ public sealed class ArchitectureValidatorTests
     public void ValidFixtureAllowsClientAndToolsToDependOnSharedAndEditorOnRuntime()
     {
         Write("shared/gameplay/Runtime/AiNative.Gameplay.asmdef", Asmdef("AiNative.Gameplay"));
-        Write("client/Runtime/AiNative.Client.asmdef", Asmdef("AiNative.Client", "AiNative.Gameplay"));
-        Write("client/Editor/AiNative.Client.Editor.asmdef", Asmdef("AiNative.Client.Editor", "AiNative.Client"));
-        Write("tools/Tool.csproj", Project("AiNative.Tools.Tool", "../shared/gameplay/Gameplay.Shared.csproj"));
+        Write(
+            "client/Runtime/AiNative.Client.asmdef",
+            Asmdef("AiNative.Client", "AiNative.Gameplay")
+        );
+        Write(
+            "client/Editor/AiNative.Client.Editor.asmdef",
+            Asmdef("AiNative.Client.Editor", "AiNative.Client")
+        );
+        Write(
+            "tools/Tool.csproj",
+            Project("AiNative.Tools.Tool", "../shared/gameplay/Gameplay.Shared.csproj")
+        );
         Write("shared/gameplay/Gameplay.Shared.csproj", Project("AiNative.Gameplay"));
         WriteSolution("shared/gameplay/Gameplay.Shared.csproj", "tools/Tool.csproj");
 
@@ -41,19 +54,29 @@ public sealed class ArchitectureValidatorTests
     [Test]
     public void UnityManifestCanReferenceAnInternalSharedPackage()
     {
-        Write("shared/gameplay/package.json", JsonSerializer.Serialize(new
-        {
-            name = "com.ainative.gameplay",
-            version = "0.1.0",
-            dependencies = new Dictionary<string, string>(),
-        }));
-        Write("client/UnityProject/Packages/manifest.json", JsonSerializer.Serialize(new
-        {
-            dependencies = new Dictionary<string, string>
-            {
-                ["com.ainative.gameplay"] = "file:../../../shared/gameplay",
-            },
-        }));
+        Write(
+            "shared/gameplay/package.json",
+            JsonSerializer.Serialize(
+                new
+                {
+                    name = "com.ainative.gameplay",
+                    version = "0.1.0",
+                    dependencies = new Dictionary<string, string>(),
+                }
+            )
+        );
+        Write(
+            "client/UnityProject/Packages/manifest.json",
+            JsonSerializer.Serialize(
+                new
+                {
+                    dependencies = new Dictionary<string, string>
+                    {
+                        ["com.ainative.gameplay"] = "file:../../../shared/gameplay",
+                    },
+                }
+            )
+        );
 
         ArchitectureValidationResult result = Validate();
 
@@ -64,16 +87,17 @@ public sealed class ArchitectureValidatorTests
     [TestCase("obj")]
     public void GeneratedDotNetOutputInsideUnityPackageIsReported(string directoryName)
     {
-        Write("shared/gameplay/package.json", JsonSerializer.Serialize(new
-        {
-            name = "com.ainative.gameplay",
-            version = "0.1.0",
-        }));
+        Write(
+            "shared/gameplay/package.json",
+            JsonSerializer.Serialize(new { name = "com.ainative.gameplay", version = "0.1.0" })
+        );
         Write($"shared/gameplay/Tests/{directoryName}/generated.dll", string.Empty);
 
         ArchitectureValidationResult result = Validate();
 
-        ArchitectureDiagnostic diagnostic = result.Diagnostics.Single(item => item.Code == "ARC007");
+        ArchitectureDiagnostic diagnostic = result.Diagnostics.Single(item =>
+            item.Code == "ARC007"
+        );
         Assert.That(diagnostic.File, Is.EqualTo($"shared/gameplay/Tests/{directoryName}"));
         Assert.That(diagnostic.Source, Is.EqualTo("shared/gameplay/package.json"));
         Assert.That(diagnostic.Target, Is.EqualTo($"shared/gameplay/Tests/{directoryName}"));
@@ -102,7 +126,10 @@ public sealed class ArchitectureValidatorTests
     [Test]
     public void RuntimeToEditorReferenceIsReported()
     {
-        Write("client/Runtime/AiNative.Client.asmdef", Asmdef("AiNative.Client", "AiNative.Client.Editor"));
+        Write(
+            "client/Runtime/AiNative.Client.asmdef",
+            Asmdef("AiNative.Client", "AiNative.Client.Editor")
+        );
         Write("client/Editor/AiNative.Client.Editor.asmdef", Asmdef("AiNative.Client.Editor"));
 
         AssertCode("ARC003");
@@ -128,7 +155,8 @@ public sealed class ArchitectureValidatorTests
     {
         Write(
             "shared/realtime/Runtime/ITransport.cs",
-            "using System.Threading; using System.Threading.Tasks; interface ITransport { ValueTask Send(CancellationToken token); }");
+            "using System.Threading; using System.Threading.Tasks; interface ITransport { ValueTask Send(CancellationToken token); }"
+        );
 
         ArchitectureValidationResult result = Validate();
 
@@ -136,7 +164,9 @@ public sealed class ArchitectureValidatorTests
     }
 
     [TestCase("using System.Threading; class Bad { object Value = new Thread(() => { }); }")]
-    [TestCase("using System.Threading; class Bad { object Value = new CancellationTokenSource(); }")]
+    [TestCase(
+        "using System.Threading; class Bad { object Value = new CancellationTokenSource(); }"
+    )]
     [TestCase("using System.Threading.Tasks; class Bad { object Value = Task.Run(() => { }); }")]
     public void RealtimePassiveContractRejectsActiveScheduling(string source)
     {
@@ -148,7 +178,10 @@ public sealed class ArchitectureValidatorTests
     [Test]
     public void MissingInternalReferenceIsReported()
     {
-        Write("client/Runtime/AiNative.Client.asmdef", Asmdef("AiNative.Client", "AiNative.Missing"));
+        Write(
+            "client/Runtime/AiNative.Client.asmdef",
+            Asmdef("AiNative.Client", "AiNative.Missing")
+        );
 
         AssertCode("ARC005");
     }
@@ -168,7 +201,8 @@ public sealed class ArchitectureValidatorTests
         Write("server/vendor/Fantasy/Fantasy.sln", string.Empty);
         Write(
             "server/vendor/Fantasy/Fantasy.Packages/Fantasy.Net/Fantasy.Net.csproj",
-            Project("Fantasy.Net", "../../../../client/Forbidden.csproj"));
+            Project("Fantasy.Net", "../../../../client/Forbidden.csproj")
+        );
         Write("server/vendor/Fantasy/Shared/Bad.cs", "using UnityEngine; class Bad { }");
 
         ArchitectureValidationResult result = Validate();
@@ -181,7 +215,8 @@ public sealed class ArchitectureValidatorTests
     {
         Write(
             "client/Client.csproj",
-            "<Project Sdk=\"Microsoft.NET.Sdk\"><ItemGroup><PackageReference Include=\"Fantasy-Net\" Version=\"1.0.0\" /></ItemGroup></Project>");
+            "<Project Sdk=\"Microsoft.NET.Sdk\"><ItemGroup><PackageReference Include=\"Fantasy-Net\" Version=\"1.0.0\" /></ItemGroup></Project>"
+        );
         WriteSolution("client/Client.csproj");
 
         AssertCode("ARC008");
@@ -200,7 +235,8 @@ public sealed class ArchitectureValidatorTests
     {
         Write(
             "packages/com.ainative.client.fantasy/Runtime/FantasyKcpRealtimeTransport.cs",
-            "using global::Fantasy.Network; class FantasyKcpRealtimeTransport { }");
+            "using global::Fantasy.Network; class FantasyKcpRealtimeTransport { }"
+        );
 
         ArchitectureValidationResult result = Validate();
 
@@ -212,20 +248,24 @@ public sealed class ArchitectureValidatorTests
     {
         Write(
             "packages/com.ainative.client.prediction/Runtime/Bad.cs",
-            "using Fantasy.Network; class ClientBad { }");
-        Write(
-            "shared/realtime/Runtime/Bad.cs",
-            "using Fantasy.Network; class SharedBad { }");
+            "using Fantasy.Network; class ClientBad { }"
+        );
+        Write("shared/realtime/Runtime/Bad.cs", "using Fantasy.Network; class SharedBad { }");
 
         ArchitectureValidationResult result = Validate();
 
         Assert.That(
-            result.Diagnostics.Where(diagnostic => diagnostic.Code == "ARC008").Select(diagnostic => diagnostic.File),
-            Is.EquivalentTo(new[]
-            {
-                "packages/com.ainative.client.prediction/Runtime/Bad.cs",
-                "shared/realtime/Runtime/Bad.cs",
-            }));
+            result
+                .Diagnostics.Where(diagnostic => diagnostic.Code == "ARC008")
+                .Select(diagnostic => diagnostic.File),
+            Is.EquivalentTo(
+                new[]
+                {
+                    "packages/com.ainative.client.prediction/Runtime/Bad.cs",
+                    "shared/realtime/Runtime/Bad.cs",
+                }
+            )
+        );
     }
 
     [Test]
@@ -233,16 +273,20 @@ public sealed class ArchitectureValidatorTests
     {
         Write(
             "server/src/Modules/AiNative.Server.Fantasy/AiNative.Server.Fantasy.csproj",
-            "<Project Sdk=\"Microsoft.NET.Sdk\"><ItemGroup><PackageReference Include=\"Fantasy-Net\" Version=\"1.0.0\" /></ItemGroup></Project>");
+            "<Project Sdk=\"Microsoft.NET.Sdk\"><ItemGroup><PackageReference Include=\"Fantasy-Net\" Version=\"1.0.0\" /></ItemGroup></Project>"
+        );
         Write(
             "server/src/Modules/AiNative.Server.Fantasy/Adapter.cs",
-            "using global::Fantasy.Network; class Adapter { }");
+            "using global::Fantasy.Network; class Adapter { }"
+        );
         Write(
             "server/src/Hosts/AiNative.BattleHost/AiNative.BattleHost.csproj",
-            "<Project Sdk=\"Microsoft.NET.Sdk.Web\"><ItemGroup><PackageReference Include=\"Fantasy-Net\" Version=\"1.0.0\" /></ItemGroup></Project>");
+            "<Project Sdk=\"Microsoft.NET.Sdk.Web\"><ItemGroup><PackageReference Include=\"Fantasy-Net\" Version=\"1.0.0\" /></ItemGroup></Project>"
+        );
         WriteSolution(
             "server/src/Modules/AiNative.Server.Fantasy/AiNative.Server.Fantasy.csproj",
-            "server/src/Hosts/AiNative.BattleHost/AiNative.BattleHost.csproj");
+            "server/src/Hosts/AiNative.BattleHost/AiNative.BattleHost.csproj"
+        );
 
         ArchitectureValidationResult result = Validate();
 
@@ -254,8 +298,15 @@ public sealed class ArchitectureValidatorTests
     {
         Write("packages/core/Core.csproj", Project("AiNative.Core"));
         WriteSolution("packages/core/Core.csproj");
-        Write("client/UnityProject/AiNative.Core.csproj", Project("AiNative.Core", "missing.csproj"));
-        Write("client/UnityProject/Unity.sln", File.ReadAllText(Path.Combine(_fixtureRoot, "AiNative.sln")).Replace("packages\\core\\Core.csproj", "missing.csproj"));
+        Write(
+            "client/UnityProject/AiNative.Core.csproj",
+            Project("AiNative.Core", "missing.csproj")
+        );
+        Write(
+            "client/UnityProject/Unity.sln",
+            File.ReadAllText(Path.Combine(_fixtureRoot, "AiNative.sln"))
+                .Replace("packages\\core\\Core.csproj", "missing.csproj")
+        );
         Assert.That(Validate().Diagnostics, Is.Empty);
     }
 
@@ -263,16 +314,28 @@ public sealed class ArchitectureValidatorTests
     public void UnityAssetsProjectsAndAsmdefsRemainChecked()
     {
         Write("client/UnityProject/Assets/Real.csproj", Project("AiNative.Real"));
-        Write("client/UnityProject/Assets/Runtime/Real.asmdef", Asmdef("AiNative.Real", "AiNative.Missing"));
-        Assert.That(Validate().Diagnostics.Select(item => item.Code), Is.EquivalentTo(new[] { "ARC005", "ARC006" }));
+        Write(
+            "client/UnityProject/Assets/Runtime/Real.asmdef",
+            Asmdef("AiNative.Real", "AiNative.Missing")
+        );
+        Assert.That(
+            Validate().Diagnostics.Select(item => item.Code),
+            Is.EquivalentTo(new[] { "ARC005", "ARC006" })
+        );
     }
 
     [Test]
     public void ServerHostCannotReferenceAnotherHost()
     {
-        Write("server/src/Hosts/AiNative.GateHost/Gate.csproj", Project("AiNative.GateHost", "../AiNative.PlayerHost/Player.csproj"));
+        Write(
+            "server/src/Hosts/AiNative.GateHost/Gate.csproj",
+            Project("AiNative.GateHost", "../AiNative.PlayerHost/Player.csproj")
+        );
         Write("server/src/Hosts/AiNative.PlayerHost/Player.csproj", Project("AiNative.PlayerHost"));
-        WriteSolution("server/src/Hosts/AiNative.GateHost/Gate.csproj", "server/src/Hosts/AiNative.PlayerHost/Player.csproj");
+        WriteSolution(
+            "server/src/Hosts/AiNative.GateHost/Gate.csproj",
+            "server/src/Hosts/AiNative.PlayerHost/Player.csproj"
+        );
         ArchitectureDiagnostic diagnostic = Validate().Diagnostics.Single();
         Assert.That(diagnostic.Code, Is.EqualTo("ARC009"));
         Assert.That(diagnostic.Source, Is.EqualTo("AiNative.GateHost"));
@@ -288,7 +351,10 @@ public sealed class ArchitectureValidatorTests
     public void TopologyHostAllowsFantasyPackageButRejectsHandwrittenRuntimeNamespace(string host)
     {
         string prefix = $"server/src/Hosts/AiNative.{host}";
-        Write($"{prefix}/Host.csproj", "<Project><ItemGroup><PackageReference Include=\"Fantasy-Net\" Version=\"1.0.0\" /></ItemGroup></Project>");
+        Write(
+            $"{prefix}/Host.csproj",
+            "<Project><ItemGroup><PackageReference Include=\"Fantasy-Net\" Version=\"1.0.0\" /></ItemGroup></Project>"
+        );
         WriteSolution($"{prefix}/Host.csproj");
         Assert.That(Validate().Diagnostics, Is.Empty);
         Write($"{prefix}/Bad.cs", "using Fantasy.Network; class Bad { }");
@@ -300,8 +366,12 @@ public sealed class ArchitectureValidatorTests
     {
         const string prefix = "server/acceptance/AiNative.TopologyAcceptance";
         const string project = prefix + "/AiNative.TopologyAcceptance.csproj";
-        Write(project, "<Project><ItemGroup><PackageReference Include=\"Fantasy-Net\" Version=\"2026.1.1003\" /></ItemGroup></Project>");
-        WriteSolution(project); Assert.That(Validate().Diagnostics, Is.Empty);
+        Write(
+            project,
+            "<Project><ItemGroup><PackageReference Include=\"Fantasy-Net\" Version=\"2026.1.1003\" /></ItemGroup></Project>"
+        );
+        WriteSolution(project);
+        Assert.That(Validate().Diagnostics, Is.Empty);
         Write(prefix + "/Bad.cs", "using Fantasy.Network; class Bad { }");
         Assert.That(Validate().Diagnostics.Single().Code, Is.EqualTo("ARC008"));
     }
@@ -322,14 +392,20 @@ public sealed class ArchitectureValidatorTests
     {
         string content = string.Join(
             Environment.NewLine,
-            projects.Select((path, index) =>
-                $"Project(\"{{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}}\") = \"P{index}\", \"{path.Replace('/', '\\')}\", \"{{00000000-0000-0000-0000-{index:D12}}}\"{Environment.NewLine}EndProject"));
+            projects.Select(
+                (path, index) =>
+                    $"Project(\"{{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}}\") = \"P{index}\", \"{path.Replace('/', '\\')}\", \"{{00000000-0000-0000-0000-{index:D12}}}\"{Environment.NewLine}EndProject"
+            )
+        );
         Write("AiNative.sln", content);
     }
 
     private void Write(string relativePath, string content)
     {
-        string path = Path.Combine(_fixtureRoot, relativePath.Replace('/', Path.DirectorySeparatorChar));
+        string path = Path.Combine(
+            _fixtureRoot,
+            relativePath.Replace('/', Path.DirectorySeparatorChar)
+        );
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         File.WriteAllText(path, content);
     }
@@ -342,9 +418,6 @@ public sealed class ArchitectureValidatorTests
         return $"<Project Sdk=\"Microsoft.NET.Sdk\"><PropertyGroup><AssemblyName>{assemblyName}</AssemblyName></PropertyGroup>{reference}</Project>";
     }
 
-    private static string Asmdef(string name, params string[] references) => JsonSerializer.Serialize(new
-    {
-        name,
-        references,
-    });
+    private static string Asmdef(string name, params string[] references) =>
+        JsonSerializer.Serialize(new { name, references });
 }

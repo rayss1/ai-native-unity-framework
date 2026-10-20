@@ -9,9 +9,9 @@ using AiNative.Protocol.V1;
 using AiNative.Realtime;
 using AiNative.RuntimeAcceptance;
 using AiNative.Server.Protocol;
-using Microsoft.Extensions.Configuration;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.Configuration;
 using NUnit.Framework;
 using OpenTelemetry;
 using OpenTelemetry.Metrics;
@@ -23,11 +23,15 @@ public sealed class HealthAndBudgetTests
     [Test]
     public void FixedRatePacerPreservesFractionalSixtyHertzDeadlines()
     {
-        long[] deadlines = Enumerable.Range(1, 60)
+        long[] deadlines = Enumerable
+            .Range(1, 60)
             .Select(tick => MonotonicFixedRatePacer.GetDeadlineOffset(tick, 60, 1000))
             .ToArray();
         long[] intervals = deadlines
-            .Zip(new long[] { 0 }.Concat(deadlines[..^1]), (deadline, previous) => deadline - previous)
+            .Zip(
+                new long[] { 0 }.Concat(deadlines[..^1]),
+                (deadline, previous) => deadline - previous
+            )
             .ToArray();
 
         Assert.That(deadlines[^1], Is.EqualTo(1000));
@@ -54,8 +58,8 @@ public sealed class HealthAndBudgetTests
     [Test]
     public async Task DrainMakesReadinessUnavailableWithoutFailingLiveness()
     {
-        await using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>()
-            .WithWebHostBuilder(builder =>
+        await using WebApplicationFactory<Program> factory =
+            new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
             {
                 builder.UseSetting("AINATIVE_ENABLE_EVALUATION_ENDPOINTS", "true");
                 builder.UseSetting("AINATIVE_EVALUATION_ROOM_COUNT", "2");
@@ -81,25 +85,34 @@ public sealed class HealthAndBudgetTests
     [Test]
     public async Task TelemetryHealthDoesNotAffectRuntimeReadiness()
     {
-        await using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>()
-            .WithWebHostBuilder(builder => builder.UseSetting("AINATIVE_FANTASY_ENABLED", "false"));
+        await using WebApplicationFactory<Program> factory =
+            new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+                builder.UseSetting("AINATIVE_FANTASY_ENABLED", "false")
+            );
         using HttpClient client = factory.CreateClient();
 
         using JsonDocument telemetry = JsonDocument.Parse(
-            await client.GetStringAsync("/health/telemetry"));
+            await client.GetStringAsync("/health/telemetry")
+        );
         JsonElement root = telemetry.RootElement;
 
         Assert.That(root.GetProperty("status").GetString(), Is.EqualTo("healthy"));
         Assert.That(root.GetProperty("exporterConfigured").GetBoolean(), Is.False);
         Assert.That(root.GetProperty("metricExportFailures").GetInt64(), Is.Zero);
         Assert.That(root.GetProperty("traceExportFailures").GetInt64(), Is.Zero);
-        Assert.That((await client.GetAsync("/health/ready")).StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        Assert.That(
+            (await client.GetAsync("/health/ready")).StatusCode,
+            Is.EqualTo(HttpStatusCode.OK)
+        );
     }
 
     [Test]
     public void TelemetryIdentityIsBoundedAndHashesTheApplicationConfiguration()
     {
-        string directory = Path.Combine(Path.GetTempPath(), $"ainative-telemetry-{Guid.NewGuid():N}");
+        string directory = Path.Combine(
+            Path.GetTempPath(),
+            $"ainative-telemetry-{Guid.NewGuid():N}"
+        );
         Directory.CreateDirectory(directory);
         byte[] fantasyConfig = "telemetry-config"u8.ToArray();
         File.WriteAllBytes(Path.Combine(directory, "Fantasy.config"), fantasyConfig);
@@ -107,18 +120,24 @@ public sealed class HealthAndBudgetTests
         try
         {
             IConfiguration configuration = new ConfigurationBuilder()
-                .AddInMemoryCollection(new Dictionary<string, string?>
-                {
-                    ["AINATIVE_DEPLOYMENT_ENVIRONMENT"] = "acceptance",
-                    ["AINATIVE_SERVICE_INSTANCE_ID"] = "runner-1",
-                    ["AINATIVE_SOURCE_COMMIT"] = new string('1', 40),
-                    ["AINATIVE_FANTASY_COMMIT"] = new string('2', 40),
-                    ["AINATIVE_PROTOCOL_IDENTITY"] = new string('3', 64),
-                })
+                .AddInMemoryCollection(
+                    new Dictionary<string, string?>
+                    {
+                        ["AINATIVE_DEPLOYMENT_ENVIRONMENT"] = "acceptance",
+                        ["AINATIVE_SERVICE_INSTANCE_ID"] = "runner-1",
+                        ["AINATIVE_SOURCE_COMMIT"] = new string('1', 40),
+                        ["AINATIVE_FANTASY_COMMIT"] = new string('2', 40),
+                        ["AINATIVE_PROTOCOL_IDENTITY"] = new string('3', 64),
+                    }
+                )
                 .Build();
 
-            BattleTelemetrySettings settings = BattleTelemetrySettings.Create(configuration, directory);
-            Dictionary<string, object> attributes = settings.Identity.ResourceAttributes.ToDictionary();
+            BattleTelemetrySettings settings = BattleTelemetrySettings.Create(
+                configuration,
+                directory
+            );
+            Dictionary<string, object> attributes =
+                settings.Identity.ResourceAttributes.ToDictionary();
 
             Assert.That(settings.Endpoint, Is.Null);
             Assert.That(attributes["deployment.environment.name"], Is.EqualTo("acceptance"));
@@ -126,7 +145,8 @@ public sealed class HealthAndBudgetTests
             Assert.That(attributes["ainative.source.commit"], Is.EqualTo(new string('1', 40)));
             Assert.That(
                 attributes["ainative.configuration.identity"],
-                Is.EqualTo(Convert.ToHexString(SHA256.HashData(fantasyConfig)).ToLowerInvariant()));
+                Is.EqualTo(Convert.ToHexString(SHA256.HashData(fantasyConfig)).ToLowerInvariant())
+            );
             Assert.That(attributes["ainative.room.count"], Is.EqualTo(1));
             Assert.That(attributes["ainative.room.capacity"], Is.EqualTo(64));
             Assert.That(attributes.Keys, Has.Count.EqualTo(8));
@@ -141,34 +161,39 @@ public sealed class HealthAndBudgetTests
     public void MultiRoomCapacityIsExplicitlyEvaluationOnlyAndAcceptsRoomAwareReplay()
     {
         IConfiguration accepted = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["AINATIVE_ENABLE_EVALUATION_ENDPOINTS"] = "true",
-                ["AINATIVE_EVALUATION_ROOM_COUNT"] = "2",
-                ["AINATIVE_REPLAY_CAPTURE_PATH"] = "multi-room.anrp",
-            })
+            .AddInMemoryCollection(
+                new Dictionary<string, string?>
+                {
+                    ["AINATIVE_ENABLE_EVALUATION_ENDPOINTS"] = "true",
+                    ["AINATIVE_EVALUATION_ROOM_COUNT"] = "2",
+                    ["AINATIVE_REPLAY_CAPTURE_PATH"] = "multi-room.anrp",
+                }
+            )
             .Build();
         BattleHostCapacitySettings settings = BattleHostCapacitySettings.Create(accepted);
 
         Assert.That(settings.RoomCount, Is.EqualTo(2));
         Assert.That(settings.TotalBotCapacity, Is.EqualTo(128));
 
-        foreach (Dictionary<string, string?> rejected in new[]
-        {
-            new Dictionary<string, string?> { ["AINATIVE_EVALUATION_ROOM_COUNT"] = "2" },
-            new Dictionary<string, string?>
+        foreach (
+            Dictionary<string, string?> rejected in new[]
             {
-                ["AINATIVE_ENABLE_EVALUATION_ENDPOINTS"] = "true",
-                ["AINATIVE_EVALUATION_ROOM_COUNT"] = "3",
-            },
-        })
+                new Dictionary<string, string?> { ["AINATIVE_EVALUATION_ROOM_COUNT"] = "2" },
+                new Dictionary<string, string?>
+                {
+                    ["AINATIVE_ENABLE_EVALUATION_ENDPOINTS"] = "true",
+                    ["AINATIVE_EVALUATION_ROOM_COUNT"] = "3",
+                },
+            }
+        )
         {
             IConfiguration invalid = new ConfigurationBuilder()
                 .AddInMemoryCollection(rejected)
                 .Build();
             Assert.That(
                 () => BattleHostCapacitySettings.Create(invalid),
-                Throws.TypeOf<InvalidOperationException>());
+                Throws.TypeOf<InvalidOperationException>()
+            );
         }
     }
 
@@ -199,15 +224,20 @@ public sealed class HealthAndBudgetTests
     [TestCase("arena", 1, 8)]
     [TestCase("arena", 2, 8)]
     public void GameModePreservesConfiguredAcceptanceCapacityAndBoundsArena(
-        string? mode, int roomCount, int expectedConnections)
+        string? mode,
+        int roomCount,
+        int expectedConnections
+    )
     {
         IConfiguration configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["AINATIVE_GAME_MODE"] = mode,
-                ["AINATIVE_ENABLE_EVALUATION_ENDPOINTS"] = "true",
-                ["AINATIVE_EVALUATION_ROOM_COUNT"] = roomCount.ToString(),
-            })
+            .AddInMemoryCollection(
+                new Dictionary<string, string?>
+                {
+                    ["AINATIVE_GAME_MODE"] = mode,
+                    ["AINATIVE_ENABLE_EVALUATION_ENDPOINTS"] = "true",
+                    ["AINATIVE_EVALUATION_ROOM_COUNT"] = roomCount.ToString(),
+                }
+            )
             .Build();
 
         BattleGameModeSettings gameMode = BattleGameModeSettings.Create(configuration);
@@ -242,7 +272,8 @@ public sealed class HealthAndBudgetTests
 
         Assert.That(
             () => BattleTelemetrySettings.Create(configuration, Path.GetTempPath()),
-            Throws.TypeOf<InvalidOperationException>());
+            Throws.TypeOf<InvalidOperationException>()
+        );
     }
 
     [Test]
@@ -251,10 +282,13 @@ public sealed class HealthAndBudgetTests
         TelemetryExportHealth health = new(exporterConfigured: true);
         using MeterProvider provider = Sdk.CreateMeterProviderBuilder()
             .AddMeter(BattleMetrics.MeterName)
-            .AddReader(new PeriodicExportingMetricReader(
-                new TrackingMetricExporter(new FailureMetricExporter(), health),
-                exportIntervalMilliseconds: 60_000,
-                exportTimeoutMilliseconds: 100))
+            .AddReader(
+                new PeriodicExportingMetricReader(
+                    new TrackingMetricExporter(new FailureMetricExporter(), health),
+                    exportIntervalMilliseconds: 60_000,
+                    exportTimeoutMilliseconds: 100
+                )
+            )
             .Build();
         using BattleMetrics metrics = new(telemetryHealth: health);
 
@@ -271,7 +305,10 @@ public sealed class HealthAndBudgetTests
 
         TelemetryExportSnapshot snapshot = health.Snapshot();
         Assert.That(snapshot.MetricExportFailures, Is.GreaterThan(0));
-        Assert.That(snapshot.ProjectMetricSeries, Is.InRange(1, TelemetryExportHealth.MaximumProjectMetricSeries));
+        Assert.That(
+            snapshot.ProjectMetricSeries,
+            Is.InRange(1, TelemetryExportHealth.MaximumProjectMetricSeries)
+        );
         Assert.That(snapshot.ProjectMetricTagViolations, Is.Zero);
         Assert.That(snapshot.ProjectMetricSeriesOverflow, Is.Zero);
     }
@@ -287,8 +324,10 @@ public sealed class HealthAndBudgetTests
             queueSize: 2,
             exportDelayMilliseconds: 1,
             exporterTimeoutMilliseconds: 1_000,
-            exportBatchSize: 1);
-        Activity[] activities = Enumerable.Range(0, 128)
+            exportBatchSize: 1
+        );
+        Activity[] activities = Enumerable
+            .Range(0, 128)
             .Select(index => new Activity($"trace-{index}").Start())
             .ToArray();
         foreach (Activity activity in activities)
@@ -340,8 +379,9 @@ public sealed class HealthAndBudgetTests
         int slowTicks = durations.Count(duration => ToMilliseconds(duration) > 16.67);
 
         TestContext.WriteLine(
-            $"runtime={Environment.Version}; os={Environment.OSVersion}; processors={Environment.ProcessorCount}; " +
-            $"warmup=600; ticks={measuredTicks}; p99_ms={p99:F4}; p999_ms={p999:F4}; slow_ticks={slowTicks}; allocated={allocated}");
+            $"runtime={Environment.Version}; os={Environment.OSVersion}; processors={Environment.ProcessorCount}; "
+                + $"warmup=600; ticks={measuredTicks}; p99_ms={p99:F4}; p999_ms={p999:F4}; slow_ticks={slowTicks}; allocated={allocated}"
+        );
 
         Assert.That(allocated, Is.Zero);
         Assert.That(p99, Is.LessThanOrEqualTo(16.67));
@@ -374,9 +414,10 @@ public sealed class HealthAndBudgetTests
         double p999 = ToMilliseconds(durations[PercentileIndex(measuredTicks, 0.999)]);
 
         TestContext.WriteLine(
-            $"rooms=2; bots=128; runtime={Environment.Version}; os={Environment.OSVersion}; " +
-            $"processors={Environment.ProcessorCount}; warmup=600; ticks={measuredTicks}; " +
-            $"p99_ms={p99:F4}; p999_ms={p999:F4}; allocated={allocated}");
+            $"rooms=2; bots=128; runtime={Environment.Version}; os={Environment.OSVersion}; "
+                + $"processors={Environment.ProcessorCount}; warmup=600; ticks={measuredTicks}; "
+                + $"p99_ms={p99:F4}; p999_ms={p999:F4}; allocated={allocated}"
+        );
 
         Assert.That(allocated, Is.Zero);
         Assert.That(p99, Is.LessThanOrEqualTo(13.336));
@@ -396,7 +437,8 @@ public sealed class HealthAndBudgetTests
             RecordedInput input = new(
                 (int)(inputRandom.NextUInt32() % 64),
                 (int)(inputRandom.NextUInt32() % 2001) - 1000,
-                (int)(inputRandom.NextUInt32() % 2001) - 1000);
+                (int)(inputRandom.NextUInt32() % 2001) - 1000
+            );
             recording[tick] = input;
             recorded.ApplyInput(input.EntityIndex, input.MoveXMilli, input.MoveYMilli);
             recorded.Tick();
@@ -428,15 +470,17 @@ public sealed class HealthAndBudgetTests
         try
         {
             IConfiguration configuration = new ConfigurationBuilder()
-                .AddInMemoryCollection(new Dictionary<string, string?>
-                {
-                    ["AINATIVE_REPLAY_CAPTURE_PATH"] = path,
-                    ["AINATIVE_REPLAY_CAPTURE_CAPACITY"] = "4096",
-                    ["AINATIVE_SOURCE_COMMIT"] = "test-source",
-                    ["AINATIVE_FANTASY_COMMIT"] = "test-fantasy",
-                    ["AINATIVE_PROTOCOL_IDENTITY"] = "test-protocol",
-                    ["AINATIVE_CONFIGURATION_IDENTITY"] = "test-config",
-                })
+                .AddInMemoryCollection(
+                    new Dictionary<string, string?>
+                    {
+                        ["AINATIVE_REPLAY_CAPTURE_PATH"] = path,
+                        ["AINATIVE_REPLAY_CAPTURE_CAPACITY"] = "4096",
+                        ["AINATIVE_SOURCE_COMMIT"] = "test-source",
+                        ["AINATIVE_FANTASY_COMMIT"] = "test-fantasy",
+                        ["AINATIVE_PROTOCOL_IDENTITY"] = "test-protocol",
+                        ["AINATIVE_CONFIGURATION_IDENTITY"] = "test-config",
+                    }
+                )
                 .Build();
             using BattleMetrics metrics = new();
             BattleHostCapacitySettings capacitySettings = new(1);
@@ -456,57 +500,78 @@ public sealed class HealthAndBudgetTests
                     MoveXMilli = (int)(random.NextUInt32() % 2001) - 1000,
                     MoveYMilli = (int)(random.NextUInt32() % 2001) - 1000,
                 };
-                Assert.That(RealtimeProtocolCodec.TryEncode(
-                    MessageId.InputCommand,
-                    command,
-                    frame,
-                    out TransportChannel channel,
-                    out int writtenBytes), Is.True);
+                Assert.That(
+                    RealtimeProtocolCodec.TryEncode(
+                        MessageId.InputCommand,
+                        command,
+                        frame,
+                        out TransportChannel channel,
+                        out int writtenBytes
+                    ),
+                    Is.True
+                );
                 Assert.That(channel.Id, Is.EqualTo(2));
-                Assert.That(capture.TryRecordInput(
-                    0,
-                    checked((ulong)tick),
-                    entityIndex,
-                    frame.AsSpan(0, writtenBytes)), Is.True);
+                Assert.That(
+                    capture.TryRecordInput(
+                        0,
+                        checked((ulong)tick),
+                        entityIndex,
+                        frame.AsSpan(0, writtenBytes)
+                    ),
+                    Is.True
+                );
                 recorded.ApplyInput(entityIndex, command.MoveXMilli, command.MoveYMilli);
                 recorded.Tick();
             }
 
             const int batchedEntityIndex = 3;
             InputBatch batch = new();
-            batch.Commands.Add(new InputCommand
-            {
-                RoomTick = checked((ulong)ticks),
-                Sequence = checked((uint)ticks + 1),
-                MoveXMilli = 1000,
-                MoveYMilli = -500,
-            });
-            batch.Commands.Add(new InputCommand
-            {
-                RoomTick = checked((ulong)ticks),
-                Sequence = checked((uint)ticks + 2),
-                MoveXMilli = -250,
-                MoveYMilli = 750,
-                Buttons = 1,
-            });
-            Assert.That(RealtimeProtocolCodec.TryEncode(
-                MessageId.InputBatch,
-                batch,
-                frame,
-                out TransportChannel batchChannel,
-                out int batchBytes), Is.True);
+            batch.Commands.Add(
+                new InputCommand
+                {
+                    RoomTick = checked((ulong)ticks),
+                    Sequence = checked((uint)ticks + 1),
+                    MoveXMilli = 1000,
+                    MoveYMilli = -500,
+                }
+            );
+            batch.Commands.Add(
+                new InputCommand
+                {
+                    RoomTick = checked((ulong)ticks),
+                    Sequence = checked((uint)ticks + 2),
+                    MoveXMilli = -250,
+                    MoveYMilli = 750,
+                    Buttons = 1,
+                }
+            );
+            Assert.That(
+                RealtimeProtocolCodec.TryEncode(
+                    MessageId.InputBatch,
+                    batch,
+                    frame,
+                    out TransportChannel batchChannel,
+                    out int batchBytes
+                ),
+                Is.True
+            );
             Assert.That(batchChannel.Id, Is.EqualTo(2));
-            Assert.That(capture.TryRecordInput(
-                0,
-                checked((ulong)ticks),
-                batchedEntityIndex,
-                frame.AsSpan(0, batchBytes)), Is.True);
+            Assert.That(
+                capture.TryRecordInput(
+                    0,
+                    checked((ulong)ticks),
+                    batchedEntityIndex,
+                    frame.AsSpan(0, batchBytes)
+                ),
+                Is.True
+            );
             foreach (InputCommand batchedCommand in batch.Commands)
             {
                 recorded.ApplyInput(
                     batchedEntityIndex,
                     batchedCommand.MoveXMilli,
-                    batchedCommand.MoveYMilli);
+                    batchedCommand.MoveYMilli
+                );
             }
 
             await capture.CompleteAsync(ticks, recorded.ComputeStateHash());
@@ -532,22 +597,27 @@ public sealed class HealthAndBudgetTests
     [Test]
     public async Task RoomAwareReplayCapturesTwoIndependentRoomsAndCombinedHash()
     {
-        string directory = Path.Combine(Path.GetTempPath(), $"ainative-multi-room-replay-{Guid.NewGuid():N}");
+        string directory = Path.Combine(
+            Path.GetTempPath(),
+            $"ainative-multi-room-replay-{Guid.NewGuid():N}"
+        );
         string path = Path.Combine(directory, "multi-room.anrp");
         Directory.CreateDirectory(directory);
 
         try
         {
             IConfiguration configuration = new ConfigurationBuilder()
-                .AddInMemoryCollection(new Dictionary<string, string?>
-                {
-                    ["AINATIVE_REPLAY_CAPTURE_PATH"] = path,
-                    ["AINATIVE_REPLAY_CAPTURE_CAPACITY"] = "4096",
-                    ["AINATIVE_SOURCE_COMMIT"] = "test-source",
-                    ["AINATIVE_FANTASY_COMMIT"] = "test-fantasy",
-                    ["AINATIVE_PROTOCOL_IDENTITY"] = "test-protocol",
-                    ["AINATIVE_CONFIGURATION_IDENTITY"] = "test-config",
-                })
+                .AddInMemoryCollection(
+                    new Dictionary<string, string?>
+                    {
+                        ["AINATIVE_REPLAY_CAPTURE_PATH"] = path,
+                        ["AINATIVE_REPLAY_CAPTURE_CAPACITY"] = "4096",
+                        ["AINATIVE_SOURCE_COMMIT"] = "test-source",
+                        ["AINATIVE_FANTASY_COMMIT"] = "test-fantasy",
+                        ["AINATIVE_PROTOCOL_IDENTITY"] = "test-protocol",
+                        ["AINATIVE_CONFIGURATION_IDENTITY"] = "test-config",
+                    }
+                )
                 .Build();
             BattleHostCapacitySettings capacitySettings = new(2);
             BattleRoomSet recorded = new(capacitySettings);
@@ -568,21 +638,27 @@ public sealed class HealthAndBudgetTests
                         MoveXMilli = roomIndex == 0 ? 1000 : -500,
                         MoveYMilli = roomIndex == 0 ? -250 : 750,
                     };
-                    Assert.That(RealtimeProtocolCodec.TryEncode(
-                        MessageId.InputCommand,
-                        command,
-                        frame,
-                        out _,
-                        out int writtenBytes), Is.True);
-                    Assert.That(capture.TryRecordInput(
-                        roomIndex,
-                        checked((ulong)tick),
-                        entityIndex,
-                        frame.AsSpan(0, writtenBytes)), Is.True);
-                    recorded[roomIndex].ApplyInput(
-                        entityIndex,
-                        command.MoveXMilli,
-                        command.MoveYMilli);
+                    Assert.That(
+                        RealtimeProtocolCodec.TryEncode(
+                            MessageId.InputCommand,
+                            command,
+                            frame,
+                            out _,
+                            out int writtenBytes
+                        ),
+                        Is.True
+                    );
+                    Assert.That(
+                        capture.TryRecordInput(
+                            roomIndex,
+                            checked((ulong)tick),
+                            entityIndex,
+                            frame.AsSpan(0, writtenBytes)
+                        ),
+                        Is.True
+                    );
+                    recorded[roomIndex]
+                        .ApplyInput(entityIndex, command.MoveXMilli, command.MoveYMilli);
                 }
 
                 recorded.TickAll();
@@ -608,7 +684,10 @@ public sealed class HealthAndBudgetTests
     [Test]
     public void ReplayVerifierRetainsVersionOneReadCompatibility()
     {
-        string directory = Path.Combine(Path.GetTempPath(), $"ainative-v1-replay-{Guid.NewGuid():N}");
+        string directory = Path.Combine(
+            Path.GetTempPath(),
+            $"ainative-v1-replay-{Guid.NewGuid():N}"
+        );
         string path = Path.Combine(directory, "legacy.anrp");
         Directory.CreateDirectory(directory);
 
@@ -642,7 +721,10 @@ public sealed class HealthAndBudgetTests
     [Test]
     public void RoomAwareReplayFailsClosedForInvalidTopologyRoomOrderDropAndHash()
     {
-        string directory = Path.Combine(Path.GetTempPath(), $"ainative-invalid-replay-{Guid.NewGuid():N}");
+        string directory = Path.Combine(
+            Path.GetTempPath(),
+            $"ainative-invalid-replay-{Guid.NewGuid():N}"
+        );
         Directory.CreateDirectory(directory);
         SyntheticRoom[] initialRooms =
         {
@@ -665,7 +747,8 @@ public sealed class HealthAndBudgetTests
 
             Assert.That(
                 () => BattleReplayVerifier.Verify(topologyPath),
-                Throws.TypeOf<InvalidDataException>());
+                Throws.TypeOf<InvalidDataException>()
+            );
 
             string roomPath = Path.Combine(directory, "room.anrp");
             using (FileStream stream = File.Create(roomPath))
@@ -679,21 +762,33 @@ public sealed class HealthAndBudgetTests
 
             Assert.That(
                 () => BattleReplayVerifier.Verify(roomPath),
-                Throws.TypeOf<InvalidDataException>());
+                Throws.TypeOf<InvalidDataException>()
+            );
 
             string orderPath = Path.Combine(directory, "order.anrp");
             byte[] frame = new byte[RealtimeProtocolCodec.MaxDatagramBytes];
-            Assert.That(RealtimeProtocolCodec.TryEncode(
-                MessageId.InputCommand,
-                new InputCommand { RoomTick = 1, Sequence = 1 },
-                frame,
-                out _,
-                out int writtenBytes), Is.True);
+            Assert.That(
+                RealtimeProtocolCodec.TryEncode(
+                    MessageId.InputCommand,
+                    new InputCommand { RoomTick = 1, Sequence = 1 },
+                    frame,
+                    out _,
+                    out int writtenBytes
+                ),
+                Is.True
+            );
             using (FileStream stream = File.Create(orderPath))
             using (BinaryWriter writer = new(stream, Encoding.UTF8, leaveOpen: false))
             {
                 WriteReplayHeader(writer, version: 2, roomCount: 2);
-                WriteRoomAwareInput(writer, roomIndex: 0, roomTick: 1, entityIndex: 0, frame, writtenBytes);
+                WriteRoomAwareInput(
+                    writer,
+                    roomIndex: 0,
+                    roomTick: 1,
+                    entityIndex: 0,
+                    frame,
+                    writtenBytes
+                );
                 writer.Write((byte)1);
                 writer.Write(0);
                 writer.Write(0UL);
@@ -701,13 +796,16 @@ public sealed class HealthAndBudgetTests
 
             Assert.That(
                 () => BattleReplayVerifier.Verify(orderPath),
-                Throws.TypeOf<InvalidDataException>());
+                Throws.TypeOf<InvalidDataException>()
+            );
 
-            foreach ((string name, ulong hash, long dropped) in new[]
-            {
-                ("dropped", initialHash, 1L),
-                ("hash", initialHash ^ 1UL, 0L),
-            })
+            foreach (
+                (string name, ulong hash, long dropped) in new[]
+                {
+                    ("dropped", initialHash, 1L),
+                    ("hash", initialHash ^ 1UL, 0L),
+                }
+            )
             {
                 string footerPath = Path.Combine(directory, $"{name}.anrp");
                 using (FileStream stream = File.Create(footerPath))
@@ -722,7 +820,8 @@ public sealed class HealthAndBudgetTests
 
                 Assert.That(
                     () => BattleReplayVerifier.Verify(footerPath),
-                    Throws.TypeOf<InvalidDataException>());
+                    Throws.TypeOf<InvalidDataException>()
+                );
             }
         }
         finally
@@ -756,8 +855,18 @@ public sealed class HealthAndBudgetTests
                     for (int client = 0; client < 64; client++)
                     {
                         ushort clientPort = checked((ushort)(30_000 + client));
-                        WriteUdpPacket(writer, firstSecond + checked((uint)second), 22000, clientPort);
-                        WriteUdpPacket(writer, firstSecond + checked((uint)second), clientPort, 22000);
+                        WriteUdpPacket(
+                            writer,
+                            firstSecond + checked((uint)second),
+                            22000,
+                            clientPort
+                        );
+                        WriteUdpPacket(
+                            writer,
+                            firstSecond + checked((uint)second),
+                            clientPort,
+                            22000
+                        );
                     }
                 }
             }
@@ -779,7 +888,8 @@ public sealed class HealthAndBudgetTests
                 firstSecond * 1000L,
                 60,
                 expectedClientCount: 64,
-                headroomPercent: 20);
+                headroomPercent: 20
+            );
             Assert.That(headroom.HeadroomPercent, Is.EqualTo(20));
             Assert.That(headroom.DownstreamP95LimitKbps, Is.EqualTo(204.8));
             Assert.That(headroom.UpstreamP95LimitKbps, Is.EqualTo(51.2));
@@ -813,7 +923,15 @@ public sealed class HealthAndBudgetTests
         }
 
         writer.Write(SyntheticRoom.InitialRandomState);
-        foreach (string identity in new[] { "test-source", "test-fantasy", "test-protocol", "test-config" })
+        foreach (
+            string identity in new[]
+            {
+                "test-source",
+                "test-fantasy",
+                "test-protocol",
+                "test-config",
+            }
+        )
         {
             byte[] bytes = Encoding.UTF8.GetBytes(identity);
             writer.Write(checked((ushort)bytes.Length));
@@ -827,7 +945,8 @@ public sealed class HealthAndBudgetTests
         ulong roomTick,
         int entityIndex,
         byte[] frame,
-        int frameLength)
+        int frameLength
+    )
     {
         writer.Write((byte)1);
         writer.Write(roomIndex);
@@ -867,7 +986,12 @@ public sealed class HealthAndBudgetTests
         }
     }
 
-    private static void WriteUdpPacket(BinaryWriter writer, uint seconds, ushort sourcePort, ushort destinationPort)
+    private static void WriteUdpPacket(
+        BinaryWriter writer,
+        uint seconds,
+        ushort sourcePort,
+        ushort destinationPort
+    )
     {
         const int payloadBytes = 100;
         const int ipBytes = 20 + 8 + payloadBytes;

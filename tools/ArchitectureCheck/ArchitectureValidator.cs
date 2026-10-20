@@ -45,18 +45,21 @@ public sealed class ArchitectureValidator
         ValidateSolutions(root, files, diagnostics);
         ValidateUnityPackageGeneratedDirectories(root, files.PackageManifests, rules, diagnostics);
 
-        return new ArchitectureValidationResult(diagnostics
-            .OrderBy(diagnostic => diagnostic.Code, StringComparer.Ordinal)
-            .ThenBy(diagnostic => diagnostic.File, StringComparer.Ordinal)
-            .ThenBy(diagnostic => diagnostic.Message, StringComparer.Ordinal)
-            .ToArray());
+        return new ArchitectureValidationResult(
+            diagnostics
+                .OrderBy(diagnostic => diagnostic.Code, StringComparer.Ordinal)
+                .ThenBy(diagnostic => diagnostic.File, StringComparer.Ordinal)
+                .ThenBy(diagnostic => diagnostic.Message, StringComparer.Ordinal)
+                .ToArray()
+        );
     }
 
     private static Graph BuildGraph(
         string root,
         RepositoryFiles files,
         ArchitectureRules rules,
-        List<ArchitectureDiagnostic> diagnostics)
+        List<ArchitectureDiagnostic> diagnostics
+    )
     {
         List<Node> nodes = [];
 
@@ -68,35 +71,53 @@ public sealed class ArchitectureValidator
                 continue;
             }
 
-            nodes.Add(new Node(
-                nameElement.GetString() ?? throw new InvalidDataException($"Package name is empty: {path}"),
-                Relative(root, path),
-                LayerFor(root, path, rules),
-                NodeKind.Package));
+            nodes.Add(
+                new Node(
+                    nameElement.GetString()
+                        ?? throw new InvalidDataException($"Package name is empty: {path}"),
+                    Relative(root, path),
+                    LayerFor(root, path, rules),
+                    NodeKind.Package
+                )
+            );
         }
 
         foreach (string path in files.AsmdefFiles)
         {
             using JsonDocument document = JsonDocument.Parse(File.ReadAllText(path));
-            string name = document.RootElement.GetProperty("name").GetString()
+            string name =
+                document.RootElement.GetProperty("name").GetString()
                 ?? throw new InvalidDataException($"Assembly name is empty: {path}");
-            nodes.Add(new Node(name, Relative(root, path), LayerFor(root, path, rules), NodeKind.Assembly));
+            nodes.Add(
+                new Node(name, Relative(root, path), LayerFor(root, path, rules), NodeKind.Assembly)
+            );
         }
 
         foreach (string path in files.ProjectFiles)
         {
             XDocument document = XDocument.Load(path, LoadOptions.SetLineInfo);
-            string name = document.Descendants("AssemblyName").Select(element => element.Value).FirstOrDefault()
+            string name =
+                document
+                    .Descendants("AssemblyName")
+                    .Select(element => element.Value)
+                    .FirstOrDefault()
                 ?? Path.GetFileNameWithoutExtension(path);
-            nodes.Add(new Node(name, Relative(root, path), LayerFor(root, path, rules), NodeKind.Project));
+            nodes.Add(
+                new Node(name, Relative(root, path), LayerFor(root, path, rules), NodeKind.Project)
+            );
         }
 
         Node unityProject = new(
             "client/UnityProject",
             "client/UnityProject/Packages/manifest.json",
             "Client",
-            NodeKind.UnityProject);
-        if (File.Exists(Path.Combine(root, unityProject.Path.Replace('/', Path.DirectorySeparatorChar))))
+            NodeKind.UnityProject
+        );
+        if (
+            File.Exists(
+                Path.Combine(root, unityProject.Path.Replace('/', Path.DirectorySeparatorChar))
+            )
+        )
         {
             nodes.Add(unityProject);
         }
@@ -112,7 +133,9 @@ public sealed class ArchitectureValidator
 
             if (manifests.Any(manifest => manifest.Kind == node.Kind))
             {
-                throw new InvalidDataException($"Duplicate internal {node.Kind} identifier '{node.Id}'.");
+                throw new InvalidDataException(
+                    $"Duplicate internal {node.Kind} identifier '{node.Id}'."
+                );
             }
 
             manifests.Add(node);
@@ -130,21 +153,30 @@ public sealed class ArchitectureValidator
             XDocument document = XDocument.Load(path);
             foreach (XElement reference in document.Descendants("ProjectReference"))
             {
-                string include = reference.Attribute("Include")?.Value
-                    ?? throw new InvalidDataException($"ProjectReference has no Include: {sourcePath}");
-                string targetPath = Relative(root, Path.GetFullPath(Path.Combine(Path.GetDirectoryName(path)!, include)));
+                string include =
+                    reference.Attribute("Include")?.Value
+                    ?? throw new InvalidDataException(
+                        $"ProjectReference has no Include: {sourcePath}"
+                    );
+                string targetPath = Relative(
+                    root,
+                    Path.GetFullPath(Path.Combine(Path.GetDirectoryName(path)!, include))
+                );
                 if (projectsByPath.TryGetValue(targetPath, out Node? target))
                 {
                     edges.Add(new Edge(source, target, sourcePath));
                 }
                 else
                 {
-                    diagnostics.Add(new ArchitectureDiagnostic(
-                        UnresolvedReferenceCode,
-                        sourcePath,
-                        $"ProjectReference does not resolve to a repository project: {include}",
-                        source.Id,
-                        targetPath));
+                    diagnostics.Add(
+                        new ArchitectureDiagnostic(
+                            UnresolvedReferenceCode,
+                            sourcePath,
+                            $"ProjectReference does not resolve to a repository project: {include}",
+                            source.Id,
+                            targetPath
+                        )
+                    );
                 }
             }
         }
@@ -152,7 +184,9 @@ public sealed class ArchitectureValidator
         foreach (string path in files.AsmdefFiles)
         {
             string sourcePath = Relative(root, path);
-            Node source = nodes.Single(node => node.Kind == NodeKind.Assembly && node.Path == sourcePath);
+            Node source = nodes.Single(node =>
+                node.Kind == NodeKind.Assembly && node.Path == sourcePath
+            );
             using JsonDocument document = JsonDocument.Parse(File.ReadAllText(path));
             if (!document.RootElement.TryGetProperty("references", out JsonElement references))
             {
@@ -162,18 +196,34 @@ public sealed class ArchitectureValidator
             foreach (JsonElement reference in references.EnumerateArray())
             {
                 string targetId = reference.GetString() ?? string.Empty;
-                AddReferenceEdge(source, targetId, sourcePath, nodesById, rules, edges, diagnostics);
+                AddReferenceEdge(
+                    source,
+                    targetId,
+                    sourcePath,
+                    nodesById,
+                    rules,
+                    edges,
+                    diagnostics
+                );
             }
         }
 
         foreach (string path in files.PackageManifests)
         {
             string sourcePath = Relative(root, path);
-            Node source = nodes.Single(node => node.Kind == NodeKind.Package && node.Path == sourcePath);
+            Node source = nodes.Single(node =>
+                node.Kind == NodeKind.Package && node.Path == sourcePath
+            );
             AddPackageEdges(path, source, sourcePath, nodesById, rules, edges, diagnostics);
         }
 
-        string unityManifestPath = Path.Combine(root, "client", "UnityProject", "Packages", "manifest.json");
+        string unityManifestPath = Path.Combine(
+            root,
+            "client",
+            "UnityProject",
+            "Packages",
+            "manifest.json"
+        );
         if (File.Exists(unityManifestPath))
         {
             AddPackageEdges(
@@ -183,7 +233,8 @@ public sealed class ArchitectureValidator
                 nodesById,
                 rules,
                 edges,
-                diagnostics);
+                diagnostics
+            );
         }
 
         return new Graph(nodes, edges);
@@ -196,7 +247,8 @@ public sealed class ArchitectureValidator
         IReadOnlyDictionary<string, List<Node>> nodesById,
         ArchitectureRules rules,
         List<Edge> edges,
-        List<ArchitectureDiagnostic> diagnostics)
+        List<ArchitectureDiagnostic> diagnostics
+    )
     {
         using JsonDocument document = JsonDocument.Parse(File.ReadAllText(path));
         if (!document.RootElement.TryGetProperty("dependencies", out JsonElement dependencies))
@@ -206,7 +258,15 @@ public sealed class ArchitectureValidator
 
         foreach (JsonProperty dependency in dependencies.EnumerateObject())
         {
-            AddReferenceEdge(source, dependency.Name, sourcePath, nodesById, rules, edges, diagnostics);
+            AddReferenceEdge(
+                source,
+                dependency.Name,
+                sourcePath,
+                nodesById,
+                rules,
+                edges,
+                diagnostics
+            );
         }
     }
 
@@ -217,33 +277,43 @@ public sealed class ArchitectureValidator
         IReadOnlyDictionary<string, List<Node>> nodesById,
         ArchitectureRules rules,
         List<Edge> edges,
-        List<ArchitectureDiagnostic> diagnostics)
+        List<ArchitectureDiagnostic> diagnostics
+    )
     {
         if (nodesById.TryGetValue(targetId, out List<Node>? targets))
         {
             NodeKind expectedKind = source.Kind is NodeKind.Package or NodeKind.UnityProject
                 ? NodeKind.Package
                 : NodeKind.Assembly;
-            Node target = targets.FirstOrDefault(candidate => candidate.Kind == expectedKind) ?? targets[0];
+            Node target =
+                targets.FirstOrDefault(candidate => candidate.Kind == expectedKind) ?? targets[0];
             edges.Add(new Edge(source, target, sourcePath));
             return;
         }
 
-        if (rules.InternalReferencePrefixes.Any(prefix => targetId.StartsWith(prefix, StringComparison.Ordinal)))
+        if (
+            rules.InternalReferencePrefixes.Any(prefix =>
+                targetId.StartsWith(prefix, StringComparison.Ordinal)
+            )
+        )
         {
-            diagnostics.Add(new ArchitectureDiagnostic(
-                UnresolvedReferenceCode,
-                sourcePath,
-                $"Internal reference does not resolve: {targetId}",
-                source.Id,
-                targetId));
+            diagnostics.Add(
+                new ArchitectureDiagnostic(
+                    UnresolvedReferenceCode,
+                    sourcePath,
+                    $"Internal reference does not resolve: {targetId}",
+                    source.Id,
+                    targetId
+                )
+            );
         }
     }
 
     private static void ValidateDependencies(
         Graph graph,
         ArchitectureRules rules,
-        List<ArchitectureDiagnostic> diagnostics)
+        List<ArchitectureDiagnostic> diagnostics
+    )
     {
         foreach (Edge edge in graph.Edges)
         {
@@ -252,37 +322,61 @@ public sealed class ArchitectureValidator
                 continue;
             }
 
-            if (!rules.AllowedDependencies.TryGetValue(edge.Source.Layer, out string[]? allowed)
-                || !allowed.Contains(edge.Target.Layer, StringComparer.Ordinal))
+            if (
+                !rules.AllowedDependencies.TryGetValue(edge.Source.Layer, out string[]? allowed)
+                || !allowed.Contains(edge.Target.Layer, StringComparer.Ordinal)
+            )
             {
-                diagnostics.Add(new ArchitectureDiagnostic(
-                    ForbiddenDependencyCode,
-                    edge.DeclaredIn,
-                    $"Layer '{edge.Source.Layer}' may not depend on '{edge.Target.Layer}'.",
-                    edge.Source.Id,
-                    edge.Target.Id));
+                diagnostics.Add(
+                    new ArchitectureDiagnostic(
+                        ForbiddenDependencyCode,
+                        edge.DeclaredIn,
+                        $"Layer '{edge.Source.Layer}' may not depend on '{edge.Target.Layer}'.",
+                        edge.Source.Id,
+                        edge.Target.Id
+                    )
+                );
             }
 
-            if (edge.Source.Kind == NodeKind.Project && edge.Target.Kind == NodeKind.Project
-                && edge.Source.Path.StartsWith("server/src/Hosts/", StringComparison.OrdinalIgnoreCase)
-                && edge.Target.Path.StartsWith("server/src/Hosts/", StringComparison.OrdinalIgnoreCase))
+            if (
+                edge.Source.Kind == NodeKind.Project
+                && edge.Target.Kind == NodeKind.Project
+                && edge.Source.Path.StartsWith(
+                    "server/src/Hosts/",
+                    StringComparison.OrdinalIgnoreCase
+                )
+                && edge.Target.Path.StartsWith(
+                    "server/src/Hosts/",
+                    StringComparison.OrdinalIgnoreCase
+                )
+            )
             {
-                diagnostics.Add(new ArchitectureDiagnostic(
-                    HostDependencyCode, edge.DeclaredIn,
-                    "A Server Host composition root may not reference another Host.",
-                    edge.Source.Id, edge.Target.Id));
+                diagnostics.Add(
+                    new ArchitectureDiagnostic(
+                        HostDependencyCode,
+                        edge.DeclaredIn,
+                        "A Server Host composition root may not reference another Host.",
+                        edge.Source.Id,
+                        edge.Target.Id
+                    )
+                );
             }
 
-            if (edge.Source.Kind == NodeKind.Assembly
+            if (
+                edge.Source.Kind == NodeKind.Assembly
                 && IsRuntimePath(edge.Source.Path)
-                && IsEditorPath(edge.Target.Path))
+                && IsEditorPath(edge.Target.Path)
+            )
             {
-                diagnostics.Add(new ArchitectureDiagnostic(
-                    RuntimeEditorCode,
-                    edge.DeclaredIn,
-                    "A Runtime assembly may not reference an Editor assembly.",
-                    edge.Source.Id,
-                    edge.Target.Id));
+                diagnostics.Add(
+                    new ArchitectureDiagnostic(
+                        RuntimeEditorCode,
+                        edge.DeclaredIn,
+                        "A Runtime assembly may not reference an Editor assembly.",
+                        edge.Source.Id,
+                        edge.Target.Id
+                    )
+                );
             }
         }
     }
@@ -303,13 +397,19 @@ public sealed class ArchitectureValidator
             {
                 if (state == VisitState.Visiting)
                 {
-                    Node[] cycle = path.Reverse().SkipWhile(item => item != node).Append(node).ToArray();
-                    diagnostics.Add(new ArchitectureDiagnostic(
-                        CycleCode,
-                        node.Path,
-                        $"Dependency cycle detected: {string.Join(" -> ", cycle.Select(item => item.Id))}",
-                        node.Id,
-                        node.Id));
+                    Node[] cycle = path.Reverse()
+                        .SkipWhile(item => item != node)
+                        .Append(node)
+                        .ToArray();
+                    diagnostics.Add(
+                        new ArchitectureDiagnostic(
+                            CycleCode,
+                            node.Path,
+                            $"Dependency cycle detected: {string.Join(" -> ", cycle.Select(item => item.Id))}",
+                            node.Id,
+                            node.Id
+                        )
+                    );
                 }
 
                 return;
@@ -331,16 +431,20 @@ public sealed class ArchitectureValidator
         string root,
         IReadOnlyList<string> sourceFiles,
         ArchitectureRules rules,
-        List<ArchitectureDiagnostic> diagnostics)
+        List<ArchitectureDiagnostic> diagnostics
+    )
     {
         foreach (string path in sourceFiles.Where(path => IsSharedRuntime(root, path)))
         {
             string relativePath = Relative(root, path);
             bool isPassiveContract = rules.SharedPassiveContractPathPrefixes.Any(prefix =>
                 relativePath.Equals(prefix, StringComparison.OrdinalIgnoreCase)
-                || relativePath.StartsWith(prefix + "/", StringComparison.OrdinalIgnoreCase));
+                || relativePath.StartsWith(prefix + "/", StringComparison.OrdinalIgnoreCase)
+            );
             string source = File.ReadAllText(path);
-            CompilationUnitSyntax compilation = CSharpSyntaxTree.ParseText(source).GetCompilationUnitRoot();
+            CompilationUnitSyntax compilation = CSharpSyntaxTree
+                .ParseText(source)
+                .GetCompilationUnitRoot();
             HashSet<string> violations = new(StringComparer.Ordinal);
 
             foreach (UsingDirectiveSyntax directive in compilation.Usings)
@@ -361,11 +465,17 @@ public sealed class ArchitectureValidator
                 }
             }
 
-            foreach (ObjectCreationExpressionSyntax creation in compilation.DescendantNodes().OfType<ObjectCreationExpressionSyntax>())
+            foreach (
+                ObjectCreationExpressionSyntax creation in compilation
+                    .DescendantNodes()
+                    .OfType<ObjectCreationExpressionSyntax>()
+            )
             {
                 string typeName = creation.Type.ToString();
-                if (typeName.Equals("Random", StringComparison.Ordinal)
-                    || typeName.EndsWith(".Random", StringComparison.Ordinal))
+                if (
+                    typeName.Equals("Random", StringComparison.Ordinal)
+                    || typeName.EndsWith(".Random", StringComparison.Ordinal)
+                )
                 {
                     violations.Add(typeName);
                 }
@@ -376,19 +486,27 @@ public sealed class ArchitectureValidator
                 }
             }
 
-            foreach (AttributeSyntax attribute in compilation.DescendantNodes().OfType<AttributeSyntax>())
+            foreach (
+                AttributeSyntax attribute in compilation.DescendantNodes().OfType<AttributeSyntax>()
+            )
             {
                 string name = attribute.Name.ToString();
-                if (name.EndsWith("DllImport", StringComparison.Ordinal)
+                if (
+                    name.EndsWith("DllImport", StringComparison.Ordinal)
                     || name.EndsWith("DllImportAttribute", StringComparison.Ordinal)
                     || name.EndsWith("LibraryImport", StringComparison.Ordinal)
-                    || name.EndsWith("LibraryImportAttribute", StringComparison.Ordinal))
+                    || name.EndsWith("LibraryImportAttribute", StringComparison.Ordinal)
+                )
                 {
                     violations.Add(name);
                 }
             }
 
-            foreach (MemberAccessExpressionSyntax member in compilation.DescendantNodes().OfType<MemberAccessExpressionSyntax>())
+            foreach (
+                MemberAccessExpressionSyntax member in compilation
+                    .DescendantNodes()
+                    .OfType<MemberAccessExpressionSyntax>()
+            )
             {
                 string expression = member.Expression.ToString();
                 string name = member.Name.Identifier.ValueText;
@@ -398,11 +516,22 @@ public sealed class ArchitectureValidator
                     violations.Add(fullMember);
                 }
 
-                if (((expression.EndsWith("DateTime", StringComparison.Ordinal)
-                        || expression.EndsWith("DateTimeOffset", StringComparison.Ordinal))
-                        && name is "Now" or "UtcNow" or "Today")
-                    || (expression.EndsWith("Environment", StringComparison.Ordinal) && name is "TickCount" or "TickCount64")
-                    || (expression.EndsWith("Stopwatch", StringComparison.Ordinal) && name is "GetTimestamp" or "StartNew"))
+                if (
+                    (
+                        (
+                            expression.EndsWith("DateTime", StringComparison.Ordinal)
+                            || expression.EndsWith("DateTimeOffset", StringComparison.Ordinal)
+                        ) && name is "Now" or "UtcNow" or "Today"
+                    )
+                    || (
+                        expression.EndsWith("Environment", StringComparison.Ordinal)
+                        && name is "TickCount" or "TickCount64"
+                    )
+                    || (
+                        expression.EndsWith("Stopwatch", StringComparison.Ordinal)
+                        && name is "GetTimestamp" or "StartNew"
+                    )
+                )
                 {
                     violations.Add($"{expression}.{name}");
                 }
@@ -413,36 +542,59 @@ public sealed class ArchitectureValidator
                 }
             }
 
-            if (compilation.DescendantTrivia(descendIntoTrivia: true).Any(trivia => trivia.IsDirective))
+            if (
+                compilation
+                    .DescendantTrivia(descendIntoTrivia: true)
+                    .Any(trivia => trivia.IsDirective)
+            )
             {
                 violations.Add("conditional compilation directive");
             }
 
             foreach (string violation in violations)
             {
-                diagnostics.Add(new ArchitectureDiagnostic(
-                    SharedApiCode,
-                    Relative(root, path),
-                    $"Shared Runtime uses forbidden API or namespace: {violation}"));
+                diagnostics.Add(
+                    new ArchitectureDiagnostic(
+                        SharedApiCode,
+                        Relative(root, path),
+                        $"Shared Runtime uses forbidden API or namespace: {violation}"
+                    )
+                );
             }
         }
     }
 
-    private static bool IsForbiddenName(string name, ArchitectureRules rules, bool isPassiveContract) =>
+    private static bool IsForbiddenName(
+        string name,
+        ArchitectureRules rules,
+        bool isPassiveContract
+    ) =>
         rules.SharedForbiddenNamespacePrefixes.Any(prefix =>
-            (name.Equals(prefix, StringComparison.Ordinal)
-             || name.StartsWith(prefix + ".", StringComparison.Ordinal))
-            && (!isPassiveContract
+            (
+                name.Equals(prefix, StringComparison.Ordinal)
+                || name.StartsWith(prefix + ".", StringComparison.Ordinal)
+            )
+            && (
+                !isPassiveContract
                 || !rules.SharedPassiveContractAllowedNamespacePrefixes.Any(allowed =>
                     name.Equals(allowed, StringComparison.Ordinal)
-                    || name.StartsWith(allowed + ".", StringComparison.Ordinal))));
+                    || name.StartsWith(allowed + ".", StringComparison.Ordinal)
+                )
+            )
+        );
 
     private static bool IsActiveSchedulingType(string typeName) =>
-        typeName is "Thread" or "System.Threading.Thread"
-            or "Timer" or "System.Threading.Timer"
-            or "CancellationTokenSource" or "System.Threading.CancellationTokenSource"
-            or "Task" or "System.Threading.Tasks.Task"
-            or "TaskFactory" or "System.Threading.Tasks.TaskFactory";
+        typeName
+            is "Thread"
+                or "System.Threading.Thread"
+                or "Timer"
+                or "System.Threading.Timer"
+                or "CancellationTokenSource"
+                or "System.Threading.CancellationTokenSource"
+                or "Task"
+                or "System.Threading.Tasks.Task"
+                or "TaskFactory"
+                or "System.Threading.Tasks.TaskFactory";
 
     private static bool IsActiveSchedulingMember(string expression, string name) =>
         (expression.EndsWith("Task", StringComparison.Ordinal) && name == "Run")
@@ -455,7 +607,8 @@ public sealed class ArchitectureValidator
         IReadOnlyList<string> sourceFiles,
         IReadOnlyList<string> projectFiles,
         ArchitectureRules rules,
-        List<ArchitectureDiagnostic> diagnostics)
+        List<ArchitectureDiagnostic> diagnostics
+    )
     {
         foreach (string path in sourceFiles)
         {
@@ -465,20 +618,28 @@ public sealed class ArchitectureValidator
                 continue;
             }
 
-            CompilationUnitSyntax compilation = CSharpSyntaxTree.ParseText(File.ReadAllText(path)).GetCompilationUnitRoot();
-            bool referencesFantasy = compilation.Usings
-                .Select(directive => directive.Name?.ToString() ?? string.Empty)
-                .Any(IsFantasyNamespace)
-                || compilation.DescendantNodes().OfType<NameSyntax>()
+            CompilationUnitSyntax compilation = CSharpSyntaxTree
+                .ParseText(File.ReadAllText(path))
+                .GetCompilationUnitRoot();
+            bool referencesFantasy =
+                compilation
+                    .Usings.Select(directive => directive.Name?.ToString() ?? string.Empty)
+                    .Any(IsFantasyNamespace)
+                || compilation
+                    .DescendantNodes()
+                    .OfType<NameSyntax>()
                     .Where(name => name is QualifiedNameSyntax or AliasQualifiedNameSyntax)
                     .Select(name => name.ToString())
                     .Any(IsFantasyNamespace);
             if (referencesFantasy)
             {
-                diagnostics.Add(new ArchitectureDiagnostic(
-                    FantasyBoundaryCode,
-                    relativePath,
-                    "Fantasy runtime namespaces must terminate inside the dedicated Server adapter."));
+                diagnostics.Add(
+                    new ArchitectureDiagnostic(
+                        FantasyBoundaryCode,
+                        relativePath,
+                        "Fantasy runtime namespaces must terminate inside the dedicated Server adapter."
+                    )
+                );
             }
         }
 
@@ -486,16 +647,22 @@ public sealed class ArchitectureValidator
         {
             string relativePath = Relative(root, path);
             XDocument document = XDocument.Load(path);
-            bool referencesFantasyPackage = document.Descendants("PackageReference")
+            bool referencesFantasyPackage = document
+                .Descendants("PackageReference")
                 .Select(reference => reference.Attribute("Include")?.Value ?? string.Empty)
                 .Any(package => package.Equals("Fantasy-Net", StringComparison.OrdinalIgnoreCase));
-            if (referencesFantasyPackage
-                && !IsAllowedPath(relativePath, rules.FantasyPackageReferenceAllowedPathPrefixes))
+            if (
+                referencesFantasyPackage
+                && !IsAllowedPath(relativePath, rules.FantasyPackageReferenceAllowedPathPrefixes)
+            )
             {
-                diagnostics.Add(new ArchitectureDiagnostic(
-                    FantasyBoundaryCode,
-                    relativePath,
-                    "Fantasy-Net may be referenced only by the dedicated Server adapter, approved topology Hosts or the exact topology acceptance executable for compile-time startup metadata."));
+                diagnostics.Add(
+                    new ArchitectureDiagnostic(
+                        FantasyBoundaryCode,
+                        relativePath,
+                        "Fantasy-Net may be referenced only by the dedicated Server adapter, approved topology Hosts or the exact topology acceptance executable for compile-time startup metadata."
+                    )
+                );
             }
         }
     }
@@ -510,46 +677,60 @@ public sealed class ArchitectureValidator
     }
 
     private static bool IsAllowedPath(string path, IEnumerable<string> prefixes) =>
-        prefixes.Any(prefix => path.Equals(prefix, StringComparison.OrdinalIgnoreCase)
-            || path.StartsWith(prefix + "/", StringComparison.OrdinalIgnoreCase));
+        prefixes.Any(prefix =>
+            path.Equals(prefix, StringComparison.OrdinalIgnoreCase)
+            || path.StartsWith(prefix + "/", StringComparison.OrdinalIgnoreCase)
+        );
 
     private static void ValidateSolutions(
         string root,
         RepositoryFiles files,
-        List<ArchitectureDiagnostic> diagnostics)
+        List<ArchitectureDiagnostic> diagnostics
+    )
     {
-        HashSet<string> projects = files.ProjectFiles
-            .Select(path => Relative(root, path))
+        HashSet<string> projects = files
+            .ProjectFiles.Select(path => Relative(root, path))
             .ToHashSet(RepositoryPathComparer);
         HashSet<string> solutionProjects = new(RepositoryPathComparer);
 
         foreach (string solution in files.SolutionFiles)
         {
             string solutionDirectory = Path.GetDirectoryName(solution)!;
-            foreach (Match match in Regex.Matches(
-                         File.ReadAllText(solution),
-                         "Project\\(\\\"[^\\\"]+\\\"\\) = \\\"[^\\\"]+\\\", \\\"(?<path>[^\\\"]+\\.csproj)\\\"",
-                         RegexOptions.CultureInvariant))
+            foreach (
+                Match match in Regex.Matches(
+                    File.ReadAllText(solution),
+                    "Project\\(\\\"[^\\\"]+\\\"\\) = \\\"[^\\\"]+\\\", \\\"(?<path>[^\\\"]+\\.csproj)\\\"",
+                    RegexOptions.CultureInvariant
+                )
+            )
             {
                 string path = match.Groups["path"].Value.Replace('\\', Path.DirectorySeparatorChar);
-                solutionProjects.Add(Relative(root, Path.GetFullPath(Path.Combine(solutionDirectory, path))));
+                solutionProjects.Add(
+                    Relative(root, Path.GetFullPath(Path.Combine(solutionDirectory, path)))
+                );
             }
         }
 
         foreach (string project in projects.Except(solutionProjects, RepositoryPathComparer))
         {
-            diagnostics.Add(new ArchitectureDiagnostic(
-                SolutionDriftCode,
-                project,
-                "Project is not included in a repository solution."));
+            diagnostics.Add(
+                new ArchitectureDiagnostic(
+                    SolutionDriftCode,
+                    project,
+                    "Project is not included in a repository solution."
+                )
+            );
         }
 
         foreach (string project in solutionProjects.Except(projects, RepositoryPathComparer))
         {
-            diagnostics.Add(new ArchitectureDiagnostic(
-                SolutionDriftCode,
-                project,
-                "Solution references a missing or excluded project."));
+            diagnostics.Add(
+                new ArchitectureDiagnostic(
+                    SolutionDriftCode,
+                    project,
+                    "Solution references a missing or excluded project."
+                )
+            );
         }
     }
 
@@ -557,7 +738,8 @@ public sealed class ArchitectureValidator
         string root,
         IReadOnlyList<string> packageManifests,
         ArchitectureRules rules,
-        List<ArchitectureDiagnostic> diagnostics)
+        List<ArchitectureDiagnostic> diagnostics
+    )
     {
         foreach (string packageManifest in packageManifests)
         {
@@ -571,18 +753,31 @@ public sealed class ArchitectureValidator
                     string name = Path.GetFileName(child);
                     string relative = Relative(root, child);
 
-                    if (rules.UnityPackageForbiddenDirectoryNames.Contains(name, StringComparer.OrdinalIgnoreCase))
+                    if (
+                        rules.UnityPackageForbiddenDirectoryNames.Contains(
+                            name,
+                            StringComparer.OrdinalIgnoreCase
+                        )
+                    )
                     {
-                        diagnostics.Add(new ArchitectureDiagnostic(
-                            UnityPackageGeneratedOutputCode,
-                            relative,
-                            $"Generated .NET output directory '{name}' must not be inside a Unity package.",
-                            Relative(root, packageManifest),
-                            relative));
+                        diagnostics.Add(
+                            new ArchitectureDiagnostic(
+                                UnityPackageGeneratedOutputCode,
+                                relative,
+                                $"Generated .NET output directory '{name}' must not be inside a Unity package.",
+                                Relative(root, packageManifest),
+                                relative
+                            )
+                        );
                         continue;
                     }
 
-                    if (!rules.IgnoredDirectoryNames.Contains(name, StringComparer.OrdinalIgnoreCase))
+                    if (
+                        !rules.IgnoredDirectoryNames.Contains(
+                            name,
+                            StringComparer.OrdinalIgnoreCase
+                        )
+                    )
                     {
                         directories.Push(child);
                     }
@@ -594,7 +789,9 @@ public sealed class ArchitectureValidator
     private static string LayerFor(string root, string path, ArchitectureRules rules)
     {
         string relative = Relative(root, path);
-        string firstSegment = relative.Split('/', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? string.Empty;
+        string firstSegment =
+            relative.Split('/', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()
+            ?? string.Empty;
         return rules.LayerRoots.TryGetValue(firstSegment, out string? layer) ? layer : string.Empty;
     }
 
@@ -641,7 +838,8 @@ public sealed class ArchitectureValidator
         IReadOnlyList<string> AsmdefFiles,
         IReadOnlyList<string> ProjectFiles,
         IReadOnlyList<string> SolutionFiles,
-        IReadOnlyList<string> CSharpFiles)
+        IReadOnlyList<string> CSharpFiles
+    )
     {
         public static RepositoryFiles Discover(string root, ArchitectureRules rules)
         {
@@ -654,10 +852,13 @@ public sealed class ArchitectureValidator
                 {
                     string name = Path.GetFileName(child);
                     string relative = Relative(root, child);
-                    if (rules.IgnoredDirectoryNames.Contains(name, StringComparer.OrdinalIgnoreCase)
+                    if (
+                        rules.IgnoredDirectoryNames.Contains(name, StringComparer.OrdinalIgnoreCase)
                         || rules.IgnoredPathPrefixes.Any(prefix =>
                             relative.Equals(prefix, StringComparison.OrdinalIgnoreCase)
-                            || relative.StartsWith(prefix + "/", StringComparison.OrdinalIgnoreCase)))
+                            || relative.StartsWith(prefix + "/", StringComparison.OrdinalIgnoreCase)
+                        )
+                    )
                     {
                         continue;
                     }
@@ -665,18 +866,40 @@ public sealed class ArchitectureValidator
                     directories.Push(child);
                 }
 
-                files.AddRange(Directory.EnumerateFiles(directory).Where(path =>
-                    !Relative(root, directory).Equals("client/UnityProject", StringComparison.OrdinalIgnoreCase)
-                    || !(path.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase)
-                        || path.EndsWith(".sln", StringComparison.OrdinalIgnoreCase))));
+                files.AddRange(
+                    Directory
+                        .EnumerateFiles(directory)
+                        .Where(path =>
+                            !Relative(root, directory)
+                                .Equals("client/UnityProject", StringComparison.OrdinalIgnoreCase)
+                            || !(
+                                path.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase)
+                                || path.EndsWith(".sln", StringComparison.OrdinalIgnoreCase)
+                            )
+                        )
+                );
             }
 
             return new RepositoryFiles(
-                files.Where(path => Path.GetFileName(path).Equals("package.json", StringComparison.OrdinalIgnoreCase)).ToArray(),
-                files.Where(path => path.EndsWith(".asmdef", StringComparison.OrdinalIgnoreCase)).ToArray(),
-                files.Where(path => path.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase)).ToArray(),
-                files.Where(path => path.EndsWith(".sln", StringComparison.OrdinalIgnoreCase)).ToArray(),
-                files.Where(path => path.EndsWith(".cs", StringComparison.OrdinalIgnoreCase)).ToArray());
+                files
+                    .Where(path =>
+                        Path.GetFileName(path)
+                            .Equals("package.json", StringComparison.OrdinalIgnoreCase)
+                    )
+                    .ToArray(),
+                files
+                    .Where(path => path.EndsWith(".asmdef", StringComparison.OrdinalIgnoreCase))
+                    .ToArray(),
+                files
+                    .Where(path => path.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase))
+                    .ToArray(),
+                files
+                    .Where(path => path.EndsWith(".sln", StringComparison.OrdinalIgnoreCase))
+                    .ToArray(),
+                files
+                    .Where(path => path.EndsWith(".cs", StringComparison.OrdinalIgnoreCase))
+                    .ToArray()
+            );
         }
     }
 }

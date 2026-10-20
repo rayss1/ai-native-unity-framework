@@ -31,26 +31,34 @@ namespace AiNative.Client.Application.PlayModeTests
         [UnityTearDown]
         public IEnumerator DestroyUiBeforeRestoringInputSystem()
         {
-            if (_owner != null) Object.Destroy(_owner);
+            if (_owner != null)
+                Object.Destroy(_owner);
             _owner = null;
             // Flow -> view -> owned EventSystem destruction spans three frames.
-            yield return null; yield return null; yield return null;
+            yield return null;
+            yield return null;
+            yield return null;
         }
 
         public override void TearDown()
         {
-            if (_owner != null) Object.DestroyImmediate(_owner);
+            if (_owner != null)
+                Object.DestroyImmediate(_owner);
             base.TearDown();
         }
 
         [Test]
         public void WasdAndFireUseNewDevicesAndCancelOppositeKeys()
         {
-            Press(_keyboard.wKey); Press(_keyboard.dKey); Press(_mouse.leftButton);
+            Press(_keyboard.wKey);
+            Press(_keyboard.dKey);
+            Press(_mouse.leftButton);
             Invoke(_flow, "SampleManualInput");
             Assert.That(Field(_flow, "_manualMove"), Is.EqualTo(new Vector2Int(1000, 1000)));
             Assert.That(Field(_flow, "_manualFire"), Is.True);
-            Press(_keyboard.aKey); Press(_keyboard.sKey); Release(_mouse.leftButton);
+            Press(_keyboard.aKey);
+            Press(_keyboard.sKey);
+            Release(_mouse.leftButton);
             Invoke(_flow, "SampleManualInput");
             Assert.That(Field(_flow, "_manualMove"), Is.EqualTo(Vector2Int.zero));
             Assert.That(Field(_flow, "_manualFire"), Is.False);
@@ -59,12 +67,14 @@ namespace AiNative.Client.Application.PlayModeTests
         [Test]
         public void MissingDevicesAndFocusLossClearCachedInput()
         {
-            Press(_keyboard.wKey); Press(_mouse.leftButton);
+            Press(_keyboard.wKey);
+            Press(_mouse.leftButton);
             Invoke(_flow, "SampleManualInput");
             Invoke(_flow, "OnApplicationFocus", false);
             Assert.That(Field(_flow, "_manualMove"), Is.EqualTo(Vector2Int.zero));
             Assert.That(Field(_flow, "_manualFire"), Is.False);
-            InputSystem.RemoveDevice(_keyboard); InputSystem.RemoveDevice(_mouse);
+            InputSystem.RemoveDevice(_keyboard);
+            InputSystem.RemoveDevice(_mouse);
             Assert.DoesNotThrow(() => Invoke(_flow, "SampleManualInput"));
             Assert.That(Field(_flow, "_manualMove"), Is.EqualTo(Vector2Int.zero));
             Assert.That(Field(_flow, "_manualFire"), Is.False);
@@ -82,38 +92,72 @@ namespace AiNative.Client.Application.PlayModeTests
             Assert.That(module.actionsAsset, Is.Not.Null);
             Assert.That(EventSystem.current.GetComponent<StandaloneInputModule>(), Is.Null);
 
-            Press(_keyboard.tabKey); yield return null;
-            Assert.That(EventSystem.current.currentSelectedGameObject, Is.EqualTo(view.Username.gameObject));
-            Release(_keyboard.tabKey); yield return null;
-            Press(_keyboard.leftShiftKey); Press(_keyboard.tabKey); yield return null;
-            Assert.That(EventSystem.current.currentSelectedGameObject, Is.EqualTo(view.AdvancedButton.gameObject));
-            Release(_keyboard.tabKey); Release(_keyboard.leftShiftKey); yield return null;
-
-            view.Username.text = "ab"; view.Password.text = "short";
-            view.Password.Select(); view.Password.ActivateInputField();
+            Press(_keyboard.tabKey);
             yield return null;
-            Press(_keyboard.enterKey); yield return null;
-            Assert.That(_flow.Error, Is.EqualTo("invalid_credentials"), "Enter must reach validation without sending a network request.");
-            Release(_keyboard.enterKey); yield return null;
+            Assert.That(
+                EventSystem.current.currentSelectedGameObject,
+                Is.EqualTo(view.Username.gameObject)
+            );
+            Release(_keyboard.tabKey);
+            yield return null;
+            Press(_keyboard.leftShiftKey);
+            Press(_keyboard.tabKey);
+            yield return null;
+            Assert.That(
+                EventSystem.current.currentSelectedGameObject,
+                Is.EqualTo(view.AdvancedButton.gameObject)
+            );
+            Release(_keyboard.tabKey);
+            Release(_keyboard.leftShiftKey);
+            yield return null;
+
+            view.Username.text = "ab";
+            view.Password.text = "short";
+            view.Password.Select();
+            view.Password.ActivateInputField();
+            yield return null;
+            Press(_keyboard.enterKey);
+            yield return null;
+            Assert.That(
+                _flow.Error,
+                Is.EqualTo("invalid_credentials"),
+                "Enter must reach validation without sending a network request."
+            );
+            Release(_keyboard.enterKey);
+            yield return null;
             LogAssert.NoUnexpectedReceived();
         }
 
         [UnityTest]
         public IEnumerator PointerClickUsesNewModuleAndDestroyedUiDoesNotLeakEventSystem()
         {
-            yield return null; yield return null;
+            yield return null;
+            yield return null;
             var view = (TopologyClientView)Field(_flow, "_view");
             GameObject eventSystem = EventSystem.current.gameObject;
             Canvas.ForceUpdateCanvases();
             var rect = (RectTransform)view.AdvancedButton.transform;
-            Vector2 position = RectTransformUtility.WorldToScreenPoint(null, rect.TransformPoint(rect.rect.center));
+            Vector2 position = RectTransformUtility.WorldToScreenPoint(
+                null,
+                rect.TransformPoint(rect.rect.center)
+            );
             bool prior = view.Advanced.activeSelf;
-            Set(_mouse.position, position); yield return null;
-            Press(_mouse.leftButton); yield return null;
-            Release(_mouse.leftButton); yield return null;
-            Assert.That(view.Advanced.activeSelf, Is.Not.EqualTo(prior), "A real Input System pointer click must reach the UGUI button.");
-            Object.Destroy(_owner); _owner = null;
-            yield return null; yield return null; yield return null;
+            Set(_mouse.position, position);
+            yield return null;
+            Press(_mouse.leftButton);
+            yield return null;
+            Release(_mouse.leftButton);
+            yield return null;
+            Assert.That(
+                view.Advanced.activeSelf,
+                Is.Not.EqualTo(prior),
+                "A real Input System pointer click must reach the UGUI button."
+            );
+            Object.Destroy(_owner);
+            _owner = null;
+            yield return null;
+            yield return null;
+            yield return null;
             Assert.That(eventSystem == null, Is.True);
             LogAssert.NoUnexpectedReceived();
         }
@@ -122,8 +166,13 @@ namespace AiNative.Client.Application.PlayModeTests
         public IEnumerator BorrowedLegacyEventSystemMigratesWithoutBeingDestroyed()
         {
             EventSystem previous = EventSystem.current;
-            if (previous != null) previous.gameObject.SetActive(false);
-            var borrowed = new GameObject("Borrowed EventSystem", typeof(EventSystem), typeof(StandaloneInputModule));
+            if (previous != null)
+                previous.gameObject.SetActive(false);
+            var borrowed = new GameObject(
+                "Borrowed EventSystem",
+                typeof(EventSystem),
+                typeof(StandaloneInputModule)
+            );
             EventSystem.current = borrowed.GetComponent<EventSystem>();
             try
             {
@@ -135,18 +184,29 @@ namespace AiNative.Client.Application.PlayModeTests
                 Assert.That(borrowed.GetComponent<StandaloneInputModule>().enabled, Is.False);
                 Assert.That(borrowed.GetComponent<InputSystemUIInputModule>().enabled, Is.True);
                 Object.Destroy(ui);
-                yield return null; yield return null;
+                yield return null;
+                yield return null;
                 Assert.That(borrowed != null, Is.True);
                 LogAssert.NoUnexpectedReceived();
             }
             finally
             {
                 Object.DestroyImmediate(borrowed);
-                if (previous != null) previous.gameObject.SetActive(true);
+                if (previous != null)
+                    previous.gameObject.SetActive(true);
             }
         }
 
-        private static object Field(object target, string name) => target.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic).GetValue(target);
-        private static void Invoke(object target, string name, params object[] args) => target.GetType().GetMethod(name, BindingFlags.Instance | BindingFlags.NonPublic).Invoke(target, args);
+        private static object Field(object target, string name) =>
+            target
+                .GetType()
+                .GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)
+                .GetValue(target);
+
+        private static void Invoke(object target, string name, params object[] args) =>
+            target
+                .GetType()
+                .GetMethod(name, BindingFlags.Instance | BindingFlags.NonPublic)
+                .Invoke(target, args);
     }
 }

@@ -30,13 +30,35 @@ namespace AiNative.Client.Application.Tests
             var feet = new Vector3(0, 0, distance);
             Vector3 direction = (feet + Vector3.up * 1.2f - camera).normalized;
             Vector3 relative = (camera - feet) * 1000;
-            Assert.That(ArenaHitGeometry.RayCapsule(relative.x, relative.y, relative.z,
-                direction.x, direction.y, direction.z, 100000, out double t), Is.True);
+            Assert.That(
+                ArenaHitGeometry.RayCapsule(
+                    relative.x,
+                    relative.y,
+                    relative.z,
+                    direction.x,
+                    direction.y,
+                    direction.z,
+                    100000,
+                    out double t
+                ),
+                Is.True
+            );
             var point = camera + direction * ((float)t / 1000 + .02f);
             NetworkCharacterInput.AimDelta(state, point, out int yaw, out int pitch);
             Vector3 shot = Quaternion.Euler(-pitch / 1000f, yaw / 1000f, 0) * Vector3.forward;
-            Assert.That(ArenaHitGeometry.RayCapsule(0, 600, -distance * 1000,
-                shot.x, shot.y, shot.z, 100000, out _), Is.True);
+            Assert.That(
+                ArenaHitGeometry.RayCapsule(
+                    0,
+                    600,
+                    -distance * 1000,
+                    shot.x,
+                    shot.y,
+                    shot.z,
+                    100000,
+                    out _
+                ),
+                Is.True
+            );
         }
 
         [TestCase(0, 0, 1000)]
@@ -45,7 +67,10 @@ namespace AiNative.Client.Application.Tests
         [TestCase(270, -1000, 0)]
         public void ForwardUsesCameraWorldHeading(float yaw, int x, int z)
         {
-            Assert.That(NetworkCharacterInput.RotateMove(new Vector2Int(0, 1000), yaw), Is.EqualTo(new Vector2Int(x, z)));
+            Assert.That(
+                NetworkCharacterInput.RotateMove(new Vector2Int(0, 1000), yaw),
+                Is.EqualTo(new Vector2Int(x, z))
+            );
         }
 
         [Test]
@@ -59,13 +84,19 @@ namespace AiNative.Client.Application.Tests
         [Test]
         public void LookUsesShortestYawAndInvertsUnityPitchWithoutRepeatingDelta()
         {
-            var state = new ArenaPlayerState { YawMillidegrees = 359000, PitchMillidegrees = 10000 };
+            var state = new ArenaPlayerState
+            {
+                YawMillidegrees = 359000,
+                PitchMillidegrees = 10000,
+            };
             NetworkCharacterInput.LookDelta(state, 1, -20, out int yaw, out int pitch);
             Assert.That(yaw, Is.EqualTo(2000));
             Assert.That(pitch, Is.EqualTo(10000));
-            state.YawMillidegrees = 1000; state.PitchMillidegrees = 20000;
+            state.YawMillidegrees = 1000;
+            state.PitchMillidegrees = 20000;
             NetworkCharacterInput.LookDelta(state, 1, -20, out yaw, out pitch);
-            Assert.That(yaw, Is.Zero); Assert.That(pitch, Is.Zero);
+            Assert.That(yaw, Is.Zero);
+            Assert.That(pitch, Is.Zero);
         }
 
         [Test]

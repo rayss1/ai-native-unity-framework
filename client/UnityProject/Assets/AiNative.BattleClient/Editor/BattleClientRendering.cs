@@ -20,14 +20,17 @@ namespace AiNative.Client.Editor
             EnsureFolder(SettingsFolder);
             EnsureFolder(ResourcesFolder);
             EnsureFolder(MaterialFolder);
-            UniversalRendererData renderer = AssetDatabase.LoadAssetAtPath<UniversalRendererData>(RendererPath);
+            UniversalRendererData renderer = AssetDatabase.LoadAssetAtPath<UniversalRendererData>(
+                RendererPath
+            );
             if (renderer == null)
             {
                 renderer = ScriptableObject.CreateInstance<UniversalRendererData>();
                 AssetDatabase.CreateAsset(renderer, RendererPath);
             }
 
-            UniversalRenderPipelineAsset pipeline = AssetDatabase.LoadAssetAtPath<UniversalRenderPipelineAsset>(PipelinePath);
+            UniversalRenderPipelineAsset pipeline =
+                AssetDatabase.LoadAssetAtPath<UniversalRenderPipelineAsset>(PipelinePath);
             if (pipeline == null)
             {
                 pipeline = UniversalRenderPipelineAsset.Create(renderer);
@@ -45,18 +48,25 @@ namespace AiNative.Client.Editor
                     QualitySettings.renderPipeline = pipeline;
                 }
             }
-            finally { QualitySettings.SetQualityLevel(selectedQuality, false); }
+            finally
+            {
+                QualitySettings.SetQualityLevel(selectedQuality, false);
+            }
 
             CreateMaterial("Player", new Color(0.15f, 0.65f, 1f));
             CreateMaterial("Floor", new Color(0.08f, 0.1f, 0.14f));
 
             // Supersedes the old built-in greybox shader-retention workaround.
             SerializedObject graphics = new SerializedObject(
-                AssetDatabase.LoadAllAssetsAtPath("ProjectSettings/GraphicsSettings.asset")[0]);
+                AssetDatabase.LoadAllAssetsAtPath("ProjectSettings/GraphicsSettings.asset")[0]
+            );
             SerializedProperty included = graphics.FindProperty("m_AlwaysIncludedShaders");
             for (int index = included.arraySize - 1; index >= 0; index--)
             {
-                if (included.GetArrayElementAtIndex(index).objectReferenceValue is Shader shader && shader.name == "Standard")
+                if (
+                    included.GetArrayElementAtIndex(index).objectReferenceValue is Shader shader
+                    && shader.name == "Standard"
+                )
                 {
                     included.GetArrayElementAtIndex(index).objectReferenceValue = null;
                     included.DeleteArrayElementAtIndex(index);
@@ -70,30 +80,45 @@ namespace AiNative.Client.Editor
 
         public static void ValidateUrpConfiguration()
         {
-            UniversalRenderPipelineAsset pipeline = AssetDatabase.LoadAssetAtPath<UniversalRenderPipelineAsset>(PipelinePath);
+            UniversalRenderPipelineAsset pipeline =
+                AssetDatabase.LoadAssetAtPath<UniversalRenderPipelineAsset>(PipelinePath);
             if (pipeline == null || GraphicsSettings.defaultRenderPipeline != pipeline)
-                throw new InvalidOperationException("Configure the Battle Client URP asset before building.");
+                throw new InvalidOperationException(
+                    "Configure the Battle Client URP asset before building."
+                );
             if (pipeline.rendererDataList.Length == 0 || pipeline.rendererDataList[0] == null)
                 throw new InvalidOperationException("The URP asset requires a renderer.");
             for (int index = 0; index < QualitySettings.names.Length; index++)
             {
                 if (QualitySettings.GetRenderPipelineAssetAt(index) != pipeline)
-                    throw new InvalidOperationException("Every quality level must select the Battle Client URP asset.");
+                    throw new InvalidOperationException(
+                        "Every quality level must select the Battle Client URP asset."
+                    );
             }
             foreach (string name in new[] { "Player", "Floor" })
             {
-                Material material = AssetDatabase.LoadAssetAtPath<Material>(MaterialFolder + "/" + name + ".mat");
-                if (material == null || material.shader == null || material.shader.name != "Universal Render Pipeline/Lit")
-                    throw new InvalidOperationException("Missing URP Lit greybox material: " + name);
+                Material material = AssetDatabase.LoadAssetAtPath<Material>(
+                    MaterialFolder + "/" + name + ".mat"
+                );
+                if (
+                    material == null
+                    || material.shader == null
+                    || material.shader.name != "Universal Render Pipeline/Lit"
+                )
+                    throw new InvalidOperationException(
+                        "Missing URP Lit greybox material: " + name
+                    );
             }
         }
 
         private static void CreateMaterial(string name, Color color)
         {
             string path = MaterialFolder + "/" + name + ".mat";
-            if (AssetDatabase.LoadAssetAtPath<Material>(path) != null) return;
+            if (AssetDatabase.LoadAssetAtPath<Material>(path) != null)
+                return;
             Shader shader = Shader.Find("Universal Render Pipeline/Lit");
-            if (shader == null) throw new InvalidOperationException("URP Lit shader is unavailable.");
+            if (shader == null)
+                throw new InvalidOperationException("URP Lit shader is unavailable.");
             Material material = new Material(shader) { name = name };
             material.SetColor("_BaseColor", color);
             material.SetFloat("_Smoothness", 0.2f);
@@ -103,7 +128,10 @@ namespace AiNative.Client.Editor
         private static void EnsureFolder(string path)
         {
             if (!AssetDatabase.IsValidFolder(path))
-                AssetDatabase.CreateFolder(System.IO.Path.GetDirectoryName(path).Replace('\\', '/'), System.IO.Path.GetFileName(path));
+                AssetDatabase.CreateFolder(
+                    System.IO.Path.GetDirectoryName(path).Replace('\\', '/'),
+                    System.IO.Path.GetFileName(path)
+                );
         }
     }
 }

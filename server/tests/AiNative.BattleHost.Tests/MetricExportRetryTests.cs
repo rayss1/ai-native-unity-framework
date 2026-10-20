@@ -15,10 +15,13 @@ public sealed class MetricExportRetryTests
         using var meter = new System.Diagnostics.Metrics.Meter(BattleMetrics.MeterName);
         using MeterProvider provider = Sdk.CreateMeterProviderBuilder()
             .AddMeter(BattleMetrics.MeterName)
-            .AddReader(new PeriodicExportingMetricReader(
-                new TrackingMetricExporter(new RecoverableExporter(), health, clock),
-                exportIntervalMilliseconds: 60_000,
-                exportTimeoutMilliseconds: 100))
+            .AddReader(
+                new PeriodicExportingMetricReader(
+                    new TrackingMetricExporter(new RecoverableExporter(), health, clock),
+                    exportIntervalMilliseconds: 60_000,
+                    exportTimeoutMilliseconds: 100
+                )
+            )
             .Build();
         var counter = meter.CreateCounter<long>("test.cardinality");
         counter.Add(1);
@@ -48,7 +51,11 @@ public sealed class MetricExportRetryTests
             int attempts = inner.Attempts;
             clock.AdvanceMilliseconds(delaySeconds * 1000 - 1);
             Assert.That(exporter.Export(in batch), Is.EqualTo(ExportResult.Failure));
-            Assert.That(inner.Attempts, Is.EqualTo(attempts), "Backoff must not call the exporter.");
+            Assert.That(
+                inner.Attempts,
+                Is.EqualTo(attempts),
+                "Backoff must not call the exporter."
+            );
             clock.AdvanceMilliseconds(1);
             Assert.That(exporter.Export(in batch), Is.EqualTo(ExportResult.Failure));
             Assert.That(inner.Attempts, Is.EqualTo(attempts + 1));
@@ -67,14 +74,20 @@ public sealed class MetricExportRetryTests
         Assert.That(exporter.Export(in batch), Is.EqualTo(ExportResult.Failure));
         clock.AdvanceMilliseconds(1000);
         Assert.That(exporter.Export(in batch), Is.EqualTo(ExportResult.Failure));
-        Assert.That(inner.Attempts, Is.EqualTo(12), "A recovered exporter must restart at the one-second delay.");
+        Assert.That(
+            inner.Attempts,
+            Is.EqualTo(12),
+            "A recovered exporter must restart at the one-second delay."
+        );
     }
 
     private sealed class ManualClock : TimeProvider
     {
         private long _timestamp;
         public override long TimestampFrequency => 1000;
+
         public override long GetTimestamp() => _timestamp;
+
         public void AdvanceMilliseconds(long milliseconds) => _timestamp += milliseconds;
     }
 
@@ -87,8 +100,10 @@ public sealed class MetricExportRetryTests
         public override ExportResult Export(in Batch<Metric> batch)
         {
             Attempts++;
-            if (Healthy) return ExportResult.Success;
-            if (Throws) throw new InvalidOperationException("Simulated collector outage");
+            if (Healthy)
+                return ExportResult.Success;
+            if (Throws)
+                throw new InvalidOperationException("Simulated collector outage");
             return ExportResult.Failure;
         }
     }

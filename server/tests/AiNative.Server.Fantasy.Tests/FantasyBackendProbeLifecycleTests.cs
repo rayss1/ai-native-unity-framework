@@ -19,8 +19,11 @@ public sealed class FantasyBackendProbeLifecycleTests
         await using var fixture = new VendorFixture();
         Task closing = fixture.Probe.DisposeAsync().AsTask();
         Task repeated = fixture.Probe.DisposeAsync().AsTask();
-        Assert.That(closing.IsCompleted, Is.False,
-            "Posting a Scene action is not completion of Session.Dispose.");
+        Assert.That(
+            closing.IsCompleted,
+            Is.False,
+            "Posting a Scene action is not completion of Session.Dispose."
+        );
         Assert.That(fixture.SessionIsDisposed, Is.False);
         Assert.That(repeated, Is.SameAs(closing), "Concurrent disposal must share its completion.");
         await fixture.PumpUntilCompleted(closing);
@@ -34,7 +37,11 @@ public sealed class FantasyBackendProbeLifecycleTests
         await using var fixture = new VendorFixture();
         Task closing = fixture.Probe.DisposeAsync().AsTask();
         Task<ServiceReply> call = fixture.Call();
-        Assert.That(call.IsCompleted, Is.True, "Closing must reject calls immediately, before the Scene action runs.");
+        Assert.That(
+            call.IsCompleted,
+            Is.True,
+            "Closing must reject calls immediately, before the Scene action runs."
+        );
         Assert.That((await call).Error, Is.EqualTo("unavailable"));
         Assert.That(fixture.PendingCallbacks, Is.Zero);
         Assert.That(fixture.Channel.SendCount, Is.Zero);
@@ -51,7 +58,11 @@ public sealed class FantasyBackendProbeLifecycleTests
         cancelled.Cancel();
         Task<ServiceReply> call = fixture.Call(cancelled.Token);
         Assert.CatchAsync<OperationCanceledException>(async () => await call);
-        Assert.That(fixture.OwnerActions, Is.Zero, "A pre-cancelled call must not enqueue an accepted mutation.");
+        Assert.That(
+            fixture.OwnerActions,
+            Is.Zero,
+            "A pre-cancelled call must not enqueue an accepted mutation."
+        );
         fixture.Pump();
         Assert.That(fixture.Channel.SendCount, Is.Zero);
         Assert.That(fixture.PendingCallbacks, Is.Zero);
@@ -67,9 +78,15 @@ public sealed class FantasyBackendProbeLifecycleTests
         fixture.Pump();
         fixture.AssertActualRpcPending();
         cancelled.Cancel();
-        await WaitUntil(() => call.IsCompleted || fixture.OwnerActions != 0, TimeSpan.FromSeconds(3));
-        Assert.That(call.IsCompleted, Is.False,
-            "Cancellation must retain Session/RPC ownership until the owning Scene has closed it.");
+        await WaitUntil(
+            () => call.IsCompleted || fixture.OwnerActions != 0,
+            TimeSpan.FromSeconds(3)
+        );
+        Assert.That(
+            call.IsCompleted,
+            Is.False,
+            "Cancellation must retain Session/RPC ownership until the owning Scene has closed it."
+        );
         await fixture.PumpUntilCompleted(call);
         Assert.CatchAsync<OperationCanceledException>(async () => await call);
         fixture.AssertActuallyClosed();
@@ -84,16 +101,35 @@ public sealed class FantasyBackendProbeLifecycleTests
     {
         await using var fixture = new VendorFixture();
         using var cancelled = new CancellationTokenSource();
-        Task<ServiceReply>[] calls = [fixture.Call(cancelled.Token), .. Enumerable.Range(0, 7).Select(_ => fixture.Call())];
+        Task<ServiceReply>[] calls =
+        [
+            fixture.Call(cancelled.Token),
+            .. Enumerable.Range(0, 7).Select(_ => fixture.Call()),
+        ];
         fixture.Pump();
         Assert.That(fixture.Channel.SendCount, Is.EqualTo(8));
-        Assert.That(fixture.PendingCallbacks, Is.EqualTo(8), "All eight callbacks must come from actual vendor Session.Call.");
+        Assert.That(
+            fixture.PendingCallbacks,
+            Is.EqualTo(8),
+            "All eight callbacks must come from actual vendor Session.Call."
+        );
         Assert.That(fixture.AvailableCallSlots, Is.Zero);
 
         cancelled.Cancel();
-        await WaitUntil(() => calls[0].IsCompleted || fixture.OwnerActions != 0, TimeSpan.FromSeconds(3));
-        Assert.That(calls[0].IsCompleted, Is.False, "The cancelled waiter must await closure of all owned RPCs.");
-        Assert.That(fixture.PendingCallbacks, Is.EqualTo(8), "The owner context has not executed Session.Dispose yet.");
+        await WaitUntil(
+            () => calls[0].IsCompleted || fixture.OwnerActions != 0,
+            TimeSpan.FromSeconds(3)
+        );
+        Assert.That(
+            calls[0].IsCompleted,
+            Is.False,
+            "The cancelled waiter must await closure of all owned RPCs."
+        );
+        Assert.That(
+            fixture.PendingCallbacks,
+            Is.EqualTo(8),
+            "The owner context has not executed Session.Dispose yet."
+        );
         Task closing = fixture.Probe.DisposeAsync().AsTask();
         Assert.That(closing.IsCompleted, Is.False);
         await fixture.PumpUntilCompleted(closing);
@@ -105,13 +141,22 @@ public sealed class FantasyBackendProbeLifecycleTests
         foreach (Task<ServiceReply> other in calls.Skip(1))
         {
             await fixture.PumpUntilCompleted(other);
-            ServiceException? failure = Assert.ThrowsAsync<ServiceException>(async () => await other);
+            ServiceException? failure = Assert.ThrowsAsync<ServiceException>(async () =>
+                await other
+            );
             Assert.That(failure!.Message, Is.EqualTo("unavailable"));
         }
         fixture.Pump();
-        Assert.That(calls.Skip(1).All(call => call.IsFaulted), Is.True,
-            "Every sibling RPC must stay terminally faulted; none may complete successfully after close.");
-        Assert.That(fixture.PendingCallbacks, Is.Zero, "No vendor callback remains eligible for a late response.");
+        Assert.That(
+            calls.Skip(1).All(call => call.IsFaulted),
+            Is.True,
+            "Every sibling RPC must stay terminally faulted; none may complete successfully after close."
+        );
+        Assert.That(
+            fixture.PendingCallbacks,
+            Is.Zero,
+            "No vendor callback remains eligible for a late response."
+        );
         Assert.That(fixture.Channel.SendCount, Is.EqualTo(8));
         Assert.That(fixture.AvailableCallSlots, Is.EqualTo(8));
     }
@@ -125,13 +170,21 @@ public sealed class FantasyBackendProbeLifecycleTests
         Assert.That(fixture.PendingCallbacks, Is.Zero);
         Assert.That(fixture.AvailableCallSlots, Is.EqualTo(7));
         Task closing = fixture.Probe.DisposeAsync().AsTask();
-        Assert.That(closing.IsCompleted, Is.False, "Disposal must retain the queued call until its finally settles.");
+        Assert.That(
+            closing.IsCompleted,
+            Is.False,
+            "Disposal must retain the queued call until its finally settles."
+        );
         await fixture.PumpUntilCompleted(closing);
         await closing;
         await fixture.PumpUntilCompleted(call);
         ServiceException? failure = Assert.ThrowsAsync<ServiceException>(async () => await call);
         Assert.That(failure!.Message, Is.EqualTo("unavailable"));
-        Assert.That(fixture.Channel.SendCount, Is.Zero, "A queued call must recheck closing before actual Session.Call/Send.");
+        Assert.That(
+            fixture.Channel.SendCount,
+            Is.Zero,
+            "A queued call must recheck closing before actual Session.Call/Send."
+        );
         Assert.That(fixture.PendingCallbacks, Is.Zero);
         fixture.AssertActuallyClosed();
     }
@@ -144,9 +197,15 @@ public sealed class FantasyBackendProbeLifecycleTests
         fixture.Pump();
         fixture.AssertActualRpcPending();
         // Exercise the production ten-second timeout, without a fake clock or Task.
-        await WaitUntil(() => call.IsCompleted || fixture.OwnerActions != 0, TimeSpan.FromSeconds(13));
-        Assert.That(call.IsCompleted, Is.False,
-            "A timeout must await actual Session disposal, not leave its vendor FTask pending.");
+        await WaitUntil(
+            () => call.IsCompleted || fixture.OwnerActions != 0,
+            TimeSpan.FromSeconds(13)
+        );
+        Assert.That(
+            call.IsCompleted,
+            Is.False,
+            "A timeout must await actual Session disposal, not leave its vendor FTask pending."
+        );
         await fixture.PumpUntilCompleted(call);
         Assert.ThrowsAsync<TimeoutException>(async () => await call);
         fixture.AssertActuallyClosed();
@@ -160,8 +219,11 @@ public sealed class FantasyBackendProbeLifecycleTests
         fixture.Post(() => closing = fixture.Probe.DisposeAsync().AsTask());
         fixture.Pump();
         Assert.That(closing, Is.Not.Null);
-        Assert.That(closing!.IsCompletedSuccessfully, Is.True,
-            "The connection abandonment path may close inline on its owning Scene.");
+        Assert.That(
+            closing!.IsCompletedSuccessfully,
+            Is.True,
+            "The connection abandonment path may close inline on its owning Scene."
+        );
         await closing;
         fixture.AssertActuallyClosed();
     }
@@ -171,7 +233,10 @@ public sealed class FantasyBackendProbeLifecycleTests
         Stopwatch timer = Stopwatch.StartNew();
         while (!condition())
         {
-            if (timer.Elapsed >= timeout) throw new TimeoutException("Vendor lifecycle fixture did not reach the expected state.");
+            if (timer.Elapsed >= timeout)
+                throw new TimeoutException(
+                    "Vendor lifecycle fixture did not reach the expected state."
+                );
             await Task.Delay(5).ConfigureAwait(false);
         }
     }
@@ -181,6 +246,7 @@ public sealed class FantasyBackendProbeLifecycleTests
         public object Session { get; set; } = null!;
         public int SendCount { get; private set; }
         public int DisposeCount { get; private set; }
+
         public void MarkDisposed() => DisposeCount++;
 
         protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
@@ -188,23 +254,36 @@ public sealed class FantasyBackendProbeLifecycleTests
             switch (targetMethod?.Name)
             {
                 case "Send":
-                    Assert.That(args![0], Is.Not.EqualTo(0u), "A real Session.Call must allocate an RPC ID.");
+                    Assert.That(
+                        args![0],
+                        Is.Not.EqualTo(0u),
+                        "A real Session.Call must allocate an RPC ID."
+                    );
                     Assert.That(args[3], Is.Not.Null);
                     SendCount++;
                     return null; // No reply: Session.Call's real vendor callback stays pending.
-                case "get_Session": return Session;
-                case "get_IsDisposed": return DisposeCount != 0;
-                case "Dispose": MarkDisposed(); return null;
-                default: throw new NotSupportedException(targetMethod?.Name);
+                case "get_Session":
+                    return Session;
+                case "get_IsDisposed":
+                    return DisposeCount != 0;
+                case "Dispose":
+                    MarkDisposed();
+                    return null;
+                default:
+                    throw new NotSupportedException(targetMethod?.Name);
             }
         }
     }
 
     private sealed class VendorFixture : IAsyncDisposable
     {
-        private const BindingFlags Members = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+        private const BindingFlags Members =
+            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
         private static long _nextRuntimeId = 10_000_000;
-        private readonly object _scene, _session, _context, _entityPool;
+        private readonly object _scene,
+            _session,
+            _context,
+            _entityPool;
         private readonly List<Task<ServiceReply>> _calls = [];
         private readonly long _sessionRuntimeId;
         public FantasyBackendProbe Probe { get; }
@@ -220,7 +299,10 @@ public sealed class FantasyBackendProbeLifecycleTests
             _scene = Activator.CreateInstance(sceneType)!;
             _session = Activator.CreateInstance(sessionType)!;
             _context = Activator.CreateInstance(Vendor("Fantasy.ThreadSynchronizationContext"))!;
-            _entityPool = Activator.CreateInstance(Vendor("Fantasy.Entitas.EntityPool"), nonPublic: true)!;
+            _entityPool = Activator.CreateInstance(
+                Vendor("Fantasy.Entitas.EntityPool"),
+                nonPublic: true
+            )!;
             object component = Activator.CreateInstance(Vendor("Fantasy.Entitas.EntityComponent"))!;
 
             // No assemblies/events are started. Install a valid frozen destroy
@@ -228,14 +310,26 @@ public sealed class FantasyBackendProbeLifecycleTests
             // "no registered destroy system" path instead of dereferencing null.
             FieldInfo destroy = component.GetType().GetField("_destroySystems", Members)!;
             Type callbackType = typeof(Action<>).MakeGenericType(entity);
-            Delegate noOp = Expression.Lambda(callbackType, Expression.Empty(), Expression.Parameter(entity)).Compile();
+            Delegate noOp = Expression
+                .Lambda(callbackType, Expression.Empty(), Expression.Parameter(entity))
+                .Compile();
             Array callbacks = Array.CreateInstance(callbackType, 1);
             callbacks.SetValue(noOp, 0);
-            ConstructorInfo frozenConstructor = destroy.FieldType.GetConstructor(
-                [typeof(RuntimeTypeHandle[]), callbackType.MakeArrayType()])
-                ?? throw new MissingMethodException("The actual vendor destroy registry constructor differs from the inspected pinned source.");
-            destroy.SetValue(component, frozenConstructor.Invoke(
-                [new RuntimeTypeHandle[] { typeof(VendorFixture).TypeHandle }, callbacks]));
+            ConstructorInfo frozenConstructor =
+                destroy.FieldType.GetConstructor([
+                    typeof(RuntimeTypeHandle[]),
+                    callbackType.MakeArrayType(),
+                ])
+                ?? throw new MissingMethodException(
+                    "The actual vendor destroy registry constructor differs from the inspected pinned source."
+                );
+            destroy.SetValue(
+                component,
+                frozenConstructor.Invoke([
+                    new RuntimeTypeHandle[] { typeof(VendorFixture).TypeHandle },
+                    callbacks,
+                ])
+            );
 
             Set(_scene, "Scene", _scene);
             Set(_scene, "Parent", _scene);
@@ -251,13 +345,24 @@ public sealed class FantasyBackendProbeLifecycleTests
             Set(_session, "RuntimeId", _sessionRuntimeId);
             sceneType.GetMethod("AddEntity", Members)!.Invoke(_scene, [_session]);
 
-            object channel = DispatchProxy.Create(Vendor("Fantasy.Network.Interface.INetworkChannel"), typeof(BlackholeChannel));
+            object channel = DispatchProxy.Create(
+                Vendor("Fantasy.Network.Interface.INetworkChannel"),
+                typeof(BlackholeChannel)
+            );
             Channel = (BlackholeChannel)channel;
             Channel.Session = _session;
             Set(_session, "Channel", channel);
-            sessionType.GetField("OnDispose", Members)!.SetValue(_session, (Action)Channel.MarkDisposed);
-            Probe = (FantasyBackendProbe)Activator.CreateInstance(typeof(FantasyBackendProbe), Members,
-                binder: null, args: [_session], culture: null)!;
+            sessionType
+                .GetField("OnDispose", Members)!
+                .SetValue(_session, (Action)Channel.MarkDisposed);
+            Probe = (FantasyBackendProbe)
+                Activator.CreateInstance(
+                    typeof(FantasyBackendProbe),
+                    Members,
+                    binder: null,
+                    args: [_session],
+                    culture: null
+                )!;
         }
 
         private static void Set(object target, string name, object value)
@@ -265,12 +370,19 @@ public sealed class FantasyBackendProbeLifecycleTests
             for (Type? type = target.GetType(); type is not null; type = type.BaseType)
             {
                 if (type.GetProperty(name, Members | BindingFlags.DeclaredOnly) is { } property)
-                { property.SetValue(target, value); return; }
+                {
+                    property.SetValue(target, value);
+                    return;
+                }
                 if (type.GetField(name, Members | BindingFlags.DeclaredOnly) is { } field)
-                { field.SetValue(target, value); return; }
+                {
+                    field.SetValue(target, value);
+                    return;
+                }
             }
             throw new MissingMemberException(target.GetType().FullName, name);
         }
+
         private static object Get(object target, string name)
         {
             for (Type? type = target.GetType(); type is not null; type = type.BaseType)
@@ -282,17 +394,33 @@ public sealed class FantasyBackendProbeLifecycleTests
             }
             throw new MissingMemberException(target.GetType().FullName, name);
         }
+
         public bool SessionIsDisposed => (bool)Get(_session, "IsDisposed");
-        public int PendingCallbacks => ((IDictionary)_session.GetType().GetField("RequestCallback", Members)!.GetValue(_session)!).Count;
-        public int AvailableCallSlots => ((SemaphoreSlim)typeof(FantasyBackendProbe).GetField("_calls", Members)!.GetValue(Probe)!).CurrentCount;
-        public int OwnerActions => (int)Get(_context.GetType().GetField("_queue", Members)!.GetValue(_context)!, "Count");
+        public int PendingCallbacks =>
+            (
+                (IDictionary)
+                    _session.GetType().GetField("RequestCallback", Members)!.GetValue(_session)!
+            ).Count;
+        public int AvailableCallSlots =>
+            (
+                (SemaphoreSlim)
+                    typeof(FantasyBackendProbe).GetField("_calls", Members)!.GetValue(Probe)!
+            ).CurrentCount;
+        public int OwnerActions =>
+            (int)Get(_context.GetType().GetField("_queue", Members)!.GetValue(_context)!, "Count");
+
         public Task<ServiceReply> Call(CancellationToken cancellation = default)
         {
-            Task<ServiceReply> call = Probe.CallAsync("lifecycle-regression", ReadOnlyMemory<byte>.Empty, ct: cancellation).AsTask();
+            Task<ServiceReply> call = Probe
+                .CallAsync("lifecycle-regression", ReadOnlyMemory<byte>.Empty, ct: cancellation)
+                .AsTask();
             _calls.Add(call);
             return call;
         }
-        public void Post(Action action) => _context.GetType().GetMethod("Post", [typeof(Action)])!.Invoke(_context, [action]);
+
+        public void Post(Action action) =>
+            _context.GetType().GetMethod("Post", [typeof(Action)])!.Invoke(_context, [action]);
+
         public void Pump()
         {
             SynchronizationContext? prior = SynchronizationContext.Current;
@@ -301,28 +429,64 @@ public sealed class FantasyBackendProbeLifecycleTests
                 SynchronizationContext.SetSynchronizationContext((SynchronizationContext)_context);
                 _context.GetType().GetMethod("Update")!.Invoke(_context, null);
             }
-            finally { SynchronizationContext.SetSynchronizationContext(prior); }
+            finally
+            {
+                SynchronizationContext.SetSynchronizationContext(prior);
+            }
         }
+
         public async Task PumpUntilCompleted(Task task)
         {
-            await WaitUntil(() => { Pump(); return task.IsCompleted; }, TimeSpan.FromSeconds(3));
+            await WaitUntil(
+                () =>
+                {
+                    Pump();
+                    return task.IsCompleted;
+                },
+                TimeSpan.FromSeconds(3)
+            );
         }
+
         public void AssertActualRpcPending()
         {
             Assert.That(Channel.SendCount, Is.EqualTo(1));
-            Assert.That(PendingCallbacks, Is.EqualTo(1), "The actual vendor Session.Call must register its own FTask callback.");
+            Assert.That(
+                PendingCallbacks,
+                Is.EqualTo(1),
+                "The actual vendor Session.Call must register its own FTask callback."
+            );
             Assert.That(AvailableCallSlots, Is.EqualTo(7));
         }
+
         public void AssertActuallyClosed()
         {
-            Assert.That(SessionIsDisposed, Is.True, "Real Entity.RuntimeId must be cleared by Session.Dispose.");
+            Assert.That(
+                SessionIsDisposed,
+                Is.True,
+                "Real Entity.RuntimeId must be cleared by Session.Dispose."
+            );
             Assert.That(PendingCallbacks, Is.Zero);
-            Assert.That(AvailableCallSlots, Is.EqualTo(8), "The vendor failure callback must resume RPC finally and release its slot.");
-            Assert.That(Channel.DisposeCount, Is.EqualTo(1), "Actual Session.OnDispose must run once.");
-            MethodInfo getEntity = _scene.GetType().GetMethods(Members).Single(method =>
-                method.Name == "GetEntity" && !method.IsGenericMethod && method.GetParameters().Length == 1);
+            Assert.That(
+                AvailableCallSlots,
+                Is.EqualTo(8),
+                "The vendor failure callback must resume RPC finally and release its slot."
+            );
+            Assert.That(
+                Channel.DisposeCount,
+                Is.EqualTo(1),
+                "Actual Session.OnDispose must run once."
+            );
+            MethodInfo getEntity = _scene
+                .GetType()
+                .GetMethods(Members)
+                .Single(method =>
+                    method.Name == "GetEntity"
+                    && !method.IsGenericMethod
+                    && method.GetParameters().Length == 1
+                );
             Assert.That(getEntity.Invoke(_scene, [_sessionRuntimeId]), Is.Null);
         }
+
         public async ValueTask DisposeAsync()
         {
             // Runs even after a RED assertion. Drain the real owner queue, force
@@ -341,14 +505,24 @@ public sealed class FantasyBackendProbeLifecycleTests
                 foreach (Task<ServiceReply> call in _calls)
                 {
                     await PumpUntilCompleted(call);
-                    try { await call; }
-                    catch (Exception error) when (error is OperationCanceledException or TimeoutException or ServiceException) { }
+                    try
+                    {
+                        await call;
+                    }
+                    catch (Exception error)
+                        when (error
+                                is OperationCanceledException
+                                    or TimeoutException
+                                    or ServiceException
+                        ) { }
                 }
                 Pump();
             }
             finally
             {
-                foreach (Task call in _calls) if (call.IsFaulted) _ = call.Exception;
+                foreach (Task call in _calls)
+                    if (call.IsFaulted)
+                        _ = call.Exception;
                 _entityPool.GetType().GetMethod("Dispose")!.Invoke(_entityPool, null);
                 Set(_scene, "RuntimeId", 0L);
             }

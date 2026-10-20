@@ -35,7 +35,9 @@ namespace AiNative.Client.Character.Tests
         [TearDown]
         public void TearDown()
         {
-            foreach (var item in objects) if (item != null) Object.DestroyImmediate(item);
+            foreach (var item in objects)
+                if (item != null)
+                    Object.DestroyImmediate(item);
             objects.Clear();
         }
 
@@ -44,7 +46,10 @@ namespace AiNative.Client.Character.Tests
         {
             yield return null;
             yield return null;
-            Assert.That(Vector3.Distance(orbit.transform.position, pivot), Is.EqualTo(4).Within(.02f));
+            Assert.That(
+                Vector3.Distance(orbit.transform.position, pivot),
+                Is.EqualTo(4).Within(.02f)
+            );
             var wall = Create("Camera obstacle");
             wall.transform.position = pivot + boomDirection * 2;
             wall.AddComponent<BoxCollider>().size = new Vector3(5, 5, .2f);
@@ -56,10 +61,21 @@ namespace AiNative.Client.Character.Tests
             Physics.SyncTransforms();
             yield return null;
             float recovering = Vector3.Distance(orbit.transform.position, pivot);
-            Assert.That(recovering, Is.GreaterThan(blocked), "Camera should start restoring after obstruction clears.");
-            Assert.That(recovering, Is.LessThan(4f), "Recovery must be smoothed rather than snapped.");
+            Assert.That(
+                recovering,
+                Is.GreaterThan(blocked),
+                "Camera should start restoring after obstruction clears."
+            );
+            Assert.That(
+                recovering,
+                Is.LessThan(4f),
+                "Recovery must be smoothed rather than snapped."
+            );
             yield return new WaitForSeconds(.8f);
-            Assert.That(Vector3.Distance(orbit.transform.position, pivot), Is.EqualTo(4).Within(.03f));
+            Assert.That(
+                Vector3.Distance(orbit.transform.position, pivot),
+                Is.EqualTo(4).Within(.03f)
+            );
         }
 
         [UnityTest]
@@ -75,7 +91,10 @@ namespace AiNative.Client.Character.Tests
             Physics.SyncTransforms();
             yield return null;
             yield return null;
-            Assert.That(Vector3.Distance(orbit.transform.position, pivot), Is.EqualTo(4).Within(.02f));
+            Assert.That(
+                Vector3.Distance(orbit.transform.position, pivot),
+                Is.EqualTo(4).Within(.02f)
+            );
             // Positive control: the same shape on the environment layer must block.
             accessory.layer = 0;
             Physics.SyncTransforms();
@@ -94,7 +113,9 @@ namespace AiNative.Client.Character.Tests
             yield return null;
             yield return null;
             var rotation = Quaternion.Euler(9, 12, 0);
-            var expected = remote.transform.position + Vector3.up * .9f
+            var expected =
+                remote.transform.position
+                + Vector3.up * .9f
                 + rotation * new Vector3(.45f, 0, -2.2f);
             Assert.That(orbit.Yaw, Is.EqualTo(12).Within(.001f));
             Assert.That(orbit.Pitch, Is.EqualTo(9).Within(.001f));
@@ -113,8 +134,14 @@ namespace AiNative.Client.Character.Tests
             orbit.Configure(motor, null);
             yield return null;
             yield return null;
-            Assert.That(Vector3.Distance(orbit.transform.position, pivot), Is.EqualTo(4).Within(.02f));
-            Assert.That(Vector3.Distance(orbit.transform.position, pivot + boomDirection * 4), Is.LessThan(.02f));
+            Assert.That(
+                Vector3.Distance(orbit.transform.position, pivot),
+                Is.EqualTo(4).Within(.02f)
+            );
+            Assert.That(
+                Vector3.Distance(orbit.transform.position, pivot + boomDirection * 4),
+                Is.LessThan(.02f)
+            );
         }
 
         private GameObject Create(string name)

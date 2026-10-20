@@ -24,12 +24,14 @@ public sealed class WorkerAndOutboxTests
     public async Task FaultedWorkerStopsAdvertisingReadyRooms()
     {
         await using BattleWorkerPool pool = new("node", "epoch", 1, 1, 8, _ => new BrokenRoom());
-        pool.Start(); pool.Reserve(Room("a"));
+        pool.Start();
+        pool.Reserve(Room("a"));
         await pool.CreateAsync("a", "a", "epoch");
         await Task.Delay(60);
         Assert.That(pool.Inventory().Rooms.Single().State, Is.EqualTo("Lost"));
         Assert.That(pool.Inventory().Workers.Single().AvailableRooms, Is.Zero);
     }
+
     [Test]
     public async Task RoomStaysOnItsWorkerAndRejectsOldEpochOrOverCapacity()
     {
@@ -41,7 +43,8 @@ public sealed class WorkerAndOutboxTests
         Assert.That(pool.Reserve(a), Is.EqualTo(""));
         Assert.That(pool.Reserve(b), Is.EqualTo(""));
         Assert.That(pool.Reserve(Room("c")), Is.EqualTo("capacity-unavailable"));
-        RoomAllocation old = Room("old"); old.BootEpoch = "previous";
+        RoomAllocation old = Room("old");
+        old.BootEpoch = "previous";
         Assert.That(pool.Reserve(old), Is.EqualTo("stale-epoch"));
         Assert.That(await pool.CreateAsync("a", "a", "epoch"), Is.EqualTo(""));
         int owner = pool.GetWorkerId("a");
@@ -56,8 +59,14 @@ public sealed class WorkerAndOutboxTests
         using ManualResetEventSlim entered = new();
         using ManualResetEventSlim release = new();
         CountingRoom healthy = new();
-        await using BattleWorkerPool pool = new("node", "epoch", 2, 1, 2,
-            room => room.RoomId == "slow" ? new BlockedRoom(entered, release) : healthy);
+        await using BattleWorkerPool pool = new(
+            "node",
+            "epoch",
+            2,
+            1,
+            2,
+            room => room.RoomId == "slow" ? new BlockedRoom(entered, release) : healthy
+        );
         pool.Start();
         try
         {
@@ -74,22 +83,42 @@ public sealed class WorkerAndOutboxTests
             await Task.Delay(100);
             Assert.That(healthy.Ticks, Is.GreaterThan(before + 2));
         }
-        finally { release.Set(); }
+        finally
+        {
+            release.Set();
+        }
     }
 
     [Test]
     public async Task UnconfirmedResultsSurviveRestartAndConflictingDuplicateIsRejected()
     {
-        string dir = Path.Combine(Path.GetTempPath(), "ainative-outbox", Guid.NewGuid().ToString("N"));
+        string dir = Path.Combine(
+            Path.GetTempPath(),
+            "ainative-outbox",
+            Guid.NewGuid().ToString("N")
+        );
         try
         {
             DurableResultOutbox first = new(dir, 1, 16384);
-            MatchResult result = new() { MatchId = "m1", RoomId = "r1", NodeId = "node", BootEpoch = "epoch", Players = { new PlayerResult { PlayerId = "p", Kills = 3 } } };
+            MatchResult result = new()
+            {
+                MatchId = "m1",
+                RoomId = "r1",
+                NodeId = "node",
+                BootEpoch = "epoch",
+                Players =
+                {
+                    new PlayerResult { PlayerId = "p", Kills = 3 },
+                },
+            };
             await first.InitializeAsync();
             Assert.That(await first.StoreAsync(result), Is.True);
             Assert.That(await first.StoreAsync(result), Is.True);
-            MatchResult conflicting = result.Clone(); conflicting.Players[0].Kills = 4;
-            Assert.ThrowsAsync<InvalidDataException>(async () => await first.StoreAsync(conflicting));
+            MatchResult conflicting = result.Clone();
+            conflicting.Players[0].Kills = 4;
+            Assert.ThrowsAsync<InvalidDataException>(async () =>
+                await first.StoreAsync(conflicting)
+            );
             DurableResultOutbox restarted = new(dir, 1, 16384);
             await restarted.InitializeAsync();
             Assert.That(restarted.Pending.Single().Players[0].Kills, Is.EqualTo(3));
@@ -101,21 +130,48 @@ public sealed class WorkerAndOutboxTests
             Assert.That(confirmed.Pending, Is.Empty);
             Assert.That(confirmed.CanAdmit, Is.True);
         }
-        finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
+        finally
+        {
+            if (Directory.Exists(dir))
+                Directory.Delete(dir, true);
+        }
     }
 
-    private static RoomAllocation Room(string id) => new()
-    { RoomId = id, MatchId = id, AllocationId = id, NodeId = "node", BootEpoch = "epoch", State = "Reserved", PlayerIds = { "p" + id } };
+    private static RoomAllocation Room(string id) =>
+        new()
+        {
+            RoomId = id,
+            MatchId = id,
+            AllocationId = id,
+            NodeId = "node",
+            BootEpoch = "epoch",
+            State = "Reserved",
+            PlayerIds = { "p" + id },
+        };
+
     private class CountingRoom : IWorkerRoom
     {
         private long _ticks;
         public long Ticks => Interlocked.Read(ref _ticks);
+
         public virtual void Tick() => Interlocked.Increment(ref _ticks);
+
         public void Dispose() { }
     }
-    private sealed class BlockedRoom(ManualResetEventSlim entered, ManualResetEventSlim release) : CountingRoom
+
+    private sealed class BlockedRoom(ManualResetEventSlim entered, ManualResetEventSlim release)
+        : CountingRoom
     {
-        public override void Tick() { entered.Set(); release.Wait(); base.Tick(); }
+        public override void Tick()
+        {
+            entered.Set();
+            release.Wait();
+            base.Tick();
+        }
     }
-    private sealed class BrokenRoom : CountingRoom { public override void Tick() => throw new InvalidOperationException("broken"); }
+
+    private sealed class BrokenRoom : CountingRoom
+    {
+        public override void Tick() => throw new InvalidOperationException("broken");
+    }
 }

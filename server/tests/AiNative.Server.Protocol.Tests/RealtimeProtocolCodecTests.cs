@@ -26,10 +26,12 @@ public sealed class RealtimeProtocolCodecTests
             input,
             frame,
             out TransportChannel channel,
-            out int writtenBytes);
+            out int writtenBytes
+        );
         ProtocolDecodeStatus status = RealtimeProtocolCodec.TryDecode(
             frame.Slice(0, writtenBytes),
-            out DecodedProtocolMessage decoded);
+            out DecodedProtocolMessage decoded
+        );
         byte messageIdLowByte = frame[0];
         byte messageIdHighByte = frame[1];
 
@@ -50,21 +52,25 @@ public sealed class RealtimeProtocolCodecTests
     public void TwoFrameInputBatchUsesTheSequencedUnreliableChannelAndFitsOneDatagram()
     {
         InputBatch batch = new();
-        batch.Commands.Add(new InputCommand
-        {
-            RoomTick = 42,
-            Sequence = 7,
-            MoveXMilli = -1000,
-            MoveYMilli = 500,
-        });
-        batch.Commands.Add(new InputCommand
-        {
-            RoomTick = 43,
-            Sequence = 8,
-            MoveXMilli = 1000,
-            MoveYMilli = -500,
-            Buttons = 1,
-        });
+        batch.Commands.Add(
+            new InputCommand
+            {
+                RoomTick = 42,
+                Sequence = 7,
+                MoveXMilli = -1000,
+                MoveYMilli = 500,
+            }
+        );
+        batch.Commands.Add(
+            new InputCommand
+            {
+                RoomTick = 43,
+                Sequence = 8,
+                MoveXMilli = 1000,
+                MoveYMilli = -500,
+                Buttons = 1,
+            }
+        );
         Span<byte> frame = stackalloc byte[RealtimeProtocolCodec.MaxDatagramBytes];
 
         bool encoded = RealtimeProtocolCodec.TryEncode(
@@ -72,10 +78,12 @@ public sealed class RealtimeProtocolCodecTests
             batch,
             frame,
             out TransportChannel channel,
-            out int writtenBytes);
+            out int writtenBytes
+        );
         ProtocolDecodeStatus status = RealtimeProtocolCodec.TryDecode(
             frame[..writtenBytes],
-            out DecodedProtocolMessage decoded);
+            out DecodedProtocolMessage decoded
+        );
 
         Assert.Multiple(() =>
         {
@@ -101,15 +109,17 @@ public sealed class RealtimeProtocolCodecTests
         };
         for (uint entityId = 1; entityId <= 64; entityId++)
         {
-            snapshot.Players.Add(new PlayerState
-            {
-                EntityId = entityId,
-                PositionXMilli = (int)entityId * 10,
-                PositionYMilli = 0,
-                PositionZMilli = (int)entityId * -10,
-                YawMillidegrees = (int)entityId * 100,
-                Health = 100,
-            });
+            snapshot.Players.Add(
+                new PlayerState
+                {
+                    EntityId = entityId,
+                    PositionXMilli = (int)entityId * 10,
+                    PositionYMilli = 0,
+                    PositionZMilli = (int)entityId * -10,
+                    YawMillidegrees = (int)entityId * 100,
+                    Health = 100,
+                }
+            );
         }
 
         Span<byte> frame = stackalloc byte[RealtimeProtocolCodec.MaxDatagramBytes];
@@ -118,7 +128,8 @@ public sealed class RealtimeProtocolCodecTests
             snapshot,
             frame,
             out TransportChannel channel,
-            out int writtenBytes);
+            out int writtenBytes
+        );
 
         Assert.Multiple(() =>
         {
@@ -137,14 +148,19 @@ public sealed class RealtimeProtocolCodecTests
             new InputCommand(),
             destination,
             out _,
-            out _);
+            out _
+        );
         byte[] malformed = { 0x4c, 0x04, 0x80 };
 
         ProtocolDecodeStatus malformedStatus = RealtimeProtocolCodec.TryDecode(malformed, out _);
-        ProtocolDecodeStatus unknownStatus = RealtimeProtocolCodec.TryDecode(new byte[] { 0xff, 0xff }, out _);
+        ProtocolDecodeStatus unknownStatus = RealtimeProtocolCodec.TryDecode(
+            new byte[] { 0xff, 0xff },
+            out _
+        );
         ProtocolDecodeStatus oversizedStatus = RealtimeProtocolCodec.TryDecode(
             new byte[RealtimeProtocolCodec.MaxDatagramBytes + 1],
-            out _);
+            out _
+        );
 
         Assert.That(wrongType, Is.False);
         Assert.That(malformedStatus, Is.EqualTo(ProtocolDecodeStatus.MalformedPayload));

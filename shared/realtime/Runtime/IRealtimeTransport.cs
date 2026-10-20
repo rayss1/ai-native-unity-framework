@@ -15,7 +15,8 @@ namespace AiNative.Realtime
         ValueTask<SendResult> SendAsync(
             TransportChannel channel,
             ReadOnlyMemory<byte> payload,
-            CancellationToken cancellationToken = default);
+            CancellationToken cancellationToken = default
+        );
 
         bool TryReceive(Span<byte> destination, out ReceivedPacket packet);
     }

@@ -1,11 +1,11 @@
-using AiNative.Client.Protocol.Protobuf;
-using AiNative.Client.Protocol;
 using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using AiNative.Client.Prediction;
+using AiNative.Client.Protocol;
+using AiNative.Client.Protocol.Protobuf;
 using AiNative.Gameplay;
 using AiNative.Realtime;
 using NUnit.Framework;
@@ -16,22 +16,42 @@ namespace AiNative.Client.Application.Tests
     {
         [TestCase(SendStatus.Accepted)]
         [TestCase(SendStatus.WouldBlock)]
-        public void Deferred_input_send_is_observed_once_before_retry_or_queue_release(SendStatus completion)
+        public void Deferred_input_send_is_observed_once_before_retry_or_queue_release(
+            SendStatus completion
+        )
         {
             var transport = new FakeTransport();
             var session = CreateActiveSession(transport, out _);
-            transport.Enqueue(TestFrames.Snapshot(7, 10, 0), BattleClientProtocolV1.SnapshotChannel, 1);
+            transport.Enqueue(
+                TestFrames.Snapshot(7, 10, 0),
+                BattleClientProtocolV1.SnapshotChannel,
+                1
+            );
             session.Pump(0);
             var deferred = new TaskCompletionSource<SendResult>();
-            int calls = 0; ReadOnlyMemory<byte> borrowed = default;
-            transport.InputSender = bytes => { calls++; borrowed = bytes; return new ValueTask<SendResult>(deferred.Task); };
+            int calls = 0;
+            ReadOnlyMemory<byte> borrowed = default;
+            transport.InputSender = bytes =>
+            {
+                calls++;
+                borrowed = bytes;
+                return new ValueTask<SendResult>(deferred.Task);
+            };
             session.PredictAndQueueInput(11, 1000, 0);
-            session.Pump(0); session.Pump(0);
+            session.Pump(0);
+            session.Pump(0);
             Assert.That(calls, Is.EqualTo(1));
             Assert.That(session.QueuedInputFrames, Is.EqualTo(1));
             byte[] original = borrowed.ToArray();
-            deferred.SetResult(new SendResult(completion, completion == SendStatus.Accepted ? borrowed.Length : 0));
-            transport.InputSender = bytes => { calls++; Assert.That(bytes.ToArray(), Is.EqualTo(original)); return new ValueTask<SendResult>(new SendResult(SendStatus.Accepted, bytes.Length)); };
+            deferred.SetResult(
+                new SendResult(completion, completion == SendStatus.Accepted ? borrowed.Length : 0)
+            );
+            transport.InputSender = bytes =>
+            {
+                calls++;
+                Assert.That(bytes.ToArray(), Is.EqualTo(original));
+                return new ValueTask<SendResult>(new SendResult(SendStatus.Accepted, bytes.Length));
+            };
             session.Pump(0);
             if (completion == SendStatus.WouldBlock)
             {
@@ -46,16 +66,33 @@ namespace AiNative.Client.Application.Tests
 
         [TestCase(false)]
         [TestCase(true)]
-        public void Reconnect_or_dispose_does_not_overwrite_memory_owned_by_an_outstanding_send(bool dispose)
+        public void Reconnect_or_dispose_does_not_overwrite_memory_owned_by_an_outstanding_send(
+            bool dispose
+        )
         {
-            var initial = new FakeTransport(); var replacement = new FakeTransport();
-            var session = CreateActiveSession(initial, out _, new FakeConnector(initial, replacement), inputCapacity: 1);
-            initial.Enqueue(TestFrames.Snapshot(7, 10, 0), BattleClientProtocolV1.SnapshotChannel, 1);
+            var initial = new FakeTransport();
+            var replacement = new FakeTransport();
+            var session = CreateActiveSession(
+                initial,
+                out _,
+                new FakeConnector(initial, replacement),
+                inputCapacity: 1
+            );
+            initial.Enqueue(
+                TestFrames.Snapshot(7, 10, 0),
+                BattleClientProtocolV1.SnapshotChannel,
+                1
+            );
             session.Pump(0);
             var deferred = new TaskCompletionSource<SendResult>();
             ReadOnlyMemory<byte> borrowed = default;
-            initial.InputSender = bytes => { borrowed = bytes; return new ValueTask<SendResult>(deferred.Task); };
-            session.PredictAndQueueInput(11, 1000, 0); session.Pump(0);
+            initial.InputSender = bytes =>
+            {
+                borrowed = bytes;
+                return new ValueTask<SendResult>(deferred.Task);
+            };
+            session.PredictAndQueueInput(11, 1000, 0);
+            session.Pump(0);
             byte[] original = borrowed.ToArray();
             if (dispose)
             {
@@ -64,32 +101,68 @@ namespace AiNative.Client.Application.Tests
                 deferred.SetException(new OperationCanceledException("disposed fixture"));
                 return;
             }
-            session.RequestReconnect(); session.Pump(0.3f); session.Pump(0);
-            replacement.Enqueue(TestFrames.Reconnect(2, 11, TestFrames.SnapshotPayload(7, 11, 0)), BattleClientProtocolV1.ControlChannel, 2);
+            session.RequestReconnect();
+            session.Pump(0.3f);
+            session.Pump(0);
+            replacement.Enqueue(
+                TestFrames.Reconnect(2, 11, TestFrames.SnapshotPayload(7, 11, 0)),
+                BattleClientProtocolV1.ControlChannel,
+                2
+            );
             session.Pump(0);
             Assert.That(session.State, Is.EqualTo(BattleClientState.Active));
-            session.PredictAndQueueInput(12, -1000, 0); session.Pump(0);
+            session.PredictAndQueueInput(12, -1000, 0);
+            session.Pump(0);
             Assert.That(session.QueuedInputFrames, Is.EqualTo(1));
-            Assert.That(borrowed.ToArray(), Is.EqualTo(original), "The cleared ring may reuse its slot, but transport-owned send memory must stay unchanged.");
+            Assert.That(
+                borrowed.ToArray(),
+                Is.EqualTo(original),
+                "The cleared ring may reuse its slot, but transport-owned send memory must stay unchanged."
+            );
             int sentBeforeCompletion = replacement.SentFrames.Count;
             deferred.SetResult(new SendResult(SendStatus.Accepted, borrowed.Length));
             session.Pump(0);
             Assert.That(session.QueuedInputFrames, Is.Zero);
-            Assert.That(replacement.SentFrames.Count, Is.EqualTo(sentBeforeCompletion + 1), "Old completion must not pop the new connection's head.");
-            Assert.That(replacement.SentFrames[replacement.SentFrames.Count - 1], Is.Not.EqualTo(original));
+            Assert.That(
+                replacement.SentFrames.Count,
+                Is.EqualTo(sentBeforeCompletion + 1),
+                "Old completion must not pop the new connection's head."
+            );
+            Assert.That(
+                replacement.SentFrames[replacement.SentFrames.Count - 1],
+                Is.Not.EqualTo(original)
+            );
             session.DisposeAsync().GetAwaiter().GetResult();
         }
+
         [Test]
         public void TopologyLoginSendsTicketAndGlobalRoomUsingExistingV1Fields()
         {
             var transport = new FakeTransport();
             var session = CreateTopologySession(new FakeConnector(transport));
-            session.Start(); session.Pump(0);
-            Assert.That(transport.SentFrames[0], Is.EqualTo(new byte[]
-            {
-                0xe8, 0x03, 0x08, 1, 0x12, 1, (byte)'x',
-                0x1a, 1, (byte)'t', 0x22, 1, (byte)'r',
-            }));
+            session.Start();
+            session.Pump(0);
+            Assert.That(
+                transport.SentFrames[0],
+                Is.EqualTo(
+                    new byte[]
+                    {
+                        0xe8,
+                        0x03,
+                        0x08,
+                        1,
+                        0x12,
+                        1,
+                        (byte)'x',
+                        0x1a,
+                        1,
+                        (byte)'t',
+                        0x22,
+                        1,
+                        (byte)'r',
+                    }
+                )
+            );
         }
 
         [TestCase("", "e")]
@@ -100,8 +173,13 @@ namespace AiNative.Client.Application.Tests
         {
             var transport = new FakeTransport();
             var session = CreateTopologySession(new FakeConnector(transport));
-            session.Start(); session.Pump(0);
-            transport.Enqueue(TestFrames.Login(42, 1, room, boot), BattleClientProtocolV1.ControlChannel, 1);
+            session.Start();
+            session.Pump(0);
+            transport.Enqueue(
+                TestFrames.Login(42, 1, room, boot),
+                BattleClientProtocolV1.ControlChannel,
+                1
+            );
             session.Pump(0);
             Assert.That(session.State, Is.EqualTo(BattleClientState.Faulted));
             Assert.That(transport.SentFrames.Count, Is.EqualTo(1));
@@ -112,14 +190,23 @@ namespace AiNative.Client.Application.Tests
         {
             var transport = new FakeTransport();
             var session = CreateTopologySession(new FakeConnector(transport));
-            session.Start(); session.Pump(0);
-            transport.Enqueue(TestFrames.Login(42, 2, "r", "e"), BattleClientProtocolV1.ControlChannel, 1);
+            session.Start();
+            session.Pump(0);
+            transport.Enqueue(
+                TestFrames.Login(42, 2, "r", "e"),
+                BattleClientProtocolV1.ControlChannel,
+                1
+            );
             session.Pump(0);
             transport.Enqueue(TestFrames.Join(19, 3, 60), BattleClientProtocolV1.ControlChannel, 1);
             session.Pump(0);
             Assert.That(session.State, Is.EqualTo(BattleClientState.JoiningRoom));
             transport.Enqueue(TestFrames.Join(19, 3, 60), BattleClientProtocolV1.ControlChannel, 2);
-            transport.Enqueue(TestFrames.Snapshot(3, 110, 0), BattleClientProtocolV1.SnapshotChannel, 2);
+            transport.Enqueue(
+                TestFrames.Snapshot(3, 110, 0),
+                BattleClientProtocolV1.SnapshotChannel,
+                2
+            );
             session.Pump(0);
             Assert.That(session.State, Is.EqualTo(BattleClientState.Active));
             Assert.That(session.EntityId, Is.EqualTo(3));
@@ -129,14 +216,28 @@ namespace AiNative.Client.Application.Tests
         [Test]
         public void TopologyReconnectReloginsWithFreshTicketAndClearsOldPredictionAndInputs()
         {
-            var initial = new FakeTransport(); var replacement = new FakeTransport();
+            var initial = new FakeTransport();
+            var replacement = new FakeTransport();
             var session = CreateTopologySession(new FakeConnector(initial, replacement));
-            session.Start(); session.Pump(0);
-            initial.Enqueue(TestFrames.Login(42, 1, "r", "e"), BattleClientProtocolV1.ControlChannel, 1);
+            session.Start();
+            session.Pump(0);
+            initial.Enqueue(
+                TestFrames.Login(42, 1, "r", "e"),
+                BattleClientProtocolV1.ControlChannel,
+                1
+            );
             initial.Enqueue(TestFrames.Join(19, 7, 60), BattleClientProtocolV1.ControlChannel, 1);
             initial.Enqueue(ArenaSnapshot(100), BattleClientProtocolV1.SnapshotChannel, 1);
             session.Pump(0);
-            session.PredictAndQueueArenaInput(101, 1000, 0, 0, 0, ArenaButtons.Jump, ArenaWeaponId.Machinegun);
+            session.PredictAndQueueArenaInput(
+                101,
+                1000,
+                0,
+                0,
+                0,
+                ArenaButtons.Jump,
+                ArenaWeaponId.Machinegun
+            );
             Assert.That(session.QueuedInputFrames, Is.EqualTo(1));
             UpdateTopologyAdmission(session, "r", "e", "fresh");
             session.RequestReconnect();
@@ -144,17 +245,43 @@ namespace AiNative.Client.Application.Tests
             Assert.That(session.IsPredictionInitialized, Is.False);
             Assert.That(session.TryGetArenaState(out _), Is.False);
             Assert.That(session.TryAdvancePresentation(0, out _), Is.False);
-            session.Pump(0.3f); session.Pump(0);
-            Assert.That(BattleClientProtocolV1.ReadMessageId(replacement.SentFrames[0]), Is.EqualTo(1000));
-            Assert.That(System.Text.Encoding.UTF8.GetString(replacement.SentFrames[0]), Does.Contain("fresh"));
-            replacement.Enqueue(TestFrames.Login(42, 1, "r", "e"), BattleClientProtocolV1.ControlChannel, 1);
-            replacement.Enqueue(TestFrames.Join(19, 7, 60), BattleClientProtocolV1.ControlChannel, 1);
+            session.Pump(0.3f);
+            session.Pump(0);
+            Assert.That(
+                BattleClientProtocolV1.ReadMessageId(replacement.SentFrames[0]),
+                Is.EqualTo(1000)
+            );
+            Assert.That(
+                System.Text.Encoding.UTF8.GetString(replacement.SentFrames[0]),
+                Does.Contain("fresh")
+            );
+            replacement.Enqueue(
+                TestFrames.Login(42, 1, "r", "e"),
+                BattleClientProtocolV1.ControlChannel,
+                1
+            );
+            replacement.Enqueue(
+                TestFrames.Join(19, 7, 60),
+                BattleClientProtocolV1.ControlChannel,
+                1
+            );
             replacement.Enqueue(ArenaSnapshot(110), BattleClientProtocolV1.SnapshotChannel, 1);
             session.Pump(0);
             Assert.That(session.State, Is.EqualTo(BattleClientState.Active));
             Assert.That(session.SessionId, Is.EqualTo(42));
             Assert.That(session.EntityId, Is.EqualTo(7));
-            Assert.That(session.PredictAndQueueArenaInput(1, 0, 0, 0, 0, ArenaButtons.None, ArenaWeaponId.Machinegun), Is.EqualTo(PredictionPrepareStatus.Prepared));
+            Assert.That(
+                session.PredictAndQueueArenaInput(
+                    1,
+                    0,
+                    0,
+                    0,
+                    0,
+                    ArenaButtons.None,
+                    ArenaWeaponId.Machinegun
+                ),
+                Is.EqualTo(PredictionPrepareStatus.Prepared)
+            );
             session.TryGetArenaState(out var state);
             Assert.That(state.Tick, Is.EqualTo(111));
             Assert.That(state.PositionXMillimetres, Is.Zero);
@@ -165,14 +292,27 @@ namespace AiNative.Client.Application.Tests
         {
             var transport = new FakeTransport();
             var session = CreateTopologySession(new FakeConnector(transport));
-            session.Start(); session.Pump(0);
-            transport.Enqueue(TestFrames.Login(42, 1, "r", "e", 100), BattleClientProtocolV1.ControlChannel, 1);
+            session.Start();
+            session.Pump(0);
+            transport.Enqueue(
+                TestFrames.Login(42, 1, "r", "e", 100),
+                BattleClientProtocolV1.ControlChannel,
+                1
+            );
             transport.Enqueue(TestFrames.Join(19, 3, 60), BattleClientProtocolV1.ControlChannel, 1);
-            transport.Enqueue(TestFrames.Snapshot(3, 99, 0), BattleClientProtocolV1.SnapshotChannel, 1);
+            transport.Enqueue(
+                TestFrames.Snapshot(3, 99, 0),
+                BattleClientProtocolV1.SnapshotChannel,
+                1
+            );
             session.Pump(0);
             Assert.That(session.LastReceivedTick, Is.EqualTo(100));
             Assert.That(session.IsPredictionInitialized, Is.False);
-            transport.Enqueue(TestFrames.Snapshot(3, 101, 9), BattleClientProtocolV1.SnapshotChannel, 1);
+            transport.Enqueue(
+                TestFrames.Snapshot(3, 101, 9),
+                BattleClientProtocolV1.SnapshotChannel,
+                1
+            );
             session.Pump(0);
             Assert.That(session.IsPredictionInitialized, Is.True);
             Assert.That(session.LastAcknowledgedSequence, Is.EqualTo(9));
@@ -181,8 +321,11 @@ namespace AiNative.Client.Application.Tests
         [TestCase("", "e", "t")]
         [TestCase("r", "", "t")]
         [TestCase("r", "e", " ")]
-        public void TopologyAdmissionRequiresRoomBootAndTicket(string room, string boot, string ticket)
-            => Assert.Throws<ArgumentException>(() => new BattleAdmissionInfo(room, boot, ticket));
+        public void TopologyAdmissionRequiresRoomBootAndTicket(
+            string room,
+            string boot,
+            string ticket
+        ) => Assert.Throws<ArgumentException>(() => new BattleAdmissionInfo(room, boot, ticket));
 
         [TestCase("other", "e")]
         [TestCase("r", "other")]
@@ -190,22 +333,49 @@ namespace AiNative.Client.Application.Tests
         {
             var transport = new FakeTransport();
             var session = CreateTopologySession(new FakeConnector(transport));
-            Assert.Throws<ArgumentException>(() => session.UpdateAdmission(new BattleAdmissionInfo(room, boot, "fresh")));
-            session.Start(); session.Pump(0);
-            Assert.That(transport.SentFrames[0], Is.EqualTo(new byte[]
-            {
-                0xe8, 0x03, 0x08, 1, 0x12, 1, (byte)'x',
-                0x1a, 1, (byte)'t', 0x22, 1, (byte)'r',
-            }));
+            Assert.Throws<ArgumentException>(() =>
+                session.UpdateAdmission(new BattleAdmissionInfo(room, boot, "fresh"))
+            );
+            session.Start();
+            session.Pump(0);
+            Assert.That(
+                transport.SentFrames[0],
+                Is.EqualTo(
+                    new byte[]
+                    {
+                        0xe8,
+                        0x03,
+                        0x08,
+                        1,
+                        0x12,
+                        1,
+                        (byte)'x',
+                        0x1a,
+                        1,
+                        (byte)'t',
+                        0x22,
+                        1,
+                        (byte)'r',
+                    }
+                )
+            );
         }
 
         [Test]
         public void TopologyLoginRejectsOversizedTicketWithoutSendingPartialFrame()
         {
             var transport = new FakeTransport();
-            var session = new BattleClientSession(new ProtobufBattleProtocolCodec(), "localhost", 22000, "x", 4, new FakeConnector(transport),
-                new BattleAdmissionInfo("r", "e", new string('t', 1200)));
-            session.Start(); session.Pump(0);
+            var session = new BattleClientSession(
+                new ProtobufBattleProtocolCodec(),
+                "localhost",
+                22000,
+                "x",
+                4,
+                new FakeConnector(transport),
+                new BattleAdmissionInfo("r", "e", new string('t', 1200))
+            );
+            session.Start();
+            session.Pump(0);
             Assert.That(session.State, Is.EqualTo(BattleClientState.Faulted));
             Assert.That(transport.SentFrames, Is.Empty);
         }
@@ -213,18 +383,35 @@ namespace AiNative.Client.Application.Tests
         [Test]
         public void TopologyReconnectRetriesTimedOutReloginWithRefreshedTicket()
         {
-            var initial = new FakeTransport(); var timedOut = new FakeTransport(); var replacement = new FakeTransport();
+            var initial = new FakeTransport();
+            var timedOut = new FakeTransport();
+            var replacement = new FakeTransport();
             var session = CreateTopologySession(new FakeConnector(initial, timedOut, replacement));
-            session.Start(); session.Pump(0);
-            initial.Enqueue(TestFrames.Login(42, 1, "r", "e"), BattleClientProtocolV1.ControlChannel, 1);
+            session.Start();
+            session.Pump(0);
+            initial.Enqueue(
+                TestFrames.Login(42, 1, "r", "e"),
+                BattleClientProtocolV1.ControlChannel,
+                1
+            );
             initial.Enqueue(TestFrames.Join(19, 7, 60), BattleClientProtocolV1.ControlChannel, 1);
-            session.Pump(0); session.RequestReconnect(); session.Pump(0.3f); session.Pump(0);
+            session.Pump(0);
+            session.RequestReconnect();
+            session.Pump(0.3f);
+            session.Pump(0);
             session.Pump(5.1f);
             Assert.That(session.State, Is.EqualTo(BattleClientState.Reconnecting));
             session.UpdateAdmission(new BattleAdmissionInfo("r", "e", "fresh"));
-            session.Pump(0.6f); session.Pump(0);
-            Assert.That(BattleClientProtocolV1.ReadMessageId(replacement.SentFrames[0]), Is.EqualTo(1000));
-            Assert.That(System.Text.Encoding.UTF8.GetString(replacement.SentFrames[0]), Does.Contain("fresh"));
+            session.Pump(0.6f);
+            session.Pump(0);
+            Assert.That(
+                BattleClientProtocolV1.ReadMessageId(replacement.SentFrames[0]),
+                Is.EqualTo(1000)
+            );
+            Assert.That(
+                System.Text.Encoding.UTF8.GetString(replacement.SentFrames[0]),
+                Does.Contain("fresh")
+            );
         }
 
         [Test]
@@ -233,7 +420,11 @@ namespace AiNative.Client.Application.Tests
             var transport = new FakeTransport();
             var connector = new FakeConnector(transport, new FakeTransport());
             var session = CreateActiveTopologySession(transport, connector);
-            transport.Enqueue(FinishedArenaSnapshot(110), BattleClientProtocolV1.SnapshotChannel, 1);
+            transport.Enqueue(
+                FinishedArenaSnapshot(110),
+                BattleClientProtocolV1.SnapshotChannel,
+                1
+            );
             session.Pump(0);
             Assert.That(session.ArenaPhase, Is.EqualTo(ArenaMatchPhase.Finished));
             transport.Close();
@@ -246,18 +437,32 @@ namespace AiNative.Client.Application.Tests
 
         [TestCase(SendStatus.Closed)]
         [TestCase(SendStatus.Faulted)]
-        public void FinishedArenaDiscardsQueuedInputsBeforeSendFailureCanTriggerReconnect(SendStatus sendStatus)
+        public void FinishedArenaDiscardsQueuedInputsBeforeSendFailureCanTriggerReconnect(
+            SendStatus sendStatus
+        )
         {
             var transport = new FakeTransport();
             var connector = new FakeConnector(transport, new FakeTransport());
             var session = CreateActiveTopologySession(transport, connector);
             transport.Enqueue(ArenaSnapshot(100), BattleClientProtocolV1.SnapshotChannel, 1);
             session.Pump(0);
-            session.PredictAndQueueArenaInput(101, 1000, 0, 0, 0, ArenaButtons.Jump, ArenaWeaponId.Machinegun);
+            session.PredictAndQueueArenaInput(
+                101,
+                1000,
+                0,
+                0,
+                0,
+                ArenaButtons.Jump,
+                ArenaWeaponId.Machinegun
+            );
             Assert.That(session.QueuedInputFrames, Is.EqualTo(1));
             int sentBeforeFinal = transport.SentFrames.Count;
             transport.NextSendStatus = sendStatus;
-            transport.Enqueue(FinishedArenaSnapshot(110), BattleClientProtocolV1.SnapshotChannel, 1);
+            transport.Enqueue(
+                FinishedArenaSnapshot(110),
+                BattleClientProtocolV1.SnapshotChannel,
+                1
+            );
             session.Pump(0);
             session.Pump(1);
             AssertFinalArenaState(session);
@@ -271,11 +476,28 @@ namespace AiNative.Client.Application.Tests
         {
             var transport = new FakeTransport();
             var session = CreateActiveTopologySession(transport, new FakeConnector(transport));
-            transport.Enqueue(FinishedArenaSnapshot(110), BattleClientProtocolV1.SnapshotChannel, 1);
+            transport.Enqueue(
+                FinishedArenaSnapshot(110),
+                BattleClientProtocolV1.SnapshotChannel,
+                1
+            );
             session.Pump(0);
-            Assert.That(session.PredictAndQueueArenaInput(111, 1000, 0, 0, 0, ArenaButtons.Fire, ArenaWeaponId.Machinegun),
-                Is.EqualTo(PredictionPrepareStatus.NotInitialized));
-            Assert.That(session.PredictAndQueueInput(111, 1000, 0), Is.EqualTo(PredictionPrepareStatus.NotInitialized));
+            Assert.That(
+                session.PredictAndQueueArenaInput(
+                    111,
+                    1000,
+                    0,
+                    0,
+                    0,
+                    ArenaButtons.Fire,
+                    ArenaWeaponId.Machinegun
+                ),
+                Is.EqualTo(PredictionPrepareStatus.NotInitialized)
+            );
+            Assert.That(
+                session.PredictAndQueueInput(111, 1000, 0),
+                Is.EqualTo(PredictionPrepareStatus.NotInitialized)
+            );
             Assert.That(session.QueuedInputFrames, Is.Zero);
             AssertFinalArenaState(session);
         }
@@ -287,8 +509,20 @@ namespace AiNative.Client.Application.Tests
             var session = CreateActiveTopologySession(transport, new FakeConnector(transport));
             transport.Enqueue(ArenaSnapshot(100), BattleClientProtocolV1.SnapshotChannel, 1);
             session.Pump(0);
-            session.PredictAndQueueArenaInput(101, 1000, 0, 0, 0, ArenaButtons.Jump, ArenaWeaponId.Machinegun);
-            transport.Enqueue(FinishedArenaSnapshot(110, 0), BattleClientProtocolV1.SnapshotChannel, 1);
+            session.PredictAndQueueArenaInput(
+                101,
+                1000,
+                0,
+                0,
+                0,
+                ArenaButtons.Jump,
+                ArenaWeaponId.Machinegun
+            );
+            transport.Enqueue(
+                FinishedArenaSnapshot(110, 0),
+                BattleClientProtocolV1.SnapshotChannel,
+                1
+            );
             session.Pump(0);
             Assert.That(session.TryGetArenaState(out var state), Is.True);
             Assert.That(state.Tick, Is.EqualTo(110));
@@ -315,28 +549,50 @@ namespace AiNative.Client.Application.Tests
             Assert.That(state.LastProcessedInputSequence, Is.EqualTo(42));
         }
 
-        private static BattleAdmissionInfo CreateTopologyAdmission(string room, string boot, string ticket)
-            => new BattleAdmissionInfo(room, boot, ticket);
+        private static BattleAdmissionInfo CreateTopologyAdmission(
+            string room,
+            string boot,
+            string ticket
+        ) => new BattleAdmissionInfo(room, boot, ticket);
 
         private static BattleClientSession CreateTopologySession(FakeConnector connector)
         {
-            return new BattleClientSession(new ProtobufBattleProtocolCodec(), "127.0.0.1", 22000, "x", 4, connector,
-                CreateTopologyAdmission("r", "e", "t"));
+            return new BattleClientSession(
+                new ProtobufBattleProtocolCodec(),
+                "127.0.0.1",
+                22000,
+                "x",
+                4,
+                connector,
+                CreateTopologyAdmission("r", "e", "t")
+            );
         }
 
-        private static BattleClientSession CreateActiveTopologySession(FakeTransport transport, FakeConnector connector)
+        private static BattleClientSession CreateActiveTopologySession(
+            FakeTransport transport,
+            FakeConnector connector
+        )
         {
             var session = CreateTopologySession(connector);
-            session.Start(); session.Pump(0);
-            transport.Enqueue(TestFrames.Login(42, 1, "r", "e"), BattleClientProtocolV1.ControlChannel, 1);
+            session.Start();
+            session.Pump(0);
+            transport.Enqueue(
+                TestFrames.Login(42, 1, "r", "e"),
+                BattleClientProtocolV1.ControlChannel,
+                1
+            );
             transport.Enqueue(TestFrames.Join(19, 7, 60), BattleClientProtocolV1.ControlChannel, 1);
             session.Pump(0);
             Assert.That(session.State, Is.EqualTo(BattleClientState.Active));
             return session;
         }
 
-        private static void UpdateTopologyAdmission(BattleClientSession session, string room, string boot, string ticket)
-            => session.UpdateAdmission(CreateTopologyAdmission(room, boot, ticket));
+        private static void UpdateTopologyAdmission(
+            BattleClientSession session,
+            string room,
+            string boot,
+            string ticket
+        ) => session.UpdateAdmission(CreateTopologyAdmission(room, boot, ticket));
 
         [Test]
         public void ArenaPredictionUsesAuthorityTickAndRejectsWrongEpochBeforeHudMutation()
@@ -346,7 +602,18 @@ namespace AiNative.Client.Application.Tests
             byte[] snapshot = ArenaSnapshot(100);
             transport.Enqueue(snapshot, BattleClientProtocolV1.SnapshotChannel, 1);
             session.Pump(0);
-            Assert.That(session.PredictAndQueueArenaInput(1, 1000, 0, 0, 0, ArenaButtons.Jump, ArenaWeaponId.Machinegun), Is.EqualTo(PredictionPrepareStatus.Prepared));
+            Assert.That(
+                session.PredictAndQueueArenaInput(
+                    1,
+                    1000,
+                    0,
+                    0,
+                    0,
+                    ArenaButtons.Jump,
+                    ArenaWeaponId.Machinegun
+                ),
+                Is.EqualTo(PredictionPrepareStatus.Prepared)
+            );
             Assert.That(session.TryGetArenaState(out var predicted), Is.True);
             Assert.That(predicted.PositionXMillimetres, Is.EqualTo(16));
             Assert.That(predicted.PositionYMillimetres, Is.EqualTo(91));
@@ -360,25 +627,55 @@ namespace AiNative.Client.Application.Tests
 
         [TestCase(1UL)]
         [TestCase(ulong.MaxValue)]
-        public void ArenaSessionWireTickRemainsAtLatestAuthorityDespiteUnacknowledgedPrediction(ulong callerTick)
+        public void ArenaSessionWireTickRemainsAtLatestAuthorityDespiteUnacknowledgedPrediction(
+            ulong callerTick
+        )
         {
             var transport = new FakeTransport();
             var session = CreateActiveTopologySession(transport, new FakeConnector(transport));
             transport.Enqueue(ArenaSnapshot(100), BattleClientProtocolV1.SnapshotChannel, 1);
             session.Pump(0);
             for (int index = 0; index < 3; index++)
-                Assert.That(session.PredictAndQueueArenaInput(callerTick, 1000, 0, 0, 0, ArenaButtons.None, ArenaWeaponId.Machinegun),
-                    Is.EqualTo(PredictionPrepareStatus.Prepared));
+                Assert.That(
+                    session.PredictAndQueueArenaInput(
+                        callerTick,
+                        1000,
+                        0,
+                        0,
+                        0,
+                        ArenaButtons.None,
+                        ArenaWeaponId.Machinegun
+                    ),
+                    Is.EqualTo(PredictionPrepareStatus.Prepared)
+                );
             session.Pump(0);
             for (int index = 2; index < transport.SentFrames.Count; index++)
-                Assert.That(BinaryPrimitives.ReadUInt64LittleEndian(transport.SentFrames[index].AsSpan(3)), Is.EqualTo(101));
+                Assert.That(
+                    BinaryPrimitives.ReadUInt64LittleEndian(transport.SentFrames[index].AsSpan(3)),
+                    Is.EqualTo(101)
+                );
 
             transport.Enqueue(ArenaSnapshot(103), BattleClientProtocolV1.SnapshotChannel, 1);
             session.Pump(0);
-            Assert.That(session.PredictAndQueueArenaInput(callerTick, 1000, 0, 0, 0, ArenaButtons.None, ArenaWeaponId.Machinegun),
-                Is.EqualTo(PredictionPrepareStatus.Prepared));
+            Assert.That(
+                session.PredictAndQueueArenaInput(
+                    callerTick,
+                    1000,
+                    0,
+                    0,
+                    0,
+                    ArenaButtons.None,
+                    ArenaWeaponId.Machinegun
+                ),
+                Is.EqualTo(PredictionPrepareStatus.Prepared)
+            );
             session.Pump(0);
-            Assert.That(BinaryPrimitives.ReadUInt64LittleEndian(transport.SentFrames[transport.SentFrames.Count - 1].AsSpan(3)), Is.EqualTo(104));
+            Assert.That(
+                BinaryPrimitives.ReadUInt64LittleEndian(
+                    transport.SentFrames[transport.SentFrames.Count - 1].AsSpan(3)
+                ),
+                Is.EqualTo(104)
+            );
             Assert.That(session.TryGetArenaState(out var predicted), Is.True);
             Assert.That(predicted.Tick, Is.EqualTo(107));
             Assert.That(session.LastAcknowledgedSequence, Is.Zero);
@@ -387,16 +684,35 @@ namespace AiNative.Client.Application.Tests
         [Test]
         public void ArenaReconnectUsesFullStateAndRetainsArenaSimulation()
         {
-            var initial = new FakeTransport(); var replacement = new FakeTransport();
+            var initial = new FakeTransport();
+            var replacement = new FakeTransport();
             var connector = new FakeConnector(initial, replacement);
             var session = CreateActiveSession(initial, out _, connector);
-            initial.Enqueue(ArenaSnapshot(100), BattleClientProtocolV1.SnapshotChannel, 1); session.Pump(0);
-            session.RequestReconnect(); session.Pump(0.3f); session.Pump(0);
+            initial.Enqueue(ArenaSnapshot(100), BattleClientProtocolV1.SnapshotChannel, 1);
+            session.Pump(0);
+            session.RequestReconnect();
+            session.Pump(0.3f);
+            session.Pump(0);
             byte[] snapshot = ArenaSnapshot(110);
-            replacement.Enqueue(TestFrames.Reconnect(2, 110, snapshot.AsSpan(2).ToArray()), BattleClientProtocolV1.ControlChannel, 2);
+            replacement.Enqueue(
+                TestFrames.Reconnect(2, 110, snapshot.AsSpan(2).ToArray()),
+                BattleClientProtocolV1.ControlChannel,
+                2
+            );
             session.Pump(0);
             Assert.That(session.State, Is.EqualTo(BattleClientState.Active));
-            Assert.That(session.PredictAndQueueArenaInput(1, 1000, 0, 0, 0, ArenaButtons.Jump, ArenaWeaponId.Machinegun), Is.EqualTo(PredictionPrepareStatus.Prepared));
+            Assert.That(
+                session.PredictAndQueueArenaInput(
+                    1,
+                    1000,
+                    0,
+                    0,
+                    0,
+                    ArenaButtons.Jump,
+                    ArenaWeaponId.Machinegun
+                ),
+                Is.EqualTo(PredictionPrepareStatus.Prepared)
+            );
             session.TryGetArenaState(out var state);
             Assert.That(state.Tick, Is.EqualTo(111));
             Assert.That(state.PositionYMillimetres, Is.EqualTo(91));
@@ -405,17 +721,37 @@ namespace AiNative.Client.Application.Tests
         [Test]
         public void StaleArenaReconnectCannotAdvanceSessionOrReplayQueuedInput()
         {
-            var initial = new FakeTransport(); var replacement = new FakeTransport();
-            var session = CreateActiveSession(initial, out _, new FakeConnector(initial, replacement));
-            initial.Enqueue(ArenaSnapshot(100), BattleClientProtocolV1.SnapshotChannel, 1); session.Pump(0);
-            Assert.That(session.PredictAndQueueArenaInput(101, 1000, 0, 0, 0, ArenaButtons.Fire, ArenaWeaponId.Machinegun),
-                Is.EqualTo(PredictionPrepareStatus.Prepared));
+            var initial = new FakeTransport();
+            var replacement = new FakeTransport();
+            var session = CreateActiveSession(
+                initial,
+                out _,
+                new FakeConnector(initial, replacement)
+            );
+            initial.Enqueue(ArenaSnapshot(100), BattleClientProtocolV1.SnapshotChannel, 1);
+            session.Pump(0);
+            Assert.That(
+                session.PredictAndQueueArenaInput(
+                    101,
+                    1000,
+                    0,
+                    0,
+                    0,
+                    ArenaButtons.Fire,
+                    ArenaWeaponId.Machinegun
+                ),
+                Is.EqualTo(PredictionPrepareStatus.Prepared)
+            );
             Assert.That(session.QueuedInputFrames, Is.EqualTo(1));
             session.RequestReconnect();
             Assert.That(session.QueuedInputFrames, Is.Zero);
-            session.Pump(0.3f); session.Pump(0);
-            replacement.Enqueue(TestFrames.Reconnect(2, 99, ArenaSnapshot(99).AsSpan(2).ToArray()),
-                BattleClientProtocolV1.ControlChannel, 2);
+            session.Pump(0.3f);
+            session.Pump(0);
+            replacement.Enqueue(
+                TestFrames.Reconnect(2, 99, ArenaSnapshot(99).AsSpan(2).ToArray()),
+                BattleClientProtocolV1.ControlChannel,
+                2
+            );
             session.Pump(0);
             Assert.That(session.State, Is.EqualTo(BattleClientState.Reconnecting));
             Assert.That(session.ConnectionEpoch, Is.EqualTo(1));
@@ -426,45 +762,99 @@ namespace AiNative.Client.Application.Tests
         [TestCase(true)]
         public void ExtremeReconnectTickCannotAdvanceTransportEpoch(bool arena)
         {
-            var initial = new FakeTransport(); var replacement = new FakeTransport();
-            var session = CreateActiveSession(initial, out _, new FakeConnector(initial, replacement));
-            initial.Enqueue(arena ? ArenaSnapshot(100) : TestFrames.Snapshot(7, 100, 0),
-                BattleClientProtocolV1.SnapshotChannel, 1);
+            var initial = new FakeTransport();
+            var replacement = new FakeTransport();
+            var session = CreateActiveSession(
+                initial,
+                out _,
+                new FakeConnector(initial, replacement)
+            );
+            initial.Enqueue(
+                arena ? ArenaSnapshot(100) : TestFrames.Snapshot(7, 100, 0),
+                BattleClientProtocolV1.SnapshotChannel,
+                1
+            );
             session.Pump(0);
-            Assert.That(session.PredictAndQueueInput(101, 1000, 0), Is.EqualTo(PredictionPrepareStatus.Prepared));
-            session.RequestReconnect(); session.Pump(0.3f); session.Pump(0);
+            Assert.That(
+                session.PredictAndQueueInput(101, 1000, 0),
+                Is.EqualTo(PredictionPrepareStatus.Prepared)
+            );
+            session.RequestReconnect();
+            session.Pump(0.3f);
+            session.Pump(0);
             byte[] snapshot = arena ? ArenaSnapshot(100) : TestFrames.Snapshot(7, 100, 0);
             BinaryPrimitives.WriteUInt64LittleEndian(snapshot.AsSpan(5, 8), (ulong)long.MaxValue);
-            replacement.Enqueue(TestFrames.Reconnect(2, (ulong)long.MaxValue, snapshot.AsSpan(2).ToArray()),
-                BattleClientProtocolV1.ControlChannel, 1);
+            replacement.Enqueue(
+                TestFrames.Reconnect(2, (ulong)long.MaxValue, snapshot.AsSpan(2).ToArray()),
+                BattleClientProtocolV1.ControlChannel,
+                1
+            );
             session.Pump(0);
-            Assert.That(replacement.ConnectionEpoch, Is.EqualTo(1), "Numeric admission must precede the transport epoch commit.");
+            Assert.That(
+                replacement.ConnectionEpoch,
+                Is.EqualTo(1),
+                "Numeric admission must precede the transport epoch commit."
+            );
             Assert.That(session.ConnectionEpoch, Is.EqualTo(1));
             Assert.That(session.LastReceivedTick, Is.EqualTo(100));
             Assert.That(session.State, Is.EqualTo(BattleClientState.Reconnecting));
         }
 
-        private static byte[] ArenaSnapshot(byte tick)
-            => new byte[] { 0x4d, 0x04, 0x08, 1, 0x11, tick, 0, 0, 0, 0, 0, 0, 0, 0x22, 8, 0x08, 7, 0x30, 100, 0x50, 1, 0x60, 1 };
+        private static byte[] ArenaSnapshot(byte tick) =>
+            new byte[]
+            {
+                0x4d,
+                0x04,
+                0x08,
+                1,
+                0x11,
+                tick,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0x22,
+                8,
+                0x08,
+                7,
+                0x30,
+                100,
+                0x50,
+                1,
+                0x60,
+                1,
+            };
 
         [Test]
         public void ProtocolV1ControlRequestsMatchFrozenWireShape()
         {
             byte[] frame = new byte[64];
 
-            Assert.That(BattleClientProtocolV1.TryEncodeLogin("x", frame, out int loginBytes), Is.True);
-            Assert.That(frame.AsSpan(0, loginBytes).ToArray(), Is.EqualTo(new byte[]
-            {
-                0xe8, 0x03, 0x08, 0x01, 0x12, 0x01, 0x78,
-            }));
+            Assert.That(
+                BattleClientProtocolV1.TryEncodeLogin("x", frame, out int loginBytes),
+                Is.True
+            );
+            Assert.That(
+                frame.AsSpan(0, loginBytes).ToArray(),
+                Is.EqualTo(new byte[] { 0xe8, 0x03, 0x08, 0x01, 0x12, 0x01, 0x78 })
+            );
 
-            Assert.That(BattleClientProtocolV1.TryEncodeJoin(1, 1, frame, out int joinBytes), Is.True);
-            Assert.That(frame.AsSpan(0, joinBytes).ToArray(), Is.EqualTo(new byte[]
-            {
-                0xf2, 0x03, 0x09, 1, 0, 0, 0, 0, 0, 0, 0, 0x10, 0x01,
-            }));
+            Assert.That(
+                BattleClientProtocolV1.TryEncodeJoin(1, 1, frame, out int joinBytes),
+                Is.True
+            );
+            Assert.That(
+                frame.AsSpan(0, joinBytes).ToArray(),
+                Is.EqualTo(new byte[] { 0xf2, 0x03, 0x09, 1, 0, 0, 0, 0, 0, 0, 0, 0x10, 0x01 })
+            );
 
-            Assert.That(BattleClientProtocolV1.TryEncodeReconnect(1, 2, 3, frame, out int reconnectBytes), Is.True);
+            Assert.That(
+                BattleClientProtocolV1.TryEncodeReconnect(1, 2, 3, frame, out int reconnectBytes),
+                Is.True
+            );
             Assert.That(BinaryPrimitives.ReadUInt16LittleEndian(frame), Is.EqualTo(1200));
             Assert.That(reconnectBytes, Is.EqualTo(22));
         }
@@ -475,7 +865,11 @@ namespace AiNative.Client.Application.Tests
             FakeTransport transport = new FakeTransport();
             BattleClientSession session = CreateActiveSession(transport, out _);
 
-            transport.Enqueue(TestFrames.Snapshot(7, 10, 0), BattleClientProtocolV1.SnapshotChannel, 1);
+            transport.Enqueue(
+                TestFrames.Snapshot(7, 10, 0),
+                BattleClientProtocolV1.SnapshotChannel,
+                1
+            );
             session.Pump(0);
 
             Assert.That(session.State, Is.EqualTo(BattleClientState.Active));
@@ -489,8 +883,14 @@ namespace AiNative.Client.Application.Tests
         public void LoginTimeoutMovesSessionToFaulted()
         {
             FakeTransport transport = new FakeTransport();
-            BattleClientSession session = new BattleClientSession(new ProtobufBattleProtocolCodec(),
-                "127.0.0.1", 22000, "test", 4, new FakeConnector(transport));
+            BattleClientSession session = new BattleClientSession(
+                new ProtobufBattleProtocolCodec(),
+                "127.0.0.1",
+                22000,
+                "test",
+                4,
+                new FakeConnector(transport)
+            );
 
             session.Start();
             session.Pump(0);
@@ -507,7 +907,11 @@ namespace AiNative.Client.Application.Tests
             FakeTransport replacement = new FakeTransport();
             FakeConnector connector = new FakeConnector(initial, null, null, replacement);
             BattleClientSession session = CreateActiveSession(initial, out _, connector);
-            initial.Enqueue(TestFrames.Snapshot(7, 10, 0), BattleClientProtocolV1.SnapshotChannel, 1);
+            initial.Enqueue(
+                TestFrames.Snapshot(7, 10, 0),
+                BattleClientProtocolV1.SnapshotChannel,
+                1
+            );
             session.Pump(0);
             ClientPredictionAdapter prediction = session.PredictionAdapter;
 
@@ -528,7 +932,8 @@ namespace AiNative.Client.Application.Tests
             replacement.Enqueue(
                 TestFrames.Reconnect(2, 11, TestFrames.SnapshotPayload(7, 11, 0)),
                 BattleClientProtocolV1.ControlChannel,
-                1);
+                1
+            );
             session.Pump(0);
 
             Assert.That(session.State, Is.EqualTo(BattleClientState.Active));
@@ -541,7 +946,11 @@ namespace AiNative.Client.Application.Tests
         {
             FakeTransport transport = new FakeTransport();
             BattleClientSession session = CreateActiveSession(transport, out _, inputCapacity: 1);
-            transport.Enqueue(TestFrames.Snapshot(7, 10, 0), BattleClientProtocolV1.SnapshotChannel, 1);
+            transport.Enqueue(
+                TestFrames.Snapshot(7, 10, 0),
+                BattleClientProtocolV1.SnapshotChannel,
+                1
+            );
             session.Pump(0);
             transport.NextSendStatus = SendStatus.WouldBlock;
 
@@ -559,7 +968,11 @@ namespace AiNative.Client.Application.Tests
         {
             FakeTransport transport = new FakeTransport();
             BattleClientSession session = CreateActiveSession(transport, out _);
-            transport.Enqueue(TestFrames.Snapshot(7, 10, 0), BattleClientProtocolV1.SnapshotChannel, 1);
+            transport.Enqueue(
+                TestFrames.Snapshot(7, 10, 0),
+                BattleClientProtocolV1.SnapshotChannel,
+                1
+            );
             session.Pump(0);
             Assert.That(session.PredictionDiagnostics.AcceptedSnapshots, Is.EqualTo(1));
 
@@ -574,14 +987,28 @@ namespace AiNative.Client.Application.Tests
         {
             FakeTransport transport = new FakeTransport();
             BattleClientSession session = CreateActiveSession(transport, out _);
-            transport.Enqueue(TestFrames.Snapshot(7, 10, 0), BattleClientProtocolV1.SnapshotChannel, 1);
+            transport.Enqueue(
+                TestFrames.Snapshot(7, 10, 0),
+                BattleClientProtocolV1.SnapshotChannel,
+                1
+            );
             session.Pump(0);
             session.PredictAndQueueInput(11, 1000, 0);
-            transport.Enqueue(TestFrames.Snapshot(7, 11, 1, 40), BattleClientProtocolV1.SnapshotChannel, 1);
+            transport.Enqueue(
+                TestFrames.Snapshot(7, 11, 1, 40),
+                BattleClientProtocolV1.SnapshotChannel,
+                1
+            );
             session.Pump(0);
 
-            Assert.That(session.TryAdvancePresentation(0, out PresentationPosition initial), Is.True);
-            Assert.That(session.PredictionAdapter.TryGetPredictedState(out KinematicState simulation), Is.True);
+            Assert.That(
+                session.TryAdvancePresentation(0, out PresentationPosition initial),
+                Is.True
+            );
+            Assert.That(
+                session.PredictionAdapter.TryGetPredictedState(out KinematicState simulation),
+                Is.True
+            );
             Assert.That(initial.XMillimetres, Is.EqualTo(50d));
             Assert.That(simulation.PositionXMillimetres, Is.EqualTo(40));
 
@@ -596,8 +1023,14 @@ namespace AiNative.Client.Application.Tests
         public void InvalidLoginEpochIsIgnoredWithoutJoiningAndEventuallyTimesOut()
         {
             FakeTransport transport = new FakeTransport();
-            BattleClientSession session = new BattleClientSession(new ProtobufBattleProtocolCodec(),
-                "127.0.0.1", 22000, "test", 4, new FakeConnector(transport));
+            BattleClientSession session = new BattleClientSession(
+                new ProtobufBattleProtocolCodec(),
+                "127.0.0.1",
+                22000,
+                "test",
+                4,
+                new FakeConnector(transport)
+            );
             session.Start();
             session.Pump(0);
             transport.Enqueue(TestFrames.Login(42, 0), BattleClientProtocolV1.ControlChannel, 1);
@@ -616,11 +1049,18 @@ namespace AiNative.Client.Application.Tests
             FakeTransport transport,
             out FakeConnector createdConnector,
             FakeConnector connector = null,
-            int inputCapacity = 4)
+            int inputCapacity = 4
+        )
         {
             createdConnector = connector ?? new FakeConnector(transport);
-            BattleClientSession session = new BattleClientSession(new ProtobufBattleProtocolCodec(),
-                "127.0.0.1", 22000, "test", inputCapacity, createdConnector);
+            BattleClientSession session = new BattleClientSession(
+                new ProtobufBattleProtocolCodec(),
+                "127.0.0.1",
+                22000,
+                "test",
+                inputCapacity,
+                createdConnector
+            );
             session.Start();
             session.Pump(0);
             transport.Enqueue(TestFrames.Login(42, 1), BattleClientProtocolV1.ControlChannel, 1);
@@ -645,15 +1085,18 @@ namespace AiNative.Client.Application.Tests
             string host,
             int port,
             int timeoutMilliseconds,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken
+        )
         {
             CallCount++;
-            if (_transports.Count == 0) return new ValueTask<BattleTransportConnection>(default(BattleTransportConnection));
+            if (_transports.Count == 0)
+                return new ValueTask<BattleTransportConnection>(default(BattleTransportConnection));
             FakeTransport transport = _transports.Dequeue();
-            if (transport is null) return new ValueTask<BattleTransportConnection>(default(BattleTransportConnection));
-            return new ValueTask<BattleTransportConnection>(new BattleTransportConnection(
-                transport,
-                transport.TryAdvanceEpoch));
+            if (transport is null)
+                return new ValueTask<BattleTransportConnection>(default(BattleTransportConnection));
+            return new ValueTask<BattleTransportConnection>(
+                new BattleTransportConnection(transport, transport.TryAdvanceEpoch)
+            );
         }
     }
 
@@ -674,7 +1117,8 @@ namespace AiNative.Client.Application.Tests
 
         internal bool TryAdvanceEpoch(uint epoch)
         {
-            if (epoch == 0 || epoch < _epoch) return false;
+            if (epoch == 0 || epoch < _epoch)
+                return false;
             _epoch = epoch;
             return true;
         }
@@ -687,7 +1131,8 @@ namespace AiNative.Client.Application.Tests
         public ValueTask<SendResult> SendAsync(
             TransportChannel channel,
             ReadOnlyMemory<byte> payload,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken = default
+        )
         {
             BeforeSend?.Invoke();
             if (State != TransportState.Connected)
@@ -695,12 +1140,14 @@ namespace AiNative.Client.Application.Tests
                 return new ValueTask<SendResult>(new SendResult(SendStatus.Closed));
             }
 
-            if (channel.Id == 2 && InputSender != null) return InputSender(payload);
+            if (channel.Id == 2 && InputSender != null)
+                return InputSender(payload);
             SendStatus status = NextSendStatus;
-            if (status == SendStatus.Accepted) SentFrames.Add(payload.ToArray());
-            return new ValueTask<SendResult>(new SendResult(
-                status,
-                status == SendStatus.Accepted ? payload.Length : 0));
+            if (status == SendStatus.Accepted)
+                SentFrames.Add(payload.ToArray());
+            return new ValueTask<SendResult>(
+                new SendResult(status, status == SendStatus.Accepted ? payload.Length : 0)
+            );
         }
 
         public bool TryReceive(Span<byte> destination, out ReceivedPacket packet)
@@ -720,7 +1167,8 @@ namespace AiNative.Client.Application.Tests
                 written,
                 queued.Frame.Length,
                 1,
-                queued.Epoch);
+                queued.Epoch
+            );
             return true;
         }
 
@@ -747,31 +1195,48 @@ namespace AiNative.Client.Application.Tests
 
     internal static class TestFrames
     {
-        internal static byte[] Login(ulong sessionId, uint epoch, string room = "", string boot = "", ulong roomTick = 0)
+        internal static byte[] Login(
+            ulong sessionId,
+            uint epoch,
+            string room = "",
+            string boot = "",
+            ulong roomTick = 0
+        )
         {
             List<byte> payload = Header(BattleClientProtocolV1.LoginResponseMessageId);
             payload.Add(0x09);
             AddFixed64(payload, sessionId);
             payload.Add(0x10);
             AddVarint(payload, epoch);
-            if (room.Length != 0) AddString(payload, 0x1a, room);
-            if (boot.Length != 0) AddString(payload, 0x22, boot);
-            if (roomTick != 0) { payload.Add(0x29); AddFixed64(payload, roomTick); }
+            if (room.Length != 0)
+                AddString(payload, 0x1a, room);
+            if (boot.Length != 0)
+                AddString(payload, 0x22, boot);
+            if (roomTick != 0)
+            {
+                payload.Add(0x29);
+                AddFixed64(payload, roomTick);
+            }
             return payload.ToArray();
         }
 
         private static void AddString(List<byte> payload, byte key, string value)
         {
             byte[] bytes = System.Text.Encoding.UTF8.GetBytes(value);
-            payload.Add(key); AddVarint(payload, (ulong)bytes.Length); payload.AddRange(bytes);
+            payload.Add(key);
+            AddVarint(payload, (ulong)bytes.Length);
+            payload.AddRange(bytes);
         }
 
         internal static byte[] Join(uint roomId, uint entityId, uint tickRate)
         {
             List<byte> payload = Header(BattleClientProtocolV1.JoinRoomResponseMessageId);
-            payload.Add(0x08); AddVarint(payload, roomId);
-            payload.Add(0x10); AddVarint(payload, entityId);
-            payload.Add(0x18); AddVarint(payload, tickRate);
+            payload.Add(0x08);
+            AddVarint(payload, roomId);
+            payload.Add(0x10);
+            AddVarint(payload, entityId);
+            payload.Add(0x18);
+            AddVarint(payload, tickRate);
             return payload.ToArray();
         }
 
@@ -779,14 +1244,11 @@ namespace AiNative.Client.Application.Tests
             uint entityId,
             ulong tick,
             uint acknowledgement,
-            int positionXMillimetres = 0)
+            int positionXMillimetres = 0
+        )
         {
             List<byte> frame = Header(BattleClientProtocolV1.SnapshotMessageId);
-            frame.AddRange(SnapshotPayload(
-                entityId,
-                tick,
-                acknowledgement,
-                positionXMillimetres));
+            frame.AddRange(SnapshotPayload(entityId, tick, acknowledgement, positionXMillimetres));
             return frame.ToArray();
         }
 
@@ -794,7 +1256,8 @@ namespace AiNative.Client.Application.Tests
             uint entityId,
             ulong tick,
             uint acknowledgement,
-            int positionXMillimetres = 0)
+            int positionXMillimetres = 0
+        )
         {
             List<byte> player = new List<byte> { 0x08 };
             AddVarint(player, entityId);
@@ -805,29 +1268,34 @@ namespace AiNative.Client.Application.Tests
             }
             List<byte> payload = new List<byte> { 0x08, 0x01, 0x11 };
             AddFixed64(payload, tick);
-            payload.Add(0x22); AddVarint(payload, (ulong)player.Count); payload.AddRange(player);
-            payload.Add(0x30); AddVarint(payload, acknowledgement);
+            payload.Add(0x22);
+            AddVarint(payload, (ulong)player.Count);
+            payload.AddRange(player);
+            payload.Add(0x30);
+            AddVarint(payload, acknowledgement);
             return payload.ToArray();
         }
 
         internal static byte[] Reconnect(uint epoch, ulong tick, byte[] snapshotPayload)
         {
             List<byte> frame = Header(BattleClientProtocolV1.ReconnectResponseMessageId);
-            frame.Add(0x08); AddVarint(frame, epoch);
-            frame.Add(0x11); AddFixed64(frame, tick);
-            frame.Add(0x1a); AddVarint(frame, (ulong)snapshotPayload.Length); frame.AddRange(snapshotPayload);
+            frame.Add(0x08);
+            AddVarint(frame, epoch);
+            frame.Add(0x11);
+            AddFixed64(frame, tick);
+            frame.Add(0x1a);
+            AddVarint(frame, (ulong)snapshotPayload.Length);
+            frame.AddRange(snapshotPayload);
             return frame.ToArray();
         }
 
-        private static List<byte> Header(ushort messageId) => new List<byte>
-        {
-            (byte)messageId,
-            (byte)(messageId >> 8),
-        };
+        private static List<byte> Header(ushort messageId) =>
+            new List<byte> { (byte)messageId, (byte)(messageId >> 8) };
 
         private static void AddFixed64(List<byte> destination, ulong value)
         {
-            for (int index = 0; index < 8; index++) destination.Add((byte)(value >> (index * 8)));
+            for (int index = 0; index < 8; index++)
+                destination.Add((byte)(value >> (index * 8)));
         }
 
         private static void AddVarint(List<byte> destination, ulong value)
@@ -836,13 +1304,12 @@ namespace AiNative.Client.Application.Tests
             {
                 byte current = (byte)(value & 0x7f);
                 value >>= 7;
-                if (value != 0) current |= 0x80;
+                if (value != 0)
+                    current |= 0x80;
                 destination.Add(current);
-            }
-            while (value != 0);
+            } while (value != 0);
         }
 
-        private static ulong ZigZag(int value) =>
-            unchecked((ulong)((value << 1) ^ (value >> 31)));
+        private static ulong ZigZag(int value) => unchecked((ulong)((value << 1) ^ (value >> 31)));
     }
 }

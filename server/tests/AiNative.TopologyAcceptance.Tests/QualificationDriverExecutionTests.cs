@@ -10,10 +10,23 @@ public sealed class QualificationDriverExecutionTests
     [TestCase(ThreadPriority.Lowest)]
     public void Unsupported_priority_cannot_start_an_owner(ThreadPriority priority)
     {
-        int factoryCalls = 0, bodyCalls = 0;
-        Assert.ThrowsAsync<ArgumentOutOfRangeException>(async () => await QualificationDriverExecution.Run(
-            _ => { bodyCalls++; return Task.CompletedTask; },
-            () => { factoryCalls++; return new RecordingWait(); }, priority));
+        int factoryCalls = 0,
+            bodyCalls = 0;
+        Assert.ThrowsAsync<ArgumentOutOfRangeException>(async () =>
+            await QualificationDriverExecution.Run(
+                _ =>
+                {
+                    bodyCalls++;
+                    return Task.CompletedTask;
+                },
+                () =>
+                {
+                    factoryCalls++;
+                    return new RecordingWait();
+                },
+                priority
+            )
+        );
         Assert.That(factoryCalls, Is.Zero);
         Assert.That(bodyCalls, Is.Zero);
     }
@@ -25,27 +38,37 @@ public sealed class QualificationDriverExecutionTests
         var entered = Signal();
         var release = Signal();
         Thread? owner = null;
-        ThreadPriority? factoryPriority = null, initialPriority = null, resumedPriority = null;
+        ThreadPriority? factoryPriority = null,
+            initialPriority = null,
+            resumedPriority = null;
         var waiter = new RecordingWait();
-        var running = QualificationDriverExecution.Run(async wait =>
-        {
-            initialPriority = Thread.CurrentThread.Priority;
-            entered.TrySetResult();
-            await release.Task;
-            resumedPriority = Thread.CurrentThread.Priority;
-            wait();
-        }, () =>
-        {
-            owner = Thread.CurrentThread;
-            factoryPriority = owner.Priority;
-            return waiter;
-        }, ThreadPriority.AboveNormal);
+        var running = QualificationDriverExecution.Run(
+            async wait =>
+            {
+                initialPriority = Thread.CurrentThread.Priority;
+                entered.TrySetResult();
+                await release.Task;
+                resumedPriority = Thread.CurrentThread.Priority;
+                wait();
+            },
+            () =>
+            {
+                owner = Thread.CurrentThread;
+                factoryPriority = owner.Priority;
+                return waiter;
+            },
+            ThreadPriority.AboveNormal
+        );
         try
         {
             await entered.Task.WaitAsync(SafetyTimeout);
             Assert.That(running.IsCompleted, Is.False);
         }
-        finally { release.TrySetResult(); await running.WaitAsync(SafetyTimeout); }
+        finally
+        {
+            release.TrySetResult();
+            await running.WaitAsync(SafetyTimeout);
+        }
         Assert.Multiple(() =>
         {
             Assert.That(factoryPriority, Is.EqualTo(ThreadPriority.AboveNormal));
@@ -61,25 +84,43 @@ public sealed class QualificationDriverExecutionTests
     {
         var suspended = Signal();
         var completion = Signal();
-        Thread? owner = null, beforeAwait = null, afterAwait = null, completionThread = null;
-        SynchronizationContext? beforeContext = null, afterContext = null;
+        Thread? owner = null,
+            beforeAwait = null,
+            afterAwait = null,
+            completionThread = null;
+        SynchronizationContext? beforeContext = null,
+            afterContext = null;
         var waiter = new RecordingWait();
-        var running = QualificationDriverExecution.Run(async wait =>
-        {
-            beforeAwait = Thread.CurrentThread;
-            beforeContext = SynchronizationContext.Current;
-            wait();
-            suspended.SetResult();
-            await completion.Task;
-            afterAwait = Thread.CurrentThread;
-            afterContext = SynchronizationContext.Current;
-            wait();
-        }, () => { owner = CaptureOwner(); return waiter; });
+        var running = QualificationDriverExecution.Run(
+            async wait =>
+            {
+                beforeAwait = Thread.CurrentThread;
+                beforeContext = SynchronizationContext.Current;
+                wait();
+                suspended.SetResult();
+                await completion.Task;
+                afterAwait = Thread.CurrentThread;
+                afterContext = SynchronizationContext.Current;
+                wait();
+            },
+            () =>
+            {
+                owner = CaptureOwner();
+                return waiter;
+            }
+        );
         try
         {
             await suspended.Task.WaitAsync(SafetyTimeout);
             Assert.That(running.IsCompleted, Is.False);
-            var completer = new Thread(() => { completionThread = Thread.CurrentThread; completion.TrySetResult(); }) { IsBackground = true };
+            var completer = new Thread(() =>
+            {
+                completionThread = Thread.CurrentThread;
+                completion.TrySetResult();
+            })
+            {
+                IsBackground = true,
+            };
             completer.Start();
             Assert.That(completer.Join(SafetyTimeout), Is.True);
             await running.WaitAsync(SafetyTimeout);
@@ -91,20 +132,34 @@ public sealed class QualificationDriverExecutionTests
             Assert.That(waiter.WaitThreads, Is.EqualTo(new[] { owner, owner }));
             AssertReleased(owner, waiter);
         }
-        finally { completion.TrySetResult(); await running.WaitAsync(SafetyTimeout); }
+        finally
+        {
+            completion.TrySetResult();
+            await running.WaitAsync(SafetyTimeout);
+        }
     }
 
     [Test]
     public async Task Synchronously_completed_body_still_disposes_and_joins_before_returning()
     {
-        Thread? owner = null, bodyThread = null;
+        Thread? owner = null,
+            bodyThread = null;
         var waiter = new RecordingWait();
-        await QualificationDriverExecution.Run(wait =>
-        {
-            bodyThread = Thread.CurrentThread;
-            wait();
-            return Task.CompletedTask;
-        }, () => { owner = CaptureOwner(); return waiter; }).WaitAsync(SafetyTimeout);
+        await QualificationDriverExecution
+            .Run(
+                wait =>
+                {
+                    bodyThread = Thread.CurrentThread;
+                    wait();
+                    return Task.CompletedTask;
+                },
+                () =>
+                {
+                    owner = CaptureOwner();
+                    return waiter;
+                }
+            )
+            .WaitAsync(SafetyTimeout);
         Assert.That(bodyThread, Is.SameAs(owner));
         Assert.That(waiter.WaitThreads, Is.EqualTo(new[] { owner }));
         AssertReleased(owner, waiter);
@@ -122,15 +177,30 @@ public sealed class QualificationDriverExecutionTests
             cancelled.Token.WaitHandle.WaitOne();
             cancelled.Token.ThrowIfCancellationRequested();
         });
-        var running = QualificationDriverExecution.Run(wait => { wait(); return Task.CompletedTask; },
-            () => { owner = CaptureOwner(); return waiter; });
+        var running = QualificationDriverExecution.Run(
+            wait =>
+            {
+                wait();
+                return Task.CompletedTask;
+            },
+            () =>
+            {
+                owner = CaptureOwner();
+                return waiter;
+            }
+        );
         try
         {
             await waiting.Task.WaitAsync(SafetyTimeout);
             Assert.That(running.IsCompleted, Is.False);
         }
-        finally { cancelled.Cancel(); }
-        var error = Assert.CatchAsync<OperationCanceledException>(async () => await running.WaitAsync(SafetyTimeout));
+        finally
+        {
+            cancelled.Cancel();
+        }
+        var error = Assert.CatchAsync<OperationCanceledException>(async () =>
+            await running.WaitAsync(SafetyTimeout)
+        );
         Assert.That(error!.CancellationToken, Is.EqualTo(cancelled.Token));
         Assert.That(running.IsCanceled, Is.True);
         AssertReleased(owner, waiter);
@@ -142,9 +212,21 @@ public sealed class QualificationDriverExecutionTests
         Thread? owner = null;
         int bodyCalls = 0;
         var expected = new InvalidOperationException("factory failure");
-        var running = QualificationDriverExecution.Run(_ => { Interlocked.Increment(ref bodyCalls); return Task.CompletedTask; },
-            () => { owner = CaptureOwner(); throw expected; });
-        var error = Assert.ThrowsAsync<InvalidOperationException>(async () => await running.WaitAsync(SafetyTimeout));
+        var running = QualificationDriverExecution.Run(
+            _ =>
+            {
+                Interlocked.Increment(ref bodyCalls);
+                return Task.CompletedTask;
+            },
+            () =>
+            {
+                owner = CaptureOwner();
+                throw expected;
+            }
+        );
+        var error = Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await running.WaitAsync(SafetyTimeout)
+        );
         Assert.That(error, Is.SameAs(expected));
         Assert.That(bodyCalls, Is.Zero);
         AssertOwnedThreadStopped(owner);
@@ -156,16 +238,30 @@ public sealed class QualificationDriverExecutionTests
         Thread? owner = null;
         var expected = new InvalidOperationException("wait failure");
         var waiter = new RecordingWait(() => throw expected);
-        var running = QualificationDriverExecution.Run(wait => { wait(); return Task.CompletedTask; },
-            () => { owner = CaptureOwner(); return waiter; });
-        var error = Assert.ThrowsAsync<InvalidOperationException>(async () => await running.WaitAsync(SafetyTimeout));
+        var running = QualificationDriverExecution.Run(
+            wait =>
+            {
+                wait();
+                return Task.CompletedTask;
+            },
+            () =>
+            {
+                owner = CaptureOwner();
+                return waiter;
+            }
+        );
+        var error = Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await running.WaitAsync(SafetyTimeout)
+        );
         Assert.That(error, Is.SameAs(expected));
         AssertReleased(owner, waiter);
     }
 
     [TestCase(false)]
     [TestCase(true)]
-    public void Body_failure_before_or_after_incomplete_await_is_preserved_and_releases_worker(bool asynchronously)
+    public void Body_failure_before_or_after_incomplete_await_is_preserved_and_releases_worker(
+        bool asynchronously
+    )
     {
         Thread? owner = null;
         var expected = new InvalidOperationException("body failure");
@@ -174,7 +270,8 @@ public sealed class QualificationDriverExecutionTests
         var suspended = Signal();
         Task Body(Action wait)
         {
-            if (!asynchronously) throw expected;
+            if (!asynchronously)
+                throw expected;
             return FailAfterAwait();
         }
         async Task FailAfterAwait()
@@ -183,13 +280,28 @@ public sealed class QualificationDriverExecutionTests
             await release.Task;
             throw expected;
         }
-        var running = QualificationDriverExecution.Run(Body, () => { owner = CaptureOwner(); return waiter; });
+        var running = QualificationDriverExecution.Run(
+            Body,
+            () =>
+            {
+                owner = CaptureOwner();
+                return waiter;
+            }
+        );
         if (asynchronously)
         {
-            try { Assert.That(suspended.Task.Wait(SafetyTimeout), Is.True); }
-            finally { release.TrySetResult(); }
+            try
+            {
+                Assert.That(suspended.Task.Wait(SafetyTimeout), Is.True);
+            }
+            finally
+            {
+                release.TrySetResult();
+            }
         }
-        var error = Assert.ThrowsAsync<InvalidOperationException>(async () => await running.WaitAsync(SafetyTimeout));
+        var error = Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await running.WaitAsync(SafetyTimeout)
+        );
         Assert.That(error, Is.SameAs(expected));
         AssertReleased(owner, waiter);
     }
@@ -199,21 +311,52 @@ public sealed class QualificationDriverExecutionTests
     {
         using var releaseFirst = new ManualResetEventSlim();
         var firstWaiting = Signal();
-        Thread? firstOwner = null, secondOwner = null;
-        var firstWaiter = new RecordingWait(() => { firstWaiting.SetResult(); releaseFirst.Wait(); });
+        Thread? firstOwner = null,
+            secondOwner = null;
+        var firstWaiter = new RecordingWait(() =>
+        {
+            firstWaiting.SetResult();
+            releaseFirst.Wait();
+        });
         var secondWaiter = new RecordingWait();
-        var first = QualificationDriverExecution.Run(wait => { wait(); return Task.CompletedTask; },
-            () => { firstOwner = CaptureOwner(); return firstWaiter; });
+        var first = QualificationDriverExecution.Run(
+            wait =>
+            {
+                wait();
+                return Task.CompletedTask;
+            },
+            () =>
+            {
+                firstOwner = CaptureOwner();
+                return firstWaiter;
+            }
+        );
         try
         {
             await firstWaiting.Task.WaitAsync(SafetyTimeout);
-            await QualificationDriverExecution.Run(wait => { wait(); return Task.CompletedTask; },
-                () => { secondOwner = CaptureOwner(); return secondWaiter; }).WaitAsync(SafetyTimeout);
+            await QualificationDriverExecution
+                .Run(
+                    wait =>
+                    {
+                        wait();
+                        return Task.CompletedTask;
+                    },
+                    () =>
+                    {
+                        secondOwner = CaptureOwner();
+                        return secondWaiter;
+                    }
+                )
+                .WaitAsync(SafetyTimeout);
             Assert.That(first.IsCompleted, Is.False);
             Assert.That(firstOwner, Is.Not.SameAs(secondOwner));
             AssertReleased(secondOwner, secondWaiter);
         }
-        finally { releaseFirst.Set(); await first.WaitAsync(SafetyTimeout); }
+        finally
+        {
+            releaseFirst.Set();
+            await first.WaitAsync(SafetyTimeout);
+        }
         AssertReleased(firstOwner, firstWaiter);
     }
 
@@ -231,7 +374,11 @@ public sealed class QualificationDriverExecutionTests
     static void AssertOwnedThreadStopped(Thread? owner)
     {
         Assert.That(owner, Is.Not.Null);
-        Assert.That(owner!.IsAlive, Is.False, "Run task must not complete until its owned thread has exited");
+        Assert.That(
+            owner!.IsAlive,
+            Is.False,
+            "Run task must not complete until its owned thread has exited"
+        );
     }
 
     static void AssertReleased(Thread? owner, RecordingWait waiter)
@@ -246,7 +393,17 @@ public sealed class QualificationDriverExecutionTests
         public readonly List<Thread> WaitThreads = [];
         public int DisposeCalls;
         public Thread? DisposeThread;
-        public void Wait() { WaitThreads.Add(Thread.CurrentThread); onWait?.Invoke(); }
-        public void Dispose() { Interlocked.Increment(ref DisposeCalls); DisposeThread = Thread.CurrentThread; }
+
+        public void Wait()
+        {
+            WaitThreads.Add(Thread.CurrentThread);
+            onWait?.Invoke();
+        }
+
+        public void Dispose()
+        {
+            Interlocked.Increment(ref DisposeCalls);
+            DisposeThread = Thread.CurrentThread;
+        }
     }
 }

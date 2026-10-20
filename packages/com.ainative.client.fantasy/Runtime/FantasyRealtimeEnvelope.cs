@@ -40,7 +40,8 @@ namespace AiNative.Client.Fantasy
                 session.RuntimeId,
                 message.ChannelId,
                 message.Payload,
-                message.Sequence);
+                message.Sequence
+            );
             await FTask.CompletedTask;
         }
     }

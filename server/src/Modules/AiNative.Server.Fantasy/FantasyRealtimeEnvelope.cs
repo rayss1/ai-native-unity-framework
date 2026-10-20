@@ -38,7 +38,12 @@ internal sealed class FantasyRealtimeEnvelopeHandler : Message<FantasyRealtimeEn
 {
     protected override async FTask Run(Session session, FantasyRealtimeEnvelope message)
     {
-        FantasyKcpGatewayBridge.Deliver(session, message.ChannelId, message.Payload, message.Sequence);
+        FantasyKcpGatewayBridge.Deliver(
+            session,
+            message.ChannelId,
+            message.Payload,
+            message.Sequence
+        );
         await FTask.CompletedTask;
     }
 }
@@ -47,10 +52,15 @@ internal sealed class FantasyGatewaySceneCreatedEvent : AsyncEventSystem<OnCreat
 {
     protected override async FTask Handler(OnCreateScene created)
     {
-        if (SceneConfigData.Instance.TryGet(created.Scene.SceneConfigId, out var config) && config.OuterPort > 0 && string.Equals(
+        if (
+            SceneConfigData.Instance.TryGet(created.Scene.SceneConfigId, out var config)
+            && config.OuterPort > 0
+            && string.Equals(
                 config.NetworkProtocol,
                 nameof(NetworkProtocolType.KCP),
-                StringComparison.Ordinal))
+                StringComparison.Ordinal
+            )
+        )
         {
             FantasyKcpGatewayBridge.MarkListening(created.Scene, config.OuterPort);
         }

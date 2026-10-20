@@ -13,20 +13,23 @@ namespace AiNative.Client.Editor
     public static class BattleClientBuild
     {
         private const string ScenePath = "Assets/AiNative.BattleClient/Scenes/BattleClient.unity";
-        private const string NoticePath = "Packages/com.ainative.client.fantasy/THIRD-PARTY-NOTICES.md";
+        private const string NoticePath =
+            "Packages/com.ainative.client.fantasy/THIRD-PARTY-NOTICES.md";
         private const string RepositoryLicensePath = "../../server/vendor/Fantasy/LICENSE";
 
         public static void BuildWindowsSmoke()
         {
             string output = ReadRequiredAbsolutePath(
                 Environment.GetCommandLineArgs(),
-                "--ainative-build-output");
+                "--ainative-build-output"
+            );
             BuildWindowsAtPath(output);
         }
 
         public static void BuildWindowsAtPath(string output)
         {
-            if (!Path.IsPathRooted(output)) throw new ArgumentException("Player output must be an absolute path.");
+            if (!Path.IsPathRooted(output))
+                throw new ArgumentException("Player output must be an absolute path.");
             output = Path.GetFullPath(output);
             BattleClientRendering.ValidateUrpConfiguration();
             if (!output.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
@@ -38,7 +41,8 @@ namespace AiNative.Client.Editor
             Directory.CreateDirectory(outputDirectory);
             PlayerSettings.SetScriptingBackend(
                 NamedBuildTarget.Standalone,
-                ScriptingImplementation.Mono2x);
+                ScriptingImplementation.Mono2x
+            );
 
             BuildPlayerOptions options = new BuildPlayerOptions
             {
@@ -53,8 +57,9 @@ namespace AiNative.Client.Editor
             if (report.summary.result != BuildResult.Succeeded)
             {
                 throw new InvalidOperationException(
-                    $"Windows smoke Player build failed: {report.summary.result}, " +
-                    $"errors={report.summary.totalErrors}.");
+                    $"Windows smoke Player build failed: {report.summary.result}, "
+                        + $"errors={report.summary.totalErrors}."
+                );
             }
 
             CopyThirdPartyNotice(outputDirectory);
@@ -66,7 +71,8 @@ namespace AiNative.Client.Editor
             BattleClientRendering.ValidateUrpConfiguration();
             string output = ReadRequiredAbsolutePath(
                 Environment.GetCommandLineArgs(),
-                "--ainative-build-output");
+                "--ainative-build-output"
+            );
             if (!output.EndsWith(".app", StringComparison.OrdinalIgnoreCase))
             {
                 throw new ArgumentException("--ainative-build-output must name a .app bundle.");
@@ -76,38 +82,49 @@ namespace AiNative.Client.Editor
             Directory.CreateDirectory(outputDirectory);
 
             NamedBuildTarget standalone = NamedBuildTarget.Standalone;
-            ScriptingImplementation previousBackend =
-                PlayerSettings.GetScriptingBackend(standalone);
+            ScriptingImplementation previousBackend = PlayerSettings.GetScriptingBackend(
+                standalone
+            );
             BuildTarget previousBuildTarget = EditorUserBuildSettings.activeBuildTarget;
-            BuildTargetGroup previousBuildTargetGroup =
-                BuildPipeline.GetBuildTargetGroup(previousBuildTarget);
+            BuildTargetGroup previousBuildTargetGroup = BuildPipeline.GetBuildTargetGroup(
+                previousBuildTarget
+            );
             int previousArchitecture = 0;
             object macBuildProfile = null;
             BuildProfile macBuildProfileOwner = null;
             PropertyInfo macArchitectureProperty = null;
             object previousMacArchitecture = null;
             string projectSettingsPath = Path.GetFullPath(
-                Path.Combine(UnityEngine.Application.dataPath, "..", "ProjectSettings", "ProjectSettings.asset"));
+                Path.Combine(
+                    UnityEngine.Application.dataPath,
+                    "..",
+                    "ProjectSettings",
+                    "ProjectSettings.asset"
+                )
+            );
             byte[] previousProjectSettings = File.ReadAllBytes(projectSettingsPath);
             try
             {
-                if (!EditorUserBuildSettings.SwitchActiveBuildTarget(
+                if (
+                    !EditorUserBuildSettings.SwitchActiveBuildTarget(
                         BuildTargetGroup.Standalone,
-                        BuildTarget.StandaloneOSX))
+                        BuildTarget.StandaloneOSX
+                    )
+                )
                 {
                     throw new InvalidOperationException(
-                        "Unity could not activate the StandaloneOSX build target.");
+                        "Unity could not activate the StandaloneOSX build target."
+                    );
                 }
 
                 previousArchitecture = PlayerSettings.GetArchitecture(standalone);
-                PlayerSettings.SetScriptingBackend(
-                    standalone,
-                    ScriptingImplementation.Mono2x);
+                PlayerSettings.SetScriptingBackend(standalone, ScriptingImplementation.Mono2x);
                 PlayerSettings.SetArchitecture(standalone, 1); // ARM64
                 previousMacArchitecture = SetActiveMacArchitecture(
                     out macBuildProfile,
                     out macBuildProfileOwner,
-                    out macArchitectureProperty);
+                    out macArchitectureProperty
+                );
                 AssetDatabase.SaveAssets();
 
                 BuildPlayerOptions options = new BuildPlayerOptions
@@ -123,8 +140,9 @@ namespace AiNative.Client.Editor
                 if (report.summary.result != BuildResult.Succeeded)
                 {
                     throw new InvalidOperationException(
-                        $"macOS ARM64 smoke Player build failed: {report.summary.result}, " +
-                        $"errors={report.summary.totalErrors}.");
+                        $"macOS ARM64 smoke Player build failed: {report.summary.result}, "
+                            + $"errors={report.summary.totalErrors}."
+                    );
                 }
             }
             finally
@@ -133,21 +151,23 @@ namespace AiNative.Client.Editor
                 {
                     if (macArchitectureProperty != null)
                     {
-                        macArchitectureProperty.SetValue(
-                            macBuildProfile,
-                            previousMacArchitecture);
+                        macArchitectureProperty.SetValue(macBuildProfile, previousMacArchitecture);
                         EditorUtility.SetDirty(macBuildProfileOwner);
                     }
 
                     PlayerSettings.SetArchitecture(standalone, previousArchitecture);
                     PlayerSettings.SetScriptingBackend(standalone, previousBackend);
-                    if (previousBuildTarget != BuildTarget.StandaloneOSX &&
-                        !EditorUserBuildSettings.SwitchActiveBuildTarget(
+                    if (
+                        previousBuildTarget != BuildTarget.StandaloneOSX
+                        && !EditorUserBuildSettings.SwitchActiveBuildTarget(
                             previousBuildTargetGroup,
-                            previousBuildTarget))
+                            previousBuildTarget
+                        )
+                    )
                     {
                         throw new InvalidOperationException(
-                            $"Unity could not restore the {previousBuildTarget} build target.");
+                            $"Unity could not restore the {previousBuildTarget} build target."
+                        );
                     }
 
                     AssetDatabase.SaveAssets();
@@ -165,24 +185,29 @@ namespace AiNative.Client.Editor
         private static object SetActiveMacArchitecture(
             out object macBuildProfile,
             out BuildProfile macBuildProfileOwner,
-            out PropertyInfo architectureProperty)
+            out PropertyInfo architectureProperty
+        )
         {
             Type profileType = Type.GetType(
                 "UnityEditor.OSXStandalone.OSXStandaloneBuildProfile, UnityEditor.OSXStandalone.Extensions",
-                throwOnError: true);
+                throwOnError: true
+            );
             PropertyInfo platformProfileProperty = typeof(BuildProfile).GetProperty(
                 "platformBuildProfile",
-                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance
+            );
             if (platformProfileProperty == null)
             {
                 throw new MissingMemberException(
-                    "Unity BuildProfile does not expose its platform build profile.");
+                    "Unity BuildProfile does not expose its platform build profile."
+                );
             }
 
             macBuildProfile = null;
             macBuildProfileOwner = null;
-            foreach (UnityEngine.Object candidate in
-                     Resources.FindObjectsOfTypeAll(typeof(BuildProfile)))
+            foreach (
+                UnityEngine.Object candidate in Resources.FindObjectsOfTypeAll(typeof(BuildProfile))
+            )
             {
                 BuildProfile buildProfile = (BuildProfile)candidate;
                 object platformProfile = platformProfileProperty.GetValue(buildProfile);
@@ -197,16 +222,19 @@ namespace AiNative.Client.Editor
             if (macBuildProfile == null)
             {
                 throw new InvalidOperationException(
-                    "Unity did not expose the active macOS build profile.");
+                    "Unity did not expose the active macOS build profile."
+                );
             }
 
             architectureProperty = profileType.GetProperty(
                 "architecture",
-                BindingFlags.Public | BindingFlags.Instance);
+                BindingFlags.Public | BindingFlags.Instance
+            );
             if (architectureProperty == null || !architectureProperty.CanWrite)
             {
                 throw new MissingMemberException(
-                    "The active macOS build profile does not expose a writable architecture.");
+                    "The active macOS build profile does not expose a writable architecture."
+                );
             }
 
             object previousArchitecture = architectureProperty.GetValue(macBuildProfile);
@@ -220,7 +248,8 @@ namespace AiNative.Client.Editor
         {
             UnityEditor.PackageManager.PackageInfo clientPackage =
                 UnityEditor.PackageManager.PackageInfo.FindForAssembly(
-                typeof(FantasyKcpRealtimeTransport).Assembly);
+                    typeof(FantasyKcpRealtimeTransport).Assembly
+                );
             string source = clientPackage is null
                 ? Path.GetFullPath(NoticePath)
                 : Path.Combine(clientPackage.resolvedPath, "THIRD-PARTY-NOTICES.md");
@@ -228,16 +257,23 @@ namespace AiNative.Client.Editor
             {
                 throw new FileNotFoundException(
                     "Fantasy client third-party notice is required for distribution.",
-                    source);
+                    source
+                );
             }
 
             string notice = File.ReadAllText(source);
-            if (notice.IndexOf("MIT", StringComparison.OrdinalIgnoreCase) < 0 ||
-                notice.IndexOf("df4ad5fe5418c8855932de784c7cea6286c4b082", StringComparison.OrdinalIgnoreCase) < 0 ||
-                notice.IndexOf("entity", StringComparison.OrdinalIgnoreCase) < 0)
+            if (
+                notice.IndexOf("MIT", StringComparison.OrdinalIgnoreCase) < 0
+                || notice.IndexOf(
+                    "df4ad5fe5418c8855932de784c7cea6286c4b082",
+                    StringComparison.OrdinalIgnoreCase
+                ) < 0
+                || notice.IndexOf("entity", StringComparison.OrdinalIgnoreCase) < 0
+            )
             {
                 throw new InvalidDataException(
-                    "Fantasy notice must identify the MIT license, approved fork commit, and entity restriction.");
+                    "Fantasy notice must identify the MIT license, approved fork commit, and entity restriction."
+                );
             }
 
             File.Copy(source, Path.Combine(outputDirectory, "THIRD-PARTY-NOTICES.md"), true);
@@ -250,45 +286,71 @@ namespace AiNative.Client.Editor
 
             if (!File.Exists(licenseSource))
             {
-                throw new FileNotFoundException("Fantasy restricted MIT license is required.", licenseSource);
+                throw new FileNotFoundException(
+                    "Fantasy restricted MIT license is required.",
+                    licenseSource
+                );
             }
 
             string license = File.ReadAllText(licenseSource);
-            if (license.IndexOf("MIT License", StringComparison.OrdinalIgnoreCase) < 0 ||
-                license.IndexOf("explicitly prohibited", StringComparison.OrdinalIgnoreCase) < 0)
+            if (
+                license.IndexOf("MIT License", StringComparison.OrdinalIgnoreCase) < 0
+                || license.IndexOf("explicitly prohibited", StringComparison.OrdinalIgnoreCase) < 0
+            )
             {
                 throw new InvalidDataException(
-                    "Fantasy license must retain its MIT heading and entity-specific prohibition.");
+                    "Fantasy license must retain its MIT heading and entity-specific prohibition."
+                );
             }
 
             File.Copy(licenseSource, Path.Combine(outputDirectory, "Fantasy-LICENSE.txt"), true);
 
             UnityEditor.PackageManager.PackageInfo protobufPackage =
                 UnityEditor.PackageManager.PackageInfo.FindForAssembly(
-                    typeof(AiNative.Client.Protocol.Protobuf.ProtobufBattleProtocolCodec).Assembly);
+                    typeof(AiNative.Client.Protocol.Protobuf.ProtobufBattleProtocolCodec).Assembly
+                );
             if (protobufPackage == null)
-                throw new InvalidOperationException("Protobuf package must resolve before distribution.");
+                throw new InvalidOperationException(
+                    "Protobuf package must resolve before distribution."
+                );
             string notices = Path.Combine(protobufPackage.resolvedPath, "ThirdPartyNotices~");
             string protobufLicense = Path.Combine(notices, "Google.Protobuf.LICENSE");
             string dependencyLock = Path.Combine(notices, "dependencies.lock.json");
             if (!File.Exists(protobufLicense) || !File.Exists(dependencyLock))
-                throw new FileNotFoundException("Protobuf license and pinned dependency identity are required.");
+                throw new FileNotFoundException(
+                    "Protobuf license and pinned dependency identity are required."
+                );
             string protobufLicenseText = File.ReadAllText(protobufLicense);
-            if (!protobufLicenseText.Contains("Redistribution and use in source and binary forms") ||
-                !protobufLicenseText.Contains("Google"))
-                throw new InvalidDataException("Protobuf BSD license must preserve upstream terms.");
-            File.Copy(protobufLicense, Path.Combine(outputDirectory, "Google.Protobuf-LICENSE.txt"), true);
-            File.Copy(dependencyLock, Path.Combine(outputDirectory, "PROTOCOL-DEPENDENCIES.json"), true);
+            if (
+                !protobufLicenseText.Contains("Redistribution and use in source and binary forms")
+                || !protobufLicenseText.Contains("Google")
+            )
+                throw new InvalidDataException(
+                    "Protobuf BSD license must preserve upstream terms."
+                );
+            File.Copy(
+                protobufLicense,
+                Path.Combine(outputDirectory, "Google.Protobuf-LICENSE.txt"),
+                true
+            );
+            File.Copy(
+                dependencyLock,
+                Path.Combine(outputDirectory, "PROTOCOL-DEPENDENCIES.json"),
+                true
+            );
         }
 
         private static string FindFantasyUnityLicense()
         {
-            foreach (UnityEditor.PackageManager.PackageInfo package in
-                     UnityEditor.PackageManager.PackageInfo.GetAllRegisteredPackages())
+            foreach (
+                UnityEditor.PackageManager.PackageInfo package in UnityEditor.PackageManager.PackageInfo.GetAllRegisteredPackages()
+            )
             {
-                if (!string.Equals(package.name, "com.fantasy.unity", StringComparison.Ordinal)) continue;
+                if (!string.Equals(package.name, "com.fantasy.unity", StringComparison.Ordinal))
+                    continue;
                 string packageLicense = Path.Combine(package.resolvedPath, "LICENSE");
-                if (File.Exists(packageLicense)) return packageLicense;
+                if (File.Exists(packageLicense))
+                    return packageLicense;
 
                 // The Git package is rooted below the repository root; walk up only within
                 // that resolved checkout to locate the pinned fork's license.
@@ -297,7 +359,8 @@ namespace AiNative.Client.Editor
                 {
                     string candidate = Path.Combine(directory.FullName, "LICENSE");
                     string forkMarker = Path.Combine(directory.FullName, "AI_NATIVE_FORK.md");
-                    if (File.Exists(candidate) && File.Exists(forkMarker)) return candidate;
+                    if (File.Exists(candidate) && File.Exists(forkMarker))
+                        return candidate;
                     directory = directory.Parent;
                 }
             }
@@ -309,7 +372,8 @@ namespace AiNative.Client.Editor
         {
             for (int index = 0; index + 1 < arguments.Length; index++)
             {
-                if (!string.Equals(arguments[index], option, StringComparison.Ordinal)) continue;
+                if (!string.Equals(arguments[index], option, StringComparison.Ordinal))
+                    continue;
                 string path = arguments[index + 1];
                 if (!Path.IsPathRooted(path))
                 {

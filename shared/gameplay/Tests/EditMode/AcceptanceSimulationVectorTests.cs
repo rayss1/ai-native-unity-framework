@@ -63,7 +63,8 @@ namespace AiNative.Gameplay.Tests
 
                     if ((tick + index) % 15 == 0)
                     {
-                        int targetIndex = (index + 1 + (int)(_random.NextUInt32() % 63)) % _bots.Length;
+                        int targetIndex =
+                            (index + 1 + (int)(_random.NextUInt32() % 63)) % _bots.Length;
                         ref BotState target = ref _bots[targetIndex];
                         target.Health = target.Health > 0 ? target.Health - 1 : 100;
                         bot.ShotsFired++;
@@ -78,18 +79,39 @@ namespace AiNative.Gameplay.Tests
                 BinaryPrimitives.WriteUInt32LittleEndian(destination.Slice(0, 4), 1);
                 BinaryPrimitives.WriteInt64LittleEndian(destination.Slice(4, 8), tick);
                 RandomState randomState = _random.CaptureState();
-                BinaryPrimitives.WriteUInt64LittleEndian(destination.Slice(12, 8), randomState.State);
-                BinaryPrimitives.WriteUInt64LittleEndian(destination.Slice(20, 8), randomState.Stream);
+                BinaryPrimitives.WriteUInt64LittleEndian(
+                    destination.Slice(12, 8),
+                    randomState.State
+                );
+                BinaryPrimitives.WriteUInt64LittleEndian(
+                    destination.Slice(20, 8),
+                    randomState.Stream
+                );
 
                 int offset = StateHeaderSize;
                 for (int index = 0; index < _bots.Length; index++)
                 {
                     BotState bot = _bots[index];
-                    BinaryPrimitives.WriteUInt32LittleEndian(destination.Slice(offset, 4), bot.EntityId);
-                    BinaryPrimitives.WriteInt32LittleEndian(destination.Slice(offset + 4, 4), bot.PositionXMillimetres);
-                    BinaryPrimitives.WriteInt32LittleEndian(destination.Slice(offset + 8, 4), bot.PositionZMillimetres);
-                    BinaryPrimitives.WriteInt32LittleEndian(destination.Slice(offset + 12, 4), bot.Health);
-                    BinaryPrimitives.WriteUInt32LittleEndian(destination.Slice(offset + 16, 4), bot.ShotsFired);
+                    BinaryPrimitives.WriteUInt32LittleEndian(
+                        destination.Slice(offset, 4),
+                        bot.EntityId
+                    );
+                    BinaryPrimitives.WriteInt32LittleEndian(
+                        destination.Slice(offset + 4, 4),
+                        bot.PositionXMillimetres
+                    );
+                    BinaryPrimitives.WriteInt32LittleEndian(
+                        destination.Slice(offset + 8, 4),
+                        bot.PositionZMillimetres
+                    );
+                    BinaryPrimitives.WriteInt32LittleEndian(
+                        destination.Slice(offset + 12, 4),
+                        bot.Health
+                    );
+                    BinaryPrimitives.WriteUInt32LittleEndian(
+                        destination.Slice(offset + 16, 4),
+                        bot.ShotsFired
+                    );
                     offset += BotStateSize;
                 }
 

@@ -29,9 +29,9 @@ public sealed class ArchitectureRules
     public static ArchitectureRules Load(string path)
     {
         using FileStream stream = File.OpenRead(path);
-        return JsonSerializer.Deserialize<ArchitectureRules>(stream, new JsonSerializerOptions
-        {
-            PropertyNameCaseInsensitive = true,
-        }) ?? throw new InvalidDataException($"Architecture rules are empty: {path}");
+        return JsonSerializer.Deserialize<ArchitectureRules>(
+                stream,
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+            ) ?? throw new InvalidDataException($"Architecture rules are empty: {path}");
     }
 }

@@ -5,7 +5,8 @@ namespace AiNative.BattleHost;
 internal sealed class FantasyRuntimeService(
     FantasyKcpGateway gateway,
     RuntimeReadiness readiness,
-    ILogger<FantasyRuntimeService> logger) : BackgroundService
+    ILogger<FantasyRuntimeService> logger
+) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -17,7 +18,8 @@ internal sealed class FantasyRuntimeService(
             readiness.MarkNetworkReady();
             logger.LogInformation(
                 "Fantasy KCP gateway ready on UDP port {Port}",
-                gateway.ListeningPort);
+                gateway.ListeningPort
+            );
             await runtime;
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)

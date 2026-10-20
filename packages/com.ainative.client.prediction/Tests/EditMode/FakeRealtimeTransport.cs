@@ -24,7 +24,8 @@ namespace AiNative.Client.Prediction.Tests
         public ValueTask<SendResult> SendAsync(
             TransportChannel channel,
             ReadOnlyMemory<byte> payload,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken = default
+        )
         {
             if (cancellationToken.IsCancellationRequested)
             {

@@ -1,7 +1,7 @@
-using AiNative.Client.Protocol.Protobuf;
-using AiNative.Client.Protocol;
 using System;
 using System.Collections;
+using AiNative.Client.Protocol;
+using AiNative.Client.Protocol.Protobuf;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
@@ -17,9 +17,11 @@ namespace AiNative.Client.Application.PlayModeTests
         {
             System.Threading.Tasks.Task task = _idleDisposalTask;
             _idleDisposalTask = null;
-            if (task == null) yield break;
+            if (task == null)
+                yield break;
 
-            while (!task.IsCompleted) yield return null;
+            while (!task.IsCompleted)
+                yield return null;
             // Native Scene disposal is posted to its Unity thread context.
             // Give that queue a frame even when the test aborted on an assertion.
             yield return null;
@@ -86,10 +88,14 @@ namespace AiNative.Client.Application.PlayModeTests
             session.RequestReconnect();
 
             DateTime reconnectDeadline = DateTime.UtcNow.AddSeconds(15);
-            while (DateTime.UtcNow < reconnectDeadline &&
-                   !(session.State == BattleClientState.Active &&
-                     session.ConnectionEpoch > initialEpoch &&
-                     session.LastAcknowledgedSequence > acknowledgementBeforeReconnect))
+            while (
+                DateTime.UtcNow < reconnectDeadline
+                && !(
+                    session.State == BattleClientState.Active
+                    && session.ConnectionEpoch > initialEpoch
+                    && session.LastAcknowledgedSequence > acknowledgementBeforeReconnect
+                )
+            )
             {
                 session.Pump(Time.unscaledDeltaTime);
                 if (session.State == BattleClientState.Active && session.IsPredictionInitialized)
@@ -106,7 +112,10 @@ namespace AiNative.Client.Application.PlayModeTests
             }
 
             Assert.That(session.ConnectionEpoch, Is.GreaterThan(initialEpoch));
-            Assert.That(session.LastAcknowledgedSequence, Is.GreaterThan(acknowledgementBeforeReconnect));
+            Assert.That(
+                session.LastAcknowledgedSequence,
+                Is.GreaterThan(acknowledgementBeforeReconnect)
+            );
             Assert.That(session.IsPredictionInitialized, Is.True);
             yield return Dispose(session);
         }
@@ -122,7 +131,11 @@ namespace AiNative.Client.Application.PlayModeTests
                 while (DateTime.UtcNow < handshakeDeadline && !session.IsPredictionInitialized)
                 {
                     session.Pump(Time.unscaledDeltaTime);
-                    Assert.That(session.State, Is.Not.EqualTo(BattleClientState.Faulted), session.FaultReason);
+                    Assert.That(
+                        session.State,
+                        Is.Not.EqualTo(BattleClientState.Faulted),
+                        session.FaultReason
+                    );
                     yield return null;
                 }
 
@@ -140,7 +153,11 @@ namespace AiNative.Client.Application.PlayModeTests
                 while (idleClock.Elapsed.TotalSeconds < 45)
                 {
                     session.Pump(Time.unscaledDeltaTime);
-                    Assert.That(session.State, Is.EqualTo(BattleClientState.Active), session.FaultReason);
+                    Assert.That(
+                        session.State,
+                        Is.EqualTo(BattleClientState.Active),
+                        session.FaultReason
+                    );
                     Assert.That(session.SessionId, Is.EqualTo(sessionId));
                     Assert.That(session.EntityId, Is.EqualTo(entityId));
                     Assert.That(session.ConnectionEpoch, Is.EqualTo(epoch));
@@ -148,7 +165,11 @@ namespace AiNative.Client.Application.PlayModeTests
                     Assert.That(session.QueuedInputFrames, Is.Zero);
                     if (idleClock.Elapsed.TotalSeconds >= nextProgressCheckSeconds)
                     {
-                        Assert.That(session.LastReceivedTick, Is.GreaterThan(progressTick), "Idle snapshots must keep advancing.");
+                        Assert.That(
+                            session.LastReceivedTick,
+                            Is.GreaterThan(progressTick),
+                            "Idle snapshots must keep advancing."
+                        );
                         progressTick = session.LastReceivedTick;
                         nextProgressCheckSeconds += 5;
                     }
@@ -156,7 +177,9 @@ namespace AiNative.Client.Application.PlayModeTests
                 }
 
                 Assert.That(session.LastReceivedTick, Is.GreaterThan(initialTick));
-                Debug.Log($"Idle keepalive verified: seconds={idleClock.Elapsed.TotalSeconds:F3}, initialTick={initialTick}, finalTick={session.LastReceivedTick}, epoch={epoch}, acknowledgement={session.LastAcknowledgedSequence}");
+                Debug.Log(
+                    $"Idle keepalive verified: seconds={idleClock.Elapsed.TotalSeconds:F3}, initialTick={initialTick}, finalTick={session.LastReceivedTick}, epoch={epoch}, acknowledgement={session.LastAcknowledgedSequence}"
+                );
             }
             finally
             {
@@ -168,12 +191,15 @@ namespace AiNative.Client.Application.PlayModeTests
         private static BattleClientSession CreateLiveSessionOrIgnore()
         {
             string enabled = Environment.GetEnvironmentVariable("AINATIVE_WS26_RUN_PLAYMODE");
-            if (!global::UnityEngine.Application.isBatchMode &&
-                !string.Equals(enabled, "1", StringComparison.Ordinal))
+            if (
+                !global::UnityEngine.Application.isBatchMode
+                && !string.Equals(enabled, "1", StringComparison.Ordinal)
+            )
             {
                 Assert.Ignore(
-                    "Start AiNative.BattleHost, then set AINATIVE_WS26_RUN_PLAYMODE=1 for an " +
-                    "interactive Editor run. Batch validation runs these tests against its managed Host.");
+                    "Start AiNative.BattleHost, then set AINATIVE_WS26_RUN_PLAYMODE=1 for an "
+                        + "interactive Editor run. Batch validation runs these tests against its managed Host."
+                );
             }
 
             string host = Environment.GetEnvironmentVariable("AINATIVE_WS26_HOST") ?? "127.0.0.1";
@@ -183,13 +209,19 @@ namespace AiNative.Client.Application.PlayModeTests
                 Assert.Fail("AINATIVE_WS26_PORT must be a valid integer port.");
             }
 
-            return new BattleClientSession(new ProtobufBattleProtocolCodec(), host, port, "ws26-playmode");
+            return new BattleClientSession(
+                new ProtobufBattleProtocolCodec(),
+                host,
+                port,
+                "ws26-playmode"
+            );
         }
 
         private static IEnumerator Dispose(BattleClientSession session)
         {
             var task = session.DisposeAsync().AsTask();
-            while (!task.IsCompleted) yield return null;
+            while (!task.IsCompleted)
+                yield return null;
             if (task.IsFaulted)
             {
                 throw (Exception)task.Exception ?? new InvalidOperationException("Dispose failed.");

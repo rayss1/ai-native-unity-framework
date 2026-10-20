@@ -35,10 +35,10 @@ namespace AiNative.Gameplay
                     lane3 = Round(lane3, Read64(canonicalState, offset + 16));
                     lane4 = Round(lane4, Read64(canonicalState, offset + 24));
                     offset += 32;
-                }
-                while (offset <= limit);
+                } while (offset <= limit);
 
-                hash = RotateLeft(lane1, 1)
+                hash =
+                    RotateLeft(lane1, 1)
                     + RotateLeft(lane2, 7)
                     + RotateLeft(lane3, 12)
                     + RotateLeft(lane4, 18);

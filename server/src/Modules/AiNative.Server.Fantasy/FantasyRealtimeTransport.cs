@@ -23,13 +23,22 @@ internal interface IFantasyOutboundDispatcher
     void DisposeSession();
 }
 
-internal sealed class FantasyOutboundDispatcher(Session session) : IFantasyOutboundDispatcher, IFantasySendDrainDispatcher
+internal sealed class FantasyOutboundDispatcher(Session session)
+    : IFantasyOutboundDispatcher,
+        IFantasySendDrainDispatcher
 {
     private readonly global::Fantasy.Scene _ownerScene = session.Scene;
     public bool IsClosed => session.IsDisposed;
 
     public void Post(Action action)
-    { if (!_ownerScene.IsDisposed) _ownerScene.ThreadSynchronizationContext.Post(() => { if (!session.IsDisposed) action(); }); }
+    {
+        if (!_ownerScene.IsDisposed)
+            _ownerScene.ThreadSynchronizationContext.Post(() =>
+            {
+                if (!session.IsDisposed)
+                    action();
+            });
+    }
 
     public void Send(FantasyRealtimeEnvelope envelope) => session.Send(envelope);
 
@@ -37,7 +46,8 @@ internal sealed class FantasyOutboundDispatcher(Session session) : IFantasyOutbo
 
     public bool TryPostSendDrainCheck(Action action)
     {
-        if (_ownerScene.IsDisposed || session.IsDisposed) return false;
+        if (_ownerScene.IsDisposed || session.IsDisposed)
+            return false;
         // Unlike ordinary outbound work, this callback must observe a session closed after posting.
         _ownerScene.ThreadSynchronizationContext.Post(action);
         return true;
@@ -65,15 +75,15 @@ internal sealed partial class FantasySessionSender : IFantasySessionSender, IFan
     public FantasySessionSender(
         Session session,
         int maxOutboundBytes = 256 * 1024,
-        int maxOutboundPackets = 1024)
-        : this(new FantasyOutboundDispatcher(session), maxOutboundBytes, maxOutboundPackets)
-    {
-    }
+        int maxOutboundPackets = 1024
+    )
+        : this(new FantasyOutboundDispatcher(session), maxOutboundBytes, maxOutboundPackets) { }
 
     internal FantasySessionSender(
         IFantasyOutboundDispatcher dispatcher,
         int maxOutboundBytes = 256 * 1024,
-        int maxOutboundPackets = 1024)
+        int maxOutboundPackets = 1024
+    )
     {
         ArgumentNullException.ThrowIfNull(dispatcher);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxOutboundBytes);
@@ -303,7 +313,8 @@ internal sealed class FantasyRealtimeTransport : IRealtimeTransport, IFantasySen
     public FantasyRealtimeTransport(
         IFantasySessionSender sender,
         int maxInboundBytes = 256 * 1024,
-        int maxInboundPackets = 1024)
+        int maxInboundPackets = 1024
+    )
     {
         ArgumentNullException.ThrowIfNull(sender);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxInboundBytes);
@@ -317,7 +328,8 @@ internal sealed class FantasyRealtimeTransport : IRealtimeTransport, IFantasySen
     {
         get
         {
-            if (_sender.IsClosed) Volatile.Write(ref _state, (int)TransportState.Closed);
+            if (_sender.IsClosed)
+                Volatile.Write(ref _state, (int)TransportState.Closed);
             return (TransportState)Volatile.Read(ref _state);
         }
     }
@@ -330,13 +342,17 @@ internal sealed class FantasyRealtimeTransport : IRealtimeTransport, IFantasySen
                 return FantasySendDrainStatus.Failed;
             return await drain.CheckSendDrainAsync().ConfigureAwait(false);
         }
-        catch { return FantasySendDrainStatus.Failed; }
+        catch
+        {
+            return FantasySendDrainStatus.Failed;
+        }
     }
 
     public ValueTask<SendResult> SendAsync(
         TransportChannel channel,
         ReadOnlyMemory<byte> payload,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default
+    )
     {
         if (cancellationToken.IsCancellationRequested)
         {
@@ -362,9 +378,9 @@ internal sealed class FantasyRealtimeTransport : IRealtimeTransport, IFantasySen
         try
         {
             SendStatus status = _sender.Send(channel, payload.Span);
-            return new ValueTask<SendResult>(new SendResult(
-                status,
-                status == SendStatus.Accepted ? payload.Length : 0));
+            return new ValueTask<SendResult>(
+                new SendResult(status, status == SendStatus.Accepted ? payload.Length : 0)
+            );
         }
         catch (ObjectDisposedException)
         {
@@ -395,7 +411,8 @@ internal sealed class FantasyRealtimeTransport : IRealtimeTransport, IFantasySen
             written,
             inbound.Length,
             inbound.Sequence,
-            inbound.ConnectionEpoch);
+            inbound.ConnectionEpoch
+        );
         ArrayPool<byte>.Shared.Return(inbound.Buffer);
         return true;
     }
@@ -404,7 +421,8 @@ internal sealed class FantasyRealtimeTransport : IRealtimeTransport, IFantasySen
         TransportChannel channel,
         ReadOnlySpan<byte> payload,
         ulong sequence,
-        uint connectionEpoch)
+        uint connectionEpoch
+    )
     {
         if (payload.Length > MaxDatagramBytes || State != TransportState.Connected)
         {
@@ -431,7 +449,9 @@ internal sealed class FantasyRealtimeTransport : IRealtimeTransport, IFantasySen
         {
             buffer = ArrayPool<byte>.Shared.Rent(payload.Length);
             payload.CopyTo(buffer);
-            _inbound.Enqueue(new InboundPacket(buffer, payload.Length, channel, sequence, connectionEpoch));
+            _inbound.Enqueue(
+                new InboundPacket(buffer, payload.Length, channel, sequence, connectionEpoch)
+            );
             buffer = null;
             if (State != TransportState.Connected)
             {
@@ -483,5 +503,6 @@ internal sealed class FantasyRealtimeTransport : IRealtimeTransport, IFantasySen
         int Length,
         TransportChannel Channel,
         ulong Sequence,
-        uint ConnectionEpoch);
+        uint ConnectionEpoch
+    );
 }

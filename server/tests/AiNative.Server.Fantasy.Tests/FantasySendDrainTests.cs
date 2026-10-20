@@ -6,7 +6,11 @@ namespace AiNative.Server.Fantasy.Tests;
 
 public sealed class FantasySendDrainTests
 {
-    private static readonly TransportChannel Snapshot = new(1, TransportDelivery.Unreliable, TransportOrdering.Sequenced);
+    private static readonly TransportChannel Snapshot = new(
+        1,
+        TransportDelivery.Unreliable,
+        TransportOrdering.Sequenced
+    );
 
     [Test]
     public async Task CheckRunsAfterSceneBarrierAndWaitsForKcpAcknowledgement()
@@ -35,7 +39,12 @@ public sealed class FantasySendDrainTests
         Dispatcher dispatcher = new();
         using FantasySessionSender sender = new(dispatcher);
         Task<FantasySendDrainStatus> check = sender.CheckSendDrainAsync();
-        sender.Send(snapshot ? Snapshot : new TransportChannel(2, TransportDelivery.Reliable, TransportOrdering.Ordered), new byte[] { 2 });
+        sender.Send(
+            snapshot
+                ? Snapshot
+                : new TransportChannel(2, TransportDelivery.Reliable, TransportOrdering.Ordered),
+            new byte[] { 2 }
+        );
         dispatcher.RunOne();
         Assert.That(await check, Is.EqualTo(FantasySendDrainStatus.Pending));
         Assert.That(dispatcher.Reads, Is.Zero);
@@ -56,7 +65,11 @@ public sealed class FantasySendDrainTests
     [TestCase(true, false, false)]
     [TestCase(false, true, false)]
     [TestCase(false, false, true)]
-    public async Task ClosedContractFailureAndReadExceptionFailClosed(bool closed, bool invalid, bool throws)
+    public async Task ClosedContractFailureAndReadExceptionFailClosed(
+        bool closed,
+        bool invalid,
+        bool throws
+    )
     {
         Dispatcher dispatcher = new() { InvalidContract = invalid, ThrowOnRead = throws };
         using FantasySessionSender sender = new(dispatcher);
@@ -105,9 +118,14 @@ public sealed class FantasySendDrainTests
     public async Task TransportDelegatesAndUnsupportedSenderFails()
     {
         await using var unsupported = new FantasyRealtimeTransport(new UnsupportedSender());
-        Assert.That(await unsupported.CheckSendDrainAsync(), Is.EqualTo(FantasySendDrainStatus.Failed));
+        Assert.That(
+            await unsupported.CheckSendDrainAsync(),
+            Is.EqualTo(FantasySendDrainStatus.Failed)
+        );
         Dispatcher dispatcher = new();
-        await using var transport = new FantasyRealtimeTransport(new FantasySessionSender(dispatcher));
+        await using var transport = new FantasyRealtimeTransport(
+            new FantasySessionSender(dispatcher)
+        );
         var check = transport.CheckSendDrainAsync();
         Assert.That(check.IsCompleted, Is.False);
         dispatcher.RunAll();
@@ -121,15 +139,21 @@ public sealed class FantasySendDrainTests
     private sealed class UnsupportedSender : IFantasySessionSender
     {
         public bool IsClosed => false;
-        public SendStatus Send(TransportChannel channel, ReadOnlySpan<byte> payload) => SendStatus.Accepted;
+
+        public SendStatus Send(TransportChannel channel, ReadOnlySpan<byte> payload) =>
+            SendStatus.Accepted;
+
         public void Dispose() { }
     }
 
     private sealed class UnsupportedDispatcher : IFantasyOutboundDispatcher
     {
         public bool IsClosed => false;
+
         public void Post(Action action) { }
+
         public void Send(FantasyRealtimeEnvelope envelope) => envelope.Dispose();
+
         public void DisposeSession() { }
     }
 
@@ -137,34 +161,61 @@ public sealed class FantasySendDrainTests
     {
         private readonly Queue<Action> _actions = new();
         public bool IsClosed { get; set; }
-        public bool InvalidContract, ThrowOnRead, RejectPost, ThrowOnPost;
+        public bool InvalidContract,
+            ThrowOnRead,
+            RejectPost,
+            ThrowOnPost;
         public uint KcpPending;
         public int Reads;
         private bool _onScene;
+
         public void Post(Action action) => _actions.Enqueue(action);
+
         public bool TryPostSendDrainCheck(Action action)
         {
-            if (ThrowOnPost) throw new InvalidOperationException("post-failed");
-            if (RejectPost) return false;
+            if (ThrowOnPost)
+                throw new InvalidOperationException("post-failed");
+            if (RejectPost)
+                return false;
             Post(action);
             return true;
         }
+
         public bool TryGetPendingKcpSends(out uint count)
         {
             Assert.That(_onScene, Is.True);
             Reads++;
-            if (ThrowOnRead) throw new InvalidOperationException("read-failed");
+            if (ThrowOnRead)
+                throw new InvalidOperationException("read-failed");
             count = KcpPending;
             return !InvalidContract;
         }
-        public void Send(FantasyRealtimeEnvelope envelope) { KcpPending++; envelope.Dispose(); }
+
+        public void Send(FantasyRealtimeEnvelope envelope)
+        {
+            KcpPending++;
+            envelope.Dispose();
+        }
+
         public void DisposeSession() => IsClosed = true;
+
         public void RunOne()
         {
             _onScene = true;
-            try { _actions.Dequeue()(); }
-            finally { _onScene = false; }
+            try
+            {
+                _actions.Dequeue()();
+            }
+            finally
+            {
+                _onScene = false;
+            }
         }
-        public void RunAll() { while (_actions.Count != 0) RunOne(); }
+
+        public void RunAll()
+        {
+            while (_actions.Count != 0)
+                RunOne();
+        }
     }
 }

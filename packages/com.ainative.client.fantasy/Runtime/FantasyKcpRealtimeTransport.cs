@@ -38,7 +38,8 @@ namespace AiNative.Client.Fantasy
         internal FantasyKcpRealtimeTransport(
             IFantasyClientSession session,
             int maximumQueuedPackets = DefaultMaximumQueuedPackets,
-            int maximumQueuedBytes = DefaultMaximumQueuedBytes)
+            int maximumQueuedBytes = DefaultMaximumQueuedBytes
+        )
         {
             _session = session ?? throw new ArgumentNullException(nameof(session));
             _sessionRuntimeId = session.RuntimeId;
@@ -51,7 +52,8 @@ namespace AiNative.Client.Fantasy
             {
                 _state = (int)TransportState.Faulted;
                 throw new InvalidOperationException(
-                    $"A Fantasy client transport is already registered for session {_sessionRuntimeId}.");
+                    $"A Fantasy client transport is already registered for session {_sessionRuntimeId}."
+                );
             }
         }
 
@@ -68,14 +70,17 @@ namespace AiNative.Client.Fantasy
                 Interlocked.Read(ref _invalidChannels),
                 Interlocked.Read(ref _staleSequences),
                 Interlocked.Read(ref _inboundDropped),
-                Interlocked.Read(ref _connectionFaults));
+                Interlocked.Read(ref _connectionFaults)
+            );
 
         public static ValueTask<FantasyKcpConnectResult> ConnectAsync(
             FantasyKcpTransportOptions options,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken = default
+        )
         {
             return new ValueTask<FantasyKcpConnectResult>(
-                ConnectCoreAsync(options, FantasyClientConnector.Instance, cancellationToken));
+                ConnectCoreAsync(options, FantasyClientConnector.Instance, cancellationToken)
+            );
         }
 
         public bool TryAdvanceConnectionEpoch(uint connectionEpoch)
@@ -99,10 +104,13 @@ namespace AiNative.Client.Fantasy
                     return true;
                 }
 
-                if (Interlocked.CompareExchange(
+                if (
+                    Interlocked.CompareExchange(
                         ref _connectionEpoch,
                         unchecked((int)connectionEpoch),
-                        currentBits) == currentBits)
+                        currentBits
+                    ) == currentBits
+                )
                 {
                     lock (_sequenceGate)
                     {
@@ -117,7 +125,8 @@ namespace AiNative.Client.Fantasy
         public ValueTask<SendResult> SendAsync(
             TransportChannel channel,
             ReadOnlyMemory<byte> payload,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken = default
+        )
         {
             if (cancellationToken.IsCancellationRequested)
             {
@@ -157,7 +166,13 @@ namespace AiNative.Client.Fantasy
             {
                 TransportState current = State;
                 if (current != TransportState.Connected)
-                    return Completed(new SendResult(current == TransportState.Faulted ? SendStatus.Faulted : SendStatus.Closed));
+                    return Completed(
+                        new SendResult(
+                            current == TransportState.Faulted
+                                ? SendStatus.Faulted
+                                : SendStatus.Closed
+                        )
+                    );
                 if (!_outbound.TryEnqueue(channel.Id, payload.Span, sequence))
                 {
                     Interlocked.Increment(ref _sendBackpressure);
@@ -185,7 +200,8 @@ namespace AiNative.Client.Fantasy
                 written,
                 inbound.Length,
                 inbound.Sequence,
-                unchecked((uint)Volatile.Read(ref _connectionEpoch)));
+                unchecked((uint)Volatile.Read(ref _connectionEpoch))
+            );
             inbound.Return();
             return true;
         }
@@ -194,7 +210,8 @@ namespace AiNative.Client.Fantasy
         {
             lock (_disposeGate)
             {
-                if (_disposed) return default;
+                if (_disposed)
+                    return default;
                 // Closed describes connectivity, not ownership of the independent Fantasy Scene.
                 _disposed = true;
                 Volatile.Write(ref _state, (int)TransportState.Draining);
@@ -204,8 +221,14 @@ namespace AiNative.Client.Fantasy
                     _inbound.Drain();
                     _outbound.Drain();
                 }
-                try { _session.Dispose(); }
-                finally { Volatile.Write(ref _state, (int)TransportState.Closed); }
+                try
+                {
+                    _session.Dispose();
+                }
+                finally
+                {
+                    Volatile.Write(ref _state, (int)TransportState.Closed);
+                }
                 return default;
             }
         }
@@ -213,14 +236,18 @@ namespace AiNative.Client.Fantasy
         internal static Task<FantasyKcpConnectResult> ConnectCoreAsync(
             FantasyKcpTransportOptions options,
             IFantasyClientConnector connector,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken
+        )
         {
             if (options == null || !options.IsValid || connector == null)
             {
-                return Task.FromResult(new FantasyKcpConnectResult(
-                    FantasyKcpConnectStatus.InvalidConfiguration,
-                    null,
-                    new ArgumentException("Host, port, and timeout must be valid.")));
+                return Task.FromResult(
+                    new FantasyKcpConnectResult(
+                        FantasyKcpConnectStatus.InvalidConfiguration,
+                        null,
+                        new ArgumentException("Host, port, and timeout must be valid.")
+                    )
+                );
             }
 
             return ConnectValidatedAsync(options, connector, cancellationToken);
@@ -287,7 +314,8 @@ namespace AiNative.Client.Fantasy
         private static async Task<FantasyKcpConnectResult> ConnectValidatedAsync(
             FantasyKcpTransportOptions options,
             IFantasyClientConnector connector,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken
+        )
         {
             if (cancellationToken.IsCancellationRequested)
             {
@@ -296,23 +324,29 @@ namespace AiNative.Client.Fantasy
 
             var stopwatch = Stopwatch.StartNew();
             using (var timeout = new CancellationTokenSource(options.ConnectTimeoutMilliseconds))
-            using (var linked = CancellationTokenSource.CreateLinkedTokenSource(
-                cancellationToken,
-                timeout.Token))
+            using (
+                var linked = CancellationTokenSource.CreateLinkedTokenSource(
+                    cancellationToken,
+                    timeout.Token
+                )
+            )
             {
                 FantasyKcpRealtimeTransport transport = null;
                 IFantasyClientSession session = null;
                 int disconnected = 0;
                 try
                 {
-                    session = await connector.ConnectAsync(
-                        options,
-                        () =>
-                        {
-                            Interlocked.Exchange(ref disconnected, 1);
-                            transport?.NotifyDisconnected();
-                        },
-                        linked.Token).ConfigureAwait(false);
+                    session = await connector
+                        .ConnectAsync(
+                            options,
+                            () =>
+                            {
+                                Interlocked.Exchange(ref disconnected, 1);
+                                transport?.NotifyDisconnected();
+                            },
+                            linked.Token
+                        )
+                        .ConfigureAwait(false);
 
                     transport = new FantasyKcpRealtimeTransport(session);
                     if (Volatile.Read(ref disconnected) != 0)
@@ -323,7 +357,8 @@ namespace AiNative.Client.Fantasy
                     return new FantasyKcpConnectResult(
                         FantasyKcpConnectStatus.Connected,
                         transport,
-                        null);
+                        null
+                    );
                 }
                 catch (OperationCanceledException exception)
                 {
@@ -362,7 +397,11 @@ namespace AiNative.Client.Fantasy
             catch
             {
                 Interlocked.Increment(ref _connectionFaults);
-                Interlocked.CompareExchange(ref _state, (int)TransportState.Faulted, (int)TransportState.Connected);
+                Interlocked.CompareExchange(
+                    ref _state,
+                    (int)TransportState.Faulted,
+                    (int)TransportState.Connected
+                );
                 Volatile.Write(ref _drainScheduled, 0);
                 _outbound.Drain();
             }
@@ -384,12 +423,14 @@ namespace AiNative.Client.Fantasy
 
                         var payload = new byte[packet.Length];
                         packet.Buffer.AsSpan(0, packet.Length).CopyTo(payload);
-                        _session.Send(new FantasyRealtimeEnvelope
-                        {
-                            ChannelId = packet.ChannelId,
-                            Payload = payload,
-                            Sequence = packet.Sequence,
-                        });
+                        _session.Send(
+                            new FantasyRealtimeEnvelope
+                            {
+                                ChannelId = packet.ChannelId,
+                                Payload = payload,
+                                Sequence = packet.Sequence,
+                            }
+                        );
                     }
                     finally
                     {
@@ -400,7 +441,11 @@ namespace AiNative.Client.Fantasy
             catch
             {
                 Interlocked.Increment(ref _connectionFaults);
-                Interlocked.CompareExchange(ref _state, (int)TransportState.Faulted, (int)TransportState.Connected);
+                Interlocked.CompareExchange(
+                    ref _state,
+                    (int)TransportState.Faulted,
+                    (int)TransportState.Connected
+                );
                 _outbound.Drain();
             }
             finally
@@ -444,18 +489,21 @@ namespace AiNative.Client.Fantasy
                     return new TransportChannel(
                         0,
                         TransportDelivery.Reliable,
-                        TransportOrdering.Ordered);
+                        TransportOrdering.Ordered
+                    );
                 case 1:
                 case 2:
                     return new TransportChannel(
                         channelId,
                         TransportDelivery.Unreliable,
-                        TransportOrdering.Sequenced);
+                        TransportOrdering.Sequenced
+                    );
                 case 3:
                     return new TransportChannel(
                         3,
                         TransportDelivery.Reliable,
-                        TransportOrdering.Ordered);
+                        TransportOrdering.Ordered
+                    );
                 default:
                     return default;
             }

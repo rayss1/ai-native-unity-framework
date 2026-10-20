@@ -56,21 +56,30 @@ static void WriteResult(ArchitectureValidationResult result, string format)
 {
     if (format == "json")
     {
-        Console.WriteLine(JsonSerializer.Serialize(result, new JsonSerializerOptions
-        {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            WriteIndented = true,
-        }));
+        Console.WriteLine(
+            JsonSerializer.Serialize(
+                result,
+                new JsonSerializerOptions
+                {
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                    WriteIndented = true,
+                }
+            )
+        );
         return;
     }
 
     foreach (ArchitectureDiagnostic diagnostic in result.Diagnostics)
     {
-        string edge = diagnostic.Source is null ? string.Empty : $" [{diagnostic.Source} -> {diagnostic.Target}]";
+        string edge = diagnostic.Source is null
+            ? string.Empty
+            : $" [{diagnostic.Source} -> {diagnostic.Target}]";
         Console.WriteLine($"{diagnostic.Code} {diagnostic.File}: {diagnostic.Message}{edge}");
     }
 
-    Console.WriteLine(result.IsValid
-        ? "Architecture validation passed."
-        : $"Architecture validation failed with {result.Diagnostics.Count} violation(s).");
+    Console.WriteLine(
+        result.IsValid
+            ? "Architecture validation passed."
+            : $"Architecture validation failed with {result.Diagnostics.Count} violation(s)."
+    );
 }

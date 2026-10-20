@@ -11,7 +11,10 @@ public sealed class ProtocolCompatibilityTests
     {
         InputCommand command = CreateInputCommand();
 
-        Assert.That(Convert.ToHexString(command.ToByteArray()), Is.EqualTo("092A00000000000000100718CF0F20D00F28D0BB1B3003"));
+        Assert.That(
+            Convert.ToHexString(command.ToByteArray()),
+            Is.EqualTo("092A00000000000000100718CF0F20D00F28D0BB1B3003")
+        );
     }
 
     [Test]
@@ -19,17 +22,22 @@ public sealed class ProtocolCompatibilityTests
     {
         InputBatch batch = new();
         batch.Commands.Add(CreateInputCommand());
-        batch.Commands.Add(new InputCommand
-        {
-            RoomTick = 43,
-            Sequence = 8,
-            MoveXMilli = 1000,
-            MoveYMilli = -1000,
-        });
+        batch.Commands.Add(
+            new InputCommand
+            {
+                RoomTick = 43,
+                Sequence = 8,
+                MoveXMilli = 1000,
+                MoveYMilli = -1000,
+            }
+        );
 
         Assert.That(
             Convert.ToHexString(batch.ToByteArray()),
-            Is.EqualTo("0A17092A00000000000000100718CF0F20D00F28D0BB1B30030A11092B00000000000000100818D00F20CF0F"));
+            Is.EqualTo(
+                "0A17092A00000000000000100718CF0F20D00F28D0BB1B30030A11092B00000000000000100818D00F20CF0F"
+            )
+        );
     }
 
     [Test]
@@ -46,16 +54,10 @@ public sealed class ProtocolCompatibilityTests
     [Test]
     public void SnapshotInputAcknowledgementIsAdditiveAndStable()
     {
-        Snapshot current = new()
-        {
-            ProtocolMajor = 1,
-            LastProcessedInputSequence = 42,
-        };
+        Snapshot current = new() { ProtocolMajor = 1, LastProcessedInputSequence = 42 };
         Snapshot legacy = Snapshot.Parser.ParseFrom(new byte[] { 0x08, 0x01 });
 
-        Assert.That(
-            Convert.ToHexString(current.ToByteArray()),
-            Is.EqualTo("0801302A"));
+        Assert.That(Convert.ToHexString(current.ToByteArray()), Is.EqualTo("0801302A"));
         Assert.That(legacy.ProtocolMajor, Is.EqualTo(1));
         Assert.That(legacy.LastProcessedInputSequence, Is.Zero);
     }
@@ -79,17 +81,19 @@ public sealed class ProtocolCompatibilityTests
             RemainingTicks = 36000,
             LeaderEntityId = 2,
         };
-        snapshot.Players.Add(new PlayerState
-        {
-            EntityId = 2,
-            PositionYMilli = 1200,
-            VelocityYMilliPerSecond = 5500,
-            WeaponId = (uint)ArenaWeaponId.ArenaWeaponRocket,
-            Health = 75,
-            Armor = 25,
-            Alive = true,
-            Kills = 3,
-        });
+        snapshot.Players.Add(
+            new PlayerState
+            {
+                EntityId = 2,
+                PositionYMilli = 1200,
+                VelocityYMilliPerSecond = 5500,
+                WeaponId = (uint)ArenaWeaponId.ArenaWeaponRocket,
+                Health = 75,
+                Armor = 25,
+                Alive = true,
+                Kills = 3,
+            }
+        );
 
         InputCommand parsedInput = InputCommand.Parser.ParseFrom(input.ToByteArray());
         Snapshot parsedSnapshot = Snapshot.Parser.ParseFrom(snapshot.ToByteArray());
@@ -105,7 +109,13 @@ public sealed class ProtocolCompatibilityTests
     [Test]
     public void ReliableCombatEventRoundTripsWithoutChangingLegacyPayload()
     {
-        ReliableEvent legacy = new() { RoomTick = 8, Sequence = 2, EventType = 7, Payload = ByteString.CopyFromUtf8("legacy") };
+        ReliableEvent legacy = new()
+        {
+            RoomTick = 8,
+            Sequence = 2,
+            EventType = 7,
+            Payload = ByteString.CopyFromUtf8("legacy"),
+        };
         ReliableEvent current = new(legacy)
         {
             CombatEvent = new ArenaCombatEvent
@@ -132,25 +142,30 @@ public sealed class ProtocolCompatibilityTests
     {
         Assert.That(
             () => InputCommand.Parser.ParseFrom(new byte[] { 0x0A, 0x05, 0x01 }),
-            Throws.TypeOf<InvalidProtocolBufferException>());
+            Throws.TypeOf<InvalidProtocolBufferException>()
+        );
     }
 
     [Test]
     public void MessageIdsRemainUniqueAndNonZero()
     {
-        int[] ids = Enum.GetValues<MessageId>().Select(value => (int)value).Where(value => value != 0).ToArray();
+        int[] ids = Enum.GetValues<MessageId>()
+            .Select(value => (int)value)
+            .Where(value => value != 0)
+            .ToArray();
 
         Assert.That(ids, Is.Unique);
         Assert.That(ids, Has.All.Positive);
     }
 
-    private static InputCommand CreateInputCommand() => new()
-    {
-        RoomTick = 42,
-        Sequence = 7,
-        MoveXMilli = -1000,
-        MoveYMilli = 1000,
-        YawMillidegrees = 225000,
-        Buttons = 3,
-    };
+    private static InputCommand CreateInputCommand() =>
+        new()
+        {
+            RoomTick = 42,
+            Sequence = 7,
+            MoveXMilli = -1000,
+            MoveYMilli = 1000,
+            YawMillidegrees = 225000,
+            Buttons = 3,
+        };
 }
