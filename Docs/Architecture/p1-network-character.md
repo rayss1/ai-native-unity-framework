@@ -2,6 +2,8 @@
 
 日期：2026-10-16。范围：将已有 VBOT / Invector 动画与第三人称相机接入 Arena；保持 ADR-0002、0005、0007 的依赖、60 Hz 权威与客户端表现边界。
 
+状态更新（2026-10-20）：P1 实现提交 `923eed8` 已通过 PR #43 合并，本地 `main` 的合并提交为 `2d92bcb`。下面的 P1 验证记录仍对应 10 月 16 日工作区；合并不自动构成当前版本发布验收。最新检查与后续计划见 [当前进度](current-status.md)。
+
 ## 实现与接口
 
 - `TopologyClientFlow` 在动态帧读取设备，在固定 Tick 提交预测输入。`NetworkCharacterInput` 将相机相对方向转成 Arena 世界轴，发送相机目标角相对预测角的差值。跳跃和武器边沿仅在 prepare 成功后消费；失焦、UI 阻塞、暂停与重连丢弃待提交动作。
@@ -20,6 +22,6 @@
 
 ## 验证与后续
 
-原始执行记录在 `artifacts/p1-validation-20261016/`；完成后以当前状态入口中的实际结果为准。真实战斗测试需已有本地拓扑（Gate 23001、两人匹配、至少 7200 ticks），精确执行 `P1NetworkCombatPlayModeTests.TwoClientsObserveAuthorityCombatRespawnAndReconnectIdentity`。测试创建独立账号和对局，不重启服务器。
+10 月 16 日原始执行记录在 `artifacts/p1-validation-20261016/`，属于忽略的本地产物，跨机器复查需要原始归档；结果范围见 [当前状态入口](current-status.md)。真实战斗测试需已有本地拓扑（Gate 23001、两人匹配、至少 7200 ticks），精确执行 `P1NetworkCombatPlayModeTests.TwoClientsObserveAuthorityCombatRespawnAndReconnectIdentity`。测试创建独立账号和对局，不重启服务器。
 
 本次不改变服务端、协议、共享玩法或第三方版本。Windows Player、Android 真机、弱网/公网与平台构建须分别验收，Editor 和 .NET 测试不能替代它们。后续应补武器独立模型、近距离瞄准视差处理、死亡动作时长与更丰富的命中特效；修改玩法规则需单独定义验收。

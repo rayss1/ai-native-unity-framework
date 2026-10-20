@@ -1,5 +1,7 @@
 # Current-source validation
 
+As checked on October 20, P0/P1 are merged in local `main` at `2d92bcb`. The local review passed Release build, architecture validation and 132 targeted .NET tests (prediction/protocol 56, shared gameplay 20, server Battle 56). It did not run this full validation entry, freeze a source manifest or produce a release evidence bundle. See the [review scope and commands](../../Docs/Architecture/current-status.md).
+
 Current project progress is maintained in [one status page](../../Docs/Architecture/current-status.md). For the October 16 P1 source, select `-Profile Development -ExpectedDotnetPassed 563 -ExpectedEditModePassed 221` on Windows. The .NET total is the October 15 discovered inventory (546) plus 17 new prediction/parser cases, not a claim of a full P1 Windows rerun. The P1 targeted prediction suite passed 56 cases; the historical P0 macOS full run passed 541 and skipped five Windows-only tests. Strict release gates still reject skips. The two executable entries obtain Unity inventories and Fantasy package pins from the same profile contract. Defaults remain historical for compatibility; select the profile explicitly.
 
 | Profile | Unity EditMode | Source/dependency scope |
