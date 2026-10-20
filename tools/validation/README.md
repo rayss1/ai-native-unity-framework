@@ -2,6 +2,9 @@
 
 Current project progress is maintained in [one status page](../../Docs/Architecture/current-status.md). For the October 20 client codec migration, select `-Profile Development -ExpectedDotnetPassed 653 -ExpectedEditModePassed 294` on Windows. Counts are the current discovered inventory, not a claim that unavailable database/device tests passed; see [current validation evidence](../../Docs/Architecture/client-protocol-validation-2026-10-20.md). Strict release gates reject skipped tests. The two executable entries obtain Unity fixture inventories and Fantasy package pins from the same profile contract. Defaults remain historical for compatibility; select the profile explicitly.
 
+October 20 documentation sync is based on PR #44 merged at `aa06c05`. The earlier 132-test local review used the pre-#44 worktree at `2d92bcb`; it does not validate the training map or combat repairs. See the [review scope and commands](../../Docs/Architecture/current-status.md).
+
+
 | Profile | Unity EditMode | Source/dependency scope |
 | --- | ---: | --- |
 | Baseline | 95 | Clean `c9098be`, Fantasy `f8bed0d`; 333 .NET tests |

@@ -2,7 +2,7 @@
 
 This directory is the decision log for the first vertical slice. An accepted ADR is authoritative for its subject; the architecture baseline summarizes the set but does not override it.
 
-Implementation/evidence status as of 2026-10-08 is summarized in [current progress](../Architecture/current-status.md). Updating this index does not change accepted decisions or extend historical evidence to new binaries/platforms.
+Implementation/evidence status is maintained in [current progress](../Architecture/current-status.md), updated on 2026-10-20. Dated evidence and pending gates in this index retain their original source/platform scope; use the progress page for current implementation and validation status. Updating this index does not change accepted decisions or extend historical evidence to new binaries/platforms.
 
 ## Status model
 

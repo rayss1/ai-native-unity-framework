@@ -12,9 +12,63 @@
 
 下一步是完成 PR 审查，并补齐数据库、完整双客户端拓扑和 Android 真机验收。
 
+## 现在做到哪里
+
+工程已经具备多人射击原型的完整链路：登录、组队、匹配、分配房间、战斗、重连和结算。当前重点是完善试玩体验，并验证当前版本在真实设备和网络上的稳定性。
+
+- P0 已通过 PR #42 合并；P1 联网角色已通过 PR #43 合并；训练场与战斗修复已通过 PR #44 合并。10 月 20 日同步远端后，`origin/main` 为 `aa06c05`，包含训练场实现提交 `b63109b`。
+- 当前 Arena 每房最多 **8 人**。历史 128 客户端成绩是多个房间的总人数；单房 64 人目标尚未完成。
+- 联网角色已有模型、动画、相机和战斗反馈。单机演示的 CharacterController、翻滚、蹲伏、近战、冲刺和本地步枪伤害未接入联网规则。
+- PR #44 已加入 40×40m 训练场、静态盒体碰撞、沿墙滑动、低箱落地、射击遮挡与换弹；不支持斜坡、动态刚体、玩家间碰撞或寻路。Jolt、Recast、完整资源更新和 HybridCLR 仍属于待实现、待验证能力。
+- 合并代码不代表发布验收完成；当时尚未重跑 Windows Player；后续协议迁移的 Windows/Android 构建结果见上文，Android 真机、Linux/TLS 部署、弱网、公网和回滚仍需分别验证。
+
+## 架构和代码入口
+
+Unity 负责输入、UI、画面和预测；服务器决定战斗结果；双方共用 Shared 中的移动规则、状态和协议。服务器固定每秒计算 60 次，保存数据和文件等慢操作放在战斗 Tick 之外。Fantasy 通信细节限制在适配层内。
+
+| 部分 | 负责什么 | 主要代码 |
+| --- | --- | --- |
+| Unity 应用 | 登录到结算的流程，场景和资源组装 | [TopologyClientFlow](../../client/UnityProject/Assets/AiNative.BattleClient/Runtime/TopologyClientFlow.cs)、[BattleClientCompositionRoot](../../client/UnityProject/Assets/AiNative.BattleClient/Runtime/BattleClientCompositionRoot.cs) |
+| 客户端预测 | 本地先响应输入，再按服务器状态纠正；平滑显示远端角色 | [ArenaClientPredictionAdapter](../../packages/com.ainative.client.prediction/Runtime/ArenaClientPredictionAdapter.cs)、[ArenaRemotePresentation](../../packages/com.ainative.client.prediction/Runtime/ArenaRemotePresentation.cs) |
+| 角色表现 | 将联网状态转为动画和开火表现；单机控制另有独立实现 | [NetworkCharacterPresenter](../../client/UnityProject/Assets/AiNative.BattleClient/Runtime/NetworkCharacterPresenter.cs)、[角色包](../../packages/com.ainative.client.character/README.md) |
+| Shared | 共用移动、角色状态、武器参数和预测基础；不依赖 Unity 或数据库 | [ArenaGameplay](../../shared/gameplay/Runtime/ArenaGameplay.cs)、[协议 Schema](../../shared/schemas) |
+| 训练场与命中 | 客户端和服务器共用静态地图与角色命中几何；Unity 按地图生成场景 | [ArenaTrainingMap](../../shared/gameplay/Runtime/ArenaTrainingMap.cs)、[ArenaHitGeometry](../../shared/gameplay/Runtime/ArenaHitGeometry.cs)、[ArenaTrainingGroundPresentation](../../client/UnityProject/Assets/AiNative.BattleClient/Runtime/ArenaTrainingGroundPresentation.cs) |
+| 业务服务 | Gate 接入；Player 账号与结算；Lobby 队伍；Match 匹配 | [Backend 模块](../../server/src/Modules/AiNative.Server.Backend) |
+| 房间调度 | Coordinator 分配房间；固定 Worker 执行房间 Tick | [RoomCoordinator](../../server/src/Modules/AiNative.Server.Rooms/RoomCoordinator.cs)、[BattleWorkerPool](../../server/src/Modules/AiNative.Server.Rooms/BattleWorkerPool.cs) |
+| 战斗 | 权威移动、射击、伤害、死亡重生、补给、比分与比赛结束 | [ArenaRoom](../../server/src/Modules/AiNative.Server.Battle/ArenaRoom.cs)、[TopologyBattleEngine](../../server/src/Modules/AiNative.Server.Battle/TopologyBattleEngine.cs) |
+| 保存与复查 | PostgreSQL 玩家数据；结算落盘重试；战斗录像重模拟 | [PostgresPlayerStore](../../server/src/Modules/AiNative.Server.Backend/PostgresPlayerStore.cs)、[DurableResultOutbox](../../server/src/Modules/AiNative.Server.Rooms/DurableResultOutbox.cs)、[ArenaReplay](../../server/src/Modules/AiNative.Server.Battle/ArenaReplay.cs) |
+| 工程工具 | 启动调试、架构检查、协议生成、测试和部署 | [本机调试](../../tools/topology/README-local-debug.md)、[验证入口](../../tools/validation/README.md)、[架构检查](../../tools/ArchitectureCheck)、[部署配置](../../infrastructure/battle-host) |
+
+Gate、Player、Lobby、Match、Coordinator、Battle 是六类独立服务；常用本地配置开两个 Battle，因此合计七个服务进程。详细边界以 [依赖矩阵](dependency-matrix.md) 和 [公共接口契约](public-api-contracts.md) 为准。接口契约包含提前设计的能力，不能仅凭文档中存在接口就判断实现已完成。
+
+## PR #44：训练场与战斗修复（已合并）
+
+最新实现和原始验证范围见 [P1 后续记录](p1-network-character.md)。此次文档整合保留 PR #44 的规则与证据，没有重跑其功能测试。
+
+- 训练场使用 Shared 的同一份毫米整数盒体数据，客户端预测和服务器共用碰撞规则；Unity 只据此生成场景。支持静态墙体、滑动、低箱落地和离边下落。
+- 机枪改用角色胶囊命中，霰弹保留辅助锥并检查遮挡；火箭检测路径碰撞与爆炸视线。客户端按屏幕中心选择瞄准点，最终伤害仍由服务器决定。
+- 支持 R 键换弹及空仓自动换弹，耗时 120 ticks（2 秒）；备用弹暂不限，弹药数量和换弹进度尚未同步到 HUD。
+- PR #44 当时的 `Development` 清单为 Unity EditMode **241 项**、全量 .NET **607 项**；本次协议迁移已更新为 294/653 项。PR #44 的验证说明记录本地 .NET 602 项通过、5 项 PostgreSQL 用例因未配置数据库跳过；当时完整验收要求 607 项全部通过。
+- PR #44 的训练场记录包含共享玩法 Unity/.NET 各 33 项、Battle 75 项、预测 56 项与场景 PlayMode 1 项通过；旧 Host 77/79，两个 Python 启动用例因 PATH 问题失败。这些是上游工作区的历史记录，不是本次合并后复测。
+- 新地图真实双客户端联机、移动设备和弱网验收仍待执行；本次 Windows Player 通信和 Android 构建结果见上文。旧地图录像需对应旧构建；客户端和服务端必须同时更新。
+
+## 10 月 20 日代码审查与定向验证（PR #44 之前）
+
+以下检查发生在同步 PR #44 之前，不能作为训练场或战斗修复的验证。环境为 Windows、.NET SDK 10.0.202；基于 `2d92bcb` 所在工作区执行。工作区已有 Unity 自动生成工程文件、角色 Prefab 和项目设置等修改，未清理或覆盖。这是本地开发检查，没有冻结完整源码清单，也没有形成干净提交发布验收包。
+
+| 实际命令 | 结果 |
+| --- | --- |
+| `dotnet build AiNative.sln -c Release --nologo` | 通过，0 警告、0 错误 |
+| `dotnet run --project tools/ArchitectureCheck -c Release -- --root . --format text` | 通过 |
+| `dotnet test packages/com.ainative.client.prediction/Tests/AiNative.Client.Prediction.Tests.csproj -c Release --nologo` | 56/56 通过 |
+| `dotnet test shared/gameplay/Tests/Gameplay.Shared.Tests.csproj -c Release --no-build --no-restore --nologo` | 20/20 通过 |
+| `dotnet test server/tests/AiNative.Server.Battle.Tests/AiNative.Server.Battle.Tests.csproj -c Release --no-build --no-restore --nologo` | 56/56 通过 |
+
+共执行 132 项测试，0 失败、0 跳过。结果来自本次终端输出，未单独保存 TRX 或发布报告。本次未运行全量 .NET 测试、Unity 编译/测试、Player 构建、真实 PostgreSQL 验收、多进程真实对战、容量或移动设备测试。以下日期记录是历史证据，不代表 10 月 20 日重新执行。
+
 ## 10 月 16 日 P1：3C 联网接入
 
-P0 的 PR #42 已合并。当前 P1 位于 `codex/p1-network-character` 工作区，尚未提交。LocalMultiplayer 的组合根已使用真实 VBOT / Invector / 步枪资源，输入接入 60 Hz Arena 预测；远端角色按快照插值，开火动画、枪口闪光与命中/死亡/重生提示消费服务端可靠事件。本地 Motor、CharacterController 和 HP 未接入联网权威。操作、接口和限制见 [P1 说明](p1-network-character.md)。
+本节保留 10 月 16 日 P1 工作区的实现与验证记录；代码现已通过 PR #43 合并，合并状态见上文。LocalMultiplayer 的组合根已使用真实 VBOT / Invector / 步枪资源，输入接入 60 Hz Arena 预测；远端角色按快照插值，开火动画、枪口闪光与命中/死亡/重生提示消费服务端可靠事件。本地 Motor、CharacterController 和 HP 未接入联网权威。操作、接口和限制见 [P1 说明](p1-network-character.md)。
 
 实际验证：Unity 6000.3.23f1 EditMode **221/221**；Character PlayMode **26/26**；角色 Prefab **2/2**；Input System 回归 **5/5**；原远端胶囊池兼容回归 **1/1**；真实双客户端战斗 **1/1**（Fire/Hit/Kill/Respawn、HP/击杀快照、重连会话与实体身份）；.NET 预测/协议 **56/56**；架构检查与 source-profile 工具回归通过。角色实际渲染已检查，模型、步枪和握枪姿态正常。没有重启已运行的本地七服务拓扑，也没有改动服务端代码。
 
@@ -30,7 +84,7 @@ P0 已修复端口测试对已有服务的依赖、macOS 路径断言、Unity CI
 
 本次 macOS 工作区 Release 编译和架构检查通过；.NET 541 项通过、5 项 Windows 专属用例跳过；独立 KCP 初始化 1 项和真实 PostgreSQL 必需 5 项通过；Unity EditMode 198 项通过；拓扑 Python 109 项和 PostgreSQL 报告工具 8 项通过；7 个 PowerShell 验证回归脚本通过。详情、首轮失败及平台限制见 [P0 验证记录](p0-validation-2026-10-15.md)。这些结果不替代干净提交发布验收。
 
-新增 `Development` 配置覆盖当前 198 项 EditMode；旧 `Current` 的 166 项清单保持不变。Windows 全量 .NET 预期发现数为 546，尚未在 Windows 重跑。以下 10 月 8 日记录继续作为历史证据。
+当时新增的 `Development` 配置覆盖 198 项 EditMode；P1 后已扩展为 221 项。旧 `Current` 的 166 项清单保持不变。当时 Windows 全量 .NET 预期发现数为 546；P1 后预期为 563，仍不能视为已完成全量重跑。以下 10 月 8 日记录继续作为历史证据。
 
 ## 10 月 8 日基线：已实现、已验证、未验证
 
@@ -85,10 +139,17 @@ Linux CI 两次在“遥测不可用时 Tick P99 增量必须小于 0.25 毫秒�
 
 ## 后续顺序
 
-1. 审查 P1 集成和视觉操作体验；经负责人要求提交后，运行 Linux CI 和 Windows 干净提交验证。P0 PR #42 已合并。
-2. 补齐第三人称近距离瞄准视差、独立武器模型和更完整的死亡/命中特效；继续保持客户端表现与服务端玩法边界。
-3. 补当前版本 Android 真机、Linux/TLS 部署、弱网和回滚验收。
-4. 单独实现并验证单房 64 人目标，再按玩法需要推进资源更新、物理、导航和热更新。
+近期建议里程碑：让当前 8 人玩法在真实设备和网络上稳定、顺畅地完成一局。以下为建议执行顺序和角色分工，尚未创建任务或指派具体人员。
+
+| 顺序 | 工作与建议负责角色 | 依赖与验收 |
+| --- | --- | --- |
+| 1 | 验证负责人：确定验收源码，补当前版本 Linux CI、Windows 完整验证 | P0/P1 已合并；以明确源码身份执行 `Development` 清单，保存结果，调查 `session-expired` 偶发失败，不能以重跑通过代替原因分析 |
+| 2 | 客户端负责人：验收训练场动态目标瞄准，完善武器模型、死亡和命中反馈 | PR #44 已修正固定距离瞄准视差；仍需基于新构建真人完整对局确认操作和反馈，重连不改变玩家身份或重复执行旧动作 |
+| 3 | 玩法与架构负责人：验收现有静态训练场，明确后续斜坡、动态物体等需求 | 静态墙体与低掩体已实现；验证预测和权威的一致性及地图遮挡，新能力先定义规则与边界，不把本地 PhysX 当作联网权威 |
+| 4 | 平台与服务端负责人：Android 真机、Linux/TLS、公网、弱网和回滚验收 | 使用明确的当前版本产物；分别保存完整对局、断线恢复和回滚证据，历史 APK/Editor 通过不能替代 |
+| 5 | 性能与框架负责人：单房 64 人及后续扩展 | 单房容量独立测试；资源更新、Jolt/Recast、HybridCLR 按实际玩法需求推进，重要架构变化先补 ADR |
+
+这些步骤不改变已接受 ADR 或原有性能门槛。第 3 步的需求确认可以提前进行；实现和验收必须遵守已有依赖边界。
 
 ## 证据怎么查
 
