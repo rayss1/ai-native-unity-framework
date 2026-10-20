@@ -4,7 +4,9 @@
   "references": [
     "AiNative.Client.Fantasy",
     "AiNative.Realtime",
-    "Fantasy.Unity"
+    "Fantasy.Unity",
+    "AiNative.Client.Protocol",
+    "AiNative.Client.Protocol.Protobuf"
   ],
   "includePlatforms": [
     "Editor"

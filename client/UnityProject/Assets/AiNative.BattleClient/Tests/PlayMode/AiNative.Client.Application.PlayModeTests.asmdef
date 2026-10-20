@@ -9,7 +9,11 @@
     "AiNative.Client.Fantasy",
     "Unity.InputSystem",
     "Unity.InputSystem.TestFramework",
-    "UnityEngine.UI"
+    "UnityEngine.UI",
+    "AiNative.Client.Protocol",
+    "AiNative.Client.Protocol.Protobuf",
+    "AiNative.Client.Prediction.TestSupport",
+    "AiNative.Client.Application.TestSupport"
   ],
   "optionalUnityReferences": [
     "TestAssemblies"

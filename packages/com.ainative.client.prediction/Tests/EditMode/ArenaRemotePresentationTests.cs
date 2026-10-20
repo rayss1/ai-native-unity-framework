@@ -1,3 +1,5 @@
+using AiNative.Client.Protocol.Protobuf;
+using AiNative.Client.Protocol;
 using System;
 using System.Collections.Generic;
 using NUnit.Framework;
@@ -7,6 +9,14 @@ namespace AiNative.Client.Prediction.Tests
 {
     public sealed class ArenaRemotePresentationTests
     {
+        private static bool Apply(ArenaRemotePresentation view, byte[] frame, uint entity)
+        {
+            using var codec = new ProtobufBattleProtocolCodec();
+            var decoded = new BattlePacketBuffer();
+            return codec.TryDecode(frame, decoded) == BattleDecodeStatus.Accepted &&
+                view.ApplySnapshot(decoded.PlayerSpan, (long)decoded.Tick, entity);
+        }
+
         [Test]
         public void LegacyHealthFieldDoesNotSelectArenaDecoding()
         {
@@ -27,8 +37,8 @@ namespace AiNative.Client.Prediction.Tests
         public void InterpolatesDelayedPositionAndShortestYawAndHoldsOnStarvation()
         {
             var view = new ArenaRemotePresentation();
-            Assert.That(view.ApplySnapshot(Frame(100, Player(1, 999), Player(2, 0, 359000)), 1), Is.True);
-            Assert.That(view.ApplySnapshot(Frame(112, Player(1, 999), Player(2, 1200, 1000)), 1), Is.True);
+            Assert.That(Apply(view, Frame(100, Player(1, 999), Player(2, 0, 359000)), 1), Is.True);
+            Assert.That(Apply(view, Frame(112, Player(1, 999), Player(2, 1200, 1000)), 1), Is.True);
             var output = new ArenaRemotePose[8];
             Assert.That(view.Advance(0, output), Is.EqualTo(1));
             Assert.That(output[0].EntityId, Is.EqualTo(2));
@@ -45,8 +55,8 @@ namespace AiNative.Client.Prediction.Tests
         {
             var view = new ArenaRemotePresentation();
             var output = new ArenaRemotePose[8];
-            view.ApplySnapshot(Frame(100, AnimatedPlayer(2, 0, 0, 1000, 2000, 100, 1)), 1);
-            view.ApplySnapshot(Frame(112, AnimatedPlayer(2, 1200, 600, 3000, 10000, 40, 2)), 1);
+            Apply(view, Frame(100, AnimatedPlayer(2, 0, 0, 1000, 2000, 100, 1)), 1);
+            Apply(view, Frame(112, AnimatedPlayer(2, 1200, 600, 3000, 10000, 40, 2)), 1);
             view.Advance(0, output);
             ArenaPlayerState state = output[0].State;
             Assert.That(state.PositionXMillimetres, Is.EqualTo(600));
@@ -93,16 +103,16 @@ namespace AiNative.Client.Prediction.Tests
         public void RejectsDuplicateStaleMalformedAndOverCapacityWithoutPartialMutation()
         {
             var view = new ArenaRemotePresentation();
-            view.ApplySnapshot(Frame(10, Player(2, 100)), 1);
-            Assert.That(view.ApplySnapshot(Frame(10, Player(2, 999)), 1), Is.False);
-            Assert.That(view.ApplySnapshot(Frame(9, Player(2, 999)), 1), Is.False);
-            Assert.That(view.ApplySnapshot(Frame(11, Player(2, 999), Player(2, 1000)), 1), Is.False);
+            Apply(view, Frame(10, Player(2, 100)), 1);
+            Assert.That(Apply(view, Frame(10, Player(2, 999)), 1), Is.False);
+            Assert.That(Apply(view, Frame(9, Player(2, 999)), 1), Is.False);
+            Assert.That(Apply(view, Frame(11, Player(2, 999), Player(2, 1000)), 1), Is.False);
             var broken = Frame(11, Player(2, 999));
             Array.Resize(ref broken, broken.Length - 1);
-            Assert.That(view.ApplySnapshot(broken, 1), Is.False);
+            Assert.That(Apply(view, broken, 1), Is.False);
             var tooMany = new byte[9][];
             for (int i = 0; i < tooMany.Length; i++) tooMany[i] = Player((uint)i + 1, 0);
-            Assert.That(view.ApplySnapshot(Frame(12, tooMany), 1), Is.False);
+            Assert.That(Apply(view, Frame(12, tooMany), 1), Is.False);
             var output = new ArenaRemotePose[8];
             Assert.That(view.Advance(0, output), Is.EqualTo(1));
             Assert.That(output[0].XMillimetres, Is.EqualTo(100));
@@ -113,23 +123,23 @@ namespace AiNative.Client.Prediction.Tests
         {
             var view = new ArenaRemotePresentation();
             var output = new ArenaRemotePose[8];
-            view.ApplySnapshot(Frame(100, Player(2, 0), Player(3, 300)), 1);
-            view.ApplySnapshot(Frame(112, Player(2, 20000)), 1);
+            Apply(view, Frame(100, Player(2, 0), Player(3, 300)), 1);
+            Apply(view, Frame(112, Player(2, 20000)), 1);
             Assert.That(view.Advance(0, output), Is.EqualTo(1));
             Assert.That(output[0].XMillimetres, Is.EqualTo(20000));
-            view.ApplySnapshot(Frame(124, Player(2, 20000, alive: false)), 1);
+            Apply(view, Frame(124, Player(2, 20000, alive: false)), 1);
             view.Advance(0, output);
             Assert.That(output[0].Alive, Is.False);
             Assert.That(output[0].State.Alive, Is.False);
             Assert.That(output[0].State.Tick, Is.EqualTo(124));
-            view.ApplySnapshot(Frame(136, Player(2, 21000)), 1);
+            Apply(view, Frame(136, Player(2, 21000)), 1);
             view.Advance(0, output);
             Assert.That(output[0].XMillimetres, Is.EqualTo(21000));
             Assert.That(output[0].State.Alive, Is.True);
             Assert.That(output[0].State.PositionXMillimetres, Is.EqualTo(21000));
             view.Reset();
             Assert.That(view.Advance(0, output), Is.Zero);
-            Assert.That(view.ApplySnapshot(Frame(1, Player(4, 800)), 1), Is.True);
+            Assert.That(Apply(view, Frame(1, Player(4, 800)), 1), Is.True);
         }
 
         [Test]
@@ -148,7 +158,7 @@ namespace AiNative.Client.Prediction.Tests
         public void HistoryWrapAndInvalidRenderTimeStayBounded()
         {
             var view = new ArenaRemotePresentation();
-            for (int i = 1; i <= 100; i++) view.ApplySnapshot(Frame((ulong)i * 3, Player(2, i * 30)), 1);
+            for (int i = 1; i <= 100; i++) Apply(view, Frame((ulong)i * 3, Player(2, i * 30)), 1);
             var output = new ArenaRemotePose[8];
             view.Advance(float.NaN, output);
             Assert.That(output[0].XMillimetres, Is.EqualTo(2940).Within(0.01));
@@ -161,18 +171,18 @@ namespace AiNative.Client.Prediction.Tests
         {
             var view = new ArenaRemotePresentation();
             var output = new ArenaRemotePose[8];
-            view.ApplySnapshot(Frame(100, Player(2, 1000)), 1);
+            Apply(view, Frame(100, Player(2, 1000)), 1);
             view.Advance(1, output);
-            view.ApplySnapshot(Frame(103, Player(2, 1030)), 1);
+            Apply(view, Frame(103, Player(2, 1030)), 1);
             view.Advance(1f / 60, output);
             Assert.That(output[0].XMillimetres, Is.EqualTo(1000), "Hold while restoring the six-tick buffer.");
-            view.ApplySnapshot(Frame(106, Player(2, 1060)), 1);
+            Apply(view, Frame(106, Player(2, 1060)), 1);
             view.Advance(1f / 60, output);
             Assert.That(output[0].XMillimetres, Is.EqualTo(1010).Within(0.01));
             double previous = output[0].XMillimetres;
             for (int i = 1; i <= 60; i++)
             {
-                if (i % 3 == 0) view.ApplySnapshot(Frame((ulong)(106 + i), Player(2, 1060 + i * 10)), 1);
+                if (i % 3 == 0) Apply(view, Frame((ulong)(106 + i), Player(2, 1060 + i * 10)), 1);
                 view.Advance(1f / 60, output);
                 Assert.That(output[0].XMillimetres, Is.GreaterThan(previous));
                 Assert.That(output[0].XMillimetres, Is.LessThan(1060 + i * 10 - 20));
@@ -181,25 +191,28 @@ namespace AiNative.Client.Prediction.Tests
         }
 
         [Test]
-        public void SteadyStateDecodeAndHistoryWrapAllocateNothing()
+        public void SteadyStateDecodedHistoryWrapAllocateNothing()
         {
             var view = new ArenaRemotePresentation();
             var output = new ArenaRemotePose[8];
             byte[] frame = Frame(1, Player(1, 0), Player(2, 100));
+            var codec = new ProtobufBattleProtocolCodec();
+            var decoded = new BattlePacketBuffer();
+            Assert.That(codec.TryDecode(frame, decoded), Is.EqualTo(BattleDecodeStatus.Accepted));
             for (ulong tick = 1; tick <= 100; tick++)
             {
                 System.Buffers.Binary.BinaryPrimitives.WriteUInt64LittleEndian(frame.AsSpan(5, 8), tick);
-                view.ApplySnapshot(frame, 1); view.Advance(1f / 60, output);
+                view.ApplySnapshot(decoded.PlayerSpan, (long)tick, 1); view.Advance(1f / 60, output);
             }
-            _ = GC.GetAllocatedBytesForCurrentThread();
-            long before = GC.GetAllocatedBytesForCurrentThread();
+
+            using var allocationMeter = new CalibratedAllocationMeter(); allocationMeter.RequireSupported(); allocationMeter.Begin();
             bool accepted = true;
-            for (ulong tick = 101; tick <= 1100; tick++)
+            for (ulong tick = 101; tick <= 10100; tick++)
             {
                 System.Buffers.Binary.BinaryPrimitives.WriteUInt64LittleEndian(frame.AsSpan(5, 8), tick);
-                accepted &= view.ApplySnapshot(frame, 1); view.Advance(1f / 60, output);
+                accepted &= view.ApplySnapshot(decoded.PlayerSpan, (long)tick, 1); view.Advance(1f / 60, output);
             }
-            long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+            long allocated = allocationMeter.End();
             Assert.That(accepted, Is.True); Assert.That(allocated, Is.Zero);
             Assert.That(output[0].EntityId, Is.EqualTo(2));
         }

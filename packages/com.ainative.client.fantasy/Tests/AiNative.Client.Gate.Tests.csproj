@@ -13,5 +13,6 @@
     <PackageReference Include="NUnit" Version="3.14.0" />
     <PackageReference Include="NUnit3TestAdapter" Version="6.2.0" />
     <ProjectReference Include="../../../shared/protocol/Protocol.Shared.csproj" />
+    <ProjectReference Include="../../com.ainative.client.protocol.protobuf/AiNative.Client.Protocol.Protobuf.csproj" />
   </ItemGroup>
 </Project>

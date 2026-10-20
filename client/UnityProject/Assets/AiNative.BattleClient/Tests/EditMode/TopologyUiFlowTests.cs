@@ -1,3 +1,5 @@
+using AiNative.Client.Protocol.Protobuf;
+using AiNative.Client.Protocol;
 using System;
 using System.Reflection;
 using System.Threading.Tasks;
@@ -135,7 +137,7 @@ namespace AiNative.Client.Application.Tests
             SetProperty("Completed", completed);
             SetProperty("SettlementConfirmed", confirmed);
             SetProperty("State", "Settling");
-            var battle = new BattleClientSession("127.0.0.1", 22000,
+            var battle = new BattleClientSession(new ProtobufBattleProtocolCodec(), "127.0.0.1", 22000,
                 new BattleAdmissionInfo("old-room", "old-boot", "ticket", "old-node", "old-player"));
             SetProperty("Battle", battle);
             _flow.ReturnToLobby();

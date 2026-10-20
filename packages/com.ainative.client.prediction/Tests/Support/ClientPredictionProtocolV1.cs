@@ -1,3 +1,4 @@
+using AiNative.Client.Protocol;
 using System;
 using System.Buffers.Binary;
 using AiNative.Gameplay;
@@ -5,7 +6,7 @@ using AiNative.Realtime;
 
 namespace AiNative.Client.Prediction
 {
-    internal enum ClientProtocolDecodeStatus : byte
+    public enum ClientProtocolDecodeStatus : byte
     {
         Accepted = 0,
         FrameTooShort = 1,
@@ -16,7 +17,7 @@ namespace AiNative.Client.Prediction
         PlayerMissing = 6,
     }
 
-    internal readonly struct DecodedAuthoritativeSnapshot
+    public readonly struct DecodedAuthoritativeSnapshot
     {
         public DecodedAuthoritativeSnapshot(
             in KinematicState state,
@@ -35,7 +36,7 @@ namespace AiNative.Client.Prediction
         public uint ReconnectConnectionEpoch { get; }
     }
 
-    internal static class ClientPredictionProtocolV1
+    public static class ClientPredictionProtocolV1
     {
         public const int HeaderBytes = sizeof(ushort);
         public const int MaxDatagramBytes = 1200;

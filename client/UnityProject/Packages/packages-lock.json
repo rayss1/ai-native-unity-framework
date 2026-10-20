@@ -18,7 +18,8 @@
       "source": "local",
       "dependencies": {
         "com.ainative.realtime": "0.1.0",
-        "com.fantasy.unity": "2026.1.1002-ainative.1"
+        "com.fantasy.unity": "2026.1.1002-ainative.1",
+        "com.ainative.client.protocol.protobuf": "0.1.0"
       }
     },
     "com.ainative.client.prediction": {
@@ -27,7 +28,8 @@
       "source": "local",
       "dependencies": {
         "com.ainative.gameplay": "0.1.0",
-        "com.ainative.realtime": "0.1.0"
+        "com.ainative.realtime": "0.1.0",
+        "com.ainative.client.protocol": "0.1.0"
       }
     },
     "com.ainative.gameplay": {
@@ -335,6 +337,23 @@
       "dependencies": {
         "com.unity.modules.unitywebrequest": "1.0.0",
         "com.unity.modules.imageconversion": "1.0.0"
+      }
+    },
+    "com.ainative.client.protocol": {
+      "version": "file:../../../packages/com.ainative.client.protocol",
+      "depth": 0,
+      "source": "local",
+      "dependencies": {
+        "com.ainative.gameplay": "0.1.0",
+        "com.ainative.realtime": "0.1.0"
+      }
+    },
+    "com.ainative.client.protocol.protobuf": {
+      "version": "file:../../../packages/com.ainative.client.protocol.protobuf",
+      "depth": 0,
+      "source": "local",
+      "dependencies": {
+        "com.ainative.client.protocol": "0.1.0"
       }
     }
   }

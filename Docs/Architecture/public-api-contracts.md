@@ -5,6 +5,12 @@ Last updated: 2026-10-16
 
 This catalog defines ownership and semantics before implementation. Names and invariants are stable; value layouts may be extended additively as Spikes reveal required data. Implementations must not expose engine/framework types through these ports.
 
+## Client protocol boundary (ADR-0019, 2026-10-20)
+
+`IBattleProtocolCodec` belongs to `AiNative.Client.Protocol`, with explicit per-session injection. It exposes project-owned values, spans, channel/buffer requirements and caller-owned `BattlePacketBuffer`; no generated message, ByteString, Unity or Fantasy type crosses this port. All calls are owner-thread-only. Failed decode leaves the whole output unchanged. Views expire at the next successful decode, and consumers retain value copies only. Input encoding failure cannot advance prediction or sequence. Session owns Reset/Dispose; borrowed prediction adapters do not dispose the codec. Snapshot/event parsing occurs outside fixed Tick.
+
+Prediction constructors now require `(transport, codec, entityId, ...)`; session constructors require codec first. `RequiredInputBufferBytes` is an instance property. Remote presentation takes decoded player values, Tick and local ID. No implicit implementation constructor is retained. Both prediction adapters expose a pure `CanReplaySafely(in state)` numeric preflight so reconnect can reject unsafe replay before advancing transport epoch; check and apply on the same owner thread without intervening input. See [API migration and ownership](client-protocol-codecs.md).
+
 ## Common conventions
 
 ### Network character presentation (P1, 2026-10-16)
@@ -17,7 +23,7 @@ accepts a `CharacterMotionState` value on the Unity main thread; it takes preced
 points down in Unity. Neither interface simulates gameplay or applies health.
 
 `ArenaRemotePose.State` carries render-time motion and discrete snapshot state. Existing constructor
-and coordinate properties remain compatible. `ArenaCombatEventProtocolV1.TryDecode` validates the existing
+and coordinate properties remain compatible. `IBattleProtocolCodec.TryDecode` validates the existing
 ReliableEvent combat payload; `ArenaPresentationEvent` carries server feedback, not commands.
 `BattleClientSession.DrainCombatEvents(Span<ArenaPresentationEvent>)` is owner-thread-only, writes at most
 caller capacity and removes those items. The 256-event queue drops oldest feedback on overflow and

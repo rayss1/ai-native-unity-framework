@@ -1,0 +1,16 @@
+{
+  "name": "AiNative.Client.Prediction.TestSupport",
+  "references": [
+    "AiNative.Gameplay",
+    "AiNative.Realtime",
+    "AiNative.Client.Protocol"
+  ],
+  "autoReferenced": false,
+  "defineConstraints": [
+    "UNITY_INCLUDE_TESTS"
+  ],
+  "optionalUnityReferences": [
+    "TestAssemblies"
+  ],
+  "noEngineReferences": true
+}

@@ -1,0 +1,5 @@
+<linker>
+  <!-- Generated parser/descriptor graphs are used across Mono and IL2CPP. -->
+  <assembly fullname="AiNative.Protocol" preserve="all" />
+  <assembly fullname="Google.Protobuf" preserve="all" />
+</linker>

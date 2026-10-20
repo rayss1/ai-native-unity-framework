@@ -1,3 +1,5 @@
+using AiNative.Client.Protocol.Protobuf;
+using AiNative.Client.Protocol;
 using System;
 using System.IO;
 using System.Reflection;
@@ -105,7 +107,7 @@ namespace AiNative.Client.Application.Tests
         {
             var flow = owner.AddComponent<TopologyClientFlow>();
             flow.Initialize(new GateConnectionOptions("127.0.0.1", 23001, false), resultPath: path);
-            var battle = new BattleClientSession("127.0.0.1", 22000, "receipt-test", 4, new FakeConnector(transport));
+            var battle = new BattleClientSession(new ProtobufBattleProtocolCodec(), "127.0.0.1", 22000, "receipt-test", 4, new FakeConnector(transport));
             battle.Start(); battle.Pump(0);
             transport.Enqueue(TestFrames.Login(42, 1), BattleClientProtocolV1.ControlChannel, 1);
             transport.Enqueue(TestFrames.Join(1, 7, 60), BattleClientProtocolV1.ControlChannel, 1);

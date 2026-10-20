@@ -1,3 +1,4 @@
+using AiNative.Client.Protocol;
 using System;
 using System.Buffers.Binary;
 using AiNative.Gameplay;
@@ -5,32 +6,6 @@ using AiNative.Realtime;
 
 namespace AiNative.Client.Prediction
 {
-    public enum ArenaPresentationEventKind : byte { Fire, Hit, Kill, Respawn, Pickup, WeaponSwitch }
-
-    /// <summary>Server-authoritative feedback only; never applies movement, health or damage locally.</summary>
-    public readonly struct ArenaPresentationEvent
-    {
-        public ArenaPresentationEvent(ArenaPresentationEventKind kind, uint sequence, ulong tick,
-            uint sourceEntityId, uint targetEntityId, ArenaWeaponId weapon, int damage,
-            int positionXMillimetres, int positionYMillimetres, int positionZMillimetres)
-        {
-            Kind = kind; Sequence = sequence; Tick = tick; SourceEntityId = sourceEntityId;
-            TargetEntityId = targetEntityId; Weapon = weapon; Damage = damage;
-            PositionXMillimetres = positionXMillimetres; PositionYMillimetres = positionYMillimetres;
-            PositionZMillimetres = positionZMillimetres;
-        }
-        public ArenaPresentationEventKind Kind { get; }
-        public uint Sequence { get; }
-        public ulong Tick { get; }
-        public uint SourceEntityId { get; }
-        public uint TargetEntityId { get; }
-        public ArenaWeaponId Weapon { get; }
-        public int Damage { get; }
-        public int PositionXMillimetres { get; }
-        public int PositionYMillimetres { get; }
-        public int PositionZMillimetres { get; }
-    }
-
     public static class ArenaCombatEventProtocolV1
     {
         public const ushort MessageId = 1102;
@@ -61,7 +36,7 @@ namespace AiNative.Client.Prediction
                     case 1: if (!TryReadFixed64(frame, ref offset, out tick)) return false; break;
                     case 2: if (!TryReadUInt32(frame, ref offset, out sequence)) return false; break;
                     case 3: if (!TryReadUInt32(frame, ref offset, out kind)) return false; break;
-                    case 5: if (!TryReadLength(frame, ref offset, out combat)) return false; break;
+                    case 5: if (!TryReadLength(frame, ref offset, out var eventBytes)) return false; combat = eventBytes.ToArray(); break;
                     default: if (!TrySkip(frame, ref offset, wire)) return false; break;
                 }
             }

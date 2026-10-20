@@ -5,39 +5,39 @@ using AiNative.Realtime;
 
 namespace AiNative.Client.Application
 {
-    internal static class BattleClientProtocolV1
+    public static class BattleClientProtocolV1
     {
-        internal const ushort LoginRequestMessageId = 1000;
-        internal const ushort LoginResponseMessageId = 1001;
-        internal const ushort JoinRoomRequestMessageId = 1010;
-        internal const ushort JoinRoomResponseMessageId = 1011;
-        internal const ushort SnapshotMessageId = 1101;
-        internal const ushort ReconnectRequestMessageId = 1200;
-        internal const ushort ReconnectResponseMessageId = 1201;
-        internal const int MaxFrameBytes = 1200;
+        public const ushort LoginRequestMessageId = 1000;
+        public const ushort LoginResponseMessageId = 1001;
+        public const ushort JoinRoomRequestMessageId = 1010;
+        public const ushort JoinRoomResponseMessageId = 1011;
+        public const ushort SnapshotMessageId = 1101;
+        public const ushort ReconnectRequestMessageId = 1200;
+        public const ushort ReconnectResponseMessageId = 1201;
+        public const int MaxFrameBytes = 1200;
 
-        internal static readonly TransportChannel ControlChannel = new TransportChannel(
+        public static readonly TransportChannel ControlChannel = new TransportChannel(
             0,
             TransportDelivery.Reliable,
             TransportOrdering.Ordered);
 
-        internal static readonly TransportChannel SnapshotChannel = new TransportChannel(
+        public static readonly TransportChannel SnapshotChannel = new TransportChannel(
             1,
             TransportDelivery.Unreliable,
             TransportOrdering.Sequenced);
 
-        internal static readonly TransportChannel InputChannel = new TransportChannel(
+        public static readonly TransportChannel InputChannel = new TransportChannel(
             2,
             TransportDelivery.Unreliable,
             TransportOrdering.Sequenced);
 
-        internal static bool TryEncodeLogin(
+        public static bool TryEncodeLogin(
             string clientBuild,
             Span<byte> destination,
             out int writtenBytes)
             => TryEncodeLogin(clientBuild, null, destination, out writtenBytes);
 
-        internal static bool TryEncodeLogin(
+        public static bool TryEncodeLogin(
             string clientBuild,
             BattleAdmissionInfo admission,
             Span<byte> destination,
@@ -77,13 +77,13 @@ namespace AiNative.Client.Application
             return true;
         }
 
-        internal static bool TryDecodeLoginResponse(
+        public static bool TryDecodeLoginResponse(
             ReadOnlySpan<byte> frame,
             out ulong sessionId,
             out uint connectionEpoch)
             => TryDecodeLoginResponse(frame, out sessionId, out connectionEpoch, out _, out _, out _);
 
-        internal static bool TryDecodeLoginResponse(
+        public static bool TryDecodeLoginResponse(
             ReadOnlySpan<byte> frame,
             out ulong sessionId,
             out uint connectionEpoch,
@@ -144,7 +144,7 @@ namespace AiNative.Client.Application
             return sessionId != 0 && connectionEpoch != 0;
         }
 
-        internal static bool TryEncodeJoin(
+        public static bool TryEncodeJoin(
             ulong sessionId,
             uint roomId,
             Span<byte> destination,
@@ -170,7 +170,7 @@ namespace AiNative.Client.Application
             return true;
         }
 
-        internal static bool TryDecodeJoinResponse(
+        public static bool TryDecodeJoinResponse(
             ReadOnlySpan<byte> frame,
             out uint roomId,
             out uint entityId,
@@ -211,7 +211,7 @@ namespace AiNative.Client.Application
             return roomId != 0 && entityId != 0 && tickRate != 0;
         }
 
-        internal static bool TryEncodeReconnect(
+        public static bool TryEncodeReconnect(
             ulong sessionId,
             uint previousConnectionEpoch,
             ulong lastReceivedTick,
@@ -240,7 +240,7 @@ namespace AiNative.Client.Application
             return true;
         }
 
-        internal static bool TryDecodeReconnectResponse(
+        public static bool TryDecodeReconnectResponse(
             ReadOnlySpan<byte> frame,
             out uint connectionEpoch,
             out ulong resumeTick)
@@ -284,7 +284,7 @@ namespace AiNative.Client.Application
             return connectionEpoch != 0 && hasTick && hasSnapshot;
         }
 
-        internal static bool TryReadSnapshotMetadata(
+        public static bool TryReadSnapshotMetadata(
             ReadOnlySpan<byte> frame,
             out ulong roomTick,
             out uint acknowledgement)
@@ -315,7 +315,7 @@ namespace AiNative.Client.Application
             return hasTick;
         }
 
-        internal static ushort ReadMessageId(ReadOnlySpan<byte> frame) =>
+        public static ushort ReadMessageId(ReadOnlySpan<byte> frame) =>
             frame.Length < 2 ? (ushort)0 : BinaryPrimitives.ReadUInt16LittleEndian(frame);
 
         private static bool TryBegin(ReadOnlySpan<byte> frame, ushort expected, out int offset)

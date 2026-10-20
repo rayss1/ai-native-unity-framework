@@ -1,0 +1,17 @@
+{
+  "name": "AiNative.Client.Protocol",
+  "rootNamespace": "AiNative.Client.Protocol",
+  "references": [
+    "AiNative.Gameplay",
+    "AiNative.Realtime"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": true
+}

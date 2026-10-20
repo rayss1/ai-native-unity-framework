@@ -1,8 +1,9 @@
 # Current-source validation
 
+Current project progress is maintained in [one status page](../../Docs/Architecture/current-status.md). For the October 20 client codec migration, select `-Profile Development -ExpectedDotnetPassed 653 -ExpectedEditModePassed 294` on Windows. Counts are the current discovered inventory, not a claim that unavailable database/device tests passed; see [current validation evidence](../../Docs/Architecture/client-protocol-validation-2026-10-20.md). Strict release gates reject skipped tests. The two executable entries obtain Unity fixture inventories and Fantasy package pins from the same profile contract. Defaults remain historical for compatibility; select the profile explicitly.
+
 October 20 documentation sync is based on PR #44 merged at `aa06c05`. The earlier 132-test local review used the pre-#44 worktree at `2d92bcb`; it does not validate the training map or combat repairs. See the [review scope and commands](../../Docs/Architecture/current-status.md).
 
-Current project progress is maintained in [one status page](../../Docs/Architecture/current-status.md). For the October 16 P1 source, select `-Profile Development -ExpectedDotnetPassed 607 -ExpectedEditModePassed 241` on Windows. The local Windows solution run discovered 607 .NET cases: 602 passed and five PostgreSQL cases were skipped without AINATIVE_TEST_POSTGRES. The full gate expects all 607 to pass with the database configured; this local run is not a full release qualification claim. The P1 targeted prediction suite passed 56 cases; the historical P0 macOS full run passed 541 and skipped five Windows-only tests. Strict release gates still reject skips. The two executable entries obtain Unity inventories and Fantasy package pins from the same profile contract. Defaults remain historical for compatibility; select the profile explicitly.
 
 | Profile | Unity EditMode | Source/dependency scope |
 | --- | ---: | --- |
@@ -10,7 +11,7 @@ Current project progress is maintained in [one status page](../../Docs/Architect
 | Candidate | 147 | Earlier socket/lifecycle source generation, Fantasy `df4ad5f`; explicit .NET count |
 | TerminalDelivery | 164 | October 6 terminal-receive tests, Fantasy `df4ad5f`; explicit .NET count (historically 530) |
 | Current | 166 | Legacy-health/additive-field regressions, Fantasy `df4ad5f`; 536 .NET tests (including four snapshot-fanout regressions) |
-| Development | 241 | October 16 training map, combat/reload, password and P1 regressions; Fantasy `df4ad5f`; expected .NET inventory 607 |
+| Development | 294 | October 20 codec injection, generated Protobuf, GC, stale/overflow and async send regressions; Fantasy `df4ad5f`; expected .NET inventory 653 |
 
 Wrong totals, missing fixtures, failed/skipped cases and source changes fail the gate. Historical 128-test observations below remain evidence records, not a selectable current inventory.
 
@@ -24,7 +25,7 @@ For a clean current commit, start an isolated PostgreSQL 17.11, set `AINATIVE_TE
   -SdkPath (Get-Command dotnet).Source `
   -UnityEditorPath 'C:/Program Files/Unity/Hub/Editor/6000.3.23f1/Editor/Unity.exe' `
   -EvidenceDirectory ./artifacts/validation/new-current-run `
-  -Profile Development -ExpectedDotnetPassed 607 -ExpectedEditModePassed 241 `
+  -Profile Development -ExpectedDotnetPassed 653 -ExpectedEditModePassed 294 `
   -Phases Dotnet,Architecture,WindowsLegacy
 ```
 
@@ -43,7 +44,7 @@ $validationManifest = Get-AiNativeSourceManifest -Root $validationSource
   -SdkPath (Get-Command dotnet).Source `
   -UnityEditorPath 'C:/Program Files/Unity/Hub/Editor/6000.3.23f1/Editor/Unity.exe' `
   -EvidenceDirectory ./artifacts/validation/new-worktree-run `
-  -Profile Development -ExpectedDotnetPassed 607 -ExpectedEditModePassed 241 `
+  -Profile Development -ExpectedDotnetPassed 653 -ExpectedEditModePassed 294 `
   -SourceMode Worktree -ExpectedSourceManifestSha256 $validationManifest.sha256 `
   -Phases Dotnet,Architecture,WindowsLegacy
 ```
@@ -73,7 +74,7 @@ An initial baseline run passed, but a later full rerun reproduced an existing Wo
 | Baseline 333 .NET / 95 Unity | c9098be; [initial .NET summary](../../artifacts/release-validation-20261003/baseline/dotnet-summary.json), [Unity XML](../../artifacts/release-validation-20261003/baseline/editmode.xml); [later failed entry](../../artifacts/release-validation-20261003/entry-main-final/validation.json) |
 | Candidate 359 .NET | Worktree manifest `7ADEAFC9A986A67D72BEBEEC667E9B4B872758C07301B317553F20892F7A93FC`; [summary](../../artifacts/release-validation-20261003/candidate-dotnet-connect-final/summary.json) |
 | Candidate 360 .NET, MTU boundary revision | Worktree manifest `88EDC9FECC65B454CEFCF80711A9877139180B8414E2ECD5E2E24DE1B3E1B99A`; [summary](../../artifacts/release-validation-20261003/candidate-dotnet-mtu-boundary-final/summary.json) |
-| Candidate 364 .NET, capacity revision | Worktree manifest `34C21E37C80F293BCDAF49A53EFD0B765473F6C3CE827B13FE6D77CEB62C3BAC`; [summary](../../artifacts/release-validation-20261003/candidate-dotnet-capacity-final/summary.json). This observed count is not the default for the next candidate. |
+| Candidate 364 .NET, capacity revision | Worktree manifest `34C21E37C80F294BCDAF49A53EFD0B765473F6C3CE827B13FE6D77CEB62C3BAC`; [summary](../../artifacts/release-validation-20261003/candidate-dotnet-capacity-final/summary.json). This observed count is not the default for the next candidate. |
 | Candidate 371 .NET, reviewed capacity revision | Worktree manifest `0A927B1CC3810FEC10B6C84669277EEA5C02A79C8FE05267190D106F593D8322`; [summary](../../artifacts/release-validation-20261003/candidate-dotnet-reviewed-capacity-final/summary.json): 13 TRX, zero failed/skipped. The next clean-commit run still requires its explicit expected count. |
 | Candidate 391 .NET, rejection diagnosis and roster lifecycle revision | Worktree manifest `EA4806D88970328B6A62F69128319D6E77FEF8E0579C6740F595CE64FDF27F94`; [summary](../../artifacts/release-validation-20261003/candidate-dotnet-rejection-roster-final/summary.json): 13 TRX, zero failed/skipped; build and architecture passed. The unavailable online package vulnerability query was explicitly skipped. This does not qualify capacity or the still-proposed isolated probe groups. |
 | Candidate 401 .NET, RPC completion and isolated probe groups | Worktree manifest `60764F9446D83368C126388BE20AB48277BAF62AAF0889209C7F1308B9AFCA9E`; [summary](../../artifacts/release-validation-20261003/candidate-dotnet-probe-groups-final-owned/summary.json): 13 TRX, zero failed/skipped; build and architecture passed. Online package vulnerability queries were unavailable and explicitly skipped. [Actual group lifecycle diagnostics](../../artifacts/release-validation-20261003/probe-group-harness/lifecycle-01.json) passed separately; capacity/soak remain unqualified. |

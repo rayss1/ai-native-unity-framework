@@ -4,6 +4,7 @@ using System.Net.Sockets;
 using AiNative.Client.Fantasy;
 using AiNative.Protocol.Backend.V1;
 using Google.Protobuf;
+using AiNative.Protocol.Transport.V1;
 using NUnit.Framework;
 
 namespace AiNative.Client.Gate.Tests;
@@ -21,11 +22,11 @@ public sealed class GateConnectionTests
             using NetworkStream stream = peer.GetStream();
             byte[] header = new byte[20]; await stream.ReadExactlyAsync(header);
             byte[] body = new byte[BinaryPrimitives.ReadInt32LittleEndian(header)]; await stream.ReadExactlyAsync(body);
-            var envelope = GateWire.Read(body); var request = ControlRequest.Parser.ParseFrom(GateWire.Data(envelope, 1));
-            byte[] notification = GateWire.Frame(134217905u, 0, GateWire.Bytes(1, new ControlNotification { Method = "lobby.changed" }.ToByteArray()));
+            var envelope = GateRequestEnvelope.Parser.ParseFrom(body); var request = ControlRequest.Parser.ParseFrom(envelope.Payload);
+            byte[] notification = GateFrame.Encode(134217905u, 0, new GateRequestEnvelope { Payload = new ControlNotification { Method = "lobby.changed" }.ToByteString() }.ToByteArray());
             await stream.WriteAsync(notification);
             var response = new ControlResponse { CorrelationId = request.CorrelationId, Body = ByteString.CopyFrom(new PlayerProfile { PlayerId = "p1", Played = 2 }.ToByteArray()) };
-            byte[] frame = GateWire.Frame(402653361u, BinaryPrimitives.ReadUInt32LittleEndian(header.AsSpan(8)), GateWire.Bytes(2, response.ToByteArray()));
+            byte[] frame = GateFrame.Encode(402653361u, BinaryPrimitives.ReadUInt32LittleEndian(header.AsSpan(8)), new GateResponseEnvelope { Payload = response.ToByteString() }.ToByteArray());
             for (int offset = 0; offset < frame.Length; offset += 3) await stream.WriteAsync(frame.AsMemory(offset, Math.Min(3, frame.Length - offset)));
         });
         using FantasyGateClient client = await FantasyGateClient.ConnectAsync(new("127.0.0.1", port, useTls: false));

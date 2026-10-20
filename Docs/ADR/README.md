@@ -36,6 +36,8 @@ Changing an accepted contract requires a superseding ADR that records compatibil
 | [0017](0017-single-region-service-topology.md) | Accepted | Six independent single-region services and fixed Battle Workers | Hosts remain independent composition roots; durable allocation, signed entry and idempotent settlement | Local routing/recovery and Windows capacity passed for recorded sources; current-source external rollout/device gates remain |
 | [0018](0018-arena-dead-input-consumption.md) | Accepted | Consume dead-player commands as no-ops | At most one consumed input per player per Tick; no actions from dead inputs; no invented ACKs | [Windows 128-total-client replay/soak passed](../Architecture/battle-slice-qualification-2026-10-06.md); other platforms remain separate |
 
+| [0019](0019-client-protocol-codecs.md) | Accepted | Client codec boundary and generated Protobuf | Explicit session injection, one decoded value buffer, no implementation dependency from prediction | [Current migration and validation](../Architecture/client-protocol-codecs.md) |
+
 ## Open decision gates
 
 These are deliberately not final product choices. Each owner must record the resulting evidence in a new or superseding ADR before crossing the named gate.

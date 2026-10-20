@@ -30,7 +30,7 @@ foreach ($dependency in $packageManifest.dependencies.GetEnumerator()) {
 }
 $sourceFiles = @($sourceRoots | ForEach-Object {
     $scope = $_
-    Get-ChildItem -LiteralPath $scope.path -File -Recurse | Where-Object Extension -in @('.cs','.asmdef','.shader','.uxml','.uss','.proto','.csproj','.props','.targets') | ForEach-Object {
+    Get-ChildItem -LiteralPath $scope.path -File -Recurse | Where-Object Extension -in @('.cs','.asmdef','.shader','.uxml','.uss','.proto','.csproj','.props','.targets','.dll','.json','.xml','.meta','.md','.LICENSE') | ForEach-Object {
         @{scope=$scope.name;path=[IO.Path]::GetRelativePath($scope.path,$_.FullName);sha256=(Get-FileHash -LiteralPath $_.FullName).Hash;absolutePath=$_.FullName}
     }
 })
@@ -49,7 +49,7 @@ try {
     # A new Editor process compiles Fantasy for Android before invoking the build.
     unity run $project --editor-path $UnityEditorPath --timeout $BuildTimeoutSeconds --log-file (Join-Path $evidence 'build.log') --no-tail --format json -- -buildTarget Android -nographics -executeMethod AiNative.Client.Editor.AndroidBattleClientBuild.BuildAndroidRelease --ainative-build-output $output > (Join-Path $evidence 'build-cli.json')
     if ($LASTEXITCODE -ne 0) { throw 'Android IL2CPP build failed' }
-    foreach ($name in @('AiNative.BattleClient.apk','ANDROID-BUILD-INFO.json','THIRD-PARTY-NOTICES.md','Fantasy-LICENSE.txt')) {
+    foreach ($name in @('AiNative.BattleClient.apk','ANDROID-BUILD-INFO.json','THIRD-PARTY-NOTICES.md','Fantasy-LICENSE.txt','Google.Protobuf-LICENSE.txt','PROTOCOL-DEPENDENCIES.json')) {
         if (-not (Test-Path (Join-Path $evidence $name) -PathType Leaf)) { throw "Missing Android distribution artifact: $name" }
     }
     $info = Get-Content (Join-Path $evidence 'ANDROID-BUILD-INFO.json') -Raw | ConvertFrom-Json

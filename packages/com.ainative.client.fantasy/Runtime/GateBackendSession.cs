@@ -1,5 +1,5 @@
 using System;
-using System.Collections.Generic;
+using AiNative.Client.Protocol.Protobuf;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
@@ -21,42 +21,43 @@ namespace AiNative.Client.Fantasy
         private async Task AuthenticateAsync(string method, string username, string password, CancellationToken ct)
         {
             if (string.IsNullOrWhiteSpace(username) || string.IsNullOrEmpty(password) || username.Length > 64 || password.Length > 256) throw new ArgumentException("Account input is empty or too long.");
-            var login = GateWire.Read(await _client.CallAsync(method, GateWire.Join(GateWire.Text(1, username), GateWire.Text(2, password)), cancellationToken: ct).ConfigureAwait(false));
-            string player = GateWire.String(login, 1), credential = GateWire.String(login, 2); long expiry = checked((long)GateWire.Value(login, 3));
+            var login = GateProtocolCodec.Login(await _client.CallAsync(method, GateProtocolCodec.Account(username, password), cancellationToken: ct).ConfigureAwait(false));
+            string player = login.Player, credential = login.Credential; long expiry = login.Expiry;
             if (player.Length == 0 || credential.Length == 0 || expiry <= DateTimeOffset.UtcNow.ToUnixTimeSeconds()) throw new InvalidDataException("gate-invalid-login");
             PlayerId = player; _credential = credential; ExpiresUnixSeconds = expiry;
         }
         public async Task<GateProfile> ProfileAsync(CancellationToken ct = default)
         {
-            GateProfile profile = GateWire.Profile(await CallAsync("player.profile", GateWire.Text(1, PlayerId), ct).ConfigureAwait(false));
+            GateProfile profile = GateWire.Profile(await CallAsync("player.profile", GateProtocolCodec.ProfileRequest(PlayerId), ct).ConfigureAwait(false));
             if (profile.PlayerId != PlayerId) throw new InvalidDataException("gate-profile-identity"); return profile;
         }
         public async Task<GateSettlement> SettlementAsync(string matchId, CancellationToken ct = default)
         {
             if (string.IsNullOrEmpty(matchId) || matchId.Length > 128) throw new ArgumentException("Match identity required.", nameof(matchId));
-            var receipt = GateWire.Read(await CallAsync("player.settlement-status", GateWire.Text(1, matchId), ct).ConfigureAwait(false));
-            if (GateWire.String(receipt, 1) != matchId) throw new InvalidDataException("gate-settlement-identity");
-            return new GateSettlement { MatchId = matchId, Confirmed = GateWire.Value(receipt, 3) != 0 };
+            var receipt = GateProtocolCodec.Settlement(await CallAsync("player.settlement-status", GateProtocolCodec.SettlementRequest(matchId), ct).ConfigureAwait(false));
+            if (receipt.Match != matchId) throw new InvalidDataException("gate-settlement-identity");
+            return new GateSettlement { MatchId = matchId, Confirmed = receipt.Confirmed };
         }
         public async Task<GateParty> CreatePartyAsync(CancellationToken ct = default) => GateWire.Party(await CallAsync("lobby.create", Array.Empty<byte>(), ct).ConfigureAwait(false));
-        public async Task<GateParty> GetPartyAsync(string partyId, CancellationToken ct = default) => GateWire.Party(await CallAsync("lobby.get", GateWire.Text(1, partyId), ct).ConfigureAwait(false));
+        public async Task<GateParty> GetPartyAsync(string partyId, CancellationToken ct = default) => GateWire.Party(await CallAsync("lobby.get", GateProtocolCodec.PartyRequest(partyId), ct).ConfigureAwait(false));
         public async Task<GateParty> ReadyAsync(GateParty party, bool ready, CancellationToken ct = default) => GateWire.Party(await CallAsync("lobby.ready", PartyCommand(party, "", ready), ct).ConfigureAwait(false));
         public async Task<GateParty> InviteAsync(GateParty party, string playerId, CancellationToken ct = default) => GateWire.Party(await CallAsync("lobby.invite", PartyCommand(party, playerId, false), ct).ConfigureAwait(false));
         public async Task<GateParty> AcceptAsync(GateParty invitation, CancellationToken ct = default) => GateWire.Party(await CallAsync("lobby.accept", PartyCommand(invitation, "", false), ct).ConfigureAwait(false));
         public async Task LeaveAsync(GateParty party, CancellationToken ct = default) { await CallAsync("lobby.leave", PartyCommand(party, "", false), ct).ConfigureAwait(false); }
         public async Task<GateParty[]> InvitationsAsync(CancellationToken ct = default)
         {
-            var fields = GateWire.Read(await CallAsync("lobby.invites", Array.Empty<byte>(), ct).ConfigureAwait(false)); var parties = new List<GateParty>();
-            foreach (var field in fields) if (field.Id == 1) { if (field.Wire != 2 || parties.Count >= 64) throw new InvalidDataException("gate-invitation-limit"); parties.Add(GateWire.Party(field.Data)); }
-            return parties.ToArray();
+            var decoded = GateProtocolCodec.Invitations(await CallAsync("lobby.invites", Array.Empty<byte>(), ct).ConfigureAwait(false));
+            var parties = new GateParty[decoded.Length];
+            for (int i = 0; i < parties.Length; i++) parties[i] = GateWire.Party(decoded[i]);
+            return parties;
         }
         public async Task<GateMatch> QueueAsync(GateParty party, string requestId, CancellationToken ct = default)
         {
-            byte[] response = await CallAsync("lobby.queue", GateWire.Join(GateWire.Text(1, party.PartyId), GateWire.Number(2, party.Version), GateWire.Text(3, requestId)), ct).ConfigureAwait(false);
-            return GateWire.Match(GateWire.Bytes(1, response));
+            byte[] response = await CallAsync("lobby.queue", GateProtocolCodec.QueueRequest(party.PartyId, party.Version, requestId), ct).ConfigureAwait(false);
+            return GateWire.Match(response, queueResponse: true);
         }
-        public async Task CancelQueueAsync(string requestId, CancellationToken ct = default) { await CallAsync("match.cancel", GateWire.Text(1, requestId), ct).ConfigureAwait(false); }
-        public async Task<GateMatch> MatchAsync(string requestId, CancellationToken ct = default) => GateWire.Match(await CallAsync("match.status", GateWire.Text(1, requestId), ct).ConfigureAwait(false));
+        public async Task CancelQueueAsync(string requestId, CancellationToken ct = default) { await CallAsync("match.cancel", GateProtocolCodec.MatchRequest(requestId), ct).ConfigureAwait(false); }
+        public async Task<GateMatch> MatchAsync(string requestId, CancellationToken ct = default) => GateWire.Match(await CallAsync("match.status", GateProtocolCodec.MatchRequest(requestId), ct).ConfigureAwait(false));
         private async Task<byte[]> CallAsync(string method, byte[] payload, CancellationToken ct)
         {
             if (_credential.Length == 0) throw new GateCallException("unauthorized");
@@ -69,7 +70,7 @@ namespace AiNative.Client.Fantasy
                 throw;
             }
         }
-        private static byte[] PartyCommand(GateParty party, string target, bool ready) => GateWire.Join(GateWire.Text(1, party.PartyId), GateWire.Text(2, target), GateWire.Number(3, ready ? 1UL : 0UL), GateWire.Number(4, party.Version));
+        private static byte[] PartyCommand(GateParty party, string target, bool ready) => GateProtocolCodec.PartyRequest(party.PartyId, target, ready, party.Version);
         public void Dispose() { _credential = ""; _client.Dispose(); }
     }
 }

@@ -92,6 +92,9 @@ function Get-AiNativeEditModeFixtureCounts {
         $fixtures['AiNative.Client.Prediction.Tests.ArenaRemotePresentationTests']=10
     }
     if ($Profile -eq 'Development') {
+        $fixtures['AiNative.Client.Application.Tests.BattleClientSessionTests']=39
+        $fixtures['AiNative.Client.Prediction.Tests.CodecInjectionTests']=18
+        $fixtures['AiNative.Client.Prediction.Tests.ProtobufBattleProtocolCodecTests']=28
         $fixtures['AiNative.Client.Application.Tests.TopologyClientFlowRecoveryTests']=24
         $fixtures['AiNative.Client.Application.Tests.TopologyUiFlowTests']=20
         $fixtures['AiNative.Client.Application.Tests.LocalMultiplayerTests']=3

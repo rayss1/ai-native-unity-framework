@@ -5,17 +5,25 @@ function Get-AiNativeSourceManifest {
     $paths = @(& git -C $Root -c core.quotepath=false ls-files --cached --others --exclude-standard)
     if ($LASTEXITCODE -ne 0) { throw 'Cannot enumerate source manifest' }
     $paths = @($paths | Sort-Object -Unique -CaseSensitive)
+    $deleted = @(& git -C $Root -c core.quotepath=false ls-files --deleted)
+    if ($LASTEXITCODE -ne 0) { throw 'Cannot enumerate tracked source deletions' }
     $files = @(foreach ($path in $paths) {
         if ($path -eq 'server/vendor/Fantasy') { continue } # Gitlink is verified separately.
         $absolute = [IO.Path]::GetFullPath((Join-Path $Root $path))
         if (-not $absolute.StartsWith($Root + [IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase)) { throw 'Source manifest path escapes repository' }
-        if (-not (Test-Path -LiteralPath $absolute -PathType Leaf)) { throw "Source manifest file is missing: $path" }
+        if (-not (Test-Path -LiteralPath $absolute -PathType Leaf)) {
+            if ($deleted -ccontains $path) {
+                [pscustomobject]@{ path=$path.Replace('\','/'); sha256='deleted' }
+                continue
+            }
+            throw "Source manifest file is missing: $path"
+        }
         [pscustomobject]@{ path=$path.Replace('\','/'); sha256=(Get-FileHash -LiteralPath $absolute -Algorithm SHA256).Hash.ToLowerInvariant() }
     })
     if ($files.Count -eq 0) { throw 'Source manifest is empty' }
     $canonical = ($files | ForEach-Object { $_.path + "`t" + $_.sha256 }) -join "`n"
     $hash = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($canonical))).ToLowerInvariant()
-    return [pscustomobject]@{ algorithm='sha256-path-tab-filehash-lf-v1'; sha256=$hash; files=$files }
+    return [pscustomobject]@{ algorithm='sha256-path-tab-filehash-or-deleted-lf-v2'; sha256=$hash; files=$files }
 }
 
 function Assert-AiNativeSourceManifest {

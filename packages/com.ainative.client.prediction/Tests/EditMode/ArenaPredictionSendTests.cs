@@ -1,3 +1,5 @@
+using AiNative.Client.Protocol.Protobuf;
+using AiNative.Client.Protocol;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -13,9 +15,9 @@ namespace AiNative.Client.Prediction.Tests
         public void PreparedCallerFrameIsTheFrameSentWithoutPredictingAgain()
         {
             FakeRealtimeTransport transport = new FakeRealtimeTransport();
-            ArenaClientPredictionAdapter adapter = new ArenaClientPredictionAdapter(transport, 1);
+            ArenaClientPredictionAdapter adapter = new ArenaClientPredictionAdapter(transport, new ProtobufBattleProtocolCodec(), 1);
             adapter.Initialize(new ArenaPlayerState(100, 0, 0, 0));
-            byte[] frame = new byte[ArenaClientPredictionAdapter.RequiredInputBufferBytes];
+            byte[] frame = new byte[64];
             ArenaPredictionPrepareResult prepared = adapter.PrepareInput(101, 1000, -500,
                 90000, 0, ArenaButtons.None, ArenaWeaponId.Machinegun, frame);
             long tick = adapter.Current.Tick;
@@ -35,9 +37,9 @@ namespace AiNative.Client.Prediction.Tests
         public void SendOutcomeIsObservableAndRetryPreservesPrediction(SendStatus status)
         {
             FakeRealtimeTransport transport = new FakeRealtimeTransport { NextSendStatus = status };
-            ArenaClientPredictionAdapter adapter = new ArenaClientPredictionAdapter(transport, 1);
+            ArenaClientPredictionAdapter adapter = new ArenaClientPredictionAdapter(transport, new ProtobufBattleProtocolCodec(), 1);
             adapter.Initialize(new ArenaPlayerState(100, 0, 0, 0));
-            byte[] frame = new byte[ArenaClientPredictionAdapter.RequiredInputBufferBytes];
+            byte[] frame = new byte[64];
             var prepared = adapter.PrepareInput(101, 1000, 0, 0, 0, ArenaButtons.None, ArenaWeaponId.Machinegun, frame);
             var payload = frame.AsMemory(0, prepared.WrittenBytes);
             Assert.That(adapter.SendPreparedAsync(payload).Result.Status, Is.EqualTo(status));
@@ -51,9 +53,9 @@ namespace AiNative.Client.Prediction.Tests
         public void InvalidCancelledAndDisposedSendsDoNotReachTransport()
         {
             FakeRealtimeTransport transport = new FakeRealtimeTransport();
-            ArenaClientPredictionAdapter adapter = new ArenaClientPredictionAdapter(transport, 1);
+            ArenaClientPredictionAdapter adapter = new ArenaClientPredictionAdapter(transport, new ProtobufBattleProtocolCodec(), 1);
             Assert.Throws<ArgumentException>(() => adapter.SendPreparedAsync(ReadOnlyMemory<byte>.Empty));
-            Assert.That(adapter.SendPreparedAsync(new byte[ArenaClientPredictionAdapter.RequiredInputBufferBytes + 1]).Result.Status,
+            Assert.That(adapter.SendPreparedAsync(new byte[64 + 1]).Result.Status,
                 Is.EqualTo(SendStatus.PayloadTooLarge));
             using (var cancellation = new CancellationTokenSource())
             {
@@ -69,9 +71,9 @@ namespace AiNative.Client.Prediction.Tests
         public async Task DelayedTransportOwnsEachExplicitFrameUntilObservedCompletion()
         {
             var transport = new DeferredTransport();
-            var adapter = new ArenaClientPredictionAdapter(transport, 1);
+            var adapter = new ArenaClientPredictionAdapter(transport, new ProtobufBattleProtocolCodec(), 1);
             adapter.Initialize(new ArenaPlayerState(100, 0, 0, 0));
-            byte[] first = new byte[ArenaClientPredictionAdapter.RequiredInputBufferBytes];
+            byte[] first = new byte[64];
             var prepared = adapter.PrepareInput(101, 1000, 0, 0, 0, ArenaButtons.None, ArenaWeaponId.Machinegun, first);
             var pending = adapter.SendPreparedAsync(first.AsMemory(0, prepared.WrittenBytes));
             Assert.That(pending.IsCompleted, Is.False);
@@ -104,7 +106,7 @@ namespace AiNative.Client.Prediction.Tests
         public void InFlightCancellationAndTransportFailuresRemainObservable()
         {
             var transport = new DeferredTransport();
-            var adapter = new ArenaClientPredictionAdapter(transport, 1);
+            var adapter = new ArenaClientPredictionAdapter(transport, new ProtobufBattleProtocolCodec(), 1);
             using (var cancellation = new CancellationTokenSource())
             {
                 var pending = adapter.SendPreparedAsync(new byte[1], cancellation.Token);
@@ -116,10 +118,10 @@ namespace AiNative.Client.Prediction.Tests
             }
             var faulted = new DeferredTransport();
             var failure = new InvalidOperationException("async-send-failed");
-            var pendingFailure = new ArenaClientPredictionAdapter(faulted, 1).SendPreparedAsync(new byte[1]);
+            var pendingFailure = new ArenaClientPredictionAdapter(faulted, new ProtobufBattleProtocolCodec(), 1).SendPreparedAsync(new byte[1]);
             faulted.Completion.SetException(failure);
             Assert.That(Assert.ThrowsAsync<InvalidOperationException>(async () => await pendingFailure), Is.SameAs(failure));
-            var throwing = new ArenaClientPredictionAdapter(new DeferredTransport { ThrowOnSend = true }, 1);
+            var throwing = new ArenaClientPredictionAdapter(new DeferredTransport { ThrowOnSend = true }, new ProtobufBattleProtocolCodec(), 1);
             Assert.Throws<InvalidOperationException>(() => throwing.SendPreparedAsync(new byte[1]));
         }
     }

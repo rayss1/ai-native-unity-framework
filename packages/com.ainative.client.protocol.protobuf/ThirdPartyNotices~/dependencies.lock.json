@@ -1,0 +1,56 @@
+{
+  "artifactsSha256": {
+    "AiNative.Protocol.dll": "47ee765db68f82fba6875d95ccb65b7c7f40c83f154d1bd07929d309fefa3ed1",
+    "Google.Protobuf.dll": "67fd69447f2e8eeb45c4c27375e4625f0bb93c22fa9774ba9795f10a15cb190f"
+  },
+  "dependencies": {
+    "Google.Protobuf/3.35.1": {
+      "packaged": true,
+      "sha512": "pxtkuXhR8svkvDTQrYew9GZQt6eWhblz/V/WKUFrQgkHYlQPsumJTeF6ppHRJpe6j9ffukkd5lQULiiKaek4xA=="
+    },
+    "System.Buffers/4.4.0": {
+      "packaged": false,
+      "sha512": "AwarXzzoDwX6BgrhjoJsk6tUezZEozOT5Y9QKF94Gl4JK91I4PIIBkBco9068Y9/Dra8Dkbie99kXB8+1BaYKw=="
+    },
+    "System.Memory/4.5.3": {
+      "packaged": false,
+      "sha512": "3oDzvc/zzetpTKWMShs1AADwZjQ/36HnsufHRPcOjyRAAMLDlu2iD33MBI2opxnezcVUtXyqDXXjoFMOU9c7SA=="
+    },
+    "System.Numerics.Vectors/4.4.0": {
+      "packaged": false,
+      "sha512": "UiLzLW+Lw6HLed1Hcg+8jSRttrbuXv7DANVj0DkL9g6EnnzbL75EB7EWsw5uRbhxd/4YdG8li5XizGWepmG3PQ=="
+    },
+    "System.Runtime.CompilerServices.Unsafe/4.5.2": {
+      "packaged": false,
+      "sha512": "wprSFgext8cwqymChhrBLu62LMg/1u92bU+VOwyfBimSPVFXtsNqEWC92Pf9ofzJFlk4IHmJA75EDJn1b2goAQ=="
+    }
+  },
+  "format": 1,
+  "runtimeAsset": "lib/netstandard2.0/Google.Protobuf.dll",
+  "sourcesSha256": {
+    "global.json": "44eb0e45562fb344b3bfd58406019c3b18e0796a0638fbc7d4491d9794be24fa",
+    "shared/generated/csharp/ainative/v1/Backend.cs": "91f8e07c71868c1b34f74b18f143c0afe9a93428b4a48692905e364985d17faf",
+    "shared/generated/csharp/ainative/v1/Gameplay.cs": "9b57ad1dc5f8a2e1c5a6c0b40da9faff3b5f6ecf85d9ab4e4e8efcfe0cd5927b",
+    "shared/generated/csharp/ainative/v1/GateEnvelope.cs": "0348fbc4530dc84d24d6dded3915e917991b266e4cfe314bbd33959c05a53dab",
+    "shared/protocol/Protocol.Shared.csproj": "f3c5a1a5de5310633ba2a9c14fa9928852db047257f6c70a0fc5f86ef80386e1",
+    "shared/schemas/ainative/v1/backend.proto": "05aa414c7fb7fafb711726945a031261ae74aec0d890ecf6d120357de1d603ee",
+    "shared/schemas/ainative/v1/gameplay.proto": "f06bc8ccf7d0b757f2c122904da8c6e46bd3a822404856f931d3d3403747265d",
+    "shared/schemas/ainative/v1/gate_envelope.proto": "02837203d3ec2984392a6e3b49ed2be4c24cfde51b0e12863ce2ac473495379c",
+    "tools/ProtocolCodegen/ProtocolCodegen.csproj": "fc93026316c3907da0ce5ae036ec0fb38ee4a1a6864c3b1704776fb728dcb284",
+    "tools/ProtocolCodegen/package_unity.py": "f8ff31170def8e0f16bd2d9859e1c90a3abb58a88652f5bef7a4c4d27ed2ea7b"
+  },
+  "targetFramework": "netstandard2.1",
+  "unityProvided": [
+    "System.Memory",
+    "System.Buffers",
+    "System.Numerics.Vectors",
+    "System.Runtime.CompilerServices.Unsafe"
+  ],
+  "vendorProvided": {
+    "server/vendor/Fantasy/Fantasy.Packages/Fantasy.Unity/Runtime/Plugins/Other/System.Runtime.CompilerServices.Unsafe.dll": "01748200f2400c742aa689f1f5101bd6298efdfd92c00c18f4fa473847235ba9"
+  },
+  "versions": {
+    "Google.Protobuf": "3.35.1",
+    "Grpc.Tools": "2.83.0"
+  }
+}

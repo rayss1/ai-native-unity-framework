@@ -1,3 +1,4 @@
+using AiNative.Client.Protocol;
 using System;
 using AiNative.Client.Prediction;
 using AiNative.Gameplay;
@@ -8,9 +9,9 @@ namespace AiNative.Client.Application
     /// <summary>Application-owned bounded visuals. Poses are world-space, independent of the local player.</summary>
     internal sealed class ArenaRemoteVisualPool : IDisposable
     {
-        private readonly GameObject[] _visuals = new GameObject[ArenaClientProtocolV1.MaxSnapshotPlayers - 1];
-        private readonly uint[] _ids = new uint[ArenaClientProtocolV1.MaxSnapshotPlayers - 1];
-        private readonly NetworkCharacterPresenter[] _presenters = new NetworkCharacterPresenter[ArenaClientProtocolV1.MaxSnapshotPlayers - 1];
+        private readonly GameObject[] _visuals = new GameObject[BattlePacketBuffer.MaxArenaPlayers - 1];
+        private readonly uint[] _ids = new uint[BattlePacketBuffer.MaxArenaPlayers - 1];
+        private readonly NetworkCharacterPresenter[] _presenters = new NetworkCharacterPresenter[BattlePacketBuffer.MaxArenaPlayers - 1];
         private readonly float _heightOffset;
         private bool _disposed;
 

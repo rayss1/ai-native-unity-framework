@@ -4,21 +4,28 @@
   "references": [
     "AiNative.Client.Prediction",
     "AiNative.Gameplay",
-    "AiNative.Realtime"
+    "AiNative.Realtime",
+    "AiNative.Client.Protocol",
+    "AiNative.Client.Protocol.Protobuf",
+    "AiNative.Client.Prediction.TestSupport"
   ],
   "includePlatforms": [
     "Editor"
   ],
   "excludePlatforms": [],
   "allowUnsafeCode": false,
-  "overrideReferences": false,
-  "precompiledReferences": [],
+  "overrideReferences": true,
+  "precompiledReferences": [
+    "nunit.framework.dll",
+    "AiNative.Protocol.dll",
+    "Google.Protobuf.dll"
+  ],
   "autoReferenced": false,
   "defineConstraints": [
     "UNITY_INCLUDE_TESTS"
   ],
   "versionDefines": [],
-  "noEngineReferences": true,
+  "noEngineReferences": false,
   "optionalUnityReferences": [
     "TestAssemblies"
   ]
