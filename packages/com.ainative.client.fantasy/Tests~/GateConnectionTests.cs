@@ -25,18 +25,18 @@ public sealed class GateConnectionTests
             await stream.ReadExactlyAsync(header);
             byte[] body = new byte[BinaryPrimitives.ReadInt32LittleEndian(header)];
             await stream.ReadExactlyAsync(body);
-            var envelope = GateRequestEnvelope.Parser.ParseFrom(body);
-            var request = ControlRequest.Parser.ParseFrom(envelope.Payload);
+            var envelope = C2S_GateTransportRequest.Parser.ParseFrom(body);
+            var request = S2S_ControlRequest.Parser.ParseFrom(envelope.Payload);
             byte[] notification = GateFrame.Encode(
                 134217905u,
                 0,
-                new GateRequestEnvelope
+                new C2S_GateTransportRequest
                 {
-                    Payload = new ControlNotification { Method = "lobby.changed" }.ToByteString(),
+                    Payload = new S2C_GatePush { Method = "lobby.changed" }.ToByteString(),
                 }.ToByteArray()
             );
             await stream.WriteAsync(notification);
-            var response = new ControlResponse
+            var response = new S2S_ControlResponse
             {
                 CorrelationId = request.CorrelationId,
                 Body = ByteString.CopyFrom(
@@ -46,7 +46,7 @@ public sealed class GateConnectionTests
             byte[] frame = GateFrame.Encode(
                 402653361u,
                 BinaryPrimitives.ReadUInt32LittleEndian(header.AsSpan(8)),
-                new GateResponseEnvelope { Payload = response.ToByteString() }.ToByteArray()
+                new S2C_GateTransportResponse { Payload = response.ToByteString() }.ToByteArray()
             );
             for (int offset = 0; offset < frame.Length; offset += 3)
                 await stream.WriteAsync(frame.AsMemory(offset, Math.Min(3, frame.Length - offset)));
@@ -56,7 +56,7 @@ public sealed class GateConnectionTests
         );
         byte[] result = await client.CallAsync(
             "player.profile",
-            new ProfileRequest { PlayerId = "p1" }.ToByteArray(),
+            new ProfileQuery { PlayerId = "p1" }.ToByteArray(),
             "test-session"
         );
         Assert.That(PlayerProfile.Parser.ParseFrom(result).Played, Is.EqualTo(2));

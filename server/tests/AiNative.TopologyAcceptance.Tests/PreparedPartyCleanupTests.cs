@@ -74,7 +74,7 @@ public class PreparedPartyCleanupTests
                     Is.EqualTo(ServiceMethods.PartyLeave),
                     "A rejected ticket must never authorize queue cancellation."
                 );
-                Assert.That(((PartyCommand)payload).ExpectedVersion, Is.EqualTo(4UL));
+                Assert.That(((PartyOperation)payload).ExpectedVersion, Is.EqualTo(4UL));
                 removed = true;
                 return Task.FromResult(ServiceReply.From(Party("", 5)));
             }
@@ -189,7 +189,7 @@ public class PreparedPartyCleanupTests
                     );
                 }
                 Assert.That(method, Is.EqualTo(ServiceMethods.PartyLeave));
-                Assert.That(((PartyCommand)payload).ExpectedVersion, Is.EqualTo(4UL));
+                Assert.That(((PartyOperation)payload).ExpectedVersion, Is.EqualTo(4UL));
                 removed = true;
                 return Task.FromResult(ServiceReply.From(Party("", 5)));
             }

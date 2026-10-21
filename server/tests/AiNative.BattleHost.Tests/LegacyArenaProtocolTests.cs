@@ -22,18 +22,18 @@ public sealed class LegacyArenaProtocolTests
         f.Game.TickOnce();
         f.Game.TickOnce();
         f.Wire.Push(
-            MessageId.InputBatch,
-            new InputBatch
+            MessageId.C2SInputBatch,
+            new C2S_InputBatch
             {
                 Commands =
                 {
-                    new InputCommand
+                    new C2S_InputCommand
                     {
                         Sequence = 1,
                         RoomTick = 3,
                         MoveXMilli = 1000,
                     },
-                    new InputCommand { Sequence = 2, RoomTick = 3 },
+                    new C2S_InputCommand { Sequence = 2, RoomTick = 3 },
                 },
             }
         );
@@ -41,7 +41,7 @@ public sealed class LegacyArenaProtocolTests
         f.Game.TickOnce();
         f.Service.PublishSnapshots(3);
         Assert.That(
-            f.Wire.Last<Snapshot>(MessageId.Snapshot).LastProcessedInputSequence,
+            f.Wire.Last<S2C_SnapshotPush>(MessageId.S2CSnapshotPush).LastProcessedInputSequence,
             Is.EqualTo(1)
         );
     }
@@ -52,8 +52,8 @@ public sealed class LegacyArenaProtocolTests
         await using var f = new Fixture();
         f.Join();
         f.Wire.Push(
-            MessageId.InputCommand,
-            new InputCommand
+            MessageId.C2SInputCommand,
+            new C2S_InputCommand
             {
                 Sequence = 1,
                 RoomTick = 1,
@@ -63,7 +63,7 @@ public sealed class LegacyArenaProtocolTests
         f.Service.PumpInbound(0);
         f.Game.TickOnce();
         f.Service.PublishSnapshots(1);
-        Assert.That(f.Wire.Output.Any(m => m.Id == MessageId.ReliableEvent), Is.True);
+        Assert.That(f.Wire.Output.Any(m => m.Id == MessageId.S2CReliableEventPush), Is.True);
         Assert.That(f.Game.DrainEvents(new ArenaCombatEventRecord[256]), Is.Zero);
     }
 
@@ -76,8 +76,8 @@ public sealed class LegacyArenaProtocolTests
         for (int index = 0; index < f.Wires.Length; index++)
             f.Wires[index]
                 .Push(
-                    MessageId.InputCommand,
-                    new InputCommand
+                    MessageId.C2SInputCommand,
+                    new C2S_InputCommand
                     {
                         Sequence = sequences[index],
                         RoomTick = 1,
@@ -89,15 +89,18 @@ public sealed class LegacyArenaProtocolTests
         f.Service.PublishSnapshots(3);
         for (int index = 0; index < f.Wires.Length; index++)
         {
-            Snapshot expected = f.Rooms[index % 2].CreateSnapshot(3);
+            S2C_SnapshotPush expected = f.Rooms[index % 2].CreateSnapshot(3);
             expected.LastProcessedInputSequence = sequences[index];
-            Assert.That(f.Wires[index].Last<Snapshot>(MessageId.Snapshot), Is.EqualTo(expected));
+            Assert.That(
+                f.Wires[index].Last<S2C_SnapshotPush>(MessageId.S2CSnapshotPush),
+                Is.EqualTo(expected)
+            );
         }
         Assert.That(f.Rooms[0].ComputeStateHash(), Is.Not.EqualTo(f.Rooms[1].ComputeStateHash()));
         f.Wires[0]
             .Push(
-                MessageId.InputCommand,
-                new InputCommand
+                MessageId.C2SInputCommand,
+                new C2S_InputCommand
                 {
                     Sequence = 2,
                     RoomTick = 4,
@@ -110,9 +113,12 @@ public sealed class LegacyArenaProtocolTests
         sequences[0] = 2;
         for (int index = 0; index < f.Wires.Length; index++)
         {
-            Snapshot expected = f.Rooms[index % 2].CreateSnapshot(6);
+            S2C_SnapshotPush expected = f.Rooms[index % 2].CreateSnapshot(6);
             expected.LastProcessedInputSequence = sequences[index];
-            Assert.That(f.Wires[index].Last<Snapshot>(MessageId.Snapshot), Is.EqualTo(expected));
+            Assert.That(
+                f.Wires[index].Last<S2C_SnapshotPush>(MessageId.S2CSnapshotPush),
+                Is.EqualTo(expected)
+            );
         }
     }
 
@@ -178,13 +184,15 @@ public sealed class LegacyArenaProtocolTests
             for (int index = 0; index < Wires.Length; index++)
             {
                 Wire wire = Wires[index];
-                wire.Push(MessageId.LoginRequest, new LoginRequest { ProtocolMajor = 1 });
+                wire.Push(MessageId.C2SLoginRequest, new C2S_LoginRequest { ProtocolMajor = 1 });
                 Service.PumpInbound(0);
                 wire.Push(
-                    MessageId.JoinRoomRequest,
-                    new JoinRoomRequest
+                    MessageId.C2SJoinRoomRequest,
+                    new C2S_JoinRoomRequest
                     {
-                        SessionId = wire.Last<LoginResponse>(MessageId.LoginResponse).SessionId,
+                        SessionId = wire.Last<S2C_LoginResponse>(
+                            MessageId.S2CLoginResponse
+                        ).SessionId,
                         RequestedRoom = (uint)(index % Rooms.RoomCount) + 1,
                     }
                 );

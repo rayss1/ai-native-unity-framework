@@ -164,9 +164,9 @@ internal sealed class SyntheticRoom
         _positionZ[entityIndex] = KinematicMovement.ApplyAxis(_positionZ[entityIndex], moveYMilli);
     }
 
-    public AiNative.Protocol.V1.Snapshot CreateSnapshot(ulong roomTick)
+    public AiNative.Protocol.V1.S2C_SnapshotPush CreateSnapshot(ulong roomTick)
     {
-        AiNative.Protocol.V1.Snapshot snapshot = new()
+        AiNative.Protocol.V1.S2C_SnapshotPush snapshot = new()
         {
             ProtocolMajor = 1,
             RoomTick = roomTick,

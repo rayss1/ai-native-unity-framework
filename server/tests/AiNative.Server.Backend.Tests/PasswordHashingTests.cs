@@ -38,7 +38,7 @@ public sealed class PasswordHashingTests
             }
         );
         var player = new PlayerService(store, key, TimeProvider.System, hasher);
-        var request = new AccountRequest
+        var request = new AccountCredentials
         {
             Username = "pump_user",
             Password = "correct-password",
@@ -482,7 +482,7 @@ public sealed class PasswordHashingTests
             await player.HandleAsync(
                 new(ServiceRole.Gate, "gate"),
                 method,
-                new AccountRequest
+                new AccountCredentials
                 {
                     Username = "cancelled_user",
                     Password = "correct-password",
@@ -512,7 +512,7 @@ public sealed class PasswordHashingTests
             }
         );
         var player = new PlayerService(new MemoryStore(), key, TimeProvider.System, hasher);
-        var request = new AccountRequest
+        var request = new AccountCredentials
         {
             Username = "unknown_user",
             Password = "correct-password",
@@ -543,7 +543,11 @@ public sealed class PasswordHashingTests
         using RSA key = RSA.Create(2048);
         var store = new MemoryStore();
         var player = new PlayerService(store, key, TimeProvider.System);
-        var request = new AccountRequest { Username = "hash_user", Password = "correct-password" };
+        var request = new AccountCredentials
+        {
+            Username = "hash_user",
+            Password = "correct-password",
+        };
         Assert.That(
             (
                 await player.HandleAsync(

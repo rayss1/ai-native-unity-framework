@@ -29,14 +29,14 @@ namespace AiNative.Client.Prediction.Tests
             ClientPredictionAdapter adapter = Initialize(transport, 7, 1);
 
             adapter.SendInputAsync(42, 1000, -500).GetAwaiter().GetResult();
-            InputCommand expected = new InputCommand
+            C2S_InputCommand expected = new C2S_InputCommand
             {
                 RoomTick = 42,
                 Sequence = 1,
                 MoveXMilli = 1000,
                 MoveYMilli = -500,
             };
-            byte[] expectedFrame = Envelope(MessageId.InputCommand, expected);
+            byte[] expectedFrame = Envelope(MessageId.C2SInputCommand, expected);
 
             Assert.That(transport.LastPayload.ToArray(), Is.EqualTo(expectedFrame));
         }
@@ -48,14 +48,14 @@ namespace AiNative.Client.Prediction.Tests
             ClientPredictionAdapter adapter = Initialize(transport, 7, 1);
             adapter.SendInputAsync(11, 1000, 0).GetAwaiter().GetResult();
             adapter.SendInputAsync(12, 1000, 0).GetAwaiter().GetResult();
-            Snapshot snapshot = new Snapshot
+            S2C_SnapshotPush snapshot = new S2C_SnapshotPush
             {
                 ProtocolMajor = 1,
                 RoomTick = 11,
                 LastProcessedInputSequence = 1,
             };
             snapshot.Players.Add(new PlayerState { EntityId = 7, PositionXMilli = 40 });
-            byte[] frame = Envelope(MessageId.Snapshot, snapshot);
+            byte[] frame = Envelope(MessageId.S2CSnapshotPush, snapshot);
             Array.Resize(ref frame, frame.Length + 3);
             frame[frame.Length - 3] = 0xa0;
             frame[frame.Length - 2] = 0x06;
@@ -75,15 +75,15 @@ namespace AiNative.Client.Prediction.Tests
         {
             FakeRealtimeTransport transport = new FakeRealtimeTransport();
             ClientPredictionAdapter adapter = Initialize(transport, 7, 1);
-            Snapshot snapshot = new Snapshot { ProtocolMajor = 1, RoomTick = 12 };
+            S2C_SnapshotPush snapshot = new S2C_SnapshotPush { ProtocolMajor = 1, RoomTick = 12 };
             snapshot.Players.Add(new PlayerState { EntityId = 7 });
-            ReconnectResponse reconnect = new ReconnectResponse
+            S2C_ReconnectResponse reconnect = new S2C_ReconnectResponse
             {
                 ConnectionEpoch = 2,
                 ResumeTick = 12,
                 Snapshot = snapshot,
             };
-            byte[] frame = Envelope(MessageId.ReconnectResponse, reconnect);
+            byte[] frame = Envelope(MessageId.S2CReconnectResponse, reconnect);
 
             SnapshotApplyResult applied = adapter.ApplyPacket(
                 frame,
@@ -106,9 +106,9 @@ namespace AiNative.Client.Prediction.Tests
                 entityId,
                 16
             );
-            Snapshot snapshot = new Snapshot { ProtocolMajor = 1, RoomTick = 10 };
+            S2C_SnapshotPush snapshot = new S2C_SnapshotPush { ProtocolMajor = 1, RoomTick = 10 };
             snapshot.Players.Add(new PlayerState { EntityId = entityId });
-            byte[] frame = Envelope(MessageId.Snapshot, snapshot);
+            byte[] frame = Envelope(MessageId.S2CSnapshotPush, snapshot);
             SnapshotApplyResult applied = adapter.ApplyPacket(
                 frame,
                 new ReceivedPacket(SnapshotChannel, frame.Length, frame.Length, 1, connectionEpoch)

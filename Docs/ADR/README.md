@@ -37,6 +37,7 @@ Changing an accepted contract requires a superseding ADR that records compatibil
 | [0018](0018-arena-dead-input-consumption.md) | Accepted | Consume dead-player commands as no-ops | At most one consumed input per player per Tick; no actions from dead inputs; no invented ACKs | [Windows 128-total-client replay/soak passed](../Architecture/battle-slice-qualification-2026-10-06.md); other platforms remain separate |
 
 | [0019](0019-client-protocol-codecs.md) | Accepted | Client codec boundary and generated Protobuf | Explicit session injection, one decoded value buffer, no implementation dependency from prediction | [Current migration and validation](../Architecture/client-protocol-codecs.md) |
+| [0020](0020-directional-protocol-names.md) | Accepted | Directional protocol names | C2S/S2C/S2S envelopes, neutral shared payloads, unchanged binary layout | [Naming and migration](../Architecture/protocol-naming.md) |
 
 ## Open decision gates
 

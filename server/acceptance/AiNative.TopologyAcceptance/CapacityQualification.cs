@@ -297,7 +297,7 @@ public sealed class QualificationCombatEvidence(uint[] entities)
             AiNative.Gameplay.ArenaWeaponRules.Rocket.MagazineSize,
         ];
 
-    public void Observe(ReliableEvent message, bool measuring)
+    public void Observe(S2C_ReliableEventPush message, bool measuring)
     {
         if (message.CombatEvent is not { } combat || message.Sequence <= lastSequence)
             return;

@@ -8,10 +8,10 @@ namespace AiNative.Server.Fantasy;
 
 // Application indices 177 are reserved for backend control; realtime index 1 remains unchanged.
 [ProtoContract]
-internal sealed partial class FantasyControlRequest : AMessage, IAddressRequest
+internal sealed partial class S2S_FantasyControlRequest : AMessage, IAddressRequest
 {
     [ProtoIgnore]
-    public FantasyControlResponse ResponseType { get; set; } = null!;
+    public S2S_FantasyControlResponse ResponseType { get; set; } = null!;
 
     [ProtoMember(1)]
     public byte[] Payload { get; set; } = [];
@@ -22,7 +22,7 @@ internal sealed partial class FantasyControlRequest : AMessage, IAddressRequest
 }
 
 [ProtoContract]
-internal sealed partial class FantasyControlResponse : AMessage, IAddressResponse
+internal sealed partial class S2S_FantasyControlResponse : AMessage, IAddressResponse
 {
     [ProtoMember(1)]
     public uint ErrorCode { get; set; }
@@ -40,10 +40,10 @@ internal sealed partial class FantasyControlResponse : AMessage, IAddressRespons
 }
 
 [ProtoContract]
-internal sealed partial class FantasyGateRequest : AMessage, IRequest
+internal sealed partial class C2S_FantasyGateRequest : AMessage, IRequest
 {
     [ProtoIgnore]
-    public FantasyGateResponse ResponseType { get; set; } = null!;
+    public S2C_FantasyGateResponse ResponseType { get; set; } = null!;
 
     [ProtoMember(1)]
     public byte[] Payload { get; set; } = [];
@@ -54,7 +54,7 @@ internal sealed partial class FantasyGateRequest : AMessage, IRequest
 }
 
 [ProtoContract]
-internal sealed partial class FantasyGateResponse : AMessage, IResponse
+internal sealed partial class S2C_FantasyGateResponse : AMessage, IResponse
 {
     [ProtoMember(1)]
     public uint ErrorCode { get; set; }
@@ -72,12 +72,12 @@ internal sealed partial class FantasyGateResponse : AMessage, IResponse
 }
 
 internal sealed class FantasyControlHandler
-    : AddressRPC<Scene, FantasyControlRequest, FantasyControlResponse>
+    : AddressRPC<Scene, S2S_FantasyControlRequest, S2S_FantasyControlResponse>
 {
     protected override async FTask Run(
         Scene scene,
-        FantasyControlRequest request,
-        FantasyControlResponse response,
+        S2S_FantasyControlRequest request,
+        S2S_FantasyControlResponse response,
         Action reply
     )
     {
@@ -85,12 +85,13 @@ internal sealed class FantasyControlHandler
     }
 }
 
-internal sealed class FantasyGateHandler : MessageRPC<FantasyGateRequest, FantasyGateResponse>
+internal sealed class FantasyGateHandler
+    : MessageRPC<C2S_FantasyGateRequest, S2C_FantasyGateResponse>
 {
     protected override async FTask Run(
         global::Fantasy.Network.Session session,
-        FantasyGateRequest request,
-        FantasyGateResponse response,
+        C2S_FantasyGateRequest request,
+        S2C_FantasyGateResponse response,
         Action reply
     )
     {
@@ -106,7 +107,7 @@ internal sealed class FantasyGateHandler : MessageRPC<FantasyGateRequest, Fantas
 }
 
 [ProtoContract]
-internal sealed partial class FantasyGateNotification : AMessage, IMessage
+internal sealed partial class S2C_FantasyGatePush : AMessage, IMessage
 {
     [ProtoMember(1)]
     public byte[] Payload { get; set; } = [];
@@ -116,11 +117,11 @@ internal sealed partial class FantasyGateNotification : AMessage, IMessage
     public void Dispose() => Payload = [];
 }
 
-internal sealed class FantasyGateNotificationHandler : Message<FantasyGateNotification>
+internal sealed class FantasyGateNotificationHandler : Message<S2C_FantasyGatePush>
 {
     protected override async FTask Run(
         global::Fantasy.Network.Session session,
-        FantasyGateNotification notification
+        S2C_FantasyGatePush notification
     )
     {
         FantasyBackendProbe.Deliver(session.RuntimeId, notification.Payload);

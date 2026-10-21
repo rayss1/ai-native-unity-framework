@@ -62,14 +62,14 @@ public sealed class PresenceTests
             await lobby.HandleAsync(
                 gate,
                 ServiceMethods.PartyCreate,
-                new PartyCommand().ToByteArray()
+                new PartyOperation().ToByteArray()
             )
         ).Read(PartyState.Parser);
         party = (
             await lobby.HandleAsync(
                 gate,
                 ServiceMethods.PartyReady,
-                new PartyCommand
+                new PartyOperation
                 {
                     PartyId = party.PartyId,
                     ExpectedVersion = party.Version,
@@ -80,7 +80,7 @@ public sealed class PresenceTests
         await lobby.HandleAsync(
             gate,
             ServiceMethods.PartyQueue,
-            new PartyQueueRequest
+            new PartyQueueData
             {
                 PartyId = party.PartyId,
                 ExpectedVersion = party.Version,
@@ -97,7 +97,7 @@ public sealed class PresenceTests
             await lobby.HandleAsync(
                 gate,
                 ServiceMethods.PartyGet,
-                new PartyCommand { PartyId = party.PartyId }.ToByteArray()
+                new PartyOperation { PartyId = party.PartyId }.ToByteArray()
             )
         ).Read(PartyState.Parser);
         Assert.That(after, Is.EqualTo(party));
@@ -106,7 +106,7 @@ public sealed class PresenceTests
                 await lobby.HandleAsync(
                     gate,
                     ServiceMethods.PartyLeave,
-                    new PartyCommand
+                    new PartyOperation
                     {
                         PartyId = party.PartyId,
                         ExpectedVersion = party.Version,

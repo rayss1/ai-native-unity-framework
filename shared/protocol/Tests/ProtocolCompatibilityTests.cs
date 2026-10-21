@@ -9,7 +9,7 @@ public sealed class ProtocolCompatibilityTests
     [Test]
     public void InputCommandMatchesGoldenBytes()
     {
-        InputCommand command = CreateInputCommand();
+        C2S_InputCommand command = CreateInputCommand();
 
         Assert.That(
             Convert.ToHexString(command.ToByteArray()),
@@ -20,10 +20,10 @@ public sealed class ProtocolCompatibilityTests
     [Test]
     public void InputBatchMatchesGoldenBytes()
     {
-        InputBatch batch = new();
+        C2S_InputBatch batch = new();
         batch.Commands.Add(CreateInputCommand());
         batch.Commands.Add(
-            new InputCommand
+            new C2S_InputCommand
             {
                 RoomTick = 43,
                 Sequence = 8,
@@ -46,7 +46,7 @@ public sealed class ProtocolCompatibilityTests
         byte[] current = CreateInputCommand().ToByteArray();
         byte[] future = current.Concat(new byte[] { 0xA0, 0x06, 0x01 }).ToArray();
 
-        InputCommand parsed = InputCommand.Parser.ParseFrom(future);
+        C2S_InputCommand parsed = C2S_InputCommand.Parser.ParseFrom(future);
 
         Assert.That(parsed.ToByteArray(), Is.EqualTo(future));
     }
@@ -54,8 +54,8 @@ public sealed class ProtocolCompatibilityTests
     [Test]
     public void SnapshotInputAcknowledgementIsAdditiveAndStable()
     {
-        Snapshot current = new() { ProtocolMajor = 1, LastProcessedInputSequence = 42 };
-        Snapshot legacy = Snapshot.Parser.ParseFrom(new byte[] { 0x08, 0x01 });
+        S2C_SnapshotPush current = new() { ProtocolMajor = 1, LastProcessedInputSequence = 42 };
+        S2C_SnapshotPush legacy = S2C_SnapshotPush.Parser.ParseFrom(new byte[] { 0x08, 0x01 });
 
         Assert.That(Convert.ToHexString(current.ToByteArray()), Is.EqualTo("0801302A"));
         Assert.That(legacy.ProtocolMajor, Is.EqualTo(1));
@@ -65,7 +65,7 @@ public sealed class ProtocolCompatibilityTests
     [Test]
     public void ArenaFieldsAreAdditiveAndRoundTrip()
     {
-        InputCommand input = new()
+        C2S_InputCommand input = new()
         {
             RoomTick = 12,
             Sequence = 4,
@@ -74,7 +74,7 @@ public sealed class ProtocolCompatibilityTests
             LookPitchMilli = -400,
             Buttons = (uint)(ArenaButton.Fire | ArenaButton.Jump),
         };
-        Snapshot snapshot = new()
+        S2C_SnapshotPush snapshot = new()
         {
             ProtocolMajor = 1,
             MatchPhase = ArenaMatchPhase.ArenaMatchActive,
@@ -95,8 +95,8 @@ public sealed class ProtocolCompatibilityTests
             }
         );
 
-        InputCommand parsedInput = InputCommand.Parser.ParseFrom(input.ToByteArray());
-        Snapshot parsedSnapshot = Snapshot.Parser.ParseFrom(snapshot.ToByteArray());
+        C2S_InputCommand parsedInput = C2S_InputCommand.Parser.ParseFrom(input.ToByteArray());
+        S2C_SnapshotPush parsedSnapshot = S2C_SnapshotPush.Parser.ParseFrom(snapshot.ToByteArray());
 
         Assert.That(parsedInput.WeaponId, Is.EqualTo((uint)ArenaWeaponId.ArenaWeaponRocket));
         Assert.That(parsedInput.LookYawMilli, Is.EqualTo(1250));
@@ -109,14 +109,14 @@ public sealed class ProtocolCompatibilityTests
     [Test]
     public void ReliableCombatEventRoundTripsWithoutChangingLegacyPayload()
     {
-        ReliableEvent legacy = new()
+        S2C_ReliableEventPush legacy = new()
         {
             RoomTick = 8,
             Sequence = 2,
             EventType = 7,
             Payload = ByteString.CopyFromUtf8("legacy"),
         };
-        ReliableEvent current = new(legacy)
+        S2C_ReliableEventPush current = new(legacy)
         {
             CombatEvent = new ArenaCombatEvent
             {
@@ -129,7 +129,9 @@ public sealed class ProtocolCompatibilityTests
             },
         };
 
-        ReliableEvent parsed = ReliableEvent.Parser.ParseFrom(current.ToByteArray());
+        S2C_ReliableEventPush parsed = S2C_ReliableEventPush.Parser.ParseFrom(
+            current.ToByteArray()
+        );
 
         Assert.That(parsed.Payload.ToStringUtf8(), Is.EqualTo("legacy"));
         Assert.That(parsed.CombatEvent.EventType, Is.EqualTo(ArenaCombatEventType.ArenaEventKill));
@@ -141,7 +143,7 @@ public sealed class ProtocolCompatibilityTests
     public void MalformedInputIsRejected()
     {
         Assert.That(
-            () => InputCommand.Parser.ParseFrom(new byte[] { 0x0A, 0x05, 0x01 }),
+            () => C2S_InputCommand.Parser.ParseFrom(new byte[] { 0x0A, 0x05, 0x01 }),
             Throws.TypeOf<InvalidProtocolBufferException>()
         );
     }
@@ -158,7 +160,7 @@ public sealed class ProtocolCompatibilityTests
         Assert.That(ids, Has.All.Positive);
     }
 
-    private static InputCommand CreateInputCommand() =>
+    private static C2S_InputCommand CreateInputCommand() =>
         new()
         {
             RoomTick = 42,

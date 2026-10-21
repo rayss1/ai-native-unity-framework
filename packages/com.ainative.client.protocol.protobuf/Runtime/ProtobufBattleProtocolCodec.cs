@@ -13,7 +13,7 @@ namespace AiNative.Client.Protocol.Protobuf
     /// <summary>Session-owned, single-threaded codec. Generated messages never escape this boundary.</summary>
     public sealed class ProtobufBattleProtocolCodec : IBattleProtocolCodec
     {
-        private readonly Wire.InputCommand input = new Wire.InputCommand();
+        private readonly Wire.C2S_InputCommand input = new Wire.C2S_InputCommand();
         private readonly byte[] receive = new byte[1200];
         private readonly BattlePacketBuffer scratch = new BattlePacketBuffer();
         private bool disposed;
@@ -86,7 +86,7 @@ namespace AiNative.Client.Protocol.Protobuf
                 return false;
             return Encode(
                 1000,
-                new Wire.LoginRequest
+                new Wire.C2S_LoginRequest
                 {
                     ProtocolMajor = 1,
                     ClientBuild = clientBuild ?? "",
@@ -112,7 +112,7 @@ namespace AiNative.Client.Protocol.Protobuf
                 && roomId != 0
                 && Encode(
                     1010,
-                    new Wire.JoinRoomRequest { SessionId = sessionId, RequestedRoom = roomId },
+                    new Wire.C2S_JoinRoomRequest { SessionId = sessionId, RequestedRoom = roomId },
                     destination,
                     MaximumFrameBytes,
                     out writtenBytes
@@ -134,7 +134,7 @@ namespace AiNative.Client.Protocol.Protobuf
                 && lastTick <= long.MaxValue
                 && Encode(
                     1200,
-                    new Wire.ReconnectRequest
+                    new Wire.C2S_ReconnectRequest
                     {
                         SessionId = sessionId,
                         ConnectionEpoch = epoch,
@@ -182,19 +182,19 @@ namespace AiNative.Client.Protocol.Protobuf
             switch (id)
             {
                 case 1001:
-                    descriptor = Wire.LoginResponse.Descriptor;
+                    descriptor = Wire.S2C_LoginResponse.Descriptor;
                     break;
                 case 1011:
-                    descriptor = Wire.JoinRoomResponse.Descriptor;
+                    descriptor = Wire.S2C_JoinRoomResponse.Descriptor;
                     break;
                 case 1101:
-                    descriptor = Wire.Snapshot.Descriptor;
+                    descriptor = Wire.S2C_SnapshotPush.Descriptor;
                     break;
                 case 1102:
-                    descriptor = Wire.ReliableEvent.Descriptor;
+                    descriptor = Wire.S2C_ReliableEventPush.Descriptor;
                     break;
                 case 1201:
-                    descriptor = Wire.ReconnectResponse.Descriptor;
+                    descriptor = Wire.S2C_ReconnectResponse.Descriptor;
                     break;
                 default:
                     return BattleDecodeStatus.UnknownMessage;
@@ -211,7 +211,7 @@ namespace AiNative.Client.Protocol.Protobuf
                 switch (id)
                 {
                     case 1001:
-                        var login = Wire.LoginResponse.Parser.ParseFrom(receive, 0, length);
+                        var login = Wire.S2C_LoginResponse.Parser.ParseFrom(receive, 0, length);
                         if (
                             login.SessionId == 0
                             || login.ConnectionEpoch == 0
@@ -226,7 +226,7 @@ namespace AiNative.Client.Protocol.Protobuf
                         scratch.BootEpoch = login.BootEpoch;
                         break;
                     case 1011:
-                        var join = Wire.JoinRoomResponse.Parser.ParseFrom(receive, 0, length);
+                        var join = Wire.S2C_JoinRoomResponse.Parser.ParseFrom(receive, 0, length);
                         if (join.RoomId == 0 || join.EntityId == 0 || join.TickRate == 0)
                             return BattleDecodeStatus.MalformedPayload;
                         scratch.Kind = BattleMessageKind.JoinResponse;
@@ -235,7 +235,7 @@ namespace AiNative.Client.Protocol.Protobuf
                         scratch.TickRate = join.TickRate;
                         break;
                     case 1101:
-                        var snapshot = Wire.Snapshot.Parser.ParseFrom(receive, 0, length);
+                        var snapshot = Wire.S2C_SnapshotPush.Parser.ParseFrom(receive, 0, length);
                         if (snapshot.ProtocolMajor != 1)
                             return BattleDecodeStatus.ProtocolMismatch;
                         if (!MapSnapshot(snapshot, arena))
@@ -243,7 +243,11 @@ namespace AiNative.Client.Protocol.Protobuf
                         scratch.Kind = BattleMessageKind.Snapshot;
                         break;
                     case 1201:
-                        var reconnect = Wire.ReconnectResponse.Parser.ParseFrom(receive, 0, length);
+                        var reconnect = Wire.S2C_ReconnectResponse.Parser.ParseFrom(
+                            receive,
+                            0,
+                            length
+                        );
                         if (
                             reconnect.Snapshot == null
                             || reconnect.ConnectionEpoch == 0
@@ -258,7 +262,11 @@ namespace AiNative.Client.Protocol.Protobuf
                         scratch.Kind = BattleMessageKind.ReconnectResponse;
                         break;
                     case 1102:
-                        var reliable = Wire.ReliableEvent.Parser.ParseFrom(receive, 0, length);
+                        var reliable = Wire.S2C_ReliableEventPush.Parser.ParseFrom(
+                            receive,
+                            0,
+                            length
+                        );
                         if (!MapEvent(reliable))
                             return BattleDecodeStatus.MalformedPayload;
                         break;
@@ -349,7 +357,7 @@ namespace AiNative.Client.Protocol.Protobuf
             return stream.Position == end;
         }
 
-        private bool MapSnapshot(Wire.Snapshot value, bool arena)
+        private bool MapSnapshot(Wire.S2C_SnapshotPush value, bool arena)
         {
             if (
                 value.RoomTick > long.MaxValue
@@ -432,7 +440,7 @@ namespace AiNative.Client.Protocol.Protobuf
             return true;
         }
 
-        private bool MapEvent(Wire.ReliableEvent value)
+        private bool MapEvent(Wire.S2C_ReliableEventPush value)
         {
             var e = value.CombatEvent;
             if (

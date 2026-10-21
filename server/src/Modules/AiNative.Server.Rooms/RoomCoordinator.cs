@@ -104,7 +104,7 @@ public sealed class RoomCoordinator : IServiceHandler
                     ),
                 ServiceMethods.Allocate when context.Caller == ServiceRole.Match =>
                     await AllocateAsync(
-                        AllocationRequest.Parser.ParseFrom(payload.Span),
+                        AllocationSpec.Parser.ParseFrom(payload.Span),
                         cancellationToken
                     ),
                 ServiceMethods.RoomGet => Get(RoomQuery.Parser.ParseFrom(payload.Span)),
@@ -272,7 +272,7 @@ public sealed class RoomCoordinator : IServiceHandler
     }
 
     private async ValueTask<ServiceReply> AllocateAsync(
-        AllocationRequest request,
+        AllocationSpec request,
         CancellationToken ct
     )
     {

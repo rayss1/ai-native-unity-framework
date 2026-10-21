@@ -1,6 +1,6 @@
 {
   "artifactsSha256": {
-    "AiNative.Protocol.dll": "47ee765db68f82fba6875d95ccb65b7c7f40c83f154d1bd07929d309fefa3ed1",
+    "AiNative.Protocol.dll": "060f7fd65a945562deeb74249219e9ba8155c874287017c268d8fd1c36854202",
     "Google.Protobuf.dll": "67fd69447f2e8eeb45c4c27375e4625f0bb93c22fa9774ba9795f10a15cb190f"
   },
   "dependencies": {
@@ -29,13 +29,13 @@
   "runtimeAsset": "lib/netstandard2.0/Google.Protobuf.dll",
   "sourcesSha256": {
     "global.json": "44eb0e45562fb344b3bfd58406019c3b18e0796a0638fbc7d4491d9794be24fa",
-    "shared/generated/csharp/ainative/v1/Backend.cs": "91f8e07c71868c1b34f74b18f143c0afe9a93428b4a48692905e364985d17faf",
-    "shared/generated/csharp/ainative/v1/Gameplay.cs": "9b57ad1dc5f8a2e1c5a6c0b40da9faff3b5f6ecf85d9ab4e4e8efcfe0cd5927b",
-    "shared/generated/csharp/ainative/v1/GateEnvelope.cs": "0348fbc4530dc84d24d6dded3915e917991b266e4cfe314bbd33959c05a53dab",
+    "shared/generated/csharp/ainative/v1/Backend.cs": "5923d94f93a84707c7d452b1b10ae1eef9a63169b7ef1ef2e052cd257a43385f",
+    "shared/generated/csharp/ainative/v1/Gameplay.cs": "9009dc04ce8189914b3b72824c87df8a75ce1a4a424c7bdbed9b0cf87184b949",
+    "shared/generated/csharp/ainative/v1/GateEnvelope.cs": "452a3f4c668ef7825a2a43a4f56e6470cbe256c4e37613174d69c855403487fb",
     "shared/protocol/Protocol.Shared.csproj": "f3c5a1a5de5310633ba2a9c14fa9928852db047257f6c70a0fc5f86ef80386e1",
-    "shared/schemas/ainative/v1/backend.proto": "c3165fd9c50e4f230870a25c060f6ca345d7c182d0f0bb57e5b7877063c60362",
-    "shared/schemas/ainative/v1/gameplay.proto": "f06bc8ccf7d0b757f2c122904da8c6e46bd3a822404856f931d3d3403747265d",
-    "shared/schemas/ainative/v1/gate_envelope.proto": "3cb9e808762794b465b7be1f7dbe696885934056d2ad06117e0f7027bdf9e589",
+    "shared/schemas/ainative/v1/backend.proto": "23b35c836632c4119d201d7227a442eacc1027a95c8bb17d46c64e62343f8f5e",
+    "shared/schemas/ainative/v1/gameplay.proto": "844b11d83b333436836c750899d48cd92dc15f29421a00514381c214368d86e6",
+    "shared/schemas/ainative/v1/gate_envelope.proto": "9549c6ff14ada1acf342b64eec5570bfb841b07cd8d291d68cddf65388f1ed8c",
     "tools/ProtocolCodegen/ProtocolCodegen.csproj": "fc93026316c3907da0ce5ae036ec0fb38ee4a1a6864c3b1704776fb728dcb284",
     "tools/ProtocolCodegen/package_unity.py": "f8ff31170def8e0f16bd2d9859e1c90a3abb58a88652f5bef7a4c4d27ed2ea7b"
   },

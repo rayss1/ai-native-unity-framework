@@ -59,7 +59,7 @@ public sealed class PeerAuthentication : IDisposable
 
     public IReadOnlyCollection<ServicePeer> Peers => _peers.Values.Select(x => x.Peer).ToArray();
 
-    public void Sign(ControlRequest request)
+    public void Sign(S2S_ControlRequest request)
     {
         request.Credential = "";
         string stamp = _clock
@@ -79,7 +79,7 @@ public sealed class PeerAuthentication : IDisposable
         request.Credential = header + "|" + Convert.ToBase64String(signature);
     }
 
-    public bool TryAuthenticate(ControlRequest request, out ServiceCallContext context)
+    public bool TryAuthenticate(S2S_ControlRequest request, out ServiceCallContext context)
     {
         context = default;
         if (
@@ -120,7 +120,7 @@ public sealed class PeerAuthentication : IDisposable
         {
             return false;
         }
-        ControlRequest unsigned = request.Clone();
+        S2S_ControlRequest unsigned = request.Clone();
         unsigned.Credential = "";
         lock (_verify)
         {
@@ -150,7 +150,7 @@ public sealed class PeerAuthentication : IDisposable
         return true;
     }
 
-    private static byte[] SignedBytes(string header, ControlRequest request)
+    private static byte[] SignedBytes(string header, S2S_ControlRequest request)
     {
         byte[] prefix = System.Text.Encoding.UTF8.GetBytes(header + "|");
         byte[] payload = request.ToByteArray();

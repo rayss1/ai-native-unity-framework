@@ -24,97 +24,99 @@ namespace AiNative.Protocol.V1 {
     static GameplayReflection() {
       byte[] descriptorData = global::System.Convert.FromBase64String(
           string.Concat(
-            "ChphaW5hdGl2ZS92MS9nYW1lcGxheS5wcm90bxILYWluYXRpdmUudjEicQoM",
-            "TG9naW5SZXF1ZXN0EhYKDnByb3RvY29sX21ham9yGAEgASgNEhQKDGNsaWVu",
-            "dF9idWlsZBgCIAEoCRIUCgxlbnRyeV90aWNrZXQYAyABKAkSFgoOZ2xvYmFs",
-            "X3Jvb21faWQYBCABKAlKBQhkEMgBIoMBCg1Mb2dpblJlc3BvbnNlEhIKCnNl",
-            "c3Npb25faWQYASABKAYSGAoQY29ubmVjdGlvbl9lcG9jaBgCIAEoDRIWCg5n",
-            "bG9iYWxfcm9vbV9pZBgDIAEoCRISCgpib290X2Vwb2NoGAQgASgJEhEKCXJv",
-            "b21fdGljaxgFIAEoBkoFCGQQyAEiRAoPSm9pblJvb21SZXF1ZXN0EhIKCnNl",
-            "c3Npb25faWQYASABKAYSFgoOcmVxdWVzdGVkX3Jvb20YAiABKA1KBQhkEMgB",
-            "IlAKEEpvaW5Sb29tUmVzcG9uc2USDwoHcm9vbV9pZBgBIAEoDRIRCgllbnRp",
-            "dHlfaWQYAiABKA0SEQoJdGlja19yYXRlGAMgASgNSgUIZBDIASLWAQoMSW5w",
-            "dXRDb21tYW5kEhEKCXJvb21fdGljaxgBIAEoBhIQCghzZXF1ZW5jZRgCIAEo",
-            "DRIUCgxtb3ZlX3hfbWlsbGkYAyABKBESFAoMbW92ZV95X21pbGxpGAQgASgR",
-            "EhgKEHlhd19taWxsaWRlZ3JlZXMYBSABKBESDwoHYnV0dG9ucxgGIAEoDRIR",
-            "Cgl3ZWFwb25faWQYByABKA0SFgoObG9va195YXdfbWlsbGkYCCABKBESGAoQ",
-            "bG9va19waXRjaF9taWxsaRgJIAEoEUoFCGQQyAEiQAoKSW5wdXRCYXRjaBIr",
-            "Cghjb21tYW5kcxgBIAMoCzIZLmFpbmF0aXZlLnYxLklucHV0Q29tbWFuZEoF",
-            "CGQQyAEi6gIKC1BsYXllclN0YXRlEhEKCWVudGl0eV9pZBgBIAEoDRIYChBw",
-            "b3NpdGlvbl94X21pbGxpGAIgASgREhgKEHBvc2l0aW9uX3lfbWlsbGkYAyAB",
-            "KBESGAoQcG9zaXRpb25fel9taWxsaRgEIAEoERIYChB5YXdfbWlsbGlkZWdy",
-            "ZWVzGAUgASgREg4KBmhlYWx0aBgGIAEoDRIjCht2ZWxvY2l0eV94X21pbGxp",
-            "X3Blcl9zZWNvbmQYByABKBESIwobdmVsb2NpdHlfeV9taWxsaV9wZXJfc2Vj",
-            "b25kGAggASgREiMKG3ZlbG9jaXR5X3pfbWlsbGlfcGVyX3NlY29uZBgJIAEo",
-            "ERIRCgl3ZWFwb25faWQYCiABKA0SDQoFYXJtb3IYCyABKA0SDQoFYWxpdmUY",
-            "DCABKAgSDQoFa2lsbHMYDSABKA0SGgoScGl0Y2hfbWlsbGlkZWdyZWVzGA4g",
-            "ASgRSgUIZBDIASLOAQoLUGlja3VwU3RhdGUSEQoJcGlja3VwX2lkGAEgASgN",
-            "EjEKC3BpY2t1cF90eXBlGAIgASgOMhwuYWluYXRpdmUudjEuQXJlbmFQaWNr",
-            "dXBUeXBlEhgKEHBvc2l0aW9uX3hfbWlsbGkYAyABKBESGAoQcG9zaXRpb25f",
-            "eV9taWxsaRgEIAEoERIYChBwb3NpdGlvbl96X21pbGxpGAUgASgREg4KBmFj",
-            "dGl2ZRgGIAEoCBIUCgxyZXNwYXduX3RpY2sYByABKAZKBQhkEMgBIsoCCghT",
-            "bmFwc2hvdBIWCg5wcm90b2NvbF9tYWpvchgBIAEoDRIRCglyb29tX3RpY2sY",
-            "AiABKAYSFQoNYmFzZWxpbmVfdGljaxgDIAEoBhIpCgdwbGF5ZXJzGAQgAygL",
-            "MhguYWluYXRpdmUudjEuUGxheWVyU3RhdGUSEgoKc3RhdGVfaGFzaBgFIAEo",
-            "BhIlCh1sYXN0X3Byb2Nlc3NlZF9pbnB1dF9zZXF1ZW5jZRgGIAEoDRIxCgtt",
-            "YXRjaF9waGFzZRgHIAEoDjIcLmFpbmF0aXZlLnYxLkFyZW5hTWF0Y2hQaGFz",
-            "ZRIXCg9yZW1haW5pbmdfdGlja3MYCCABKA0SGAoQbGVhZGVyX2VudGl0eV9p",
-            "ZBgJIAEoDRIpCgdwaWNrdXBzGAogAygLMhguYWluYXRpdmUudjEuUGlja3Vw",
-            "U3RhdGVKBQhkEMgBIqUCChBBcmVuYUNvbWJhdEV2ZW50EjUKCmV2ZW50X3R5",
-            "cGUYASABKA4yIS5haW5hdGl2ZS52MS5BcmVuYUNvbWJhdEV2ZW50VHlwZRIS",
-            "CgpldmVudF90aWNrGAIgASgGEhgKEHNvdXJjZV9lbnRpdHlfaWQYAyABKA0S",
-            "GAoQdGFyZ2V0X2VudGl0eV9pZBgEIAEoDRItCgl3ZWFwb25faWQYBSABKA4y",
-            "Gi5haW5hdGl2ZS52MS5BcmVuYVdlYXBvbklkEg4KBmRhbWFnZRgGIAEoDRIY",
-            "ChBwb3NpdGlvbl94X21pbGxpGAcgASgREhgKEHBvc2l0aW9uX3lfbWlsbGkY",
-            "CCABKBESGAoQcG9zaXRpb25fel9taWxsaRgJIAEoEUoFCGQQyAEilQEKDVJl",
-            "bGlhYmxlRXZlbnQSEQoJcm9vbV90aWNrGAEgASgGEhAKCHNlcXVlbmNlGAIg",
-            "ASgNEhIKCmV2ZW50X3R5cGUYAyABKA0SDwoHcGF5bG9hZBgEIAEoDBIzCgxj",
-            "b21iYXRfZXZlbnQYBSABKAsyHS5haW5hdGl2ZS52MS5BcmVuYUNvbWJhdEV2",
-            "ZW50SgUIZBDIASJjChBSZWNvbm5lY3RSZXF1ZXN0EhIKCnNlc3Npb25faWQY",
-            "ASABKAYSGAoQY29ubmVjdGlvbl9lcG9jaBgCIAEoDRIaChJsYXN0X3JlY2Vp",
-            "dmVkX3RpY2sYAyABKAZKBQhkEMgBInIKEVJlY29ubmVjdFJlc3BvbnNlEhgK",
-            "EGNvbm5lY3Rpb25fZXBvY2gYASABKA0SEwoLcmVzdW1lX3RpY2sYAiABKAYS",
-            "JwoIc25hcHNob3QYAyABKAsyFS5haW5hdGl2ZS52MS5TbmFwc2hvdEoFCGQQ",
-            "yAEq6gIKCU1lc3NhZ2VJZBIaChZNRVNTQUdFX0lEX1VOU1BFQ0lGSUVEEAAS",
-            "HQoYTUVTU0FHRV9JRF9MT0dJTl9SRVFVRVNUEOgHEh4KGU1FU1NBR0VfSURf",
-            "TE9HSU5fUkVTUE9OU0UQ6QcSIQocTUVTU0FHRV9JRF9KT0lOX1JPT01fUkVR",
-            "VUVTVBDyBxIiCh1NRVNTQUdFX0lEX0pPSU5fUk9PTV9SRVNQT05TRRDzBxId",
-            "ChhNRVNTQUdFX0lEX0lOUFVUX0NPTU1BTkQQzAgSGAoTTUVTU0FHRV9JRF9T",
-            "TkFQU0hPVBDNCBIeChlNRVNTQUdFX0lEX1JFTElBQkxFX0VWRU5UEM4IEhsK",
-            "Fk1FU1NBR0VfSURfSU5QVVRfQkFUQ0gQzwgSIQocTUVTU0FHRV9JRF9SRUNP",
-            "Tk5FQ1RfUkVRVUVTVBCwCRIiCh1NRVNTQUdFX0lEX1JFQ09OTkVDVF9SRVNQ",
-            "T05TRRCxCSqrAQoLQXJlbmFCdXR0b24SFQoRQVJFTkFfQlVUVE9OX05PTkUQ",
-            "ABIVChFBUkVOQV9CVVRUT05fRklSRRABEhUKEUFSRU5BX0JVVFRPTl9KVU1Q",
-            "EAISFwoTQVJFTkFfQlVUVE9OX1JFTE9BRBAEEhwKGEFSRU5BX0JVVFRPTl9O",
-            "RVhUX1dFQVBPThAIEiAKHEFSRU5BX0JVVFRPTl9QUkVWSU9VU19XRUFQT04Q",
-            "ECp2Cg1BcmVuYVdlYXBvbklkEhUKEUFSRU5BX1dFQVBPTl9OT05FEAASGwoX",
-            "QVJFTkFfV0VBUE9OX01BQ0hJTkVHVU4QARIYChRBUkVOQV9XRUFQT05fU0hP",
-            "VEdVThACEhcKE0FSRU5BX1dFQVBPTl9ST0NLRVQQAypcCg9BcmVuYU1hdGNo",
-            "UGhhc2USFwoTQVJFTkFfTUFUQ0hfV0FJVElORxAAEhYKEkFSRU5BX01BVENI",
-            "X0FDVElWRRABEhgKFEFSRU5BX01BVENIX0ZJTklTSEVEEAIqXAoPQXJlbmFQ",
-            "aWNrdXBUeXBlEhgKFEFSRU5BX1BJQ0tVUF9VTktOT1dOEAASFwoTQVJFTkFf",
-            "UElDS1VQX0hFQUxUSBABEhYKEkFSRU5BX1BJQ0tVUF9BUk1PUhACKqcBChRB",
-            "cmVuYUNvbWJhdEV2ZW50VHlwZRIUChBBUkVOQV9FVkVOVF9GSVJFEAASEwoP",
-            "QVJFTkFfRVZFTlRfSElUEAESFAoQQVJFTkFfRVZFTlRfS0lMTBACEhcKE0FS",
-            "RU5BX0VWRU5UX1JFU1BBV04QAxIWChJBUkVOQV9FVkVOVF9QSUNLVVAQBBId",
-            "ChlBUkVOQV9FVkVOVF9XRUFQT05fU1dJVENIEAVCF6oCFEFpTmF0aXZlLlBy",
-            "b3RvY29sLlYxYgZwcm90bzM="));
+            "ChphaW5hdGl2ZS92MS9nYW1lcGxheS5wcm90bxILYWluYXRpdmUudjEidQoQ",
+            "QzJTX0xvZ2luUmVxdWVzdBIWCg5wcm90b2NvbF9tYWpvchgBIAEoDRIUCgxj",
+            "bGllbnRfYnVpbGQYAiABKAkSFAoMZW50cnlfdGlja2V0GAMgASgJEhYKDmds",
+            "b2JhbF9yb29tX2lkGAQgASgJSgUIZBDIASKHAQoRUzJDX0xvZ2luUmVzcG9u",
+            "c2USEgoKc2Vzc2lvbl9pZBgBIAEoBhIYChBjb25uZWN0aW9uX2Vwb2NoGAIg",
+            "ASgNEhYKDmdsb2JhbF9yb29tX2lkGAMgASgJEhIKCmJvb3RfZXBvY2gYBCAB",
+            "KAkSEQoJcm9vbV90aWNrGAUgASgGSgUIZBDIASJIChNDMlNfSm9pblJvb21S",
+            "ZXF1ZXN0EhIKCnNlc3Npb25faWQYASABKAYSFgoOcmVxdWVzdGVkX3Jvb20Y",
+            "AiABKA1KBQhkEMgBIlQKFFMyQ19Kb2luUm9vbVJlc3BvbnNlEg8KB3Jvb21f",
+            "aWQYASABKA0SEQoJZW50aXR5X2lkGAIgASgNEhEKCXRpY2tfcmF0ZRgDIAEo",
+            "DUoFCGQQyAEi2gEKEEMyU19JbnB1dENvbW1hbmQSEQoJcm9vbV90aWNrGAEg",
+            "ASgGEhAKCHNlcXVlbmNlGAIgASgNEhQKDG1vdmVfeF9taWxsaRgDIAEoERIU",
+            "Cgxtb3ZlX3lfbWlsbGkYBCABKBESGAoQeWF3X21pbGxpZGVncmVlcxgFIAEo",
+            "ERIPCgdidXR0b25zGAYgASgNEhEKCXdlYXBvbl9pZBgHIAEoDRIWCg5sb29r",
+            "X3lhd19taWxsaRgIIAEoERIYChBsb29rX3BpdGNoX21pbGxpGAkgASgRSgUI",
+            "ZBDIASJICg5DMlNfSW5wdXRCYXRjaBIvCghjb21tYW5kcxgBIAMoCzIdLmFp",
+            "bmF0aXZlLnYxLkMyU19JbnB1dENvbW1hbmRKBQhkEMgBIuoCCgtQbGF5ZXJT",
+            "dGF0ZRIRCgllbnRpdHlfaWQYASABKA0SGAoQcG9zaXRpb25feF9taWxsaRgC",
+            "IAEoERIYChBwb3NpdGlvbl95X21pbGxpGAMgASgREhgKEHBvc2l0aW9uX3pf",
+            "bWlsbGkYBCABKBESGAoQeWF3X21pbGxpZGVncmVlcxgFIAEoERIOCgZoZWFs",
+            "dGgYBiABKA0SIwobdmVsb2NpdHlfeF9taWxsaV9wZXJfc2Vjb25kGAcgASgR",
+            "EiMKG3ZlbG9jaXR5X3lfbWlsbGlfcGVyX3NlY29uZBgIIAEoERIjCht2ZWxv",
+            "Y2l0eV96X21pbGxpX3Blcl9zZWNvbmQYCSABKBESEQoJd2VhcG9uX2lkGAog",
+            "ASgNEg0KBWFybW9yGAsgASgNEg0KBWFsaXZlGAwgASgIEg0KBWtpbGxzGA0g",
+            "ASgNEhoKEnBpdGNoX21pbGxpZGVncmVlcxgOIAEoEUoFCGQQyAEizgEKC1Bp",
+            "Y2t1cFN0YXRlEhEKCXBpY2t1cF9pZBgBIAEoDRIxCgtwaWNrdXBfdHlwZRgC",
+            "IAEoDjIcLmFpbmF0aXZlLnYxLkFyZW5hUGlja3VwVHlwZRIYChBwb3NpdGlv",
+            "bl94X21pbGxpGAMgASgREhgKEHBvc2l0aW9uX3lfbWlsbGkYBCABKBESGAoQ",
+            "cG9zaXRpb25fel9taWxsaRgFIAEoERIOCgZhY3RpdmUYBiABKAgSFAoMcmVz",
+            "cGF3bl90aWNrGAcgASgGSgUIZBDIASLSAgoQUzJDX1NuYXBzaG90UHVzaBIW",
+            "Cg5wcm90b2NvbF9tYWpvchgBIAEoDRIRCglyb29tX3RpY2sYAiABKAYSFQoN",
+            "YmFzZWxpbmVfdGljaxgDIAEoBhIpCgdwbGF5ZXJzGAQgAygLMhguYWluYXRp",
+            "dmUudjEuUGxheWVyU3RhdGUSEgoKc3RhdGVfaGFzaBgFIAEoBhIlCh1sYXN0",
+            "X3Byb2Nlc3NlZF9pbnB1dF9zZXF1ZW5jZRgGIAEoDRIxCgttYXRjaF9waGFz",
+            "ZRgHIAEoDjIcLmFpbmF0aXZlLnYxLkFyZW5hTWF0Y2hQaGFzZRIXCg9yZW1h",
+            "aW5pbmdfdGlja3MYCCABKA0SGAoQbGVhZGVyX2VudGl0eV9pZBgJIAEoDRIp",
+            "CgdwaWNrdXBzGAogAygLMhguYWluYXRpdmUudjEuUGlja3VwU3RhdGVKBQhk",
+            "EMgBIqUCChBBcmVuYUNvbWJhdEV2ZW50EjUKCmV2ZW50X3R5cGUYASABKA4y",
+            "IS5haW5hdGl2ZS52MS5BcmVuYUNvbWJhdEV2ZW50VHlwZRISCgpldmVudF90",
+            "aWNrGAIgASgGEhgKEHNvdXJjZV9lbnRpdHlfaWQYAyABKA0SGAoQdGFyZ2V0",
+            "X2VudGl0eV9pZBgEIAEoDRItCgl3ZWFwb25faWQYBSABKA4yGi5haW5hdGl2",
+            "ZS52MS5BcmVuYVdlYXBvbklkEg4KBmRhbWFnZRgGIAEoDRIYChBwb3NpdGlv",
+            "bl94X21pbGxpGAcgASgREhgKEHBvc2l0aW9uX3lfbWlsbGkYCCABKBESGAoQ",
+            "cG9zaXRpb25fel9taWxsaRgJIAEoEUoFCGQQyAEinQEKFVMyQ19SZWxpYWJs",
+            "ZUV2ZW50UHVzaBIRCglyb29tX3RpY2sYASABKAYSEAoIc2VxdWVuY2UYAiAB",
+            "KA0SEgoKZXZlbnRfdHlwZRgDIAEoDRIPCgdwYXlsb2FkGAQgASgMEjMKDGNv",
+            "bWJhdF9ldmVudBgFIAEoCzIdLmFpbmF0aXZlLnYxLkFyZW5hQ29tYmF0RXZl",
+            "bnRKBQhkEMgBImcKFEMyU19SZWNvbm5lY3RSZXF1ZXN0EhIKCnNlc3Npb25f",
+            "aWQYASABKAYSGAoQY29ubmVjdGlvbl9lcG9jaBgCIAEoDRIaChJsYXN0X3Jl",
+            "Y2VpdmVkX3RpY2sYAyABKAZKBQhkEMgBIn4KFVMyQ19SZWNvbm5lY3RSZXNw",
+            "b25zZRIYChBjb25uZWN0aW9uX2Vwb2NoGAEgASgNEhMKC3Jlc3VtZV90aWNr",
+            "GAIgASgGEi8KCHNuYXBzaG90GAMgASgLMh0uYWluYXRpdmUudjEuUzJDX1Nu",
+            "YXBzaG90UHVzaEoFCGQQyAEqnAMKCU1lc3NhZ2VJZBIaChZNRVNTQUdFX0lE",
+            "X1VOU1BFQ0lGSUVEEAASIQocTUVTU0FHRV9JRF9DMlNfTE9HSU5fUkVRVUVT",
+            "VBDoBxIiCh1NRVNTQUdFX0lEX1MyQ19MT0dJTl9SRVNQT05TRRDpBxIlCiBN",
+            "RVNTQUdFX0lEX0MyU19KT0lOX1JPT01fUkVRVUVTVBDyBxImCiFNRVNTQUdF",
+            "X0lEX1MyQ19KT0lOX1JPT01fUkVTUE9OU0UQ8wcSIQocTUVTU0FHRV9JRF9D",
+            "MlNfSU5QVVRfQ09NTUFORBDMCBIhChxNRVNTQUdFX0lEX1MyQ19TTkFQU0hP",
+            "VF9QVVNIEM0IEicKIk1FU1NBR0VfSURfUzJDX1JFTElBQkxFX0VWRU5UX1BV",
+            "U0gQzggSHwoaTUVTU0FHRV9JRF9DMlNfSU5QVVRfQkFUQ0gQzwgSJQogTUVT",
+            "U0FHRV9JRF9DMlNfUkVDT05ORUNUX1JFUVVFU1QQsAkSJgohTUVTU0FHRV9J",
+            "RF9TMkNfUkVDT05ORUNUX1JFU1BPTlNFELEJKqsBCgtBcmVuYUJ1dHRvbhIV",
+            "ChFBUkVOQV9CVVRUT05fTk9ORRAAEhUKEUFSRU5BX0JVVFRPTl9GSVJFEAES",
+            "FQoRQVJFTkFfQlVUVE9OX0pVTVAQAhIXChNBUkVOQV9CVVRUT05fUkVMT0FE",
+            "EAQSHAoYQVJFTkFfQlVUVE9OX05FWFRfV0VBUE9OEAgSIAocQVJFTkFfQlVU",
+            "VE9OX1BSRVZJT1VTX1dFQVBPThAQKnYKDUFyZW5hV2VhcG9uSWQSFQoRQVJF",
+            "TkFfV0VBUE9OX05PTkUQABIbChdBUkVOQV9XRUFQT05fTUFDSElORUdVThAB",
+            "EhgKFEFSRU5BX1dFQVBPTl9TSE9UR1VOEAISFwoTQVJFTkFfV0VBUE9OX1JP",
+            "Q0tFVBADKlwKD0FyZW5hTWF0Y2hQaGFzZRIXChNBUkVOQV9NQVRDSF9XQUlU",
+            "SU5HEAASFgoSQVJFTkFfTUFUQ0hfQUNUSVZFEAESGAoUQVJFTkFfTUFUQ0hf",
+            "RklOSVNIRUQQAipcCg9BcmVuYVBpY2t1cFR5cGUSGAoUQVJFTkFfUElDS1VQ",
+            "X1VOS05PV04QABIXChNBUkVOQV9QSUNLVVBfSEVBTFRIEAESFgoSQVJFTkFf",
+            "UElDS1VQX0FSTU9SEAIqpwEKFEFyZW5hQ29tYmF0RXZlbnRUeXBlEhQKEEFS",
+            "RU5BX0VWRU5UX0ZJUkUQABITCg9BUkVOQV9FVkVOVF9ISVQQARIUChBBUkVO",
+            "QV9FVkVOVF9LSUxMEAISFwoTQVJFTkFfRVZFTlRfUkVTUEFXThADEhYKEkFS",
+            "RU5BX0VWRU5UX1BJQ0tVUBAEEh0KGUFSRU5BX0VWRU5UX1dFQVBPTl9TV0lU",
+            "Q0gQBUIXqgIUQWlOYXRpdmUuUHJvdG9jb2wuVjFiBnByb3RvMw=="));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { },
           new pbr::GeneratedClrTypeInfo(new[] {typeof(global::AiNative.Protocol.V1.MessageId), typeof(global::AiNative.Protocol.V1.ArenaButton), typeof(global::AiNative.Protocol.V1.ArenaWeaponId), typeof(global::AiNative.Protocol.V1.ArenaMatchPhase), typeof(global::AiNative.Protocol.V1.ArenaPickupType), typeof(global::AiNative.Protocol.V1.ArenaCombatEventType), }, null, new pbr::GeneratedClrTypeInfo[] {
-            new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.V1.LoginRequest), global::AiNative.Protocol.V1.LoginRequest.Parser, new[]{ "ProtocolMajor", "ClientBuild", "EntryTicket", "GlobalRoomId" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.V1.LoginResponse), global::AiNative.Protocol.V1.LoginResponse.Parser, new[]{ "SessionId", "ConnectionEpoch", "GlobalRoomId", "BootEpoch", "RoomTick" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.V1.JoinRoomRequest), global::AiNative.Protocol.V1.JoinRoomRequest.Parser, new[]{ "SessionId", "RequestedRoom" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.V1.JoinRoomResponse), global::AiNative.Protocol.V1.JoinRoomResponse.Parser, new[]{ "RoomId", "EntityId", "TickRate" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.V1.InputCommand), global::AiNative.Protocol.V1.InputCommand.Parser, new[]{ "RoomTick", "Sequence", "MoveXMilli", "MoveYMilli", "YawMillidegrees", "Buttons", "WeaponId", "LookYawMilli", "LookPitchMilli" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.V1.InputBatch), global::AiNative.Protocol.V1.InputBatch.Parser, new[]{ "Commands" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.V1.C2S_LoginRequest), global::AiNative.Protocol.V1.C2S_LoginRequest.Parser, new[]{ "ProtocolMajor", "ClientBuild", "EntryTicket", "GlobalRoomId" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.V1.S2C_LoginResponse), global::AiNative.Protocol.V1.S2C_LoginResponse.Parser, new[]{ "SessionId", "ConnectionEpoch", "GlobalRoomId", "BootEpoch", "RoomTick" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.V1.C2S_JoinRoomRequest), global::AiNative.Protocol.V1.C2S_JoinRoomRequest.Parser, new[]{ "SessionId", "RequestedRoom" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.V1.S2C_JoinRoomResponse), global::AiNative.Protocol.V1.S2C_JoinRoomResponse.Parser, new[]{ "RoomId", "EntityId", "TickRate" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.V1.C2S_InputCommand), global::AiNative.Protocol.V1.C2S_InputCommand.Parser, new[]{ "RoomTick", "Sequence", "MoveXMilli", "MoveYMilli", "YawMillidegrees", "Buttons", "WeaponId", "LookYawMilli", "LookPitchMilli" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.V1.C2S_InputBatch), global::AiNative.Protocol.V1.C2S_InputBatch.Parser, new[]{ "Commands" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.V1.PlayerState), global::AiNative.Protocol.V1.PlayerState.Parser, new[]{ "EntityId", "PositionXMilli", "PositionYMilli", "PositionZMilli", "YawMillidegrees", "Health", "VelocityXMilliPerSecond", "VelocityYMilliPerSecond", "VelocityZMilliPerSecond", "WeaponId", "Armor", "Alive", "Kills", "PitchMillidegrees" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.V1.PickupState), global::AiNative.Protocol.V1.PickupState.Parser, new[]{ "PickupId", "PickupType", "PositionXMilli", "PositionYMilli", "PositionZMilli", "Active", "RespawnTick" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.V1.Snapshot), global::AiNative.Protocol.V1.Snapshot.Parser, new[]{ "ProtocolMajor", "RoomTick", "BaselineTick", "Players", "StateHash", "LastProcessedInputSequence", "MatchPhase", "RemainingTicks", "LeaderEntityId", "Pickups" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.V1.S2C_SnapshotPush), global::AiNative.Protocol.V1.S2C_SnapshotPush.Parser, new[]{ "ProtocolMajor", "RoomTick", "BaselineTick", "Players", "StateHash", "LastProcessedInputSequence", "MatchPhase", "RemainingTicks", "LeaderEntityId", "Pickups" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.V1.ArenaCombatEvent), global::AiNative.Protocol.V1.ArenaCombatEvent.Parser, new[]{ "EventType", "EventTick", "SourceEntityId", "TargetEntityId", "WeaponId", "Damage", "PositionXMilli", "PositionYMilli", "PositionZMilli" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.V1.ReliableEvent), global::AiNative.Protocol.V1.ReliableEvent.Parser, new[]{ "RoomTick", "Sequence", "EventType", "Payload", "CombatEvent" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.V1.ReconnectRequest), global::AiNative.Protocol.V1.ReconnectRequest.Parser, new[]{ "SessionId", "ConnectionEpoch", "LastReceivedTick" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.V1.ReconnectResponse), global::AiNative.Protocol.V1.ReconnectResponse.Parser, new[]{ "ConnectionEpoch", "ResumeTick", "Snapshot" }, null, null, null, null)
+            new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.V1.S2C_ReliableEventPush), global::AiNative.Protocol.V1.S2C_ReliableEventPush.Parser, new[]{ "RoomTick", "Sequence", "EventType", "Payload", "CombatEvent" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.V1.C2S_ReconnectRequest), global::AiNative.Protocol.V1.C2S_ReconnectRequest.Parser, new[]{ "SessionId", "ConnectionEpoch", "LastReceivedTick" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.V1.S2C_ReconnectResponse), global::AiNative.Protocol.V1.S2C_ReconnectResponse.Parser, new[]{ "ConnectionEpoch", "ResumeTick", "Snapshot" }, null, null, null, null)
           }));
     }
     #endregion
@@ -123,16 +125,16 @@ namespace AiNative.Protocol.V1 {
   #region Enums
   public enum MessageId {
     [pbr::OriginalName("MESSAGE_ID_UNSPECIFIED")] Unspecified = 0,
-    [pbr::OriginalName("MESSAGE_ID_LOGIN_REQUEST")] LoginRequest = 1000,
-    [pbr::OriginalName("MESSAGE_ID_LOGIN_RESPONSE")] LoginResponse = 1001,
-    [pbr::OriginalName("MESSAGE_ID_JOIN_ROOM_REQUEST")] JoinRoomRequest = 1010,
-    [pbr::OriginalName("MESSAGE_ID_JOIN_ROOM_RESPONSE")] JoinRoomResponse = 1011,
-    [pbr::OriginalName("MESSAGE_ID_INPUT_COMMAND")] InputCommand = 1100,
-    [pbr::OriginalName("MESSAGE_ID_SNAPSHOT")] Snapshot = 1101,
-    [pbr::OriginalName("MESSAGE_ID_RELIABLE_EVENT")] ReliableEvent = 1102,
-    [pbr::OriginalName("MESSAGE_ID_INPUT_BATCH")] InputBatch = 1103,
-    [pbr::OriginalName("MESSAGE_ID_RECONNECT_REQUEST")] ReconnectRequest = 1200,
-    [pbr::OriginalName("MESSAGE_ID_RECONNECT_RESPONSE")] ReconnectResponse = 1201,
+    [pbr::OriginalName("MESSAGE_ID_C2S_LOGIN_REQUEST")] C2SLoginRequest = 1000,
+    [pbr::OriginalName("MESSAGE_ID_S2C_LOGIN_RESPONSE")] S2CLoginResponse = 1001,
+    [pbr::OriginalName("MESSAGE_ID_C2S_JOIN_ROOM_REQUEST")] C2SJoinRoomRequest = 1010,
+    [pbr::OriginalName("MESSAGE_ID_S2C_JOIN_ROOM_RESPONSE")] S2CJoinRoomResponse = 1011,
+    [pbr::OriginalName("MESSAGE_ID_C2S_INPUT_COMMAND")] C2SInputCommand = 1100,
+    [pbr::OriginalName("MESSAGE_ID_S2C_SNAPSHOT_PUSH")] S2CSnapshotPush = 1101,
+    [pbr::OriginalName("MESSAGE_ID_S2C_RELIABLE_EVENT_PUSH")] S2CReliableEventPush = 1102,
+    [pbr::OriginalName("MESSAGE_ID_C2S_INPUT_BATCH")] C2SInputBatch = 1103,
+    [pbr::OriginalName("MESSAGE_ID_C2S_RECONNECT_REQUEST")] C2SReconnectRequest = 1200,
+    [pbr::OriginalName("MESSAGE_ID_S2C_RECONNECT_RESPONSE")] S2CReconnectResponse = 1201,
   }
 
   public enum ArenaButton {
@@ -175,17 +177,20 @@ namespace AiNative.Protocol.V1 {
   #endregion
 
   #region Messages
+  /// <summary>
+  /// 客户端 → 服务端。
+  /// </summary>
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
-  public sealed partial class LoginRequest : pb::IMessage<LoginRequest>
+  public sealed partial class C2S_LoginRequest : pb::IMessage<C2S_LoginRequest>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       , pb::IBufferMessage
   #endif
   {
-    private static readonly pb::MessageParser<LoginRequest> _parser = new pb::MessageParser<LoginRequest>(() => new LoginRequest());
+    private static readonly pb::MessageParser<C2S_LoginRequest> _parser = new pb::MessageParser<C2S_LoginRequest>(() => new C2S_LoginRequest());
     private pb::UnknownFieldSet _unknownFields;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public static pb::MessageParser<LoginRequest> Parser { get { return _parser; } }
+    public static pb::MessageParser<C2S_LoginRequest> Parser { get { return _parser; } }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -201,7 +206,7 @@ namespace AiNative.Protocol.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public LoginRequest() {
+    public C2S_LoginRequest() {
       OnConstruction();
     }
 
@@ -209,7 +214,7 @@ namespace AiNative.Protocol.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public LoginRequest(LoginRequest other) : this() {
+    public C2S_LoginRequest(C2S_LoginRequest other) : this() {
       protocolMajor_ = other.protocolMajor_;
       clientBuild_ = other.clientBuild_;
       entryTicket_ = other.entryTicket_;
@@ -219,8 +224,8 @@ namespace AiNative.Protocol.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public LoginRequest Clone() {
-      return new LoginRequest(this);
+    public C2S_LoginRequest Clone() {
+      return new C2S_LoginRequest(this);
     }
 
     /// <summary>Field number for the "protocol_major" field.</summary>
@@ -274,12 +279,12 @@ namespace AiNative.Protocol.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override bool Equals(object other) {
-      return Equals(other as LoginRequest);
+      return Equals(other as C2S_LoginRequest);
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public bool Equals(LoginRequest other) {
+    public bool Equals(C2S_LoginRequest other) {
       if (ReferenceEquals(other, null)) {
         return false;
       }
@@ -391,7 +396,7 @@ namespace AiNative.Protocol.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public void MergeFrom(LoginRequest other) {
+    public void MergeFrom(C2S_LoginRequest other) {
       if (other == null) {
         return;
       }
@@ -484,17 +489,20 @@ namespace AiNative.Protocol.V1 {
 
   }
 
+  /// <summary>
+  /// 服务端 → 客户端；Response 为请求回复，Push 为主动推送。
+  /// </summary>
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
-  public sealed partial class LoginResponse : pb::IMessage<LoginResponse>
+  public sealed partial class S2C_LoginResponse : pb::IMessage<S2C_LoginResponse>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       , pb::IBufferMessage
   #endif
   {
-    private static readonly pb::MessageParser<LoginResponse> _parser = new pb::MessageParser<LoginResponse>(() => new LoginResponse());
+    private static readonly pb::MessageParser<S2C_LoginResponse> _parser = new pb::MessageParser<S2C_LoginResponse>(() => new S2C_LoginResponse());
     private pb::UnknownFieldSet _unknownFields;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public static pb::MessageParser<LoginResponse> Parser { get { return _parser; } }
+    public static pb::MessageParser<S2C_LoginResponse> Parser { get { return _parser; } }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -510,7 +518,7 @@ namespace AiNative.Protocol.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public LoginResponse() {
+    public S2C_LoginResponse() {
       OnConstruction();
     }
 
@@ -518,7 +526,7 @@ namespace AiNative.Protocol.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public LoginResponse(LoginResponse other) : this() {
+    public S2C_LoginResponse(S2C_LoginResponse other) : this() {
       sessionId_ = other.sessionId_;
       connectionEpoch_ = other.connectionEpoch_;
       globalRoomId_ = other.globalRoomId_;
@@ -529,8 +537,8 @@ namespace AiNative.Protocol.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public LoginResponse Clone() {
-      return new LoginResponse(this);
+    public S2C_LoginResponse Clone() {
+      return new S2C_LoginResponse(this);
     }
 
     /// <summary>Field number for the "session_id" field.</summary>
@@ -596,12 +604,12 @@ namespace AiNative.Protocol.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override bool Equals(object other) {
-      return Equals(other as LoginResponse);
+      return Equals(other as S2C_LoginResponse);
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public bool Equals(LoginResponse other) {
+    public bool Equals(S2C_LoginResponse other) {
       if (ReferenceEquals(other, null)) {
         return false;
       }
@@ -726,7 +734,7 @@ namespace AiNative.Protocol.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public void MergeFrom(LoginResponse other) {
+    public void MergeFrom(S2C_LoginResponse other) {
       if (other == null) {
         return;
       }
@@ -830,17 +838,20 @@ namespace AiNative.Protocol.V1 {
 
   }
 
+  /// <summary>
+  /// 客户端 → 服务端。
+  /// </summary>
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
-  public sealed partial class JoinRoomRequest : pb::IMessage<JoinRoomRequest>
+  public sealed partial class C2S_JoinRoomRequest : pb::IMessage<C2S_JoinRoomRequest>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       , pb::IBufferMessage
   #endif
   {
-    private static readonly pb::MessageParser<JoinRoomRequest> _parser = new pb::MessageParser<JoinRoomRequest>(() => new JoinRoomRequest());
+    private static readonly pb::MessageParser<C2S_JoinRoomRequest> _parser = new pb::MessageParser<C2S_JoinRoomRequest>(() => new C2S_JoinRoomRequest());
     private pb::UnknownFieldSet _unknownFields;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public static pb::MessageParser<JoinRoomRequest> Parser { get { return _parser; } }
+    public static pb::MessageParser<C2S_JoinRoomRequest> Parser { get { return _parser; } }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -856,7 +867,7 @@ namespace AiNative.Protocol.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public JoinRoomRequest() {
+    public C2S_JoinRoomRequest() {
       OnConstruction();
     }
 
@@ -864,7 +875,7 @@ namespace AiNative.Protocol.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public JoinRoomRequest(JoinRoomRequest other) : this() {
+    public C2S_JoinRoomRequest(C2S_JoinRoomRequest other) : this() {
       sessionId_ = other.sessionId_;
       requestedRoom_ = other.requestedRoom_;
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
@@ -872,8 +883,8 @@ namespace AiNative.Protocol.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public JoinRoomRequest Clone() {
-      return new JoinRoomRequest(this);
+    public C2S_JoinRoomRequest Clone() {
+      return new C2S_JoinRoomRequest(this);
     }
 
     /// <summary>Field number for the "session_id" field.</summary>
@@ -903,12 +914,12 @@ namespace AiNative.Protocol.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override bool Equals(object other) {
-      return Equals(other as JoinRoomRequest);
+      return Equals(other as C2S_JoinRoomRequest);
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public bool Equals(JoinRoomRequest other) {
+    public bool Equals(C2S_JoinRoomRequest other) {
       if (ReferenceEquals(other, null)) {
         return false;
       }
@@ -994,7 +1005,7 @@ namespace AiNative.Protocol.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public void MergeFrom(JoinRoomRequest other) {
+    public void MergeFrom(C2S_JoinRoomRequest other) {
       if (other == null) {
         return;
       }
@@ -1065,17 +1076,20 @@ namespace AiNative.Protocol.V1 {
 
   }
 
+  /// <summary>
+  /// 服务端 → 客户端；Response 为请求回复，Push 为主动推送。
+  /// </summary>
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
-  public sealed partial class JoinRoomResponse : pb::IMessage<JoinRoomResponse>
+  public sealed partial class S2C_JoinRoomResponse : pb::IMessage<S2C_JoinRoomResponse>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       , pb::IBufferMessage
   #endif
   {
-    private static readonly pb::MessageParser<JoinRoomResponse> _parser = new pb::MessageParser<JoinRoomResponse>(() => new JoinRoomResponse());
+    private static readonly pb::MessageParser<S2C_JoinRoomResponse> _parser = new pb::MessageParser<S2C_JoinRoomResponse>(() => new S2C_JoinRoomResponse());
     private pb::UnknownFieldSet _unknownFields;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public static pb::MessageParser<JoinRoomResponse> Parser { get { return _parser; } }
+    public static pb::MessageParser<S2C_JoinRoomResponse> Parser { get { return _parser; } }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -1091,7 +1105,7 @@ namespace AiNative.Protocol.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public JoinRoomResponse() {
+    public S2C_JoinRoomResponse() {
       OnConstruction();
     }
 
@@ -1099,7 +1113,7 @@ namespace AiNative.Protocol.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public JoinRoomResponse(JoinRoomResponse other) : this() {
+    public S2C_JoinRoomResponse(S2C_JoinRoomResponse other) : this() {
       roomId_ = other.roomId_;
       entityId_ = other.entityId_;
       tickRate_ = other.tickRate_;
@@ -1108,8 +1122,8 @@ namespace AiNative.Protocol.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public JoinRoomResponse Clone() {
-      return new JoinRoomResponse(this);
+    public S2C_JoinRoomResponse Clone() {
+      return new S2C_JoinRoomResponse(this);
     }
 
     /// <summary>Field number for the "room_id" field.</summary>
@@ -1151,12 +1165,12 @@ namespace AiNative.Protocol.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override bool Equals(object other) {
-      return Equals(other as JoinRoomResponse);
+      return Equals(other as S2C_JoinRoomResponse);
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public bool Equals(JoinRoomResponse other) {
+    public bool Equals(S2C_JoinRoomResponse other) {
       if (ReferenceEquals(other, null)) {
         return false;
       }
@@ -1255,7 +1269,7 @@ namespace AiNative.Protocol.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public void MergeFrom(JoinRoomResponse other) {
+    public void MergeFrom(S2C_JoinRoomResponse other) {
       if (other == null) {
         return;
       }
@@ -1337,17 +1351,20 @@ namespace AiNative.Protocol.V1 {
 
   }
 
+  /// <summary>
+  /// 客户端 → 服务端。
+  /// </summary>
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
-  public sealed partial class InputCommand : pb::IMessage<InputCommand>
+  public sealed partial class C2S_InputCommand : pb::IMessage<C2S_InputCommand>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       , pb::IBufferMessage
   #endif
   {
-    private static readonly pb::MessageParser<InputCommand> _parser = new pb::MessageParser<InputCommand>(() => new InputCommand());
+    private static readonly pb::MessageParser<C2S_InputCommand> _parser = new pb::MessageParser<C2S_InputCommand>(() => new C2S_InputCommand());
     private pb::UnknownFieldSet _unknownFields;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public static pb::MessageParser<InputCommand> Parser { get { return _parser; } }
+    public static pb::MessageParser<C2S_InputCommand> Parser { get { return _parser; } }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -1363,7 +1380,7 @@ namespace AiNative.Protocol.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public InputCommand() {
+    public C2S_InputCommand() {
       OnConstruction();
     }
 
@@ -1371,7 +1388,7 @@ namespace AiNative.Protocol.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public InputCommand(InputCommand other) : this() {
+    public C2S_InputCommand(C2S_InputCommand other) : this() {
       roomTick_ = other.roomTick_;
       sequence_ = other.sequence_;
       moveXMilli_ = other.moveXMilli_;
@@ -1386,8 +1403,8 @@ namespace AiNative.Protocol.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public InputCommand Clone() {
-      return new InputCommand(this);
+    public C2S_InputCommand Clone() {
+      return new C2S_InputCommand(this);
     }
 
     /// <summary>Field number for the "room_tick" field.</summary>
@@ -1501,12 +1518,12 @@ namespace AiNative.Protocol.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override bool Equals(object other) {
-      return Equals(other as InputCommand);
+      return Equals(other as C2S_InputCommand);
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public bool Equals(InputCommand other) {
+    public bool Equals(C2S_InputCommand other) {
       if (ReferenceEquals(other, null)) {
         return false;
       }
@@ -1683,7 +1700,7 @@ namespace AiNative.Protocol.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public void MergeFrom(InputCommand other) {
+    public void MergeFrom(C2S_InputCommand other) {
       if (other == null) {
         return;
       }
@@ -1831,17 +1848,20 @@ namespace AiNative.Protocol.V1 {
 
   }
 
+  /// <summary>
+  /// 客户端 → 服务端。
+  /// </summary>
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
-  public sealed partial class InputBatch : pb::IMessage<InputBatch>
+  public sealed partial class C2S_InputBatch : pb::IMessage<C2S_InputBatch>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       , pb::IBufferMessage
   #endif
   {
-    private static readonly pb::MessageParser<InputBatch> _parser = new pb::MessageParser<InputBatch>(() => new InputBatch());
+    private static readonly pb::MessageParser<C2S_InputBatch> _parser = new pb::MessageParser<C2S_InputBatch>(() => new C2S_InputBatch());
     private pb::UnknownFieldSet _unknownFields;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public static pb::MessageParser<InputBatch> Parser { get { return _parser; } }
+    public static pb::MessageParser<C2S_InputBatch> Parser { get { return _parser; } }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -1857,7 +1877,7 @@ namespace AiNative.Protocol.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public InputBatch() {
+    public C2S_InputBatch() {
       OnConstruction();
     }
 
@@ -1865,37 +1885,37 @@ namespace AiNative.Protocol.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public InputBatch(InputBatch other) : this() {
+    public C2S_InputBatch(C2S_InputBatch other) : this() {
       commands_ = other.commands_.Clone();
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public InputBatch Clone() {
-      return new InputBatch(this);
+    public C2S_InputBatch Clone() {
+      return new C2S_InputBatch(this);
     }
 
     /// <summary>Field number for the "commands" field.</summary>
     public const int CommandsFieldNumber = 1;
-    private static readonly pb::FieldCodec<global::AiNative.Protocol.V1.InputCommand> _repeated_commands_codec
-        = pb::FieldCodec.ForMessage(10, global::AiNative.Protocol.V1.InputCommand.Parser);
-    private readonly pbc::RepeatedField<global::AiNative.Protocol.V1.InputCommand> commands_ = new pbc::RepeatedField<global::AiNative.Protocol.V1.InputCommand>();
+    private static readonly pb::FieldCodec<global::AiNative.Protocol.V1.C2S_InputCommand> _repeated_commands_codec
+        = pb::FieldCodec.ForMessage(10, global::AiNative.Protocol.V1.C2S_InputCommand.Parser);
+    private readonly pbc::RepeatedField<global::AiNative.Protocol.V1.C2S_InputCommand> commands_ = new pbc::RepeatedField<global::AiNative.Protocol.V1.C2S_InputCommand>();
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public pbc::RepeatedField<global::AiNative.Protocol.V1.InputCommand> Commands {
+    public pbc::RepeatedField<global::AiNative.Protocol.V1.C2S_InputCommand> Commands {
       get { return commands_; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override bool Equals(object other) {
-      return Equals(other as InputBatch);
+      return Equals(other as C2S_InputBatch);
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public bool Equals(InputBatch other) {
+    public bool Equals(C2S_InputBatch other) {
       if (ReferenceEquals(other, null)) {
         return false;
       }
@@ -1960,7 +1980,7 @@ namespace AiNative.Protocol.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public void MergeFrom(InputBatch other) {
+    public void MergeFrom(C2S_InputBatch other) {
       if (other == null) {
         return;
       }
@@ -2018,6 +2038,9 @@ namespace AiNative.Protocol.V1 {
 
   }
 
+  /// <summary>
+  /// 公共数据结构，嵌入快照或事件信封，不独立发送。
+  /// </summary>
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
   public sealed partial class PlayerState : pb::IMessage<PlayerState>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
@@ -2697,6 +2720,9 @@ namespace AiNative.Protocol.V1 {
 
   }
 
+  /// <summary>
+  /// 公共数据结构，嵌入快照或事件信封，不独立发送。
+  /// </summary>
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
   public sealed partial class PickupState : pb::IMessage<PickupState>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
@@ -3117,17 +3143,20 @@ namespace AiNative.Protocol.V1 {
 
   }
 
+  /// <summary>
+  /// 服务端 → 客户端；Response 为请求回复，Push 为主动推送。
+  /// </summary>
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
-  public sealed partial class Snapshot : pb::IMessage<Snapshot>
+  public sealed partial class S2C_SnapshotPush : pb::IMessage<S2C_SnapshotPush>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       , pb::IBufferMessage
   #endif
   {
-    private static readonly pb::MessageParser<Snapshot> _parser = new pb::MessageParser<Snapshot>(() => new Snapshot());
+    private static readonly pb::MessageParser<S2C_SnapshotPush> _parser = new pb::MessageParser<S2C_SnapshotPush>(() => new S2C_SnapshotPush());
     private pb::UnknownFieldSet _unknownFields;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public static pb::MessageParser<Snapshot> Parser { get { return _parser; } }
+    public static pb::MessageParser<S2C_SnapshotPush> Parser { get { return _parser; } }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -3143,7 +3172,7 @@ namespace AiNative.Protocol.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public Snapshot() {
+    public S2C_SnapshotPush() {
       OnConstruction();
     }
 
@@ -3151,7 +3180,7 @@ namespace AiNative.Protocol.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public Snapshot(Snapshot other) : this() {
+    public S2C_SnapshotPush(S2C_SnapshotPush other) : this() {
       protocolMajor_ = other.protocolMajor_;
       roomTick_ = other.roomTick_;
       baselineTick_ = other.baselineTick_;
@@ -3167,8 +3196,8 @@ namespace AiNative.Protocol.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public Snapshot Clone() {
-      return new Snapshot(this);
+    public S2C_SnapshotPush Clone() {
+      return new S2C_SnapshotPush(this);
     }
 
     /// <summary>Field number for the "protocol_major" field.</summary>
@@ -3292,12 +3321,12 @@ namespace AiNative.Protocol.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override bool Equals(object other) {
-      return Equals(other as Snapshot);
+      return Equals(other as S2C_SnapshotPush);
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public bool Equals(Snapshot other) {
+    public bool Equals(S2C_SnapshotPush other) {
       if (ReferenceEquals(other, null)) {
         return false;
       }
@@ -3471,7 +3500,7 @@ namespace AiNative.Protocol.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public void MergeFrom(Snapshot other) {
+    public void MergeFrom(S2C_SnapshotPush other) {
       if (other == null) {
         return;
       }
@@ -3626,6 +3655,9 @@ namespace AiNative.Protocol.V1 {
 
   }
 
+  /// <summary>
+  /// 公共数据结构，嵌入快照或事件信封，不独立发送。
+  /// </summary>
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
   public sealed partial class ArenaCombatEvent : pb::IMessage<ArenaCombatEvent>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
@@ -4120,17 +4152,20 @@ namespace AiNative.Protocol.V1 {
 
   }
 
+  /// <summary>
+  /// 服务端 → 客户端；Response 为请求回复，Push 为主动推送。
+  /// </summary>
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
-  public sealed partial class ReliableEvent : pb::IMessage<ReliableEvent>
+  public sealed partial class S2C_ReliableEventPush : pb::IMessage<S2C_ReliableEventPush>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       , pb::IBufferMessage
   #endif
   {
-    private static readonly pb::MessageParser<ReliableEvent> _parser = new pb::MessageParser<ReliableEvent>(() => new ReliableEvent());
+    private static readonly pb::MessageParser<S2C_ReliableEventPush> _parser = new pb::MessageParser<S2C_ReliableEventPush>(() => new S2C_ReliableEventPush());
     private pb::UnknownFieldSet _unknownFields;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public static pb::MessageParser<ReliableEvent> Parser { get { return _parser; } }
+    public static pb::MessageParser<S2C_ReliableEventPush> Parser { get { return _parser; } }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -4146,7 +4181,7 @@ namespace AiNative.Protocol.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public ReliableEvent() {
+    public S2C_ReliableEventPush() {
       OnConstruction();
     }
 
@@ -4154,7 +4189,7 @@ namespace AiNative.Protocol.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public ReliableEvent(ReliableEvent other) : this() {
+    public S2C_ReliableEventPush(S2C_ReliableEventPush other) : this() {
       roomTick_ = other.roomTick_;
       sequence_ = other.sequence_;
       eventType_ = other.eventType_;
@@ -4165,8 +4200,8 @@ namespace AiNative.Protocol.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public ReliableEvent Clone() {
-      return new ReliableEvent(this);
+    public S2C_ReliableEventPush Clone() {
+      return new S2C_ReliableEventPush(this);
     }
 
     /// <summary>Field number for the "room_tick" field.</summary>
@@ -4232,12 +4267,12 @@ namespace AiNative.Protocol.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override bool Equals(object other) {
-      return Equals(other as ReliableEvent);
+      return Equals(other as S2C_ReliableEventPush);
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public bool Equals(ReliableEvent other) {
+    public bool Equals(S2C_ReliableEventPush other) {
       if (ReferenceEquals(other, null)) {
         return false;
       }
@@ -4362,7 +4397,7 @@ namespace AiNative.Protocol.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public void MergeFrom(ReliableEvent other) {
+    public void MergeFrom(S2C_ReliableEventPush other) {
       if (other == null) {
         return;
       }
@@ -4475,17 +4510,20 @@ namespace AiNative.Protocol.V1 {
 
   }
 
+  /// <summary>
+  /// 客户端 → 服务端。
+  /// </summary>
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
-  public sealed partial class ReconnectRequest : pb::IMessage<ReconnectRequest>
+  public sealed partial class C2S_ReconnectRequest : pb::IMessage<C2S_ReconnectRequest>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       , pb::IBufferMessage
   #endif
   {
-    private static readonly pb::MessageParser<ReconnectRequest> _parser = new pb::MessageParser<ReconnectRequest>(() => new ReconnectRequest());
+    private static readonly pb::MessageParser<C2S_ReconnectRequest> _parser = new pb::MessageParser<C2S_ReconnectRequest>(() => new C2S_ReconnectRequest());
     private pb::UnknownFieldSet _unknownFields;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public static pb::MessageParser<ReconnectRequest> Parser { get { return _parser; } }
+    public static pb::MessageParser<C2S_ReconnectRequest> Parser { get { return _parser; } }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -4501,7 +4539,7 @@ namespace AiNative.Protocol.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public ReconnectRequest() {
+    public C2S_ReconnectRequest() {
       OnConstruction();
     }
 
@@ -4509,7 +4547,7 @@ namespace AiNative.Protocol.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public ReconnectRequest(ReconnectRequest other) : this() {
+    public C2S_ReconnectRequest(C2S_ReconnectRequest other) : this() {
       sessionId_ = other.sessionId_;
       connectionEpoch_ = other.connectionEpoch_;
       lastReceivedTick_ = other.lastReceivedTick_;
@@ -4518,8 +4556,8 @@ namespace AiNative.Protocol.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public ReconnectRequest Clone() {
-      return new ReconnectRequest(this);
+    public C2S_ReconnectRequest Clone() {
+      return new C2S_ReconnectRequest(this);
     }
 
     /// <summary>Field number for the "session_id" field.</summary>
@@ -4561,12 +4599,12 @@ namespace AiNative.Protocol.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override bool Equals(object other) {
-      return Equals(other as ReconnectRequest);
+      return Equals(other as C2S_ReconnectRequest);
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public bool Equals(ReconnectRequest other) {
+    public bool Equals(C2S_ReconnectRequest other) {
       if (ReferenceEquals(other, null)) {
         return false;
       }
@@ -4665,7 +4703,7 @@ namespace AiNative.Protocol.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public void MergeFrom(ReconnectRequest other) {
+    public void MergeFrom(C2S_ReconnectRequest other) {
       if (other == null) {
         return;
       }
@@ -4747,17 +4785,20 @@ namespace AiNative.Protocol.V1 {
 
   }
 
+  /// <summary>
+  /// 服务端 → 客户端；Response 为请求回复，Push 为主动推送。
+  /// </summary>
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
-  public sealed partial class ReconnectResponse : pb::IMessage<ReconnectResponse>
+  public sealed partial class S2C_ReconnectResponse : pb::IMessage<S2C_ReconnectResponse>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       , pb::IBufferMessage
   #endif
   {
-    private static readonly pb::MessageParser<ReconnectResponse> _parser = new pb::MessageParser<ReconnectResponse>(() => new ReconnectResponse());
+    private static readonly pb::MessageParser<S2C_ReconnectResponse> _parser = new pb::MessageParser<S2C_ReconnectResponse>(() => new S2C_ReconnectResponse());
     private pb::UnknownFieldSet _unknownFields;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public static pb::MessageParser<ReconnectResponse> Parser { get { return _parser; } }
+    public static pb::MessageParser<S2C_ReconnectResponse> Parser { get { return _parser; } }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -4773,7 +4814,7 @@ namespace AiNative.Protocol.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public ReconnectResponse() {
+    public S2C_ReconnectResponse() {
       OnConstruction();
     }
 
@@ -4781,7 +4822,7 @@ namespace AiNative.Protocol.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public ReconnectResponse(ReconnectResponse other) : this() {
+    public S2C_ReconnectResponse(S2C_ReconnectResponse other) : this() {
       connectionEpoch_ = other.connectionEpoch_;
       resumeTick_ = other.resumeTick_;
       snapshot_ = other.snapshot_ != null ? other.snapshot_.Clone() : null;
@@ -4790,8 +4831,8 @@ namespace AiNative.Protocol.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public ReconnectResponse Clone() {
-      return new ReconnectResponse(this);
+    public S2C_ReconnectResponse Clone() {
+      return new S2C_ReconnectResponse(this);
     }
 
     /// <summary>Field number for the "connection_epoch" field.</summary>
@@ -4820,10 +4861,10 @@ namespace AiNative.Protocol.V1 {
 
     /// <summary>Field number for the "snapshot" field.</summary>
     public const int SnapshotFieldNumber = 3;
-    private global::AiNative.Protocol.V1.Snapshot snapshot_;
+    private global::AiNative.Protocol.V1.S2C_SnapshotPush snapshot_;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::AiNative.Protocol.V1.Snapshot Snapshot {
+    public global::AiNative.Protocol.V1.S2C_SnapshotPush Snapshot {
       get { return snapshot_; }
       set {
         snapshot_ = value;
@@ -4833,12 +4874,12 @@ namespace AiNative.Protocol.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override bool Equals(object other) {
-      return Equals(other as ReconnectResponse);
+      return Equals(other as S2C_ReconnectResponse);
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public bool Equals(ReconnectResponse other) {
+    public bool Equals(S2C_ReconnectResponse other) {
       if (ReferenceEquals(other, null)) {
         return false;
       }
@@ -4937,7 +4978,7 @@ namespace AiNative.Protocol.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public void MergeFrom(ReconnectResponse other) {
+    public void MergeFrom(S2C_ReconnectResponse other) {
       if (other == null) {
         return;
       }
@@ -4949,7 +4990,7 @@ namespace AiNative.Protocol.V1 {
       }
       if (other.snapshot_ != null) {
         if (snapshot_ == null) {
-          Snapshot = new global::AiNative.Protocol.V1.Snapshot();
+          Snapshot = new global::AiNative.Protocol.V1.S2C_SnapshotPush();
         }
         Snapshot.MergeFrom(other.Snapshot);
       }
@@ -4982,7 +5023,7 @@ namespace AiNative.Protocol.V1 {
           }
           case 26: {
             if (snapshot_ == null) {
-              Snapshot = new global::AiNative.Protocol.V1.Snapshot();
+              Snapshot = new global::AiNative.Protocol.V1.S2C_SnapshotPush();
             }
             input.ReadMessage(Snapshot);
             break;
@@ -5016,7 +5057,7 @@ namespace AiNative.Protocol.V1 {
           }
           case 26: {
             if (snapshot_ == null) {
-              Snapshot = new global::AiNative.Protocol.V1.Snapshot();
+              Snapshot = new global::AiNative.Protocol.V1.S2C_SnapshotPush();
             }
             input.ReadMessage(Snapshot);
             break;

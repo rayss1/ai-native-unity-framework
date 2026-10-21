@@ -64,7 +64,7 @@ public sealed class CoordinatorTests
         ServiceReply blocked = await service.HandleAsync(
             new(ServiceRole.Match, "match"),
             ServiceMethods.Allocate,
-            new AllocationRequest { MatchId = "new", PlayerIds = { "p1" } }.ToByteArray()
+            new AllocationSpec { MatchId = "new", PlayerIds = { "p1" } }.ToByteArray()
         );
         Assert.That(blocked.Error, Is.EqualTo("player-already-allocated"));
         ServiceReply reconciling = await service.HandleAsync(
@@ -96,7 +96,7 @@ public sealed class CoordinatorTests
         ServiceReply reply = await service.HandleAsync(
             new(ServiceRole.Match, "match"),
             ServiceMethods.Allocate,
-            new AllocationRequest { MatchId = "later", PlayerIds = { "p1" } }.ToByteArray()
+            new AllocationSpec { MatchId = "later", PlayerIds = { "p1" } }.ToByteArray()
         );
         Assert.That(reply.Error, Is.EqualTo("coordinator-ownership-lost"));
     }
@@ -112,13 +112,13 @@ public sealed class CoordinatorTests
         );
         await service.InitializeAsync();
         await Report(service, "epoch-a");
-        AllocationRequest request = new() { MatchId = "m1", PlayerIds = { "p1" } };
+        AllocationSpec request = new() { MatchId = "m1", PlayerIds = { "p1" } };
         RoomAllocation first = await Allocate(service, request);
         Assert.That((await Allocate(service, request)).RoomId, Is.EqualTo(first.RoomId));
         ServiceReply rejected = await service.HandleAsync(
             new(ServiceRole.Match, "match"),
             ServiceMethods.Allocate,
-            new AllocationRequest { MatchId = "m2", PlayerIds = { "p2" } }.ToByteArray()
+            new AllocationSpec { MatchId = "m2", PlayerIds = { "p2" } }.ToByteArray()
         );
         Assert.That(rejected.Error, Is.EqualTo("room-history-capacity"));
     }
@@ -131,7 +131,7 @@ public sealed class CoordinatorTests
         RoomCoordinator service = new(store, rpc, TimeProvider.System);
         await service.InitializeAsync();
         await Report(service, "epoch-a");
-        AllocationRequest request = new() { MatchId = "match-a", PlayerIds = { "p1", "p2" } };
+        AllocationSpec request = new() { MatchId = "match-a", PlayerIds = { "p1", "p2" } };
         RoomAllocation pending = await Allocate(service, request);
         Assert.That(pending.State, Is.EqualTo("Reserved"));
         rpc.FailCreate = false;
@@ -193,7 +193,7 @@ public sealed class CoordinatorTests
         ServiceReply reply = await service.HandleAsync(
             new(ServiceRole.Battle, "node-a"),
             ServiceMethods.Allocate,
-            new AllocationRequest { MatchId = "attack", PlayerIds = { "p1" } }.ToByteArray()
+            new AllocationSpec { MatchId = "attack", PlayerIds = { "p1" } }.ToByteArray()
         );
         Assert.That(reply.Error, Is.EqualTo("forbidden"));
         BattleNodeReport report = Node("epoch-a");
@@ -249,7 +249,7 @@ public sealed class CoordinatorTests
 
     private static async Task<RoomAllocation> Allocate(
         RoomCoordinator service,
-        AllocationRequest request
+        AllocationSpec request
     ) =>
         (
             await service.HandleAsync(

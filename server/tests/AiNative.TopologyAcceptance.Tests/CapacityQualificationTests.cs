@@ -350,7 +350,7 @@ public class CapacityQualificationTests
         )!;
         for (uint seq = 1; seq <= 40; seq++)
             counters.Observe(
-                new ReliableEvent
+                new S2C_ReliableEventPush
                 {
                     Sequence = seq,
                     EventType = 0,
@@ -366,7 +366,7 @@ public class CapacityQualificationTests
         JsonElement report = counters.Report();
         Assert.That(report.GetProperty("measuredFire").GetInt64(), Is.EqualTo(40));
         counters.Observe(
-            new ReliableEvent
+            new S2C_ReliableEventPush
             {
                 Sequence = 41,
                 EventType = 3,
@@ -391,7 +391,7 @@ public class CapacityQualificationTests
         Assert.That((uint)counters.SelectWeapon(1u), Is.EqualTo(1u));
         for (uint sequence = 1; sequence <= 40; sequence++)
         {
-            var fire = new ReliableEvent
+            var fire = new S2C_ReliableEventPush
             {
                 Sequence = sequence,
                 CombatEvent = new ArenaCombatEvent
@@ -413,7 +413,7 @@ public class CapacityQualificationTests
         Assert.That((uint)counters.SelectWeapon(1u), Is.EqualTo(2u));
         Assert.That((uint)counters.SelectWeapon(2u), Is.EqualTo(2u));
         counters.Observe(
-            new ReliableEvent
+            new S2C_ReliableEventPush
             {
                 Sequence = 41,
                 CombatEvent = new ArenaCombatEvent
@@ -569,7 +569,7 @@ public class CapacityQualificationTests
                 if (kind == 0)
                     lastFireElapsed = elapsed;
                 combat.Observe(
-                    new ReliableEvent
+                    new S2C_ReliableEventPush
                     {
                         Sequence = ++eventSequence,
                         CombatEvent = new ArenaCombatEvent

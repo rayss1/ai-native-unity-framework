@@ -393,7 +393,7 @@ internal static class BattleReplayVerifier
 
             switch (decoded.MessageId, decoded.Message)
             {
-                case (MessageId.InputCommand, InputCommand command)
+                case (MessageId.C2SInputCommand, C2S_InputCommand command)
                     when (uint)entityIndex < (uint)botsPerRoom
                         && command.Sequence > lastInputSequences[roomIndex][entityIndex]:
                     lastInputSequences[roomIndex][entityIndex] = command.Sequence;
@@ -401,11 +401,11 @@ internal static class BattleReplayVerifier
                         .ApplyInput(entityIndex, command.MoveXMilli, command.MoveYMilli);
                     inputCount++;
                     break;
-                case (MessageId.InputBatch, InputBatch batch)
+                case (MessageId.C2SInputBatch, C2S_InputBatch batch)
                     when (uint)entityIndex < (uint)botsPerRoom
                         && batch.Commands.Count is >= 1 and <= 2:
                     uint previousSequence = lastInputSequences[roomIndex][entityIndex];
-                    foreach (InputCommand batchedCommand in batch.Commands)
+                    foreach (C2S_InputCommand batchedCommand in batch.Commands)
                     {
                         if (batchedCommand.Sequence <= previousSequence)
                         {

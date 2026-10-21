@@ -13,7 +13,7 @@ public sealed class PreparedLegacySnapshotTests
         SyntheticRoom room = new(64);
         for (int index = 0; index < 64; index++)
             room.ApplyInput(index, index * 17, -index * 29);
-        Snapshot snapshot = room.CreateSnapshot(1234);
+        S2C_SnapshotPush snapshot = room.CreateSnapshot(1234);
         PreparedLegacySnapshot frame = new();
         Assert.That(frame.TryPrepare(snapshot), Is.True);
         byte[] destination = new byte[RealtimeProtocolCodec.MaxDatagramBytes];
@@ -39,13 +39,13 @@ public sealed class PreparedLegacySnapshotTests
                 RealtimeProtocolCodec.TryDecode(destination.AsSpan(0, length), out var decoded),
                 Is.EqualTo(ProtocolDecodeStatus.Accepted)
             );
-            Snapshot expected = snapshot.Clone();
+            S2C_SnapshotPush expected = snapshot.Clone();
             expected.LastProcessedInputSequence = sequence;
             Assert.That(decoded.Message, Is.EqualTo(expected));
             Assert.That(decoded.Channel, Is.EqualTo(frame.Channel));
         }
         Assert.That(snapshot.LastProcessedInputSequence, Is.Zero);
-        Snapshot nextRoom = new SyntheticRoom(2).CreateSnapshot(5678);
+        S2C_SnapshotPush nextRoom = new SyntheticRoom(2).CreateSnapshot(5678);
         Assert.That(frame.TryPrepare(nextRoom), Is.True);
         Assert.That(frame.TryWriteRecipient(10, destination, out int nextLength), Is.True);
         Assert.That(
@@ -60,7 +60,7 @@ public sealed class PreparedLegacySnapshotTests
     public void BoundsAndFailedPreparationNeverSendStaleRoomDataOrPartiallyWriteDestination()
     {
         PreparedLegacySnapshot frame = new();
-        Snapshot snapshot = new SyntheticRoom(2).CreateSnapshot(1);
+        S2C_SnapshotPush snapshot = new SyntheticRoom(2).CreateSnapshot(1);
         Assert.That(frame.TryPrepare(snapshot), Is.True);
         byte[] destination = Enumerable
             .Repeat((byte)0x5a, RealtimeProtocolCodec.MaxDatagramBytes)
@@ -77,7 +77,7 @@ public sealed class PreparedLegacySnapshotTests
         payload[1] = 1;
         payload[2] = 0xa7;
         payload[3] = 9;
-        Assert.That(frame.TryPrepare(Snapshot.Parser.ParseFrom(payload)), Is.True);
+        Assert.That(frame.TryPrepare(S2C_SnapshotPush.Parser.ParseFrom(payload)), Is.True);
         Assert.That(
             frame.TryWriteRecipient(uint.MaxValue, destination, out int oversizedLength),
             Is.False
@@ -99,7 +99,7 @@ public sealed class PreparedLegacySnapshotTests
     public void PreparedRecipientFanoutHasZeroSteadyStateManagedAllocation()
     {
         PreparedLegacySnapshot frame = new();
-        Snapshot snapshot = new SyntheticRoom(64).CreateSnapshot(100);
+        S2C_SnapshotPush snapshot = new SyntheticRoom(64).CreateSnapshot(100);
         byte[] destination = new byte[RealtimeProtocolCodec.MaxDatagramBytes];
         Assert.That(frame.TryPrepare(snapshot), Is.True);
         for (int iteration = 0; iteration < 10000; iteration++)

@@ -1,0 +1,2 @@
+# Frozen Protobuf descriptors are binary compatibility fixtures.
+shared/protocol/Tests/Fixtures/*.pb binary

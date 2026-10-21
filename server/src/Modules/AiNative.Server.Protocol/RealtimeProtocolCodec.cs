@@ -117,22 +117,22 @@ internal static class RealtimeProtocolCodec
     {
         switch (messageId)
         {
-            case MessageId.InputCommand:
-            case MessageId.InputBatch:
+            case MessageId.C2SInputCommand:
+            case MessageId.C2SInputBatch:
                 channel = InputChannel;
                 return true;
-            case MessageId.Snapshot:
+            case MessageId.S2CSnapshotPush:
                 channel = SnapshotChannel;
                 return true;
-            case MessageId.ReliableEvent:
+            case MessageId.S2CReliableEventPush:
                 channel = EventChannel;
                 return true;
-            case MessageId.LoginRequest:
-            case MessageId.LoginResponse:
-            case MessageId.JoinRoomRequest:
-            case MessageId.JoinRoomResponse:
-            case MessageId.ReconnectRequest:
-            case MessageId.ReconnectResponse:
+            case MessageId.C2SLoginRequest:
+            case MessageId.S2CLoginResponse:
+            case MessageId.C2SJoinRoomRequest:
+            case MessageId.S2CJoinRoomResponse:
+            case MessageId.C2SReconnectRequest:
+            case MessageId.S2CReconnectResponse:
                 channel = ControlChannel;
                 return true;
             default:
@@ -144,32 +144,32 @@ internal static class RealtimeProtocolCodec
     private static bool IsExpectedType(MessageId messageId, IMessage message) =>
         messageId switch
         {
-            MessageId.LoginRequest => message is LoginRequest,
-            MessageId.LoginResponse => message is LoginResponse,
-            MessageId.JoinRoomRequest => message is JoinRoomRequest,
-            MessageId.JoinRoomResponse => message is JoinRoomResponse,
-            MessageId.InputCommand => message is InputCommand,
-            MessageId.InputBatch => message is InputBatch,
-            MessageId.Snapshot => message is Snapshot,
-            MessageId.ReliableEvent => message is ReliableEvent,
-            MessageId.ReconnectRequest => message is ReconnectRequest,
-            MessageId.ReconnectResponse => message is ReconnectResponse,
+            MessageId.C2SLoginRequest => message is C2S_LoginRequest,
+            MessageId.S2CLoginResponse => message is S2C_LoginResponse,
+            MessageId.C2SJoinRoomRequest => message is C2S_JoinRoomRequest,
+            MessageId.S2CJoinRoomResponse => message is S2C_JoinRoomResponse,
+            MessageId.C2SInputCommand => message is C2S_InputCommand,
+            MessageId.C2SInputBatch => message is C2S_InputBatch,
+            MessageId.S2CSnapshotPush => message is S2C_SnapshotPush,
+            MessageId.S2CReliableEventPush => message is S2C_ReliableEventPush,
+            MessageId.C2SReconnectRequest => message is C2S_ReconnectRequest,
+            MessageId.S2CReconnectResponse => message is S2C_ReconnectResponse,
             _ => false,
         };
 
     private static IMessage Parse(MessageId messageId, ReadOnlySpan<byte> payload) =>
         messageId switch
         {
-            MessageId.LoginRequest => LoginRequest.Parser.ParseFrom(payload),
-            MessageId.LoginResponse => LoginResponse.Parser.ParseFrom(payload),
-            MessageId.JoinRoomRequest => JoinRoomRequest.Parser.ParseFrom(payload),
-            MessageId.JoinRoomResponse => JoinRoomResponse.Parser.ParseFrom(payload),
-            MessageId.InputCommand => InputCommand.Parser.ParseFrom(payload),
-            MessageId.InputBatch => InputBatch.Parser.ParseFrom(payload),
-            MessageId.Snapshot => Snapshot.Parser.ParseFrom(payload),
-            MessageId.ReliableEvent => ReliableEvent.Parser.ParseFrom(payload),
-            MessageId.ReconnectRequest => ReconnectRequest.Parser.ParseFrom(payload),
-            MessageId.ReconnectResponse => ReconnectResponse.Parser.ParseFrom(payload),
+            MessageId.C2SLoginRequest => C2S_LoginRequest.Parser.ParseFrom(payload),
+            MessageId.S2CLoginResponse => S2C_LoginResponse.Parser.ParseFrom(payload),
+            MessageId.C2SJoinRoomRequest => C2S_JoinRoomRequest.Parser.ParseFrom(payload),
+            MessageId.S2CJoinRoomResponse => S2C_JoinRoomResponse.Parser.ParseFrom(payload),
+            MessageId.C2SInputCommand => C2S_InputCommand.Parser.ParseFrom(payload),
+            MessageId.C2SInputBatch => C2S_InputBatch.Parser.ParseFrom(payload),
+            MessageId.S2CSnapshotPush => S2C_SnapshotPush.Parser.ParseFrom(payload),
+            MessageId.S2CReliableEventPush => S2C_ReliableEventPush.Parser.ParseFrom(payload),
+            MessageId.C2SReconnectRequest => C2S_ReconnectRequest.Parser.ParseFrom(payload),
+            MessageId.S2CReconnectResponse => S2C_ReconnectResponse.Parser.ParseFrom(payload),
             _ => throw new InvalidOperationException($"Unknown message ID: {messageId}."),
         };
 }

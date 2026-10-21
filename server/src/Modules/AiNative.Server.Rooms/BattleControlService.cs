@@ -82,7 +82,7 @@ public sealed class BattleControlService : IServiceHandler
                         ? ServiceReply.From(new Empty())
                         : ServiceReply.Reject(error);
                 case ServiceMethods.Drain:
-                    var drain = DrainRequest.Parser.ParseFrom(payload.Span);
+                    var drain = DrainSpec.Parser.ParseFrom(payload.Span);
                     if (drain.BootEpoch != pool.Inventory().BootEpoch)
                         return ServiceReply.Reject("stale-epoch");
                     error = pool.BeginDrain(drain.CoordinatorEpoch);

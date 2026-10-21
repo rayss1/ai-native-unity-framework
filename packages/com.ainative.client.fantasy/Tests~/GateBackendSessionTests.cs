@@ -29,10 +29,10 @@ public sealed class GateBackendSessionTests
                     await stream.ReadExactlyAsync(header);
                     byte[] body = new byte[BinaryPrimitives.ReadInt32LittleEndian(header)];
                     await stream.ReadExactlyAsync(body);
-                    ControlRequest request = ControlRequest.Parser.ParseFrom(
-                        GateRequestEnvelope.Parser.ParseFrom(body).Payload
+                    S2S_ControlRequest request = S2S_ControlRequest.Parser.ParseFrom(
+                        C2S_GateTransportRequest.Parser.ParseFrom(body).Payload
                     );
-                    ControlResponse reply = new() { CorrelationId = request.CorrelationId };
+                    S2S_ControlResponse reply = new() { CorrelationId = request.CorrelationId };
                     if (i == 0)
                         reply.Body = ByteString.CopyFrom(
                             new LoginResult
@@ -54,7 +54,7 @@ public sealed class GateBackendSessionTests
                         GateFrame.Encode(
                             402653361u,
                             BinaryPrimitives.ReadUInt32LittleEndian(header.AsSpan(8)),
-                            new GateResponseEnvelope
+                            new S2C_GateTransportResponse
                             {
                                 Payload = reply.ToByteString(),
                             }.ToByteArray()
@@ -105,15 +105,15 @@ public sealed class GateBackendSessionTests
                 await stream.ReadExactlyAsync(header);
                 byte[] body = new byte[BinaryPrimitives.ReadInt32LittleEndian(header)];
                 await stream.ReadExactlyAsync(body);
-                ControlRequest request = ControlRequest.Parser.ParseFrom(
-                    GateRequestEnvelope.Parser.ParseFrom(body).Payload
+                S2S_ControlRequest request = S2S_ControlRequest.Parser.ParseFrom(
+                    C2S_GateTransportRequest.Parser.ParseFrom(body).Payload
                 );
                 byte[] reply;
                 if (i == 0)
                 {
                     Assert.That(request.Method, Is.EqualTo("player.login"));
                     Assert.That(
-                        AccountRequest.Parser.ParseFrom(request.Body).Username,
+                        AccountCredentials.Parser.ParseFrom(request.Body).Username,
                         Is.EqualTo("fixture")
                     );
                     reply = new LoginResult
@@ -130,7 +130,7 @@ public sealed class GateBackendSessionTests
                     Assert.That(request.Method, Is.EqualTo("player.profile"));
                     Assert.That(request.Credential, Is.EqualTo("fixture-session"));
                     Assert.That(
-                        ProfileRequest.Parser.ParseFrom(request.Body).PlayerId,
+                        ProfileQuery.Parser.ParseFrom(request.Body).PlayerId,
                         Is.EqualTo("self")
                     );
                     reply = new PlayerProfile { PlayerId = "self", Played = 1 }.ToByteArray();
@@ -153,9 +153,9 @@ public sealed class GateBackendSessionTests
                 byte[] frame = GateFrame.Encode(
                     402653361u,
                     BinaryPrimitives.ReadUInt32LittleEndian(header.AsSpan(8)),
-                    new GateResponseEnvelope
+                    new S2C_GateTransportResponse
                     {
-                        Payload = new ControlResponse
+                        Payload = new S2S_ControlResponse
                         {
                             CorrelationId = request.CorrelationId,
                             Body = ByteString.CopyFrom(reply),

@@ -25,15 +25,15 @@ namespace AiNative.Protocol.Transport.V1 {
       byte[] descriptorData = global::System.Convert.FromBase64String(
           string.Concat(
             "Ch9haW5hdGl2ZS92MS9nYXRlX2VudmVsb3BlLnByb3RvEhVhaW5hdGl2ZS50",
-            "cmFuc3BvcnQudjEiJgoTR2F0ZVJlcXVlc3RFbnZlbG9wZRIPCgdwYXlsb2Fk",
-            "GAEgASgMIjsKFEdhdGVSZXNwb25zZUVudmVsb3BlEhIKCmVycm9yX2NvZGUY",
-            "ASABKA0SDwoHcGF5bG9hZBgCIAEoDEIhqgIeQWlOYXRpdmUuUHJvdG9jb2wu",
-            "VHJhbnNwb3J0LlYxYgZwcm90bzM="));
+            "cmFuc3BvcnQudjEiKwoYQzJTX0dhdGVUcmFuc3BvcnRSZXF1ZXN0Eg8KB3Bh",
+            "eWxvYWQYASABKAwiQAoZUzJDX0dhdGVUcmFuc3BvcnRSZXNwb25zZRISCgpl",
+            "cnJvcl9jb2RlGAEgASgNEg8KB3BheWxvYWQYAiABKAxCIaoCHkFpTmF0aXZl",
+            "LlByb3RvY29sLlRyYW5zcG9ydC5WMWIGcHJvdG8z"));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { },
           new pbr::GeneratedClrTypeInfo(null, null, new pbr::GeneratedClrTypeInfo[] {
-            new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.Transport.V1.GateRequestEnvelope), global::AiNative.Protocol.Transport.V1.GateRequestEnvelope.Parser, new[]{ "Payload" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.Transport.V1.GateResponseEnvelope), global::AiNative.Protocol.Transport.V1.GateResponseEnvelope.Parser, new[]{ "ErrorCode", "Payload" }, null, null, null, null)
+            new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.Transport.V1.C2S_GateTransportRequest), global::AiNative.Protocol.Transport.V1.C2S_GateTransportRequest.Parser, new[]{ "Payload" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::AiNative.Protocol.Transport.V1.S2C_GateTransportResponse), global::AiNative.Protocol.Transport.V1.S2C_GateTransportResponse.Parser, new[]{ "ErrorCode", "Payload" }, null, null, null, null)
           }));
     }
     #endregion
@@ -43,18 +43,19 @@ namespace AiNative.Protocol.Transport.V1 {
   /// <summary>
   /// Wire mirror of the pinned FantasyGate envelopes in FantasyControlEnvelope.cs.
   /// Opcodes and the 20-byte TCP header remain transport metadata.
+  /// 客户端 → 服务端。
   /// </summary>
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
-  public sealed partial class GateRequestEnvelope : pb::IMessage<GateRequestEnvelope>
+  public sealed partial class C2S_GateTransportRequest : pb::IMessage<C2S_GateTransportRequest>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       , pb::IBufferMessage
   #endif
   {
-    private static readonly pb::MessageParser<GateRequestEnvelope> _parser = new pb::MessageParser<GateRequestEnvelope>(() => new GateRequestEnvelope());
+    private static readonly pb::MessageParser<C2S_GateTransportRequest> _parser = new pb::MessageParser<C2S_GateTransportRequest>(() => new C2S_GateTransportRequest());
     private pb::UnknownFieldSet _unknownFields;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public static pb::MessageParser<GateRequestEnvelope> Parser { get { return _parser; } }
+    public static pb::MessageParser<C2S_GateTransportRequest> Parser { get { return _parser; } }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -70,7 +71,7 @@ namespace AiNative.Protocol.Transport.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public GateRequestEnvelope() {
+    public C2S_GateTransportRequest() {
       OnConstruction();
     }
 
@@ -78,15 +79,15 @@ namespace AiNative.Protocol.Transport.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public GateRequestEnvelope(GateRequestEnvelope other) : this() {
+    public C2S_GateTransportRequest(C2S_GateTransportRequest other) : this() {
       payload_ = other.payload_;
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public GateRequestEnvelope Clone() {
-      return new GateRequestEnvelope(this);
+    public C2S_GateTransportRequest Clone() {
+      return new C2S_GateTransportRequest(this);
     }
 
     /// <summary>Field number for the "payload" field.</summary>
@@ -104,12 +105,12 @@ namespace AiNative.Protocol.Transport.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override bool Equals(object other) {
-      return Equals(other as GateRequestEnvelope);
+      return Equals(other as C2S_GateTransportRequest);
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public bool Equals(GateRequestEnvelope other) {
+    public bool Equals(C2S_GateTransportRequest other) {
       if (ReferenceEquals(other, null)) {
         return false;
       }
@@ -182,7 +183,7 @@ namespace AiNative.Protocol.Transport.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public void MergeFrom(GateRequestEnvelope other) {
+    public void MergeFrom(C2S_GateTransportRequest other) {
       if (other == null) {
         return;
       }
@@ -242,17 +243,20 @@ namespace AiNative.Protocol.Transport.V1 {
 
   }
 
+  /// <summary>
+  /// 服务端 → 客户端；Response 为请求回复，Push 为主动推送。
+  /// </summary>
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
-  public sealed partial class GateResponseEnvelope : pb::IMessage<GateResponseEnvelope>
+  public sealed partial class S2C_GateTransportResponse : pb::IMessage<S2C_GateTransportResponse>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       , pb::IBufferMessage
   #endif
   {
-    private static readonly pb::MessageParser<GateResponseEnvelope> _parser = new pb::MessageParser<GateResponseEnvelope>(() => new GateResponseEnvelope());
+    private static readonly pb::MessageParser<S2C_GateTransportResponse> _parser = new pb::MessageParser<S2C_GateTransportResponse>(() => new S2C_GateTransportResponse());
     private pb::UnknownFieldSet _unknownFields;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public static pb::MessageParser<GateResponseEnvelope> Parser { get { return _parser; } }
+    public static pb::MessageParser<S2C_GateTransportResponse> Parser { get { return _parser; } }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -268,7 +272,7 @@ namespace AiNative.Protocol.Transport.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public GateResponseEnvelope() {
+    public S2C_GateTransportResponse() {
       OnConstruction();
     }
 
@@ -276,7 +280,7 @@ namespace AiNative.Protocol.Transport.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public GateResponseEnvelope(GateResponseEnvelope other) : this() {
+    public S2C_GateTransportResponse(S2C_GateTransportResponse other) : this() {
       errorCode_ = other.errorCode_;
       payload_ = other.payload_;
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
@@ -284,8 +288,8 @@ namespace AiNative.Protocol.Transport.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public GateResponseEnvelope Clone() {
-      return new GateResponseEnvelope(this);
+    public S2C_GateTransportResponse Clone() {
+      return new S2C_GateTransportResponse(this);
     }
 
     /// <summary>Field number for the "error_code" field.</summary>
@@ -315,12 +319,12 @@ namespace AiNative.Protocol.Transport.V1 {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override bool Equals(object other) {
-      return Equals(other as GateResponseEnvelope);
+      return Equals(other as S2C_GateTransportResponse);
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public bool Equals(GateResponseEnvelope other) {
+    public bool Equals(S2C_GateTransportResponse other) {
       if (ReferenceEquals(other, null)) {
         return false;
       }
@@ -406,7 +410,7 @@ namespace AiNative.Protocol.Transport.V1 {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public void MergeFrom(GateResponseEnvelope other) {
+    public void MergeFrom(S2C_GateTransportResponse other) {
       if (other == null) {
         return;
       }

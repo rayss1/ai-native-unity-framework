@@ -78,7 +78,7 @@ public sealed class ReviewTests
     {
         var lobby = new LobbyService(new ReplyRemote((_, _, _) => ServiceReply.Reject(error)));
         var party = (
-            await Call(lobby, "gate", "p1", ServiceMethods.PartyCreate, new PartyCommand())
+            await Call(lobby, "gate", "p1", ServiceMethods.PartyCreate, new PartyOperation())
         ).Read(PartyState.Parser);
         party = (
             await Call(
@@ -86,7 +86,7 @@ public sealed class ReviewTests
                 "gate",
                 "p1",
                 ServiceMethods.PartyReady,
-                new PartyCommand
+                new PartyOperation
                 {
                     PartyId = party.PartyId,
                     ExpectedVersion = party.Version,
@@ -101,7 +101,7 @@ public sealed class ReviewTests
                     "gate",
                     "p1",
                     ServiceMethods.PartyQueue,
-                    new PartyQueueRequest
+                    new PartyQueueData
                     {
                         PartyId = party.PartyId,
                         ExpectedVersion = party.Version,
@@ -117,7 +117,7 @@ public sealed class ReviewTests
                     "gate",
                     "p1",
                     ServiceMethods.PartyLeave,
-                    new PartyCommand { PartyId = party.PartyId, ExpectedVersion = party.Version }
+                    new PartyOperation { PartyId = party.PartyId, ExpectedVersion = party.Version }
                 )
                 .AsTask(),
             Call(
@@ -125,7 +125,7 @@ public sealed class ReviewTests
                     "gate",
                     "p1",
                     ServiceMethods.PartyReady,
-                    new PartyCommand { PartyId = party.PartyId, ExpectedVersion = party.Version }
+                    new PartyOperation { PartyId = party.PartyId, ExpectedVersion = party.Version }
                 )
                 .AsTask()
         );
@@ -146,7 +146,7 @@ public sealed class ReviewTests
             {
                 if (method == ServiceMethods.Allocate)
                 {
-                    var request = AllocationRequest.Parser.ParseFrom(payload.Span);
+                    var request = AllocationSpec.Parser.ParseFrom(payload.Span);
                     accepted = new()
                     {
                         AllocationId = "allocation",
@@ -218,7 +218,7 @@ public sealed class ReviewTests
         var rpc = new ReplyRemote(
             (_, _, payload) =>
             {
-                var request = AllocationRequest.Parser.ParseFrom(payload.Span);
+                var request = AllocationSpec.Parser.ParseFrom(payload.Span);
                 var room = new RoomAllocation
                 {
                     MatchId = request.MatchId,
@@ -283,7 +283,7 @@ public sealed class ReviewTests
                         "gate",
                         "",
                         ServiceMethods.RegisterAccount,
-                        new AccountRequest { Username = name, Password = "valid-password" }
+                        new AccountCredentials { Username = name, Password = "valid-password" }
                     )
                 )
                     .Read(LoginResult.Parser)

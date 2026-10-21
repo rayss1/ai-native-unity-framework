@@ -5,11 +5,13 @@ option csharp_namespace = "AiNative.Protocol.Transport.V1";
 
 // Wire mirror of the pinned FantasyGate envelopes in FantasyControlEnvelope.cs.
 // Opcodes and the 20-byte TCP header remain transport metadata.
-message GateRequestEnvelope {
+// 客户端 → 服务端。
+message C2S_GateTransportRequest {
   bytes payload = 1;
 }
 
-message GateResponseEnvelope {
+// 服务端 → 客户端；Response 为请求回复，Push 为主动推送。
+message S2C_GateTransportResponse {
   uint32 error_code = 1;
   bytes payload = 2;
 }

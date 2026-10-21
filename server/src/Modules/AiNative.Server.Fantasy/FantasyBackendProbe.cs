@@ -18,8 +18,7 @@ public sealed class FantasyBackendProbe : IAsyncDisposable
     private readonly Session _session;
     private readonly Scene _ownerScene;
     private readonly long _sessionId;
-    private readonly Channel<ControlNotification> _notifications =
-        Channel.CreateBounded<ControlNotification>(64);
+    private readonly Channel<S2C_GatePush> _notifications = Channel.CreateBounded<S2C_GatePush>(64);
     private readonly SemaphoreSlim _calls = new(8, 8);
     private readonly object _ownership = new();
     private readonly HashSet<Task> _pendingCalls = [];
@@ -34,7 +33,7 @@ public sealed class FantasyBackendProbe : IAsyncDisposable
         Clients.TryAdd(_sessionId, this);
     }
 
-    public bool TryReadNotification(out ControlNotification? notification) =>
+    public bool TryReadNotification(out S2C_GatePush? notification) =>
         _notifications.Reader.TryRead(out notification);
 
     internal static void Deliver(long id, byte[] payload)
@@ -43,9 +42,7 @@ public sealed class FantasyBackendProbe : IAsyncDisposable
         {
             try
             {
-                client._notifications.Writer.TryWrite(
-                    ControlNotification.Parser.ParseFrom(payload)
-                );
+                client._notifications.Writer.TryWrite(S2C_GatePush.Parser.ParseFrom(payload));
             }
             catch (InvalidProtocolBufferException) { }
         }
@@ -115,7 +112,7 @@ public sealed class FantasyBackendProbe : IAsyncDisposable
             TaskCreationOptions.RunContinuationsAsynchronously
         );
         TaskCompletionSource settled = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        ControlRequest request = new()
+        C2S_GateRequest request = new()
         {
             CorrelationId = Guid.NewGuid().ToString("N"),
             Method = method,
@@ -135,10 +132,10 @@ public sealed class FantasyBackendProbe : IAsyncDisposable
                         if (_closing || _session.IsDisposed)
                             throw new ServiceException("unavailable");
                     using IResponse response = await _session.Call(
-                        new FantasyGateRequest { Payload = request.ToByteArray() }
+                        new C2S_FantasyGateRequest { Payload = request.ToByteArray() }
                     );
-                    ControlResponse decoded = ControlResponse.Parser.ParseFrom(
-                        ((FantasyGateResponse)response).Payload
+                    S2C_GateResponse decoded = S2C_GateResponse.Parser.ParseFrom(
+                        ((S2C_FantasyGateResponse)response).Payload
                     );
                     if (decoded.CorrelationId != request.CorrelationId)
                         throw new ServiceException("response-conflict");

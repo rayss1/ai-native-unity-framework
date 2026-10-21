@@ -57,7 +57,7 @@ internal static class FantasyKcpLoadProbe
         startupTimeout.CancelAfter(TimeSpan.FromMinutes(2));
         FantasyKcpProbe[] probes = new FantasyKcpProbe[botCount];
         byte[][] receiveBuffers = new byte[botCount][];
-        InputBatch[] inputBatches = new InputBatch[botCount];
+        C2S_InputBatch[] inputBatches = new C2S_InputBatch[botCount];
         byte[] sendBuffer = new byte[RealtimeProtocolCodec.MaxDatagramBytes];
         long inputFrames = 0;
         long measuredInputFrames = 0;
@@ -101,27 +101,32 @@ internal static class FantasyKcpLoadProbe
                 {
                     int index = batchStart + offset;
                     receiveBuffers[index] = new byte[RealtimeProtocolCodec.MaxDatagramBytes];
-                    InputBatch inputBatch = new();
-                    inputBatch.Commands.Add(new InputCommand());
-                    inputBatch.Commands.Add(new InputCommand());
+                    C2S_InputBatch inputBatch = new();
+                    inputBatch.Commands.Add(new C2S_InputCommand());
+                    inputBatch.Commands.Add(new C2S_InputCommand());
                     inputBatches[index] = inputBatch;
                     await FantasyKcpLoopbackProbe.SendAsync(
                         probes[index],
-                        MessageId.LoginRequest,
-                        new LoginRequest { ProtocolMajor = 1, ClientBuild = "kcp-multi-room-load" },
+                        MessageId.C2SLoginRequest,
+                        new C2S_LoginRequest
+                        {
+                            ProtocolMajor = 1,
+                            ClientBuild = "kcp-multi-room-load",
+                        },
                         sendBuffer,
                         startupTimeout.Token
                     );
-                    LoginResponse login = await FantasyKcpLoopbackProbe.ReceiveAsync<LoginResponse>(
-                        probes[index],
-                        MessageId.LoginResponse,
-                        startupTimeout.Token
-                    );
+                    S2C_LoginResponse login =
+                        await FantasyKcpLoopbackProbe.ReceiveAsync<S2C_LoginResponse>(
+                            probes[index],
+                            MessageId.S2CLoginResponse,
+                            startupTimeout.Token
+                        );
                     uint requestedRoom = checked((uint)(index / botsPerRoom) + 1);
                     await FantasyKcpLoopbackProbe.SendAsync(
                         probes[index],
-                        MessageId.JoinRoomRequest,
-                        new JoinRoomRequest
+                        MessageId.C2SJoinRoomRequest,
+                        new C2S_JoinRoomRequest
                         {
                             SessionId = login.SessionId,
                             RequestedRoom = requestedRoom,
@@ -129,10 +134,10 @@ internal static class FantasyKcpLoadProbe
                         sendBuffer,
                         startupTimeout.Token
                     );
-                    JoinRoomResponse join =
-                        await FantasyKcpLoopbackProbe.ReceiveAsync<JoinRoomResponse>(
+                    S2C_JoinRoomResponse join =
+                        await FantasyKcpLoopbackProbe.ReceiveAsync<S2C_JoinRoomResponse>(
                             probes[index],
-                            MessageId.JoinRoomResponse,
+                            MessageId.S2CJoinRoomResponse,
                             startupTimeout.Token
                         );
                     if (
@@ -153,13 +158,13 @@ internal static class FantasyKcpLoadProbe
                 for (int index = 0; index < connectedCount; index++)
                 {
                     int roomIndex = index / botsPerRoom;
-                    InputCommand command = inputBatches[index].Commands[0];
+                    C2S_InputCommand command = inputBatches[index].Commands[0];
                     command.Sequence = setupSequence;
                     command.MoveXMilli = ((index + roomIndex) & 1) == 0 ? 1000 : -1000;
                     command.MoveYMilli = 0;
                     await FantasyKcpLoopbackProbe.SendAsync(
                         probes[index],
-                        MessageId.InputCommand,
+                        MessageId.C2SInputCommand,
                         command,
                         sendBuffer,
                         startupTimeout.Token
@@ -192,7 +197,7 @@ internal static class FantasyKcpLoadProbe
                 for (int index = 0; index < botCount; index++)
                 {
                     int roomIndex = index / botsPerRoom;
-                    InputCommand command = inputBatches[index].Commands[commandSlot];
+                    C2S_InputCommand command = inputBatches[index].Commands[commandSlot];
                     command.RoomTick = newestSnapshotTick;
                     command.Sequence = sequence;
                     command.MoveXMilli =
@@ -213,7 +218,7 @@ internal static class FantasyKcpLoadProbe
                     {
                         await FantasyKcpLoopbackProbe.SendAsync(
                             probes[index],
-                            MessageId.InputBatch,
+                            MessageId.C2SInputBatch,
                             inputBatches[index],
                             sendBuffer,
                             cancellationToken
@@ -239,8 +244,8 @@ internal static class FantasyKcpLoadProbe
                                 receiveBuffer[..packet.WrittenBytes],
                                 out DecodedProtocolMessage decoded
                             ) != ProtocolDecodeStatus.Accepted
-                            || decoded.MessageId != MessageId.Snapshot
-                            || decoded.Message is not Snapshot snapshot
+                            || decoded.MessageId != MessageId.S2CSnapshotPush
+                            || decoded.Message is not S2C_SnapshotPush snapshot
                         )
                         {
                             continue;

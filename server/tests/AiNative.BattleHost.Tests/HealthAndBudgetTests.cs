@@ -493,7 +493,7 @@ public sealed class HealthAndBudgetTests
             for (int tick = 0; tick < ticks; tick++)
             {
                 int entityIndex = (int)(random.NextUInt32() % 64);
-                InputCommand command = new()
+                C2S_InputCommand command = new()
                 {
                     RoomTick = checked((ulong)tick),
                     Sequence = checked((uint)tick + 1),
@@ -502,7 +502,7 @@ public sealed class HealthAndBudgetTests
                 };
                 Assert.That(
                     RealtimeProtocolCodec.TryEncode(
-                        MessageId.InputCommand,
+                        MessageId.C2SInputCommand,
                         command,
                         frame,
                         out TransportChannel channel,
@@ -525,9 +525,9 @@ public sealed class HealthAndBudgetTests
             }
 
             const int batchedEntityIndex = 3;
-            InputBatch batch = new();
+            C2S_InputBatch batch = new();
             batch.Commands.Add(
-                new InputCommand
+                new C2S_InputCommand
                 {
                     RoomTick = checked((ulong)ticks),
                     Sequence = checked((uint)ticks + 1),
@@ -536,7 +536,7 @@ public sealed class HealthAndBudgetTests
                 }
             );
             batch.Commands.Add(
-                new InputCommand
+                new C2S_InputCommand
                 {
                     RoomTick = checked((ulong)ticks),
                     Sequence = checked((uint)ticks + 2),
@@ -547,7 +547,7 @@ public sealed class HealthAndBudgetTests
             );
             Assert.That(
                 RealtimeProtocolCodec.TryEncode(
-                    MessageId.InputBatch,
+                    MessageId.C2SInputBatch,
                     batch,
                     frame,
                     out TransportChannel batchChannel,
@@ -565,7 +565,7 @@ public sealed class HealthAndBudgetTests
                 ),
                 Is.True
             );
-            foreach (InputCommand batchedCommand in batch.Commands)
+            foreach (C2S_InputCommand batchedCommand in batch.Commands)
             {
                 recorded.ApplyInput(
                     batchedEntityIndex,
@@ -631,7 +631,7 @@ public sealed class HealthAndBudgetTests
                 for (int roomIndex = 0; roomIndex < capacitySettings.RoomCount; roomIndex++)
                 {
                     int entityIndex = tick % BattleHostCapacitySettings.BotsPerRoom;
-                    InputCommand command = new()
+                    C2S_InputCommand command = new()
                     {
                         RoomTick = checked((ulong)tick),
                         Sequence = checked((uint)tick + 1),
@@ -640,7 +640,7 @@ public sealed class HealthAndBudgetTests
                     };
                     Assert.That(
                         RealtimeProtocolCodec.TryEncode(
-                            MessageId.InputCommand,
+                            MessageId.C2SInputCommand,
                             command,
                             frame,
                             out _,
@@ -769,8 +769,8 @@ public sealed class HealthAndBudgetTests
             byte[] frame = new byte[RealtimeProtocolCodec.MaxDatagramBytes];
             Assert.That(
                 RealtimeProtocolCodec.TryEncode(
-                    MessageId.InputCommand,
-                    new InputCommand { RoomTick = 1, Sequence = 1 },
+                    MessageId.C2SInputCommand,
+                    new C2S_InputCommand { RoomTick = 1, Sequence = 1 },
                     frame,
                     out _,
                     out int writtenBytes

@@ -431,14 +431,14 @@ public class BattleDurabilityTests
             var old = await service.HandleAsync(
                 new(ServiceRole.Coordinator, "peer"),
                 ServiceMethods.Drain,
-                new DrainRequest { BootEpoch = "boot", CoordinatorEpoch = "old" }.ToByteArray()
+                new DrainSpec { BootEpoch = "boot", CoordinatorEpoch = "old" }.ToByteArray()
             );
             Assert.That(old.Success, Is.False);
             Assert.That(pool.Inventory().Draining, Is.False);
             var current = await service.HandleAsync(
                 new(ServiceRole.Coordinator, "peer"),
                 ServiceMethods.Drain,
-                new DrainRequest { BootEpoch = "boot", CoordinatorEpoch = "new" }.ToByteArray()
+                new DrainSpec { BootEpoch = "boot", CoordinatorEpoch = "new" }.ToByteArray()
             );
             Assert.That(current.Success, Is.True);
             Assert.That(pool.Inventory().Draining, Is.True);
