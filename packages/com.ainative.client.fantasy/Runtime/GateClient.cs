@@ -7,6 +7,7 @@ using System.Security.Authentication;
 using System.Threading;
 using System.Threading.Tasks;
 using AiNative.Client.Protocol.Protobuf;
+using AiNative.Realtime;
 
 namespace AiNative.Client.Fantasy
 {
@@ -110,19 +111,18 @@ namespace AiNative.Client.Fantasy
                     throw new GateCallException("unavailable");
                 // A canceled partial exchange invalidates the stream: a future response must not satisfy another call.
                 using var cancellation = deadline.Token.Register(Dispose);
-                uint rpc = ++_rpc;
-                if (rpc == 0)
-                    rpc = ++_rpc;
-                string correlation = Guid.NewGuid().ToString("N");
-                byte[] request = GateFrame.Encode(
-                    268435633u,
-                    rpc,
-                    GateProtocolCodec.Envelope(
-                        GateWire.Request(method, payload, credential, correlation)
-                    )
-                );
+                uint rpcId = ++_rpc;
+                if (rpcId == 0)
+                    rpcId = ++_rpc;
+                string correlationId = Guid.NewGuid().ToString("N");
+                // Business envelope: operation, arguments, credential and request identity.
+                byte[] request = GateWire.Request(method, payload, credential, correlationId);
+                // Fantasy message body wraps the business envelope without changing it.
+                byte[] envelope = GateProtocolCodec.Envelope(request);
+                // TCP header: payload length, message type and transport RPC identity.
+                byte[] frame = GateFrame.Encode(GateTransportOpCodes.Request, rpcId, envelope);
                 await _stream
-                    .WriteAsync(request, 0, request.Length, deadline.Token)
+                    .WriteAsync(frame, 0, frame.Length, deadline.Token)
                     .ConfigureAwait(false);
                 byte[] header = _header;
                 for (int skipped = 0; skipped <= 64; ++skipped)
@@ -135,14 +135,14 @@ namespace AiNative.Client.Fantasy
                         receivedRpc = BinaryPrimitives.ReadUInt32LittleEndian(header.AsSpan(8));
                     byte[] body = new byte[Math.Max(length, 0)];
                     await ReadExactlyAsync(body, deadline.Token).ConfigureAwait(false);
-                    if (opcode == 134217905u)
+                    if (opcode == GateTransportOpCodes.Push)
                         continue; // Notifications are advisory; application queries authoritative state.
-                    if (opcode != 402653361u || receivedRpc != rpc)
+                    if (opcode != GateTransportOpCodes.Response || receivedRpc != rpcId)
                         throw new InvalidDataException("gate-response-identity");
-                    var envelope = GateProtocolCodec.ResponseEnvelope(body);
-                    if (envelope.Error != 0)
+                    var responseEnvelope = GateProtocolCodec.ResponseEnvelope(body);
+                    if (responseEnvelope.Error != 0)
                         throw new GateCallException("unavailable");
-                    return GateWire.Response(envelope.Payload, correlation);
+                    return GateWire.Response(responseEnvelope.Payload, correlationId);
                 }
                 throw new InvalidDataException("gate-notification-limit");
             }

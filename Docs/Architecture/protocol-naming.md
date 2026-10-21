@@ -86,3 +86,45 @@ Gate 的 `match.ready`、`match.failed`、`match.cancelled` 主动通知使用 `
 - `shared/protocol/Tests/Fixtures/before-direction-names.pb` 是提交 `d43796f`
   三份 schema 的描述文件，由 Grpc.Tools 2.83.0 / protoc 35.1 生成。
   兼容性测试检查原有所有消息字段和枚举编号，并固定 Gate/S2S 信封字节。
+
+## opcode：传输层消息编号
+
+唯一生产定义在 `shared/realtime/Runtime/ControlTransportOpCodes.cs`，命名空间为
+`AiNative.Realtime`。客户端和服务端引用同一套常量；只包含项目拥有的固定线路值，
+不引用 Fantasy 或 Unity 类型，也不增加运行时依赖。
+
+| 常量 | 固定值 | Fantasy 消息类别 | 项目索引 |
+| --- | ---: | ---: | ---: |
+| `GateTransportOpCodes.Request` | 268435633 | 外部请求 2 | 177 |
+| `GateTransportOpCodes.Response` | 402653361 | 外部回复 3 | 177 |
+| `GateTransportOpCodes.Push` | 134217905 | 外部普通消息 1 | 177 |
+| `ServiceControlTransportOpCodes.Request` | 1073742001 | 内部地址请求 8 | 177 |
+| `ServiceControlTransportOpCodes.Response` | 1207959729 | 内部地址回复 9 | 177 |
+
+组合规则为 `索引 | (序列化类型 << 23) | (消息类别 << 27)`，Protobuf 类型为 0。
+类别不同，可以使用相同索引；完整 opcode 不能冲突。位运算只在统一定义内出现。
+实时战斗信封的索引 1 不在此次控制消息整理范围内，保持原样。
+
+Gate 的 TCP 帧结构：
+
+```text
+20 字节帧头
+  0..3   body 长度（既有空包约定保持不变）
+  4..7   opcode：这是哪种传输消息
+  8..11  rpcId：对应哪一次传输请求
+  12..19 保留的路由位置，Gate 写入 0
+body
+  Fantasy 信封
+    Gate 业务信封
+      correlation_id：对应哪一次业务请求
+      method：具体做什么，例如 player.login
+      body：账号凭据等业务参数
+```
+
+`GateClient.CallAsync` 按业务信封、Fantasy 消息体、TCP 帧三个步骤写出局部变量，
+没有增加编码次数或数组复制。回复仍检查 opcode、rpcId 和 correlation_id；
+超时、取消和推送处理沿用原逻辑。
+
+兼容性测试固定历史数值、两端消息类型、生成器的运行时注册表和 Gate 帧头字节。
+这些是 `const uint`，会内联到调用程序集；未来若改值必须同步重新编译两端，
+并按协议升级流程处理，不能仅替换共享 DLL。本次不改变任何线上数值。

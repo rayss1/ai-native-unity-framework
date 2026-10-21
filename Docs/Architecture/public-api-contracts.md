@@ -359,3 +359,13 @@ The first slice also requires, but does not yet freeze method shapes for:
 | `IGameplayDiagnostics` | Shared diagnostics abstraction | Zero-allocation disabled path and cardinality review |
 
 Adding one of these APIs requires contract tests, lifecycle/threading notes, and an ADR/catalog update; implementations may remain internal until that gate passes.
+
+## Control transport opcode constants (2026-10-21)
+
+Owner: `shared/realtime`, namespace `AiNative.Realtime`. `GateTransportOpCodes`
+exposes `Request`, `Response`, `Push`; `ServiceControlTransportOpCodes` exposes
+`Request`, `Response`. All are immutable `const uint` wire identifiers shared by
+Client and Server adapters. They contain no vendor types and add no dependency
+edge. Values and migration constraints are documented in [the protocol guide](protocol-naming.md#opcode传输层消息编号).
+They do not select business methods or authenticate callers. Changing an inlined
+constant requires rebuilding both peers and a compatible protocol rollout.
