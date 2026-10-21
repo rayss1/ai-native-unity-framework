@@ -1,4 +1,5 @@
 using global::Fantasy;
+using AiNative.Realtime;
 using Fantasy.Async;
 using Fantasy.Event;
 using Fantasy.Network.Interface;
@@ -16,7 +17,7 @@ internal sealed partial class S2S_FantasyControlRequest : AMessage, IAddressRequ
     [ProtoMember(1)]
     public byte[] Payload { get; set; } = [];
 
-    public uint OpCode() => 1073742001u;
+    public uint OpCode() => ServiceControlTransportOpCodes.Request;
 
     public void Dispose() => Payload = [];
 }
@@ -30,7 +31,7 @@ internal sealed partial class S2S_FantasyControlResponse : AMessage, IAddressRes
     [ProtoMember(2)]
     public byte[] Payload { get; set; } = [];
 
-    public uint OpCode() => 1207959729u;
+    public uint OpCode() => ServiceControlTransportOpCodes.Response;
 
     public void Dispose()
     {
@@ -48,7 +49,7 @@ internal sealed partial class C2S_FantasyGateRequest : AMessage, IRequest
     [ProtoMember(1)]
     public byte[] Payload { get; set; } = [];
 
-    public uint OpCode() => 268435633u;
+    public uint OpCode() => GateTransportOpCodes.Request;
 
     public void Dispose() => Payload = [];
 }
@@ -62,7 +63,7 @@ internal sealed partial class S2C_FantasyGateResponse : AMessage, IResponse
     [ProtoMember(2)]
     public byte[] Payload { get; set; } = [];
 
-    public uint OpCode() => 402653361u;
+    public uint OpCode() => GateTransportOpCodes.Response;
 
     public void Dispose()
     {
@@ -112,7 +113,7 @@ internal sealed partial class S2C_FantasyGatePush : AMessage, IMessage
     [ProtoMember(1)]
     public byte[] Payload { get; set; } = [];
 
-    public uint OpCode() => 134217905u;
+    public uint OpCode() => GateTransportOpCodes.Push;
 
     public void Dispose() => Payload = [];
 }

@@ -6,6 +6,7 @@ using AiNative.Client.Fantasy;
 using AiNative.Client.Protocol.Protobuf;
 using AiNative.Protocol.Backend.V1;
 using AiNative.Protocol.Transport.V1;
+using AiNative.Realtime;
 using Google.Protobuf;
 using NUnit.Framework;
 
@@ -145,7 +146,7 @@ public sealed class GateWireTests
         );
         Assert.That(ProfileQuery.Parser.ParseFrom(decoded.Body).PlayerId, Is.EqualTo("p1"));
         byte[] frame = GateFrame.Encode(
-            268435633u,
+            GateTransportOpCodes.Request,
             17,
             new C2S_GateTransportRequest { Payload = ByteString.CopyFrom(request) }.ToByteArray()
         );
@@ -154,6 +155,10 @@ public sealed class GateWireTests
             Is.EqualTo(268435633u)
         );
         Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(frame.AsSpan(8)), Is.EqualTo(17u));
+        Assert.That(
+            Convert.ToHexString(frame.AsSpan(4, 16)),
+            Is.EqualTo("B1000010110000000000000000000000")
+        );
         Assert.That(BinaryPrimitives.ReadInt32LittleEndian(frame), Is.EqualTo(frame.Length - 20));
     }
 
