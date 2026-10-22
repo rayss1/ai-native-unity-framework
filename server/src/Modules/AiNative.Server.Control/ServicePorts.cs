@@ -40,6 +40,9 @@ public sealed class ServiceException(string code) : Exception(code)
     public string Code { get; } = code;
 }
 
+/// <summary>
+/// 所有服务节点之间的 RPC 调用接口
+/// </summary>
 public interface IServiceRpc
 {
     ValueTask<ServiceReply> CallAsync(
@@ -61,6 +64,9 @@ public interface IServiceHandler
     );
 }
 
+/// <summary>
+/// 向客户端主动推送消息 
+/// </summary>
 public interface IClientNotifier
 {
     ValueTask NotifyAsync(

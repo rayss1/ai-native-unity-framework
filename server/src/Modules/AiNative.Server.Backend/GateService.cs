@@ -85,6 +85,7 @@ public sealed class GateService(
                 connection.Window = now;
                 connection.Requests = 0;
             }
+            // 如果是普通请求，限制每秒最多 40 次请求；如果是登录或注册请求，限制每分钟最多 5 次请求。
             if (++connection.Requests > 40)
                 return ServiceReply.Reject("rate-limited");
             connection.Seen = clock.GetUtcNow();

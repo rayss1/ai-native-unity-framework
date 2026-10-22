@@ -26,6 +26,9 @@ internal readonly record struct ArenaCombatEventRecord(
     int PositionZMillimetres
 );
 
+/// <summary>
+/// 战斗规则实现
+/// </summary>
 internal sealed class ArenaRoom
 {
     public const int MaxPlayers = 8;

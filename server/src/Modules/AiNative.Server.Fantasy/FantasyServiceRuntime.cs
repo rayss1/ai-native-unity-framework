@@ -245,6 +245,7 @@ public sealed class FantasyServiceRuntime : IServiceRpc, IClientNotifier, IAsync
             TraceParent = Activity.Current?.Id ?? "",
             TraceState = Activity.Current?.TraceStateString ?? "",
         };
+        // 用于内部服务间的调用，FantasyServiceRuntime 会在发送前签名请求，确保请求的合法性。
         _auth.Sign(request);
         source.ThreadSynchronizationContext.Post(async () =>
         {
