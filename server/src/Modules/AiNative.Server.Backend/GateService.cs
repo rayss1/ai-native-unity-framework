@@ -38,15 +38,46 @@ public sealed class GateService(
         }
         if (request.Method != method)
             return ServiceReply.Reject("invalid-method");
-        Connection connection;
+        ServiceReply? rejection = GetConnectionAndCheckLimits(
+            context.PeerId,
+            method,
+            out Connection connection
+        );
+        if (rejection is not null)
+            return rejection;
+
+        return method switch
+        {
+            "gate.ping" => ServiceReply.From(new Empty()),
+            ServiceMethods.RegisterAccount or ServiceMethods.Login => await HandleAccountAsync(
+                connection,
+                method,
+                request,
+                cancellationToken
+            ),
+            _ => await HandleAuthenticatedRequestAsync(
+                connection,
+                method,
+                request,
+                cancellationToken
+            ),
+        };
+    }
+
+    private ServiceReply? GetConnectionAndCheckLimits(
+        string peerId,
+        string method,
+        out Connection connection
+    )
+    {
         lock (_sync)
         {
-            if (!_connections.TryGetValue(context.PeerId, out connection!))
+            if (!_connections.TryGetValue(peerId, out connection!))
             {
                 if (_connections.Count >= maxConnections)
                     return ServiceReply.Reject("capacity-unavailable");
-                connection = new(context.PeerId);
-                _connections.Add(context.PeerId, connection);
+                connection = new(peerId);
+                _connections.Add(peerId, connection);
             }
             long now = clock.GetUtcNow().ToUnixTimeSeconds();
             if (connection.Window != now)
@@ -68,36 +99,49 @@ public sealed class GateService(
                     return ServiceReply.Reject("rate-limited");
             }
         }
-        if (method == "gate.ping")
-            return ServiceReply.From(new Empty());
-        if (method is ServiceMethods.RegisterAccount or ServiceMethods.Login)
+        return null;
+    }
+
+    private async ValueTask<ServiceReply> HandleAccountAsync(
+        Connection connection,
+        string method,
+        C2S_GateRequest request,
+        CancellationToken cancellationToken
+    )
+    {
+        lock (_sync)
+            if (connection.Player.Length != 0)
+                return ServiceReply.Reject("connection-already-authenticated");
+        ServiceReply login = await rpc.CallAsync(
+            new(ServiceRole.Player),
+            method,
+            request.Body.Memory,
+            cancellationToken
+        );
+        if (login.Success)
         {
+            LoginResult identity = login.Read(LoginResult.Parser);
             lock (_sync)
-                if (connection.Player.Length != 0)
-                    return ServiceReply.Reject("connection-already-authenticated");
-            ServiceReply login = await rpc.CallAsync(
-                new(ServiceRole.Player),
-                method,
-                request.Body.Memory,
-                cancellationToken
-            );
-            if (login.Success)
             {
-                LoginResult identity = login.Read(LoginResult.Parser);
-                lock (_sync)
-                {
-                    if (connection.Player.Length != 0 && connection.Player != identity.PlayerId)
-                        return ServiceReply.Reject("connection-identity-conflict");
-                    connection.Player = identity.PlayerId;
-                    connection.Token = identity.SessionToken;
-                    connection.Expires = identity.ExpiresUnixSeconds;
-                }
-                await PresenceAsync(connection, true, cancellationToken, identity.PlayerId);
+                if (connection.Player.Length != 0 && connection.Player != identity.PlayerId)
+                    return ServiceReply.Reject("connection-identity-conflict");
+                connection.Player = identity.PlayerId;
+                connection.Token = identity.SessionToken;
+                connection.Expires = identity.ExpiresUnixSeconds;
             }
-            return login;
+            await PresenceAsync(connection, true, cancellationToken, identity.PlayerId);
         }
+        return login;
+    }
+
+    private async ValueTask<(string Player, ServiceReply? Rejection)> ValidateSessionAsync(
+        Connection connection,
+        C2S_GateRequest request,
+        CancellationToken cancellationToken
+    )
+    {
         if (request.Credential.Length == 0 || request.Credential.Length > 8192)
-            return ServiceReply.Reject("invalid-session");
+            return ("", ServiceReply.Reject("invalid-session"));
         string player;
         bool cached;
         lock (_sync)
@@ -116,13 +160,13 @@ public sealed class GateService(
                 cancellationToken
             );
             if (!validation.Success)
-                return validation;
+                return ("", validation);
             PlayerIdentity identity = validation.Read(PlayerIdentity.Parser);
             player = identity.PlayerId;
             lock (_sync)
             {
                 if (connection.Player.Length != 0 && connection.Player != player)
-                    return ServiceReply.Reject("connection-identity-conflict");
+                    return ("", ServiceReply.Reject("connection-identity-conflict"));
                 connection.Player = player;
                 connection.Token = request.Credential;
                 connection.Expires = identity.ExpiresUnixSeconds;
@@ -130,75 +174,116 @@ public sealed class GateService(
             await PresenceAsync(connection, true, cancellationToken, player);
         }
         if (player.Length == 0)
-            return ServiceReply.Reject("invalid-session");
-        ServiceTarget target;
-        if (method is ServiceMethods.Profile or ServiceMethods.SettlementStatus)
-            target = new(ServiceRole.Player);
-        else if (
-            method
-            is ServiceMethods.PartyCreate
-                or ServiceMethods.PartyInvite
-                or ServiceMethods.PartyAccept
-                or ServiceMethods.PartyLeave
-                or ServiceMethods.PartyReady
-                or ServiceMethods.PartyGet
-                or ServiceMethods.PartyQueue
-                or ServiceMethods.QueueCancel
-                or ServiceMethods.MatchStatus
-                or ServiceMethods.PartyInvites
-        )
-            target = new(ServiceRole.Lobby);
-        else
+            return ("", ServiceReply.Reject("invalid-session"));
+        return (player, null);
+    }
+
+    private async ValueTask<ServiceReply> HandleAuthenticatedRequestAsync(
+        Connection connection,
+        string method,
+        C2S_GateRequest request,
+        CancellationToken cancellationToken
+    )
+    {
+        var (player, rejection) = await ValidateSessionAsync(
+            connection,
+            request,
+            cancellationToken
+        );
+        if (rejection is not null)
+            return rejection;
+
+        // Keep authentication before the allowlist check, including its presence update.
+        ServiceTarget? target = GetAllowedTarget(method);
+        if (target is null)
             return ServiceReply.Reject("forbidden");
+
         ServiceReply response = await rpc.CallAsync(
-            target,
+            target.Value,
             method,
             request.Body.Memory,
             cancellationToken,
             player
         );
-        if (
-            response.Success
-            && method
-                is ServiceMethods.PartyCreate
-                    or ServiceMethods.PartyAccept
-                    or ServiceMethods.PartyGet
-                    or ServiceMethods.PartyReady
-        )
+        return await ProcessResponseAsync(connection, method, player, response, cancellationToken);
+    }
+
+    // This switch is the client-facing business allowlist.
+    private static ServiceTarget? GetAllowedTarget(string method) =>
+        method switch
         {
-            var party = response.Read(PartyState.Parser);
-            lock (_sync)
+            ServiceMethods.Profile or ServiceMethods.SettlementStatus => new(ServiceRole.Player),
+            ServiceMethods.PartyCreate
+            or ServiceMethods.PartyInvite
+            or ServiceMethods.PartyAccept
+            or ServiceMethods.PartyLeave
+            or ServiceMethods.PartyReady
+            or ServiceMethods.PartyGet
+            or ServiceMethods.PartyQueue
+            or ServiceMethods.QueueCancel
+            or ServiceMethods.MatchStatus
+            or ServiceMethods.PartyInvites => new(ServiceRole.Lobby),
+            _ => null,
+        };
+
+    private async ValueTask<ServiceReply> ProcessResponseAsync(
+        Connection connection,
+        string method,
+        string player,
+        ServiceReply response,
+        CancellationToken cancellationToken
+    )
+    {
+        if (!response.Success)
+            return response;
+
+        switch (method)
+        {
+            case ServiceMethods.PartyCreate:
+            case ServiceMethods.PartyAccept:
+            case ServiceMethods.PartyGet:
+            case ServiceMethods.PartyReady:
             {
-                connection.PartyId = party.PartyId;
-                if (party.QueueRequestId.Length > 0 && connection.RequestId != party.QueueRequestId)
+                var party = response.Read(PartyState.Parser);
+                lock (_sync)
                 {
-                    connection.RequestId = party.QueueRequestId;
+                    connection.PartyId = party.PartyId;
+                    if (
+                        party.QueueRequestId.Length > 0
+                        && connection.RequestId != party.QueueRequestId
+                    )
+                    {
+                        connection.RequestId = party.QueueRequestId;
+                        connection.LastNotified = "";
+                    }
+                }
+                break;
+            }
+            case ServiceMethods.PartyLeave:
+                lock (_sync)
+                {
+                    connection.PartyId = "";
+                    connection.RequestId = "";
                     connection.LastNotified = "";
                 }
-            }
-        }
-        if (response.Success && method == ServiceMethods.PartyLeave)
-            lock (_sync)
+                break;
+            case ServiceMethods.PartyQueue:
             {
-                connection.PartyId = "";
-                connection.RequestId = "";
-                connection.LastNotified = "";
+                MatchStatus status = response.Read(MatchStatus.Parser);
+                lock (_sync)
+                {
+                    connection.RequestId = status.RequestId;
+                    connection.LastNotified = "";
+                }
+                break;
             }
-        if (response.Success && method == ServiceMethods.PartyQueue)
-        {
-            MatchStatus status = response.Read(MatchStatus.Parser);
-            lock (_sync)
-            {
-                connection.RequestId = status.RequestId;
-                connection.LastNotified = "";
-            }
+            case ServiceMethods.MatchStatus:
+                return await WithTicketAsync(
+                    player,
+                    response.Read(MatchStatus.Parser),
+                    cancellationToken
+                );
         }
-        if (response.Success && method == ServiceMethods.MatchStatus)
-            return await WithTicketAsync(
-                player,
-                response.Read(MatchStatus.Parser),
-                cancellationToken
-            );
         return response;
     }
 
