@@ -49,7 +49,7 @@ Windows CMD、PowerShell 5.1 或 PowerShell 7 均可直接执行配套停止脚�
 .\tools\topology\stop-manual.cmd --run-directory artifacts/manual-test
 ```
 
-停止脚本自动查找 `py`、`python`、`python3`，未配置 PATH 时也检查用户目录下的
+启动和停止脚本按相同顺序自动查找 `py`、`python`、`python3`，未配置 PATH 时也检查用户目录下的
 `anaconda3` / `miniconda3`；使用 UTF-8 输出，不依赖 PowerShell 7。
 
 停止命令请求监督器清理并立即返回，需等待原启动窗口完成退出。服务先收到退出信号，超时后仅终止本次拥有的进程；数据库通过 `pg_ctl` 关闭。账号保存在 `artifacts/manual-test/postgres`，下次可继续登录；密钥、录像和未结算结果也保留。不会接管已有数据库或按进程名批量杀进程。不要强制结束监督器，否则不能保证执行清理。
