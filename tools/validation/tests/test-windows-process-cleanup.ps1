@@ -22,14 +22,18 @@ if (-not $function) {
 Invoke-Expression $function.Extent.Text
 $UnityEditorPath = (Get-Command pwsh).Source
 $unityAllUsersProfile = $env:ProgramData
-$UnityTimeoutSeconds = 1
-$record = Join-Path $repo ('artifacts/release-validation-20261003/timeout-child-' + [guid]::NewGuid().ToString('N') + '.json')
+# Hosted runners may need several seconds to cold-start PowerShell. Give the
+# fixture time to record its identity, while still exercising the real timeout.
+$UnityTimeoutSeconds = 10
+$directory = Join-Path $repo ('artifacts/windows-process-cleanup/' + [guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path $directory -Force | Out-Null
+$record = Join-Path $directory 'child.json'
 $oldRecord = $env:AINATIVE_TEST_UNITY_PID_RECORD
 $env:AINATIVE_TEST_UNITY_PID_RECORD = $record
 $observed = $false
 try {
     try {
-        Invoke-Unity -Description 'Fixture Editor' -ArgumentList @('-NoProfile', '-Command', '@{pid=$PID;startUtc=(Get-Process -Id $PID).StartTime.ToUniversalTime().ToString("O")}|ConvertTo-Json|Set-Content -LiteralPath $env:AINATIVE_TEST_UNITY_PID_RECORD;Start-Sleep -Seconds 3')
+        Invoke-Unity -Description 'Fixture Editor' -ArgumentList @('-NoProfile', '-Command', '$ErrorActionPreference="Stop";@{pid=$PID;startUtc=(Get-Process -Id $PID).StartTime.ToUniversalTime().ToString("O")}|ConvertTo-Json|Set-Content -LiteralPath $env:AINATIVE_TEST_UNITY_PID_RECORD;Start-Sleep -Seconds 60')
     } catch {
         if ($_.Exception.Message -notmatch 'timed out') {
             throw

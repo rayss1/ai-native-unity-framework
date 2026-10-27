@@ -98,6 +98,32 @@ foreach ($path in @("$PSScriptRoot/../run-current-source.ps1", "$PSScriptRoot/..
     if ($profileParameter.Extent.Text -notmatch "'Development'") {
         throw 'Entry cannot select development profile'
     }
+    $metadata = (Get-Command $path).Parameters['Profile']
+    if (-not ($metadata.Attributes | Where-Object {
+                $_ -is [Management.Automation.ParameterAttribute] -and $_.Mandatory
+            }) -or $profileParameter.DefaultValue) {
+        throw 'Entry must require an explicit profile without a historical default'
+    }
+    # Supply every other mandatory argument. Missing Profile must fail during binding,
+    # before SDK/Unity startup, source inspection or evidence-directory creation.
+    $evidence = Join-Path $root ([IO.Path]::GetFileNameWithoutExtension($path) + '-missing-profile')
+    $arguments = @('-NoLogo', '-NoProfile', '-NonInteractive', '-File', $path,
+        '-SdkPath', (Join-Path $root 'missing-sdk'), '-EvidenceDirectory', $evidence)
+    if ([IO.Path]::GetFileName($path) -eq 'run-current-source.ps1') {
+        $arguments += @('-SourceRoot', $root, '-ExpectedCommit', $current)
+    }
+    $previousPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        $output = & (Get-Process -Id $PID).Path @arguments 2>&1
+        $exitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousPreference
+    }
+    if ($exitCode -eq 0 -or ($output -join "`n") -notmatch 'mandatory parameters: Profile' -or
+        (Test-Path -LiteralPath $evidence)) {
+        throw "Missing profile did not fail before execution: $output"
+    }
     $gate = $ast.Find({
             param($node) $node -is [Management.Automation.Language.CommandAst] -and $node.GetCommandName() -eq 'Assert-AiNativeEditModeProfile'
         }, $true)

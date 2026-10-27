@@ -11,6 +11,7 @@ $arguments = @{
     ExpectedCommit = $ExpectedCommit
     SdkPath = $SdkPath
     EvidenceDirectory = $EvidenceDirectory
+    Profile = 'Baseline'
     Phases = @('Architecture')
 }
 function Assert-Rejected([hashtable]$Options, [string]$Message) {

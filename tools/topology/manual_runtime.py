@@ -20,58 +20,12 @@ import uuid
 REPO = Path(__file__).resolve().parents[2]
 DEFAULT_RUN = "artifacts/manual-test"
 WINDOWS = os.name == "nt"
-SERVICES = [
-    dict(Id="gate", Role="Gate", ProcessId=1, SceneId=1101, Host="GateHost", Health=24101),
-    dict(Id="player", Role="Player", ProcessId=2, SceneId=1102, Host="PlayerHost", Health=24102),
-    dict(Id="lobby", Role="Lobby", ProcessId=3, SceneId=1103, Host="LobbyHost", Health=24103),
-    dict(Id="match", Role="Match", ProcessId=4, SceneId=1104, Host="MatchHost", Health=24104),
-    dict(
-        Id="coordinator",
-        Role="Coordinator",
-        ProcessId=5,
-        SceneId=1105,
-        Host="RoomCoordinatorHost",
-        Health=24105,
-    ),
-    dict(
-        Id="battle-1",
-        Role="Battle",
-        ProcessId=100,
-        SceneId=1106,
-        Host="BattleHost",
-        Health=24106,
-        Address="127.0.0.1:22000",
-    ),
-    dict(
-        Id="battle-2",
-        Role="Battle",
-        ProcessId=101,
-        SceneId=1107,
-        Host="BattleHost",
-        Health=24107,
-        Address="127.0.0.1:22001",
-    ),
-    dict(
-        Id="acceptance",
-        Role="Client",
-        ProcessId=99,
-        SceneId=1099,
-        Host="TopologyAcceptance",
-        Health=24199,
-    ),
-]
-CONFIG_SETTINGS = (
-    "AINATIVE_BATTLE_WORKERS",
-    "AINATIVE_ROOMS_PER_WORKER",
-    "AINATIVE_BATTLE_MAILBOX_CAPACITY",
-    "AINATIVE_MATCH_LENGTH_TICKS",
-    "AINATIVE_PLAYERS_PER_MATCH",
-    "AINATIVE_OUTBOX_MAX_RESULTS",
-    "AINATIVE_OUTBOX_MAX_BYTES",
-    "AINATIVE_ARENA_REPLAY_CAPACITY",
-    "AINATIVE_ARENA_REPLAY_MAX_FILES",
-    "AINATIVE_ARENA_REPLAY_MAX_BYTES",
+# Tool-owned data only; deployed hosts never read this manifest.
+TOPOLOGY = json.loads(
+    (Path(__file__).parent / "topology-manifest.json").read_text(encoding="utf-8")
 )
+SERVICES = TOPOLOGY["Services"]
+CONFIG_SETTINGS = tuple(TOPOLOGY["ReplayIdentitySettings"])
 
 
 class ManualError(RuntimeError):
@@ -384,6 +338,7 @@ def source_identity():
 def service_environment(service, run, sdk, database, match_ticks, players, identity):
     sid = service["Id"]
     env = {
+        **TOPOLOGY["EnvironmentDefaults"],
         "AINATIVE_SERVICE_ID": sid,
         "AINATIVE_PEERS_FILE": str(run / "peers.json"),
         "AINATIVE_SERVICE_PRIVATE_KEY_FILE": str(run / (sid + ".private.pem")),
@@ -392,17 +347,8 @@ def service_environment(service, run, sdk, database, match_ticks, players, ident
         "AINATIVE_FANTASY_CONFIG_FILE": str(REPO / "infrastructure/topology/Fantasy.config"),
         "ASPNETCORE_URLS": f"http://127.0.0.1:{service['Health']}",
         "AINATIVE_POSTGRES_CONNECTION_STRING": database,
-        "AINATIVE_SERVER_TOPOLOGY": "true",
-        "AINATIVE_BATTLE_WORKERS": "2",
-        "AINATIVE_ROOMS_PER_WORKER": "2",
-        "AINATIVE_BATTLE_MAILBOX_CAPACITY": "256",
         "AINATIVE_MATCH_LENGTH_TICKS": str(match_ticks),
         "AINATIVE_PLAYERS_PER_MATCH": str(players),
-        "AINATIVE_ARENA_REPLAY_CAPACITY": "4096",
-        "AINATIVE_ARENA_REPLAY_MAX_FILES": "1024",
-        "AINATIVE_ARENA_REPLAY_MAX_BYTES": "2147483648",
-        "AINATIVE_OUTBOX_MAX_RESULTS": "128",
-        "AINATIVE_OUTBOX_MAX_BYTES": "16777216",
         "AINATIVE_OUTBOX_PATH": str(run / "outbox" / sid),
         "AINATIVE_ACCEPTANCE_REPORT": str(run / "acceptance.json"),
         "DOTNET_ROOT": str(sdk.parent),

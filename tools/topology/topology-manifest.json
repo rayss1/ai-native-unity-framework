@@ -1,0 +1,105 @@
+{
+  "Services": [
+    {
+      "Id": "gate",
+      "Role": "Gate",
+      "ProcessId": 1,
+      "SceneId": 1101,
+      "Host": "GateHost",
+      "Health": 24101
+    },
+    {
+      "Id": "player",
+      "Role": "Player",
+      "ProcessId": 2,
+      "SceneId": 1102,
+      "Host": "PlayerHost",
+      "Health": 24102
+    },
+    {
+      "Id": "lobby",
+      "Role": "Lobby",
+      "ProcessId": 3,
+      "SceneId": 1103,
+      "Host": "LobbyHost",
+      "Health": 24103
+    },
+    {
+      "Id": "match",
+      "Role": "Match",
+      "ProcessId": 4,
+      "SceneId": 1104,
+      "Host": "MatchHost",
+      "Health": 24104
+    },
+    {
+      "Id": "coordinator",
+      "Role": "Coordinator",
+      "ProcessId": 5,
+      "SceneId": 1105,
+      "Host": "RoomCoordinatorHost",
+      "Health": 24105
+    },
+    {
+      "Id": "battle-1",
+      "Role": "Battle",
+      "ProcessId": 100,
+      "SceneId": 1106,
+      "Host": "BattleHost",
+      "Health": 24106,
+      "Address": "127.0.0.1:22000"
+    },
+    {
+      "Id": "battle-2",
+      "Role": "Battle",
+      "ProcessId": 101,
+      "SceneId": 1107,
+      "Host": "BattleHost",
+      "Health": 24107,
+      "Address": "127.0.0.1:22001"
+    },
+    {
+      "Id": "acceptance",
+      "Role": "Client",
+      "ProcessId": 99,
+      "SceneId": 1099,
+      "Host": "TopologyAcceptance",
+      "Health": 24199
+    }
+  ],
+  "ComposeAddresses": {
+    "gate": "172.28.0.11",
+    "player": "172.28.0.12",
+    "lobby": "172.28.0.13",
+    "match": "172.28.0.14",
+    "coordinator": "172.28.0.15",
+    "battle-1": "172.28.0.16",
+    "battle-2": "172.28.0.17",
+    "acceptance": "172.28.0.19"
+  },
+  "EnvironmentDefaults": {
+    "AINATIVE_SERVER_TOPOLOGY": "true",
+    "AINATIVE_BATTLE_WORKERS": "2",
+    "AINATIVE_ROOMS_PER_WORKER": "2",
+    "AINATIVE_BATTLE_MAILBOX_CAPACITY": "256",
+    "AINATIVE_MATCH_LENGTH_TICKS": "1200",
+    "AINATIVE_PLAYERS_PER_MATCH": "2",
+    "AINATIVE_OUTBOX_MAX_RESULTS": "128",
+    "AINATIVE_OUTBOX_MAX_BYTES": "16777216",
+    "AINATIVE_ARENA_REPLAY_CAPACITY": "4096",
+    "AINATIVE_ARENA_REPLAY_MAX_FILES": "1024",
+    "AINATIVE_ARENA_REPLAY_MAX_BYTES": "2147483648"
+  },
+  "ReplayIdentitySettings": [
+    "AINATIVE_BATTLE_WORKERS",
+    "AINATIVE_ROOMS_PER_WORKER",
+    "AINATIVE_BATTLE_MAILBOX_CAPACITY",
+    "AINATIVE_MATCH_LENGTH_TICKS",
+    "AINATIVE_PLAYERS_PER_MATCH",
+    "AINATIVE_OUTBOX_MAX_RESULTS",
+    "AINATIVE_OUTBOX_MAX_BYTES",
+    "AINATIVE_ARENA_REPLAY_CAPACITY",
+    "AINATIVE_ARENA_REPLAY_MAX_FILES",
+    "AINATIVE_ARENA_REPLAY_MAX_BYTES"
+  ]
+}
