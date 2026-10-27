@@ -1,17 +1,20 @@
 [CmdletBinding()]
 param(
     [string] $UnityEditorPath = $(
-        if ($env:UNITY_EDITOR_PATH) { $env:UNITY_EDITOR_PATH }
-        else { 'C:\Program Files\Unity\Hub\Editor\6000.3.23f1\Editor\Unity.exe' }
+        if ($env:UNITY_EDITOR_PATH) {
+            $env:UNITY_EDITOR_PATH
+        } else {
+            'C:\Program Files\Unity\Hub\Editor\6000.3.23f1\Editor\Unity.exe'
+        }
     ),
     [string] $EvidenceDirectory,
     [string] $SdkPath = 'dotnet',
     [ValidateRange(1, 1000000)]
     [int] $ExpectedEditModePassed = 95,
-    [ValidateSet('Baseline','Candidate','TerminalDelivery','Current','Development')][string] $Profile = 'Baseline',
-    [ValidateSet('CleanCommit','Worktree')][string] $SourceMode = 'CleanCommit',
+    [ValidateSet('Baseline', 'Candidate', 'TerminalDelivery', 'Current', 'Development')][string] $Profile = 'Baseline',
+    [ValidateSet('CleanCommit', 'Worktree')][string] $SourceMode = 'CleanCommit',
     [ValidatePattern('^[0-9a-f]{64}$')][string] $ExpectedSourceManifestSha256,
-    [ValidateRange(10,7200)]
+    [ValidateRange(10, 7200)]
     [int] $UnityTimeoutSeconds = 1800,
     [string] $HostAddress = '127.0.0.1',
     [ValidateRange(1, 65535)]
@@ -92,10 +95,17 @@ function Invoke-Unity {
     $started = $false
     try {
         $started = $process.Start()
-        if (-not $process.WaitForExit($UnityTimeoutSeconds * 1000)) { throw "$Description timed out after $UnityTimeoutSeconds seconds." }
-        if ($process.ExitCode -ne 0) { throw "$Description failed with Unity exit code $($process.ExitCode)." }
+        if (-not $process.WaitForExit($UnityTimeoutSeconds * 1000)) {
+            throw "$Description timed out after $UnityTimeoutSeconds seconds."
+        }
+        if ($process.ExitCode -ne 0) {
+            throw "$Description failed with Unity exit code $($process.ExitCode)."
+        }
     } finally {
-        if ($started -and -not $process.HasExited) { $process.Kill($true); $process.WaitForExit() }
+        if ($started -and -not $process.HasExited) {
+            $process.Kill($true)
+            $process.WaitForExit()
+        }
         $process.Dispose()
     }
 }
@@ -117,12 +127,20 @@ function Get-UnityVersionOutput {
         $started = $process.Start()
         $stdoutTask = $process.StandardOutput.ReadToEndAsync()
         $stderrTask = $process.StandardError.ReadToEndAsync()
-        if (-not $process.WaitForExit(60000)) { throw 'Unity -version timed out after 60 seconds.' }
-        $stdout = $stdoutTask.GetAwaiter().GetResult(); $stderr = $stderrTask.GetAwaiter().GetResult()
-        if ($process.ExitCode -ne 0) { throw "Unity -version failed with exit code $($process.ExitCode): $stderr" }
+        if (-not $process.WaitForExit(60000)) {
+            throw 'Unity -version timed out after 60 seconds.'
+        }
+        $stdout = $stdoutTask.GetAwaiter().GetResult()
+        $stderr = $stderrTask.GetAwaiter().GetResult()
+        if ($process.ExitCode -ne 0) {
+            throw "Unity -version failed with exit code $($process.ExitCode): $stderr"
+        }
         return ($stdout + [Environment]::NewLine + $stderr).Trim()
     } finally {
-        if ($started -and -not $process.HasExited) { $process.Kill($true); $process.WaitForExit() }
+        if ($started -and -not $process.HasExited) {
+            $process.Kill($true)
+            $process.WaitForExit()
+        }
         $process.Dispose()
     }
 }
@@ -155,12 +173,18 @@ if ($fantasyCommit -ne $profileContract.FantasyCommit) {
 }
 function Assert-WindowsSource {
     $actualCommit = (& git -C $repositoryRoot rev-parse HEAD).Trim()
-    if ($LASTEXITCODE -ne 0 -or $actualCommit -ne $commit) { throw 'Windows source commit changed during validation' }
+    if ($LASTEXITCODE -ne 0 -or $actualCommit -ne $commit) {
+        throw 'Windows source commit changed during validation'
+    }
     if ($SourceMode -eq 'Worktree') {
-        if (-not $ExpectedSourceManifestSha256 -or $Profile -eq 'Baseline') { throw 'Worktree requires a non-Baseline profile and explicit ExpectedSourceManifestSha256' }
+        if (-not $ExpectedSourceManifestSha256 -or $Profile -eq 'Baseline') {
+            throw 'Worktree requires a non-Baseline profile and explicit ExpectedSourceManifestSha256'
+        }
         [void](Assert-AiNativeSourceManifest -Root $repositoryRoot -ExpectedSha256 $ExpectedSourceManifestSha256)
     } else {
-        if ($ExpectedSourceManifestSha256) { throw 'ExpectedSourceManifestSha256 is only valid with Worktree' }
+        if ($ExpectedSourceManifestSha256) {
+            throw 'ExpectedSourceManifestSha256 is only valid with Worktree'
+        }
         & git -C $repositoryRoot diff --quiet HEAD --
         $trackedDirty = $LASTEXITCODE -ne 0
         $unknown = @(& git -C $repositoryRoot ls-files --others --exclude-standard)
@@ -169,14 +193,24 @@ function Assert-WindowsSource {
         }
     }
     $fantasyCheckout = (& git -C (Join-Path $repositoryRoot 'server/vendor/Fantasy') rev-parse HEAD).Trim()
-    if ($LASTEXITCODE -ne 0 -or $fantasyCheckout -ne $fantasyCommit) { throw 'Fantasy checkout differs from its gitlink' }
+    if ($LASTEXITCODE -ne 0 -or $fantasyCheckout -ne $fantasyCommit) {
+        throw 'Fantasy checkout differs from its gitlink'
+    }
     & git -C (Join-Path $repositoryRoot 'server/vendor/Fantasy') diff --quiet HEAD --
-    if ($LASTEXITCODE -ne 0) { throw 'Fantasy checkout has modifications' }
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Fantasy checkout has modifications'
+    }
     $fantasyUnknown = @(& git -C (Join-Path $repositoryRoot 'server/vendor/Fantasy') ls-files --others --exclude-standard)
-    if ($LASTEXITCODE -ne 0 -or $fantasyUnknown.Count) { throw 'Fantasy checkout contains untracked files' }
+    if ($LASTEXITCODE -ne 0 -or $fantasyUnknown.Count) {
+        throw 'Fantasy checkout contains untracked files'
+    }
 }
 Assert-WindowsSource
-$sourceManifest = if ($SourceMode -eq 'Worktree') { Get-AiNativeSourceManifest -Root $repositoryRoot } else { $null }
+$sourceManifest = if ($SourceMode -eq 'Worktree') {
+    Get-AiNativeSourceManifest -Root $repositoryRoot
+} else {
+    $null
+}
 
 $projectVersionPath = Join-Path $repositoryRoot 'client/UnityProject/ProjectSettings/ProjectVersion.txt'
 $projectVersion = Get-Content -LiteralPath $projectVersionPath -Raw
@@ -194,7 +228,9 @@ if (-not $EvidenceDirectory) {
     $EvidenceDirectory = Join-Path $repositoryRoot "artifacts/unity-windows/$commit"
 }
 $EvidenceDirectory = [System.IO.Path]::GetFullPath($EvidenceDirectory)
-if (Test-Path -LiteralPath $EvidenceDirectory) { throw 'Use a new Windows evidence directory; retained reports must not be reused.' }
+if (Test-Path -LiteralPath $EvidenceDirectory) {
+    throw 'Use a new Windows evidence directory; retained reports must not be reused.'
+}
 New-Item -ItemType Directory -Path $EvidenceDirectory | Out-Null
 
 $manifestPath = Join-Path $repositoryRoot 'client/UnityProject/Packages/manifest.json'
@@ -217,7 +253,9 @@ $metadata = [System.Collections.Generic.List[string]]::new()
 $metadata.Add("commit=$commit")
 $metadata.Add("fantasy_commit=$fantasyCommit")
 $metadata.Add("source_mode=$SourceMode")
-if ($sourceManifest) { $metadata.Add("source_manifest_sha256=$($sourceManifest.sha256)") }
+if ($sourceManifest) {
+    $metadata.Add("source_manifest_sha256=$($sourceManifest.sha256)")
+}
 $metadata.Add("validated_at_utc=$([DateTime]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ssZ'))")
 $metadata.Add("host=$([System.Environment]::OSVersion.VersionString)")
 $dotnetSdk = (& $SdkPath --version).Trim()
@@ -241,7 +279,9 @@ $metadata | Set-Content -LiteralPath $metadataPath -Encoding utf8
 (& git -C $repositoryRoot submodule status --recursive) | Add-Content -LiteralPath $metadataPath -Encoding utf8
 
 $unityProject = Join-Path $repositoryRoot 'client/UnityProject'
-if (Test-Path -LiteralPath (Join-Path $unityProject 'Library/UnityLockfile')) { throw 'The validation project is open in an Editor; use an isolated checkout.' }
+if (Test-Path -LiteralPath (Join-Path $unityProject 'Library/UnityLockfile')) {
+    throw 'The validation project is open in an Editor; use an isolated checkout.'
+}
 $settingsPath = Join-Path $unityProject 'ProjectSettings/ProjectSettings.asset'
 $settingsSnapshot = [IO.File]::ReadAllBytes($settingsPath)
 $generatedSnapshot = Save-AiNativeUnityGeneratedState -ProjectRoot $unityProject
@@ -290,15 +330,14 @@ try {
             $previousHostEnvironment[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
             [Environment]::SetEnvironmentVariable($name, $hostEnvironment[$name], 'Process')
         }
-    $hostProcess = Start-Process -FilePath $hostExecutable `
-        -ArgumentList @('--pid', '1', '-m', 'Release') `
-        -WorkingDirectory $hostPublishDirectory `
+        $hostProcess = Start-Process -FilePath $hostExecutable `
+            -ArgumentList @('--pid', '1', '-m', 'Release') `
+            -WorkingDirectory $hostPublishDirectory `
             -RedirectStandardOutput $hostStdout `
             -RedirectStandardError $hostStderr `
             -WindowStyle Hidden `
             -PassThru
-    }
-    finally {
+    } finally {
         foreach ($name in $hostEnvironment.Keys) {
             [Environment]::SetEnvironmentVariable($name, $previousHostEnvironment[$name], 'Process')
         }
@@ -317,8 +356,7 @@ try {
                 $ready = $true
                 break
             }
-        }
-        catch {
+        } catch {
             # Readiness is expected to refuse connections while the Host starts.
         }
         Start-Sleep -Milliseconds 250
@@ -336,15 +374,16 @@ try {
     )
     $editMode = Assert-AiNativeNUnitReport -Path $editModeXml -ExpectedPassed $ExpectedEditModePassed -FixtureCounts (Get-AiNativeEditModeFixtureCounts -Profile $Profile)
 
+    $playFixtures = Get-AiNativeLegacyKcpFixtureCounts
     Invoke-Unity -Description 'Unity PlayMode validation' -ArgumentList @(
         '-batchmode', '-nographics',
         '-projectPath', $unityProject,
         '-runTests', '-testPlatform', 'PlayMode',
-        '-testFilter', 'AiNative.Client.Application.PlayModeTests.BattleClientKcpPlayModeTests',
+        '-testFilter', (($playFixtures.Keys | Sort-Object) -join ';'),
         '-testResults', $playModeXml,
         '-logFile', $playModeLog
     )
-    $playMode = Assert-AiNativeNUnitReport -Path $playModeXml -ExpectedPassed 3 -FixtureCounts @{'AiNative.Client.Application.PlayModeTests.BattleClientKcpPlayModeTests'=3}
+    $playMode = Assert-AiNativeNUnitReport -Path $playModeXml -ExpectedPassed ([int](($playFixtures.Values | Measure-Object -Sum).Sum)) -FixtureCounts $playFixtures
 
     New-Item -ItemType Directory -Path $playerDirectory -Force | Out-Null
     Invoke-Unity -Description 'Windows x64 Mono Player build' -ArgumentList @(
@@ -369,14 +408,18 @@ try {
     }
 
     $playerArguments = @(
-            '--ainative-smoke',
-            '--ainative-host', $HostAddress,
-            '--ainative-port', $KcpPort.ToString([Globalization.CultureInfo]::InvariantCulture),
-            '--ainative-result', $smokeJson,
-            '-batchmode', '-nographics'
-        ) | ForEach-Object {
-            if ($_ -match '[\s"]') { '"' + $_.Replace('"', '\"') + '"' } else { $_ }
+        '--ainative-smoke',
+        '--ainative-host', $HostAddress,
+        '--ainative-port', $KcpPort.ToString([Globalization.CultureInfo]::InvariantCulture),
+        '--ainative-result', $smokeJson,
+        '-batchmode', '-nographics'
+    ) | ForEach-Object {
+        if ($_ -match '[\s"]') {
+            '"' + $_.Replace('"', '\"') + '"'
+        } else {
+            $_
         }
+    }
     $playerProcess = Start-Process -FilePath $playerPath `
         -ArgumentList $playerArguments `
         -WorkingDirectory $playerDirectory `
@@ -428,10 +471,8 @@ try {
         "smoke_pre_reconnect_ack=$($smoke.preReconnectAcknowledgedSequence)",
         "smoke_post_reconnect_ack=$($smoke.lastAcknowledgedSequence)"
     ) | Set-Content -LiteralPath (Join-Path $EvidenceDirectory 'summary.txt') -Encoding utf8
-
-}
-finally {
-    [IO.File]::WriteAllBytes($settingsPath,$settingsSnapshot)
+} finally {
+    [IO.File]::WriteAllBytes($settingsPath, $settingsSnapshot)
     if ($null -ne $playerProcess -and -not $playerProcess.HasExited) {
         Stop-Process -Id $playerProcess.Id -Force
         $playerProcess.WaitForExit()
@@ -450,9 +491,25 @@ finally {
 Assert-WindowsSource
 
 @{
-    source=$commit; fantasy=$fantasyCommit; profile=$Profile
-    sourceMode=$SourceMode; sourceManifest=$sourceManifest; releaseQualified=$false
-    tests=@($editMode,$playMode)
-    artifacts=@(@($metadataPath,(Join-Path $EvidenceDirectory 'summary.txt'),$editModeXml,$playModeXml,$smokeJson,$playerPath,$playerNotice,$playerFantasyLicense,$editModeLog,$playModeLog,$buildLog) | ForEach-Object { Get-AiNativeEvidenceFile -Path $_ })
+    source = $commit
+    fantasy = $fantasyCommit
+    profile = $Profile
+    sourceMode = $SourceMode
+    sourceManifest = $sourceManifest
+    releaseQualified = $false
+    tests = @($editMode, $playMode)
+    artifacts = @(@($metadataPath,
+            (Join-Path $EvidenceDirectory 'summary.txt'),
+            $editModeXml,
+            $playModeXml,
+            $smokeJson,
+            $playerPath,
+            $playerNotice,
+            $playerFantasyLicense,
+            $editModeLog,
+            $playModeLog,
+            $buildLog) | ForEach-Object {
+            Get-AiNativeEvidenceFile -Path $_
+        })
 } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $EvidenceDirectory 'reports.json') -Encoding utf8
 Write-Host "Windows Unity validation passed. Evidence: $EvidenceDirectory"

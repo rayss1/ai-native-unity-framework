@@ -1,4 +1,5 @@
 """Prove acceptance counts actual replay records rather than sequence maxima."""
+
 import argparse
 from decimal import Decimal
 import importlib.util
@@ -7,14 +8,28 @@ import struct
 import tempfile
 import unittest
 
-spec = importlib.util.spec_from_file_location("input_audit", Path(__file__).parents[1] / "accepted-input-audit.py")
+spec = importlib.util.spec_from_file_location(
+    "input_audit", Path(__file__).parents[1] / "accepted-input-audit.py"
+)
 tool = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(tool)
 
 
 def capture(path, sparse=False):
     payload = bytearray(struct.pack("<IH", 0x52414E41, 1))
-    for value in ("room", "allocation", "match", "battle-1", "boot", "source", "fantasy", "protocol", "config", "gameplay", "ordering"):
+    for value in (
+        "room",
+        "allocation",
+        "match",
+        "battle-1",
+        "boot",
+        "source",
+        "fantasy",
+        "protocol",
+        "config",
+        "gameplay",
+        "ordering",
+    ):
         encoded = value.encode()
         payload += struct.pack("<H", len(encoded)) + encoded
     payload += struct.pack("<i", 60)
@@ -41,10 +56,18 @@ class AcceptedInputAuditTests(unittest.TestCase):
         self.addCleanup(self.directory.cleanup)
         self.path = Path(self.directory.name) / "match.anar"
         self.arguments = argparse.Namespace(
-            replay=self.path, expected_input_hz=Decimal(60), expected_duration_seconds=Decimal(1),
-            minimum_fraction=Decimal("0.8"), maximum_final_gap_ticks=3, expected_entities=[1, 2],
-            expected_room_id="room", expected_allocation_id="allocation", expected_match_id="match",
-            expected_node_id="battle-1", expected_boot_epoch="boot")
+            replay=self.path,
+            expected_input_hz=Decimal(60),
+            expected_duration_seconds=Decimal(1),
+            minimum_fraction=Decimal("0.8"),
+            maximum_final_gap_ticks=3,
+            expected_entities=[1, 2],
+            expected_room_id="room",
+            expected_allocation_id="allocation",
+            expected_match_id="match",
+            expected_node_id="battle-1",
+            expected_boot_epoch="boot",
+        )
 
     def test_complete_record_inventory_qualifies_both_clients(self):
         capture(self.path)
@@ -66,7 +89,9 @@ class AcceptedInputAuditTests(unittest.TestCase):
     def test_other_match_cannot_qualify_current_allocation(self):
         capture(self.path)
         self.arguments.expected_match_id = "other-match"
-        self.assertIn("allocation-binding-mismatch:match_id", tool.audit(self.arguments)["failures"])
+        self.assertIn(
+            "allocation-binding-mismatch:match_id", tool.audit(self.arguments)["failures"]
+        )
 
     def test_truncated_capture_fails(self):
         capture(self.path)

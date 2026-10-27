@@ -1,4 +1,5 @@
 """Database qualification evidence must be accurate without exposing credentials."""
+
 import json
 import hashlib
 import os
@@ -23,30 +24,51 @@ class DatabasePolicyTests(unittest.TestCase):
         else:
             env["AINATIVE_TEST_POSTGRES"] = connection
         result = subprocess.run(
-            ["pwsh", "-NoProfile", "-Command",
-             "$ErrorActionPreference='Stop'; & '" + str(SCRIPT) + "' | ConvertTo-Json -Compress"],
-            env=env, capture_output=True, text=True, encoding="utf-8", timeout=30,
+            [
+                "pwsh",
+                "-NoProfile",
+                "-Command",
+                "$ErrorActionPreference='Stop'; & '" + str(SCRIPT) + "' | ConvertTo-Json -Compress",
+            ],
+            env=env,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=30,
         )
         self.assertNotIn(SECRET, result.stdout + result.stderr)
         return result
 
     def test_effective_pooling_and_explicitness_without_secret_fields(self):
         for suffix, enabled, explicit in [
-            ("", True, False), (";Pooling=true", True, True),
-            (";Pooling=false", False, True), (";pOoLiNg=FaLsE", False, True),
+            ("", True, False),
+            (";Pooling=true", True, True),
+            (";Pooling=false", False, True),
+            (";pOoLiNg=FaLsE", False, True),
             (';Pooling=" true "', True, True),
             (';Password="embedded;Pooling=;value"', True, False),
         ]:
             with self.subTest(suffix=suffix):
                 result = self.invoke(f'Host=localhost;Password="{SECRET};quoted"' + suffix)
                 self.assertEqual(0, result.returncode, result.stderr)
-                self.assertEqual({"Provider": "Npgsql", "PoolingEnabled": enabled,
-                                  "PoolingExplicitlyConfigured": explicit}, json.loads(result.stdout))
+                self.assertEqual(
+                    {
+                        "Provider": "Npgsql",
+                        "PoolingEnabled": enabled,
+                        "PoolingExplicitlyConfigured": explicit,
+                    },
+                    json.loads(result.stdout),
+                )
 
     def test_invalid_policy_fails_closed_and_sanitizes_parser_exceptions(self):
-        for connection in [None, "", f"Password={SECRET};Pooling=perhaps",
-                           f"Password={SECRET};Pooling=1", f'Password="{SECRET}',
-                           f"Password={SECRET};Pooling="]:
+        for connection in [
+            None,
+            "",
+            f"Password={SECRET};Pooling=perhaps",
+            f"Password={SECRET};Pooling=1",
+            f'Password="{SECRET}',
+            f"Password={SECRET};Pooling=",
+        ]:
             with self.subTest(present=bool(connection)):
                 result = self.invoke(connection)
                 self.assertNotEqual(0, result.returncode)
@@ -56,9 +78,20 @@ class DatabasePolicyTests(unittest.TestCase):
         env = os.environ.copy()
         env["AINATIVE_TEST_POSTGRES"] = f"Password={SECRET};Pooling=false"
         result = subprocess.run(
-            ["pwsh", "-NoProfile", "-Command", "$before=$env:AINATIVE_TEST_POSTGRES; & '"
-             + str(SCRIPT) + "' | Out-Null; if($before -cne $env:AINATIVE_TEST_POSTGRES){exit 7}"],
-            env=env, capture_output=True, text=True, encoding="utf-8", timeout=30)
+            [
+                "pwsh",
+                "-NoProfile",
+                "-Command",
+                "$before=$env:AINATIVE_TEST_POSTGRES; & '"
+                + str(SCRIPT)
+                + "' | Out-Null; if($before -cne $env:AINATIVE_TEST_POSTGRES){exit 7}",
+            ],
+            env=env,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=30,
+        )
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertNotIn(SECRET, result.stdout + result.stderr)
 
@@ -73,25 +106,45 @@ class DatabasePolicyTests(unittest.TestCase):
             for name in ["qualify-capacity.ps1", "database-policy.ps1"]:
                 shutil.copyfile(SCRIPT.parent / name, root / name)
             (root / "common.ps1").write_text(
-                "param($SdkPath,$RunDirectory)\n$Run=$RunDirectory;$Repo=$PSScriptRoot\n")
-            (root / "faultserver.ps1").write_text(
-                "$global:LASTEXITCODE=1\n")
+                "param($SdkPath,$RunDirectory)\n$Run=$RunDirectory;$Repo=$PSScriptRoot\n"
+            )
+            (root / "faultserver.ps1").write_text("$global:LASTEXITCODE=1\n")
             env = os.environ.copy()
             env["AINATIVE_TEST_POSTGRES"] = f"Host=localhost;Password={SECRET};Pooling=false"
             result = subprocess.run(
-                ["pwsh", "-NoProfile", "-File", str(root / "qualify-capacity.ps1"),
-                 "-RunDirectory", str(run), "-Profile", "single", "-SkipBuild"],
-                env=env, capture_output=True, text=True, encoding="utf-8", timeout=30)
+                [
+                    "pwsh",
+                    "-NoProfile",
+                    "-File",
+                    str(root / "qualify-capacity.ps1"),
+                    "-RunDirectory",
+                    str(run),
+                    "-Profile",
+                    "single",
+                    "-SkipBuild",
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                timeout=30,
+            )
             self.assertEqual(1, result.returncode)
-            summary = json.loads((run / "qualification-summary.json").read_text(encoding="utf-8-sig"))
+            summary = json.loads(
+                (run / "qualification-summary.json").read_text(encoding="utf-8-sig")
+            )
             self.assertIn("DatabasePolicy", summary)
             evidence = summary["DatabasePolicy"]
             path = Path(evidence["Path"])
             self.assertEqual(run / "database-policy.json", path)
-            self.assertEqual(hashlib.sha256(path.read_bytes()).hexdigest().upper(), evidence["Sha256"])
+            self.assertEqual(
+                hashlib.sha256(path.read_bytes()).hexdigest().upper(), evidence["Sha256"]
+            )
             self.assertEqual(json.loads(path.read_text(encoding="utf-8-sig")), evidence["Policy"])
             self.assertFalse(evidence["Policy"]["PoolingEnabled"])
-            self.assertNotIn(SECRET, result.stdout + result.stderr + json.dumps(summary) + path.read_text())
+            self.assertNotIn(
+                SECRET, result.stdout + result.stderr + json.dumps(summary) + path.read_text()
+            )
 
 
 if __name__ == "__main__":

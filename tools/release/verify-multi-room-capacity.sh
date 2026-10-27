@@ -2,8 +2,8 @@
 set -euo pipefail
 
 if [[ $# -ne 5 ]]; then
-  echo "Usage: $0 <host.json> <load.json> <wire.json> <replay.json> <output.json>" >&2
-  exit 2
+    echo "Usage: $0 <host.json> <load.json> <wire.json> <replay.json> <output.json>" >&2
+    exit 2
 fi
 
 host_json="$1"
@@ -13,15 +13,15 @@ replay_json="$4"
 output_json="$5"
 
 for input_file in "$host_json" "$load_json" "$wire_json" "$replay_json"; do
-  if [[ ! -s "$input_file" ]]; then
-    echo "Required multi-room capacity input is missing or empty: $input_file" >&2
-    exit 2
-  fi
+    if [[ ! -s "$input_file" ]]; then
+        echo "Required multi-room capacity input is missing or empty: $input_file" >&2
+        exit 2
+    fi
 done
 
 if ! command -v jq >/dev/null 2>&1; then
-  echo "jq is required." >&2
-  exit 2
+    echo "jq is required." >&2
+    exit 2
 fi
 
 jq -e '
@@ -127,10 +127,10 @@ jq -e --slurpfile host "$host_json" --slurpfile load "$load_json" '
 output_directory="$(dirname "$output_json")"
 mkdir -p "$output_directory"
 jq -n \
-  --slurpfile host "$host_json" \
-  --slurpfile load "$load_json" \
-  --slurpfile wire "$wire_json" \
-  --slurpfile replay "$replay_json" '
+    --slurpfile host "$host_json" \
+    --slurpfile load "$load_json" \
+    --slurpfile wire "$wire_json" \
+    --slurpfile replay "$replay_json" '
   {
     evidenceClass: "multi-room-capacity-candidate",
     sourceCommit: $host[0].sourceCommit,
@@ -194,6 +194,6 @@ jq -n \
       passed: true
     }
   }
-' > "$output_json"
+' >"$output_json"
 
 echo "Two-room capacity candidate gates passed."

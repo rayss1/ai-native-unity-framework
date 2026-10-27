@@ -1,4 +1,5 @@
 """Fail-closed gate for the named real PostgreSQL persistence tests."""
+
 import sys
 import argparse
 from pathlib import Path
@@ -40,7 +41,9 @@ def verify(directory):
             if name in seen:
                 raise ValueError(f"{path}: duplicate result for {name}")
             if result.get("outcome") != "Passed":
-                raise ValueError(f"{path}: {name} outcome is {result.get('outcome')!r}, expected Passed")
+                raise ValueError(
+                    f"{path}: {name} outcome is {result.get('outcome')!r}, expected Passed"
+                )
             seen.add(name)
     missing = REQUIRED - seen
     if missing:

@@ -1,4 +1,5 @@
 """Exercise the persistence gate with TRX reports, including false-green reports."""
+
 from pathlib import Path
 import subprocess
 import sys
@@ -8,11 +9,26 @@ import xml.etree.ElementTree as ET
 
 SCRIPT = Path(__file__).parents[1] / "verify-postgres-tests.py"
 CASES = [
-    ("AiNative.Server.Backend.Tests.PostgresTests", "Migrated_schema_initializes_with_only_runtime_DML_privileges"),
-    ("AiNative.Server.Backend.Tests.PostgresTests", "Settlement_transaction_survives_store_restart_and_updates_once"),
-    ("AiNative.Server.Rooms.Tests.PostgresAllocationStoreTests", "MigratedSchemaInitializesWithOnlyRuntimeDmlPrivileges"),
-    ("AiNative.Server.Rooms.Tests.PostgresAllocationStoreTests", "TerminatedOwnershipConnectionCannotContinueAllocating"),
-    ("AiNative.Server.Rooms.Tests.PostgresAllocationStoreTests", "ExclusiveOwnerDurableReloadAndConflictingIdentityAreEnforcedByPostgres"),
+    (
+        "AiNative.Server.Backend.Tests.PostgresTests",
+        "Migrated_schema_initializes_with_only_runtime_DML_privileges",
+    ),
+    (
+        "AiNative.Server.Backend.Tests.PostgresTests",
+        "Settlement_transaction_survives_store_restart_and_updates_once",
+    ),
+    (
+        "AiNative.Server.Rooms.Tests.PostgresAllocationStoreTests",
+        "MigratedSchemaInitializesWithOnlyRuntimeDmlPrivileges",
+    ),
+    (
+        "AiNative.Server.Rooms.Tests.PostgresAllocationStoreTests",
+        "TerminatedOwnershipConnectionCannotContinueAllocating",
+    ),
+    (
+        "AiNative.Server.Rooms.Tests.PostgresAllocationStoreTests",
+        "ExclusiveOwnerDurableReloadAndConflictingIdentityAreEnforcedByPostgres",
+    ),
 ]
 
 
@@ -23,7 +39,9 @@ def report(path, cases, outcome="Passed", summary="Completed"):
     for index, (class_name, method) in enumerate(cases):
         test = ET.SubElement(definitions, "UnitTest", id=str(index), name=method)
         ET.SubElement(test, "TestMethod", className=class_name, name=method)
-        ET.SubElement(results, "UnitTestResult", testId=str(index), testName=method, outcome=outcome)
+        ET.SubElement(
+            results, "UnitTestResult", testId=str(index), testName=method, outcome=outcome
+        )
     summary_node = ET.SubElement(root, "ResultSummary", outcome=summary)
     # Deliberately plausible totals: a gate must inspect identities and outcomes.
     ET.SubElement(summary_node, "Counters", total="5", executed="5", passed="5", failed="0")
@@ -37,7 +55,9 @@ class PostgresGateTests(unittest.TestCase):
         self.directory = Path(self.temp.name)
 
     def run_gate(self):
-        return subprocess.run([sys.executable, str(SCRIPT), str(self.directory)], capture_output=True, text=True)
+        return subprocess.run(
+            [sys.executable, str(SCRIPT), str(self.directory)], capture_output=True, text=True
+        )
 
     def test_required_cases_pass_across_two_project_reports(self):
         report(self.directory / "backend.trx", CASES[:2])

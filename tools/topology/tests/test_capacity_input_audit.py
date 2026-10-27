@@ -1,4 +1,5 @@
 """Offline fixtures: exact measurement sequences must carry the declared load."""
+
 import argparse
 from decimal import Decimal
 import hashlib
@@ -28,7 +29,19 @@ def sha(path):
 
 def capture(path, sequences):
     data = bytearray(struct.pack("<IH", 0x52414E41, 1))
-    for value in ("room", "allocation", "match", "battle-1", "boot", "source", "fantasy", "protocol", "config", "gameplay", "ordering"):
+    for value in (
+        "room",
+        "allocation",
+        "match",
+        "battle-1",
+        "boot",
+        "source",
+        "fantasy",
+        "protocol",
+        "config",
+        "gameplay",
+        "ordering",
+    ):
         encoded = value.encode()
         data += struct.pack("<H", len(encoded)) + encoded
     data += struct.pack("<i", 60)
@@ -55,10 +68,19 @@ class MeasurementWindowTests(unittest.TestCase):
         self.path = Path(self.temp.name) / "match.anar"
         self.window = {"first": 21, "last": 40, "count": 20, "total": 60}
         self.args = argparse.Namespace(
-            replay=self.path, expected_input_hz=Decimal(60), expected_duration_seconds=Decimal(1),
-            minimum_fraction=Decimal("0.8"), maximum_final_gap_ticks=180, expected_entities=[1],
-            expected_room_id="room", expected_allocation_id="allocation", expected_match_id="match",
-            expected_node_id="battle-1", expected_boot_epoch="boot", measurement_windows={1: self.window})
+            replay=self.path,
+            expected_input_hz=Decimal(60),
+            expected_duration_seconds=Decimal(1),
+            minimum_fraction=Decimal("0.8"),
+            maximum_final_gap_ticks=180,
+            expected_entities=[1],
+            expected_room_id="room",
+            expected_allocation_id="allocation",
+            expected_match_id="match",
+            expected_node_id="battle-1",
+            expected_boot_epoch="boot",
+            measurement_windows={1: self.window},
+        )
 
     def test_many_inputs_outside_window_cannot_hide_empty_window(self):
         inputs = {t: [t] for t in range(1, 61) if not 21 <= t <= 40}
@@ -81,7 +103,9 @@ class MeasurementWindowTests(unittest.TestCase):
     def test_duplicate_actual_input_is_rejected_even_outside_window(self):
         for duplicate in (5, 30):
             with self.subTest(duplicate=duplicate):
-                capture(self.path, {1: {t: [t, t] if t == duplicate else [t] for t in range(1, 61)}})
+                capture(
+                    self.path, {1: {t: [t, t] if t == duplicate else [t] for t in range(1, 61)}}
+                )
                 with self.assertRaisesRegex(ValueError, "Duplicate"):
                     parser.audit(self.args)
 
@@ -107,23 +131,62 @@ class CapacityBindingTests(unittest.TestCase):
         self.capture = self.root / "replay" / "battle-1" / "match.anar"
         self.capture.parent.mkdir(parents=True)
         self.records = capture(self.capture, {1: {t: [t] for t in range(1, 61)}})
-        self.identity = {"Source": "source", "Fantasy": "fantasy", "Protocol": "protocol", "Configuration": "config"}
+        self.identity = {
+            "Source": "source",
+            "Fantasy": "fantasy",
+            "Protocol": "protocol",
+            "Configuration": "config",
+        }
         self.identity_path = self.root / "battle-1.replay-identity.json"
         self.identity_path.write_text(json.dumps(self.identity))
         self.verifier = self.root / "bin" / "replay-verifier" / "AiNative.ArenaReplay.dll"
         self.verifier.parent.mkdir(parents=True)
         self.verifier.write_bytes(b"isolated test verifier identity fixture")
-        self.result = {"RoomId": "room", "MatchId": "match", "FinalTick": 60, "FinalHash": 123, "Records": self.records}
-        self.native = {"passed": True, "options": {"InputHz": 60, "MatchTicks": 60, "PlayersPerRoom": 1},
-                       "completedRooms": 1, "identities": [self.identity, self.identity],
-                       "players": [{"player": "player", "roomId": "room", "slot": 0, "generation": 0,
-                                    "Entity": 1, "measuredInputs": 20, "firstMeasuredInputSequence": 21,
-                                    "lastMeasuredInputSequence": 40, "totalAcceptedInputs": 60}],
-                       "replay": [{"capture": str(self.capture), "verified": self.result}]}
-        self.independent = {"passed": True, "completedCount": 1, "expectedSource": "source", "expectedFantasy": "fantasy",
-                            "verifierSha256": sha(self.verifier), "verified": [{"path": str(self.capture),
-                            "sha256": sha(self.capture), "identity": self.identity,
-                            "identitySha256": sha(self.identity_path), "result": self.result}], "incomplete": [], "failure": None}
+        self.result = {
+            "RoomId": "room",
+            "MatchId": "match",
+            "FinalTick": 60,
+            "FinalHash": 123,
+            "Records": self.records,
+        }
+        self.native = {
+            "passed": True,
+            "options": {"InputHz": 60, "MatchTicks": 60, "PlayersPerRoom": 1},
+            "completedRooms": 1,
+            "identities": [self.identity, self.identity],
+            "players": [
+                {
+                    "player": "player",
+                    "roomId": "room",
+                    "slot": 0,
+                    "generation": 0,
+                    "Entity": 1,
+                    "measuredInputs": 20,
+                    "firstMeasuredInputSequence": 21,
+                    "lastMeasuredInputSequence": 40,
+                    "totalAcceptedInputs": 60,
+                }
+            ],
+            "replay": [{"capture": str(self.capture), "verified": self.result}],
+        }
+        self.independent = {
+            "passed": True,
+            "completedCount": 1,
+            "expectedSource": "source",
+            "expectedFantasy": "fantasy",
+            "verifierSha256": sha(self.verifier),
+            "verified": [
+                {
+                    "path": str(self.capture),
+                    "sha256": sha(self.capture),
+                    "identity": self.identity,
+                    "identitySha256": sha(self.identity_path),
+                    "result": self.result,
+                }
+            ],
+            "incomplete": [],
+            "failure": None,
+        }
         self.native_path = self.root / "qualification-detail.json"
         self.independent_path = self.root / "independent-completed-replays.json"
 
@@ -131,7 +194,8 @@ class CapacityBindingTests(unittest.TestCase):
         self.native_path.write_text(json.dumps(self.native))
         self.independent_path.write_text(json.dumps(self.independent))
         return load("capacity_input_audit", "capacity-input-audit.py").audit_capacity(
-            self.native_path, self.independent_path, Decimal("0.8"))
+            self.native_path, self.independent_path, Decimal("0.8")
+        )
 
     def test_bound_window_inventory_passes(self):
         report = self.audit()
@@ -149,9 +213,14 @@ class CapacityBindingTests(unittest.TestCase):
                 self.independent["verified"][0]["identity"] = old
 
     def test_invalid_sequence_declarations_reject(self):
-        for changes in ({"firstMeasuredInputSequence": 0}, {"lastMeasuredInputSequence": 39},
-                        {"totalAcceptedInputs": 39}, {"measuredInputs": True},
-                        {"firstMeasuredInputSequence": "21"}, {"lastMeasuredInputSequence": 2**32}):
+        for changes in (
+            {"firstMeasuredInputSequence": 0},
+            {"lastMeasuredInputSequence": 39},
+            {"totalAcceptedInputs": 39},
+            {"measuredInputs": True},
+            {"firstMeasuredInputSequence": "21"},
+            {"lastMeasuredInputSequence": 2**32},
+        ):
             with self.subTest(changes=changes):
                 old = self.native["players"][0].copy()
                 self.native["players"][0].update(changes)
@@ -183,7 +252,11 @@ class CapacityBindingTests(unittest.TestCase):
                 self.independent["verified"][0][field] = old
 
     def test_duplicate_player_or_capture_reject(self):
-        for entries in (self.native["players"], self.native["replay"], self.independent["verified"]):
+        for entries in (
+            self.native["players"],
+            self.native["replay"],
+            self.independent["verified"],
+        ):
             entries.append(entries[0])
             with self.assertRaises(ValueError):
                 self.audit()
@@ -214,7 +287,9 @@ class CapacityBindingTests(unittest.TestCase):
             self.audit()
 
     def test_unsupported_zero_windows_cannot_qualify_entire_run(self):
-        self.native["players"][0].update(measuredInputs=0, firstMeasuredInputSequence=0, lastMeasuredInputSequence=0)
+        self.native["players"][0].update(
+            measuredInputs=0, firstMeasuredInputSequence=0, lastMeasuredInputSequence=0
+        )
         report = self.audit()
         self.assertFalse(report["accepted_input_audit_passed"])
         self.assertEqual(1, report["excluded_zero_measurement_players"])
@@ -239,7 +314,12 @@ class CapacityBindingTests(unittest.TestCase):
                     self.audit()
 
     def test_independent_failure_or_loose_counter_cannot_pass(self):
-        for changes in ({"passed": 1}, {"completedCount": True}, {"completedCount": "1"}, {"failure": "failure"}):
+        for changes in (
+            {"passed": 1},
+            {"completedCount": True},
+            {"completedCount": "1"},
+            {"failure": "failure"},
+        ):
             with self.subTest(changes=changes):
                 old = self.independent.copy()
                 self.independent.update(changes)
@@ -258,9 +338,20 @@ class CapacityBindingTests(unittest.TestCase):
         self.native_path.write_text(json.dumps(self.native))
         self.independent_path.write_text(json.dumps(self.independent))
         output = self.root / "rejection.json"
-        result = subprocess.run([sys.executable, str(Path(__file__).parents[1] / "capacity-input-audit.py"),
-                                 "--native-report", str(self.native_path), "--independent-replays", str(self.independent_path),
-                                 "--output", str(output)], capture_output=True, text=True)
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(Path(__file__).parents[1] / "capacity-input-audit.py"),
+                "--native-report",
+                str(self.native_path),
+                "--independent-replays",
+                str(self.independent_path),
+                "--output",
+                str(output),
+            ],
+            capture_output=True,
+            text=True,
+        )
         self.assertEqual(2, result.returncode, result.stderr)
         report = json.loads(output.read_text())
         self.assertFalse(report["accepted_input_audit_passed"])

@@ -1,6 +1,8 @@
 """Run: python3 -m unittest discover -s tools/topology/tests -p test_manual.py -v."""
+
 import argparse
 import contextlib
+import hashlib
 import io
 import json
 import os
@@ -31,8 +33,13 @@ class ManualTests(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
 
     def record(self, **changes):
-        return dict(Pid=os.getpid(), StartUtc="2026-10-15T00:00:00.1234567Z", Executable=sys.executable,
-                    Session="first", **changes)
+        return dict(
+            Pid=os.getpid(),
+            StartUtc="2026-10-15T00:00:00.1234567Z",
+            Executable=sys.executable,
+            Session="first",
+            **changes,
+        )
 
     def config(self):
         path = self.root / "infrastructure/topology/Fantasy.config"
@@ -41,30 +48,66 @@ class ManualTests(unittest.TestCase):
         return path
 
     def args(self, **changes):
-        values = dict(debug_service=None, sdk_path=None, postgres_bin_directory=None, postgres_port=25439,
-                      match_ticks=36000, players_per_room=2)
+        values = dict(
+            debug_service=None,
+            sdk_path=None,
+            postgres_bin_directory=None,
+            postgres_port=25439,
+            match_ticks=36000,
+            players_per_room=2,
+        )
         values.update(changes)
         return argparse.Namespace(**values)
 
     def test_defaults_and_all_debug_roles(self):
         args = manual.parser().parse_args(["start"])
-        self.assertEqual((args.postgres_port, args.match_ticks, args.players_per_room), (25439, 36000, 2))
+        self.assertEqual(
+            (args.postgres_port, args.match_ticks, args.players_per_room), (25439, 36000, 2)
+        )
         for service in runtime.SERVICES[:-1]:
-            self.assertEqual(manual.parser().parse_args(["start", "--debug-service", service["Id"]]).debug_service, service["Id"])
+            self.assertEqual(
+                manual.parser()
+                .parse_args(["start", "--debug-service", service["Id"]])
+                .debug_service,
+                service["Id"],
+            )
 
     def test_legacy_cmd_argument_names(self):
-        args = manual.parser().parse_args(["start", "-PlayersPerRoom", "4", "-MatchTicks", "7200",
-                                          "-PostgresBinDirectory", "path with spaces", "-DebugService", "player"])
-        self.assertEqual((args.players_per_room, args.match_ticks, args.debug_service), (4, 7200, "player"))
+        args = manual.parser().parse_args(
+            [
+                "start",
+                "-PlayersPerRoom",
+                "4",
+                "-MatchTicks",
+                "7200",
+                "-PostgresBinDirectory",
+                "path with spaces",
+                "-DebugService",
+                "player",
+            ]
+        )
+        self.assertEqual(
+            (args.players_per_room, args.match_ticks, args.debug_service), (4, 7200, "player")
+        )
         self.assertEqual(args.postgres_bin_directory, "path with spaces")
 
     def test_invalid_parameters(self):
-        for arguments in (["--players-per-room", "9"], ["--match-ticks", "0"], ["--postgres-port", "80"], ["--debug-service", "acceptance"]):
-            with self.subTest(arguments=arguments), contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+        for arguments in (
+            ["--players-per-room", "9"],
+            ["--match-ticks", "0"],
+            ["--postgres-port", "80"],
+            ["--debug-service", "acceptance"],
+        ):
+            with self.subTest(arguments=arguments), contextlib.redirect_stderr(
+                io.StringIO()
+            ), self.assertRaises(SystemExit):
                 manual.parser().parse_args(["start", *arguments])
 
     def test_platform_executable(self):
-        for windows, expected in ((True, "AiNative.PlayerHost.exe"), (False, "AiNative.PlayerHost")):
+        for windows, expected in (
+            (True, "AiNative.PlayerHost.exe"),
+            (False, "AiNative.PlayerHost"),
+        ):
             with patch.object(runtime, "WINDOWS", windows):
                 self.assertEqual(runtime.executable("AiNative.PlayerHost"), expected)
 
@@ -106,11 +149,39 @@ class ManualTests(unittest.TestCase):
 
     def test_stop_request_binds_session_not_only_pid(self):
         supervisor = self.record()
+        self.assertFalse(runtime.stop_requested(self.run, supervisor))
         for session in ("old", "first"):
             runtime.write_json(self.run / "stop-request.json", dict(supervisor, Session=session))
             self.assertEqual(runtime.stop_requested(self.run, supervisor), session == "first")
+        for key, value in (
+            ("Pid", supervisor["Pid"] + 1),
+            ("StartUtc", "stale"),
+            ("Executable", str(self.root / "another-process")),
+        ):
+            with self.subTest(identity_field=key):
+                runtime.write_json(self.run / "stop-request.json", dict(supervisor, **{key: value}))
+                self.assertFalse(runtime.stop_requested(self.run, supervisor))
         (self.run / "stop-request.json").write_text("invalid json")
         self.assertFalse(runtime.stop_requested(self.run, supervisor))
+
+    def test_readiness_reports_only_unready_services_and_recovers(self):
+        def response(url, timeout):
+            if ":24102/" in url:
+                raise runtime.urllib.error.URLError("offline")
+            return contextlib.nullcontext(Mock(status=503 if ":24106/" in url else 200))
+
+        opener = Mock()
+        with patch.object(runtime.urllib.request, "build_opener", return_value=opener):
+            opener.open.side_effect = response
+            self.assertEqual(runtime.readiness(), ["player", "battle-1"])
+            self.assertEqual(
+                [call.args[0] for call in opener.open.call_args_list],
+                [f"http://127.0.0.1:{port}/health/ready" for port in range(24101, 24108)],
+            )
+            opener.open.side_effect = lambda *args, **kwargs: contextlib.nullcontext(
+                Mock(status=200)
+            )
+            self.assertEqual(runtime.readiness(), [])
 
     def test_duplicate_database_port_rejected(self):
         with self.assertRaisesRegex(runtime.ManualError, "conflicts"):
@@ -143,7 +214,8 @@ class ManualTests(unittest.TestCase):
         with patch.object(runtime, "assert_ports_available") as probe:
             runtime.assert_free_ports(25439)
         probe.assert_called_once_with(
-            [23001, *range(24101, 24108), *range(23101, 23108), 25439], [22000, 22001])
+            [23001, *range(24101, 24108), *range(23101, 23108), 25439], [22000, 22001]
+        )
 
     def test_occupied_udp_port_rejected(self):
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as listener:
@@ -156,9 +228,13 @@ class ManualTests(unittest.TestCase):
         directory.mkdir()
         for name in ("pg_ctl", "postgres", "initdb", "createdb", "psql"):
             (directory / runtime.executable(name)).touch()
-        with patch.object(runtime, "invoke", return_value=Mock(stdout="pg_ctl (PostgreSQL) 17.11\n")):
+        with patch.object(
+            runtime, "invoke", return_value=Mock(stdout="pg_ctl (PostgreSQL) 17.11\n")
+        ):
             self.assertEqual(runtime.find_postgres(str(directory)), directory)
-        with patch.object(runtime, "invoke", return_value=Mock(stdout="pg_ctl (PostgreSQL) 17.12\n")):
+        with patch.object(
+            runtime, "invoke", return_value=Mock(stdout="pg_ctl (PostgreSQL) 17.12\n")
+        ):
             with self.assertRaises(runtime.ManualError):
                 runtime.find_postgres(str(directory))
         (directory / runtime.executable("psql")).unlink()
@@ -170,14 +246,17 @@ class ManualTests(unittest.TestCase):
         directory.mkdir(parents=True)
         for name in ("pg_ctl", "postgres", "initdb", "createdb", "psql"):
             (directory / runtime.executable(name)).touch()
-        with patch.object(runtime, "invoke", return_value=Mock(stdout="pg_ctl (PostgreSQL) 17.11\n")), \
-             patch.object(runtime.shutil, "which", return_value=None):
+        with patch.object(
+            runtime, "invoke", return_value=Mock(stdout="pg_ctl (PostgreSQL) 17.11\n")
+        ), patch.object(runtime.shutil, "which", return_value=None):
             self.assertEqual(runtime.find_postgres(), directory)
 
     def test_sdk_checks_root_and_reports_policy_failure(self):
         sdk = self.root / "dotnet"
         sdk.touch()
-        with patch.object(runtime, "invoke", return_value=Mock(returncode=155, stdout="")) as invoke:
+        with patch.object(
+            runtime, "invoke", return_value=Mock(returncode=155, stdout="")
+        ) as invoke:
             with self.assertRaisesRegex(runtime.ManualError, "root global.json"):
                 runtime.find_sdk(str(sdk))
             self.assertEqual(invoke.call_args.args[0], [sdk, "--version"])
@@ -185,33 +264,69 @@ class ManualTests(unittest.TestCase):
     def test_environment_and_replay_configuration(self):
         self.config()
         identity = dict(Source="source", Fantasy="fantasy", Protocol="protocol")
-        env = runtime.service_environment(runtime.SERVICES[5], self.run, self.root / "dotnet", "database", 7200, 4, identity)
+        env = runtime.service_environment(
+            runtime.SERVICES[5], self.run, self.root / "dotnet", "database", 7200, 4, identity
+        )
         self.assertEqual(env["AINATIVE_BATTLE_ADDRESS"], "127.0.0.1:22000")
         self.assertEqual(env["AINATIVE_PLAYERS_PER_MATCH"], "4")
         configuration = runtime.digest(self.root / "infrastructure/topology/Fantasy.config")
         configuration += "".join("|" + key + "=" + env[key] for key in runtime.CONFIG_SETTINGS)
-        self.assertEqual(env["AINATIVE_CONFIGURATION_IDENTITY"], "sha256:" + runtime.sha(configuration))
-        changed = runtime.service_environment(runtime.SERVICES[5], self.run, self.root / "dotnet", "database", 7201, 4, identity)
-        self.assertNotEqual(changed["AINATIVE_CONFIGURATION_IDENTITY"], env["AINATIVE_CONFIGURATION_IDENTITY"])
+        self.assertEqual(
+            env["AINATIVE_CONFIGURATION_IDENTITY"], "sha256:" + runtime.sha(configuration)
+        )
+        changed = runtime.service_environment(
+            runtime.SERVICES[5], self.run, self.root / "dotnet", "database", 7201, 4, identity
+        )
+        self.assertNotEqual(
+            changed["AINATIVE_CONFIGURATION_IDENTITY"], env["AINATIVE_CONFIGURATION_IDENTITY"]
+        )
 
     def test_debug_profile_inventory_and_timestamp_precision(self):
         config = self.config()
-        env = runtime.service_environment(runtime.SERVICES[1], self.run, self.root / "dotnet", "database", 7200, 4, {})
         peers = []
         for service in runtime.SERVICES:
             public = self.run / (service["Id"] + ".public.pem")
-            public.write_text("fake public")
+            public.write_text("fake public " + service["Id"])
+            (self.run / (service["Id"] + ".private.pem")).write_text(
+                "fake private " + service["Id"]
+            )
             peers.append(dict(PublicKeyFile=str(public)))
-        for name in ("player.private.pem", "player-ticket.private.pem", "player-ticket.public.pem"):
+        for name in ("player-ticket.private.pem", "player-ticket.public.pem"):
             (self.run / name).write_text("test fixture only")
         runtime.write_json(self.run / "peers.json", peers)
-        profile = runtime.debug_profile(runtime.SERVICES[1], env, self.record())
-        self.assertEqual(len(profile["RequiredFiles"]), 13)
-        self.assertEqual(profile["SupervisorStartUtc"], self.record()["StartUtc"])
-        self.assertEqual(profile["RequiredFiles"][str(config)], runtime.digest(config))
+        identity = dict(Source="source", Fantasy="fantasy", Protocol="protocol")
+        for service in runtime.SERVICES[:-1]:
+            with self.subTest(service=service["Id"]):
+                env = runtime.service_environment(
+                    service, self.run, self.root / "dotnet", "database", 7200, 4, identity
+                )
+                profile = runtime.debug_profile(service, env, self.record())
+                self.assertEqual(profile["Version"], 1)
+                for key in ("ServiceId", "ProcessId", "Host"):
+                    self.assertEqual(profile[key], service["Id" if key == "ServiceId" else key])
+                self.assertEqual(profile["Environment"], env)
+                self.assertEqual(profile["SupervisorPid"], self.record()["Pid"])
+                self.assertEqual(profile["SupervisorStartUtc"], self.record()["StartUtc"])
+                expected_paths = [
+                    config,
+                    self.run / "peers.json",
+                    self.run / (service["Id"] + ".private.pem"),
+                    self.run / "player-ticket.private.pem",
+                    self.run / "player-ticket.public.pem",
+                    *(Path(peer["PublicKeyFile"]) for peer in peers),
+                ]
+                expected_files = {
+                    str(path.resolve()): hashlib.sha256(path.read_bytes()).hexdigest().upper()
+                    for path in expected_paths
+                }
+                self.assertEqual(len(expected_files), 13)
+                self.assertEqual(profile["RequiredFiles"], expected_files)
 
     def test_environment_does_not_inherit_debug_selectors(self):
-        with patch.dict(os.environ, {"AINATIVE_LOCAL_DEBUG_PROFILE": "stale", "AINATIVE_LOCAL_DEBUG_SERVICE": "player"}):
+        with patch.dict(
+            os.environ,
+            {"AINATIVE_LOCAL_DEBUG_PROFILE": "stale", "AINATIVE_LOCAL_DEBUG_SERVICE": "player"},
+        ):
             env = runtime.child_environment({"AINATIVE_SERVICE_ID": "gate"})
             self.assertNotIn("AINATIVE_LOCAL_DEBUG_PROFILE", env)
             self.assertNotIn("AINATIVE_LOCAL_DEBUG_SERVICE", env)
@@ -223,9 +338,13 @@ class ManualTests(unittest.TestCase):
         directory.mkdir(parents=True)
         (directory / runtime.executable("AiNative.PlayerHost")).touch()
         child = Mock(pid=123)
-        with patch.object(runtime.subprocess, "Popen", return_value=child), patch.object(runtime, "write_json", side_effect=OSError("fail")), patch.object(runtime, "terminate_child") as terminate:
+        with patch.object(runtime.subprocess, "Popen", return_value=child), patch.object(
+            runtime, "write_json", side_effect=OSError("fail")
+        ), patch.object(runtime, "terminate_child") as terminate:
             with self.assertRaises(OSError):
-                runtime.start_child(service, self.run, {}, Mock(identity=Mock(return_value=self.record())))
+                runtime.start_child(
+                    service, self.run, {}, Mock(identity=Mock(return_value=self.record()))
+                )
             terminate.assert_called_once_with(child)
 
     def test_log_failure_does_not_start_child(self):
@@ -260,7 +379,9 @@ class ManualTests(unittest.TestCase):
         session.database_identity = self.record()
         session.helper = Mock(identity=Mock(return_value=dict(self.record(), StartUtc="reused")))
         session.pg_control = Mock()
-        with patch.object(runtime, "terminate_child", side_effect=[OSError("fail"), None]) as terminate:
+        with patch.object(
+            runtime, "terminate_child", side_effect=[OSError("fail"), None]
+        ) as terminate:
             with self.assertRaises(runtime.ManualError):
                 session.cleanup()
             self.assertEqual(terminate.call_count, 2)
@@ -282,7 +403,9 @@ class ManualTests(unittest.TestCase):
         with self.assertRaisesRegex(runtime.ManualError, "No active supervisor"):
             runtime.control("stop", self.run)
 
-    @unittest.skipIf(os.name == "nt", "Real Unix process lifecycle; Windows has its own execution gate")
+    @unittest.skipIf(
+        os.name == "nt", "Real Unix process lifecycle; Windows has its own execution gate"
+    )
     def test_real_child_receives_graceful_signal_and_keeps_logs(self):
         service = runtime.SERVICES[1]
         directory = self.run / "bin/player"
@@ -290,17 +413,23 @@ class ManualTests(unittest.TestCase):
         app = directory / runtime.executable("AiNative.PlayerHost")
         # /bin/sh exec preserves the Popen PID and avoids a long shebang containing spaces.
         probe = directory / "probe.py"
-        probe.write_text("import signal,time\nsignal.signal(signal.SIGTERM, lambda *_: exit(0))\nprint('ready',flush=True)\nwhile True: time.sleep(.01)\n")
+        probe.write_text(
+            "import signal,time\nsignal.signal(signal.SIGTERM, lambda *_: exit(0))\nprint('ready',flush=True)\nwhile True: time.sleep(.01)\n"
+        )
         import shlex
-        app.write_text("#!/bin/sh\nexec " + shlex.quote(sys.executable) + " " + shlex.quote(str(probe)) + "\n")
+
+        app.write_text(
+            "#!/bin/sh\nexec " + shlex.quote(sys.executable) + " " + shlex.quote(str(probe)) + "\n"
+        )
         app.chmod(0o700)
         helper = Mock(identity=lambda pid: dict(self.record(), Pid=pid))
         child = runtime.start_child(service, self.run, {}, helper)
         try:
             import time
+
             deadline = time.monotonic() + 5
             while not (self.run / "player.stdout.log").read_text() and time.monotonic() < deadline:
-                time.sleep(.01)
+                time.sleep(0.01)
             self.assertIn("ready", (self.run / "player.stdout.log").read_text())
             runtime.terminate_child(child, timeout=2)
             self.assertEqual(child.returncode, 0)
@@ -309,17 +438,30 @@ class ManualTests(unittest.TestCase):
             runtime.terminate_child(child)
 
     def test_active_stop_writes_session_bound_request(self):
-        runtime.write_json(self.run / "supervisor.json", dict(self.record(), SdkPath=sys.executable))
-        with patch.object(runtime, "RunLock", side_effect=runtime.ManualError("locked")), \
-             patch.object(runtime, "Helper", return_value=Mock(identity=Mock(return_value=self.record()))), \
-             contextlib.redirect_stdout(io.StringIO()):
+        runtime.write_json(
+            self.run / "supervisor.json", dict(self.record(), SdkPath=sys.executable)
+        )
+        with patch.object(
+            runtime, "RunLock", side_effect=runtime.ManualError("locked")
+        ), patch.object(
+            runtime, "Helper", return_value=Mock(identity=Mock(return_value=self.record()))
+        ), contextlib.redirect_stdout(
+            io.StringIO()
+        ):
             self.assertEqual(runtime.control("stop", self.run), 0)
         self.assertTrue(runtime.stop_requested(self.run, self.record()))
 
     def test_stale_supervisor_is_not_stopped(self):
-        runtime.write_json(self.run / "supervisor.json", dict(self.record(), SdkPath=sys.executable))
-        with patch.object(runtime, "RunLock", side_effect=runtime.ManualError("locked")), \
-             patch.object(runtime, "Helper", return_value=Mock(identity=Mock(return_value=dict(self.record(), StartUtc="reused")))):
+        runtime.write_json(
+            self.run / "supervisor.json", dict(self.record(), SdkPath=sys.executable)
+        )
+        with patch.object(
+            runtime, "RunLock", side_effect=runtime.ManualError("locked")
+        ), patch.object(
+            runtime,
+            "Helper",
+            return_value=Mock(identity=Mock(return_value=dict(self.record(), StartUtc="reused"))),
+        ):
             with self.assertRaisesRegex(runtime.ManualError, "stale"):
                 runtime.control("stop", self.run)
         self.assertFalse((self.run / "stop-request.json").exists())
@@ -329,11 +471,14 @@ class ManualTests(unittest.TestCase):
         session = runtime.Session(self.args(debug_service=debug), self.run)
         helper = Mock()
         helper.identity.return_value = self.record()
+
         def keys(private, public):
             private.write_text("fake private")
             public.write_text("fake public")
+
         helper.keys.side_effect = keys
         started = []
+
         def start(service, *_):
             if service["Id"] == fail_at:
                 raise runtime.ManualError("injected child failure")
@@ -341,18 +486,30 @@ class ManualTests(unittest.TestCase):
             child.poll.return_value = None
             started.append((service["Id"], child))
             return child
+
         def ready():
             session.request_stop()
             return [debug] if debug else []
+
         with contextlib.ExitStack() as stack:
             stack.enter_context(patch.object(runtime.sys, "platform", "darwin"))
-            stack.enter_context(patch.object(runtime, "find_sdk", return_value=self.root / "dotnet"))
-            stack.enter_context(patch.object(runtime, "find_postgres", return_value=self.root / "pg"))
+            stack.enter_context(
+                patch.object(runtime, "find_sdk", return_value=self.root / "dotnet")
+            )
+            stack.enter_context(
+                patch.object(runtime, "find_postgres", return_value=self.root / "pg")
+            )
             stack.enter_context(patch.object(runtime, "assert_free_ports"))
             stack.enter_context(patch.object(runtime, "Helper", return_value=helper))
             stack.enter_context(patch.object(runtime, "invoke"))
             stack.enter_context(patch.object(session, "start_database"))
-            stack.enter_context(patch.object(runtime, "source_identity", return_value=dict(Source="s", Fantasy="f", Protocol="p")))
+            stack.enter_context(
+                patch.object(
+                    runtime,
+                    "source_identity",
+                    return_value=dict(Source="s", Fantasy="f", Protocol="p"),
+                )
+            )
             stack.enter_context(patch.object(runtime, "start_child", side_effect=start))
             stack.enter_context(patch.object(runtime, "readiness", side_effect=ready))
             stack.enter_context(patch.object(runtime.time, "sleep"))
@@ -363,7 +520,9 @@ class ManualTests(unittest.TestCase):
                     session.start()
             else:
                 self.assertEqual(session.start(), 0)
-            self.assertEqual([call.args[0] for call in terminate.call_args_list], [child for _, child in started])
+            self.assertEqual(
+                [call.args[0] for call in terminate.call_args_list], [child for _, child in started]
+            )
         with runtime.RunLock(self.run):
             pass
         self.assertFalse((self.run / "vs-debug.json").exists())
@@ -373,7 +532,10 @@ class ManualTests(unittest.TestCase):
         self.assertEqual(self.run_simulated_session(), [s["Id"] for s in runtime.SERVICES[:-1]])
 
     def test_supervisor_leaves_debug_target_to_ide(self):
-        self.assertEqual(self.run_simulated_session(debug="player"), [s["Id"] for s in runtime.SERVICES[:-1] if s["Id"] != "player"])
+        self.assertEqual(
+            self.run_simulated_session(debug="player"),
+            [s["Id"] for s in runtime.SERVICES[:-1] if s["Id"] != "player"],
+        )
 
     def test_supervisor_cleans_partial_startup(self):
         self.assertEqual(self.run_simulated_session(fail_at="match"), ["gate", "player", "lobby"])
@@ -389,10 +551,23 @@ class ManualTests(unittest.TestCase):
 class LegacyParityTests(unittest.TestCase):
     def test_service_table_matches_retained_powershell(self):
         text = (Path(runtime.__file__).parent / "common.ps1").read_text()
-        rows = re.findall(r"@\{Id='([^']+)'; Role='([^']+)'; ProcessId=(\d+); SceneId=(\d+); Host='([^']+)'; Health=(\d+)(?:; Address='([^']+)')?\}", text)
+        rows = re.findall(
+            r"@\{\s*Id\s*=\s*'([^']+)'[;\s]+Role\s*=\s*'([^']+)'[;\s]+"
+            r"ProcessId\s*=\s*(\d+)[;\s]+SceneId\s*=\s*(\d+)[;\s]+"
+            r"Host\s*=\s*'([^']+)'[;\s]+Health\s*=\s*(\d+)"
+            r"(?:[;\s]+Address\s*=\s*'([^']+)')?[;\s]*\}",
+            text,
+        )
         actual = []
         for sid, role, pid, scene, host, health, address in rows:
-            row = dict(Id=sid, Role=role, ProcessId=int(pid), SceneId=int(scene), Host=host, Health=int(health))
+            row = dict(
+                Id=sid,
+                Role=role,
+                ProcessId=int(pid),
+                SceneId=int(scene),
+                Host=host,
+                Health=int(health),
+            )
             if address:
                 row["Address"] = address
             actual.append(row)
@@ -400,20 +575,32 @@ class LegacyParityTests(unittest.TestCase):
 
     def test_environment_literals_match_retained_powershell(self):
         text = (Path(runtime.__file__).parent / "common.ps1").read_text()
-        env = runtime.service_environment(runtime.SERVICES[0], Path("/run"), Path("/sdk/dotnet"), "db", 1200, 2, {})
-        for key, value in re.findall(r"(AINATIVE_[A-Z_]+)='([^']*)'", text):
+        env = runtime.service_environment(
+            runtime.SERVICES[0], Path("/run"), Path("/sdk/dotnet"), "db", 1200, 2, {}
+        )
+        literals = re.findall(r"(AINATIVE_[A-Z_]+)\s*=\s*'([^']*)'", text)
+        self.assertTrue(literals, "No PowerShell environment literals were discovered")
+        for key, value in literals:
             if key in env:
                 self.assertEqual(env[key], value, key)
-        ordered = re.search(r"foreach\(\$setting in @\(([^)]+)\)\)", text).group(1)
+        ordered = re.search(r"foreach\s*\(\s*\$setting\s+in\s+@\(([^)]+)\)\s*\)", text).group(1)
         self.assertEqual(tuple(re.findall(r"'([^']+)'", ordered)), runtime.CONFIG_SETTINGS)
 
     def test_profiles_keep_seven_ide_targets(self):
         repo = Path(runtime.__file__).resolve().parents[2]
         for service in runtime.SERVICES[:-1]:
-            path = repo / "server/src/Hosts" / ("AiNative." + service["Host"]) / "Properties/launchSettings.json"
+            path = (
+                repo
+                / "server/src/Hosts"
+                / ("AiNative." + service["Host"])
+                / "Properties/launchSettings.json"
+            )
             profile = json.loads(path.read_text())["profiles"]["Local Debug " + service["Id"]]
+            self.assertFalse(profile.get("launchBrowser", False))
             self.assertEqual(profile["commandLineArgs"], f"--pid {service['ProcessId']} -m Release")
-            self.assertEqual(profile["environmentVariables"]["AINATIVE_LOCAL_DEBUG_SERVICE"], service["Id"])
+            self.assertEqual(
+                profile["environmentVariables"]["AINATIVE_LOCAL_DEBUG_SERVICE"], service["Id"]
+            )
 
 
 if __name__ == "__main__":

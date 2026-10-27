@@ -54,11 +54,11 @@ git add server/vendor/Fantasy
 Windows/macOS native interactive testing and Rider/Visual Studio single-service debugging:
 [本机双／四客户端与 IDE 调试指南](tools/topology/README-local-debug.md).
 
-Use Python 3.11+, the root-pinned .NET SDK and PostgreSQL 17.11. On macOS run `./tools/topology/start-manual.sh`; on Windows run `py -3 tools/topology/manual.py start` or double-click `tools/topology/start-manual.cmd`. Both use the same Python lifecycle. It starts an isolated local database and seven server processes; Ctrl+C requests cleanup. Use `manual.py stop` from another terminal, or `start --debug-service player` for Rider/VS handoff. The existing PowerShell wrappers remain compatible. See [startup requirements and client connection](Docs/Architecture/server-topology-operations.md#windows-local-acceptance).
+Use Python 3.11+, the root-pinned .NET SDK and PostgreSQL 17.11. On macOS run `./tools/topology/start-manual.sh`; on Windows run `py -3 tools/topology/manual.py start` or double-click `tools/topology/start-manual.cmd`. Both use the same Python lifecycle. It starts an isolated local database and seven server processes; Ctrl+C requests cleanup. Use `manual.py stop` from another terminal, or `start --debug-service player` for Rider/VS handoff. The matching `stop-manual.cmd` / `stop-manual.sh` wrappers also request cleanup; Python retains legacy parameter spellings. See [startup requirements and client connection](Docs/Architecture/server-topology-operations.md#windows-local-acceptance).
 
 For local Unity CLI setup, project defaults and EditMode/real-KCP PlayMode commands, see [Unity CLI validation](Docs/Architecture/unity-cli-validation.md). The CLI development path accepts the current worktree; exact-commit qualification remains separate.
 
-The [current-source validation entry](tools/validation/README.md) combines explicit clean-source .NET, architecture, Unity, Windows and topology publication/acceptance phases with retained provenance. The [release validation plan and evidence ledger](Docs/Architecture/release-validation-2026-10-03.md) tracks complete-match, capacity/soak and Android build/device gates separately.
+The [tools navigation](tools/README.md) lists development, code generation, validation and release entry points. The [current-source validation entry](tools/validation/README.md) combines explicit clean-source .NET, architecture, Unity, Windows and topology publication/acceptance phases with retained provenance. The [release validation plan and evidence ledger](Docs/Architecture/release-validation-2026-10-03.md) tracks complete-match, capacity/soak and Android build/device gates separately.
 
 ```powershell
 dotnet restore AiNative.sln
@@ -75,13 +75,9 @@ colima start --vm-type vz --vz-rosetta --arch aarch64 --cpus 4 --memory 8 --netw
 tools/run-unity-manual-validation.sh
 ```
 
-The macOS script is the complete WS-26 through WS-28 desktop, real-client correction, and presentation-smoothing gate. It builds the exact-source Host with fixed .NET images, verifies exactly 44 EditMode and 2 real-KCP PlayMode tests, builds an ARM64 Mono Player, runs the reconnect smoke, applies the symmetric Regional network profile, measures correction percentiles for 60 seconds after warm-up, and retains the evidence bundle. The complete contracts are defined in [Unity macOS Validation](Docs/Architecture/unity-manual-validation.md), [Regional Real-Client Correction Validation](Docs/Architecture/regional-client-correction-validation.md), and [Presentation Correction Smoothing](Docs/Architecture/presentation-correction-smoothing.md).
+The macOS script requires PowerShell 7 (`pwsh`) and uses the shared `Development` EditMode fixture contract plus the named legacy KCP PlayMode suite. It builds the exact-source Host with fixed .NET images, builds an ARM64 Mono Player, runs the reconnect smoke, applies the symmetric Regional network profile, measures correction percentiles for 60 seconds after warm-up, and retains the evidence bundle. The complete contracts are defined in [Unity macOS Validation](Docs/Architecture/unity-manual-validation.md), [Regional Real-Client Correction Validation](Docs/Architecture/regional-client-correction-validation.md), and [Presentation Correction Smoothing](Docs/Architecture/presentation-correction-smoothing.md).
 
-For the current Windows source, select the 241-test development profile; use the unified entry for .NET/PostgreSQL and Unity phases with expected .NET inventory 607. Historical macOS commands above qualify only their recorded source. The default Windows mode requires a clean commit:
-
-```powershell
-tools/run-unity-windows-validation.ps1 -Profile Development -ExpectedEditModePassed 241
-```
+For the current Windows source, use the `Development` commands and reviewed inventories in [current-source validation](tools/validation/README.md#current-commands). That page contains the standalone Windows command and the unified .NET/PostgreSQL and Unity phases. Historical macOS bundles qualify only their recorded source; updating a runner does not establish a new platform pass. The default Windows mode requires a clean commit.
 
 The formal paths require a clean checkout so every result identifies one exact commit. The Windows and unified entries also support explicitly hashed `Worktree` development validation; see the [entry contract](tools/validation/README.md). A historical passing macOS bundle does not imply current-source Windows, Universal/x86_64, Android/iOS IL2CPP, production deployment, or a real Linux environment canary. Retain and review the generated bundle before updating milestone status.
 

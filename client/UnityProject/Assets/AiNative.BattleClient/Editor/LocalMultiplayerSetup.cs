@@ -48,7 +48,7 @@ namespace AiNative.Client.Editor
             Debug.Log(
                 "Select "
                     + Selection.activeObject.name
-                    + " in Unity's Play Mode dropdown, then press Play. Start tools/topology/start-manual.ps1 first; use a different account in each window."
+                    + " in Unity's Play Mode dropdown, then press Play. First run tools/topology/start-manual.cmd (Windows) or tools/topology/start-manual.sh (macOS); use a different account in each window."
             );
         }
 

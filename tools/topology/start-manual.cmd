@@ -1,5 +1,7 @@
 @echo off
 setlocal
+
+rem Prefer the Windows Python launcher; forward all arguments unchanged.
 where py >nul 2>nul
 if not errorlevel 1 (
     py -3 "%~dp0manual.py" start %*
@@ -12,6 +14,7 @@ if not errorlevel 1 (
     )
     python "%~dp0manual.py" start %*
 )
+
 set "manualExit=%ERRORLEVEL%"
 if not "%manualExit%"=="0" pause
 exit /b %manualExit%

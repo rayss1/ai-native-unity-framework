@@ -1,6 +1,6 @@
 # Current-source validation
 
-Current project progress is maintained in [one status page](../../Docs/Architecture/current-status.md). For the client codec migration, directional naming and October 21 opcode cleanup, select `-Profile Development -ExpectedDotnetPassed 660 -ExpectedEditModePassed 294` on Windows. Counts are the current discovered inventory, not a claim that unavailable database/device tests passed; see [current validation evidence](../../Docs/Architecture/client-protocol-validation-2026-10-20.md). Strict release gates reject skipped tests. The two executable entries obtain Unity fixture inventories and Fantasy package pins from the same profile contract. Defaults remain historical for compatibility; select the profile explicitly.
+Current project progress is maintained in [one status page](../../Docs/Architecture/current-status.md). For the client codec migration, directional naming and October 21 opcode cleanup, select `Development` using the commands below. Counts are the current discovered inventory, not a claim that unavailable database/device tests passed; see [current validation evidence](../../Docs/Architecture/client-protocol-validation-2026-10-20.md). Strict release gates reject skipped tests. The unified, Windows and macOS entries reuse the Unity fixture contract in [nunit-report.ps1](nunit-report.ps1); the macOS entry requires PowerShell 7 and selects `Development`. The unified and Windows defaults remain historical for compatibility; select their profile explicitly.
 
 October 20 documentation sync is based on PR #44 merged at `aa06c05`. The earlier 132-test local review used the pre-#44 worktree at `2d92bcb`; it does not validate the training map or combat repairs. See the [review scope and commands](../../Docs/Architecture/current-status.md).
 
@@ -16,6 +16,16 @@ October 20 documentation sync is based on PR #44 merged at `aa06c05`. The earlie
 Wrong totals, missing fixtures, failed/skipped cases and source changes fail the gate. Historical 128-test observations below remain evidence records, not a selectable current inventory.
 
 ## Current commands
+
+For the standalone Windows Unity/Host/Player gate on a clean current commit:
+
+```powershell
+./tools/run-unity-windows-validation.ps1 -Profile Development -ExpectedEditModePassed 294
+```
+
+For macOS Apple Silicon, follow [the macOS procedure](../../Docs/Architecture/unity-manual-validation.md). It uses the same `Development` EditMode inventory and named three-test legacy KCP PlayMode suite, then retains its ARM64 Mono Player and Regional correction checks. It requires `pwsh` 7 in addition to the macOS tools. Historical bundles retain their original totals; changes to the runner do not qualify the current source without a new platform run.
+
+The macOS entry requires a fresh evidence directory and rejects an existing destination; its first positional argument overrides the default commit-named directory. [unity-test-contract.ps1](unity-test-contract.ps1) fixes the profile to `Development` and produces `test-contract.json`, `editmode-gate.json` and `playmode-gate.json`, all retained in the evidence hash manifest.
 
 For a clean current commit, start an isolated PostgreSQL 17.11, set `AINATIVE_TEST_POSTGRES` in the invoking process without saving/logging credentials, then run:
 

@@ -12,9 +12,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check", action="store_true", help="Check without writing files.")
     args = parser.parse_args()
-    paths = subprocess.check_output(
-        ["git", "ls-files", "-z", "--", "*.cs"], cwd=ROOT
-    ).decode("utf-8").split("\0")
+    paths = (
+        subprocess.check_output(["git", "ls-files", "-z", "--", "*.cs"], cwd=ROOT)
+        .decode("utf-8")
+        .split("\0")
+    )
     sources = []
     for relative in filter(None, paths):
         path = ROOT / relative
@@ -33,7 +35,7 @@ def main():
     command = "check" if args.check else "format"
     for start in range(0, len(sources), 40):
         subprocess.run(
-            ["dotnet", "csharpier", command, *sources[start:start + 40]],
+            ["dotnet", "csharpier", command, *sources[start : start + 40]],
             cwd=ROOT,
             check=True,
         )

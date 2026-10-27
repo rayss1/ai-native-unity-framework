@@ -37,7 +37,7 @@
     "shared/schemas/ainative/v1/gameplay.proto": "844b11d83b333436836c750899d48cd92dc15f29421a00514381c214368d86e6",
     "shared/schemas/ainative/v1/gate_envelope.proto": "9549c6ff14ada1acf342b64eec5570bfb841b07cd8d291d68cddf65388f1ed8c",
     "tools/ProtocolCodegen/ProtocolCodegen.csproj": "fc93026316c3907da0ce5ae036ec0fb38ee4a1a6864c3b1704776fb728dcb284",
-    "tools/ProtocolCodegen/package_unity.py": "f8ff31170def8e0f16bd2d9859e1c90a3abb58a88652f5bef7a4c4d27ed2ea7b"
+    "tools/ProtocolCodegen/package_unity.py": "12e0d812a436fe3f9d8d08df1fdd458beed6d34a86ebd1c526e54fe78229b500"
   },
   "targetFramework": "netstandard2.1",
   "unityProvided": [

@@ -2,8 +2,8 @@
 set -euo pipefail
 
 if [[ $# -ne 7 ]]; then
-  echo "Usage: $0 <repository-root> <expected-source-sha> <run.json> <artifacts.json> <provenance.json> <soak-host.json> <telemetry-capacity.json>" >&2
-  exit 2
+    echo "Usage: $0 <repository-root> <expected-source-sha> <run.json> <artifacts.json> <provenance.json> <soak-host.json> <telemetry-capacity.json>" >&2
+    exit 2
 fi
 
 repository_root="$(cd "$1" && pwd)"
@@ -15,41 +15,41 @@ soak_host_json="$6"
 telemetry_capacity_json="$7"
 
 for command_name in git jq; do
-  if ! command -v "$command_name" >/dev/null 2>&1; then
-    echo "$command_name is required." >&2
-    exit 2
-  fi
+    if ! command -v "$command_name" >/dev/null 2>&1; then
+        echo "$command_name is required." >&2
+        exit 2
+    fi
 done
 
 for input_file in "$run_json" "$artifacts_json" "$provenance_json" "$soak_host_json" "$telemetry_capacity_json"; do
-  if [[ ! -s "$input_file" ]]; then
-    echo "Required qualification input is missing or empty: $input_file" >&2
-    exit 2
-  fi
+    if [[ ! -s "$input_file" ]]; then
+        echo "Required qualification input is missing or empty: $input_file" >&2
+        exit 2
+    fi
 done
 
 if [[ ! "$expected_source_sha" =~ ^[0-9a-f]{40}$ ]]; then
-  echo "Expected source SHA must be a full lowercase 40-character commit ID." >&2
-  exit 2
+    echo "Expected source SHA must be a full lowercase 40-character commit ID." >&2
+    exit 2
 fi
 
 actual_source_sha="$(git -C "$repository_root" rev-parse HEAD)"
 if [[ "$actual_source_sha" != "$expected_source_sha" ]]; then
-  echo "Checkout $actual_source_sha does not match expected source $expected_source_sha." >&2
-  exit 1
+    echo "Checkout $actual_source_sha does not match expected source $expected_source_sha." >&2
+    exit 1
 fi
 
 submodule_status="$(git -C "$repository_root" submodule status --recursive)"
 if grep -Eq '^[-+U]' <<<"$submodule_status"; then
-  echo "A submodule is uninitialized, conflicted, or differs from its gitlink." >&2
-  exit 1
+    echo "A submodule is uninitialized, conflicted, or differs from its gitlink." >&2
+    exit 1
 fi
 
 fantasy_commit="$(git -C "$repository_root/server/vendor/Fantasy" rev-parse HEAD)"
 if command -v sha256sum >/dev/null 2>&1; then
-  protocol_identity="$(sha256sum "$repository_root/shared/schemas/ainative/v1/gameplay.proto" | cut -d ' ' -f 1)"
+    protocol_identity="$(sha256sum "$repository_root/shared/schemas/ainative/v1/gameplay.proto" | cut -d ' ' -f 1)"
 else
-  protocol_identity="$(shasum -a 256 "$repository_root/shared/schemas/ainative/v1/gameplay.proto" | awk '{print $1}')"
+    protocol_identity="$(shasum -a 256 "$repository_root/shared/schemas/ainative/v1/gameplay.proto" | awk '{print $1}')"
 fi
 
 jq -e --arg source "$expected_source_sha" '

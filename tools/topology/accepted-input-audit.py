@@ -10,9 +10,17 @@ import sys
 
 
 HEADER_FIELDS = (
-    "room_id", "allocation_id", "match_id", "node_id", "boot_epoch",
-    "source_identity", "fantasy_identity", "protocol_identity", "configuration_identity",
-    "gameplay_fingerprint", "ordering",
+    "room_id",
+    "allocation_id",
+    "match_id",
+    "node_id",
+    "boot_epoch",
+    "source_identity",
+    "fantasy_identity",
+    "protocol_identity",
+    "configuration_identity",
+    "gameplay_fingerprint",
+    "ordering",
 )
 STATUS_NAMES = {0: "Capturing", 1: "Complete", 2: "Overflow", 3: "PersistenceFailure", 4: "Aborted"}
 
@@ -38,7 +46,9 @@ def audit(args):
     seen_sequences = {}
     window_sequences = {}
     if windows is not None:
-        if not windows or any(type(entity) is not int or not 1 <= entity <= 0xFFFFFFFF for entity in windows):
+        if not windows or any(
+            type(entity) is not int or not 1 <= entity <= 0xFFFFFFFF for entity in windows
+        ):
             raise ValueError("Measurement windows require positive entity IDs")
         for entity, window in windows.items():
             validate_window(window)
@@ -62,6 +72,7 @@ def audit(args):
     previous_record_tick = 0
     kinds = {1: 0, 2: 0, 3: 0, 4: 0}
     with replay_path.open("rb") as stream:
+
         def read_bytes(count):
             data = stream.read(count)
             if len(data) != count:
@@ -76,11 +87,11 @@ def audit(args):
             raise ValueError("Unsupported ANAR magic or version")
         header = {}
         for field in HEADER_FIELDS:
-            length, = read("H")
+            (length,) = read("H")
             if not 1 <= length <= 4096:
                 raise ValueError("Invalid ANAR header string length")
             header[field] = read_bytes(length).decode("utf-8", errors="strict")
-        match_length_ticks, = read("i")
+        (match_length_ticks,) = read("i")
         if match_length_ticks < 1:
             raise ValueError("Invalid declared match length")
         header.update(magic="ANAR", version=version, match_length_ticks=match_length_ticks)
@@ -90,8 +101,11 @@ def audit(args):
             if kind == 255:
                 final_hash, declared_records, status = read("QqB")
                 footer = {
-                    "kind": 255, "final_tick": server_tick, "final_hash": str(final_hash),
-                    "record_count": declared_records, "status_code": status,
+                    "kind": 255,
+                    "final_tick": server_tick,
+                    "final_hash": str(final_hash),
+                    "record_count": declared_records,
+                    "status_code": status,
                     "status": STATUS_NAMES.get(status, "Unknown"),
                 }
                 if stream.read(1):
@@ -107,13 +121,13 @@ def audit(args):
                 raise ValueError("ANAR record limit exceeded")
             kinds[kind] += 1
             if kind == 4:
-                last_tick_hash, = read("Q")
+                (last_tick_hash,) = read("Q")
                 if server_tick != last_tick_record + 1:
                     raise ValueError("ANAR Tick records are not consecutive")
                 last_tick_record = server_tick
                 tick_records += 1
                 continue
-            entity, = read("I")
+            (entity,) = read("I")
             if entity == 0:
                 raise ValueError("ANAR mutation has entity zero")
             if kind == 1:
@@ -132,7 +146,9 @@ def audit(args):
                 raise ValueError("ANAR input sequence is zero")
             if windows is not None:
                 if entity not in windows:
-                    raise ValueError("ANAR input entity missing from declared measurement inventory")
+                    raise ValueError(
+                        "ANAR input entity missing from declared measurement inventory"
+                    )
                 if sequence > windows[entity]["total"]:
                     raise ValueError("ANAR sequence exceeds successful send bound")
                 if sequence in seen_sequences[entity]:
@@ -140,21 +156,36 @@ def audit(args):
                 seen_sequences[entity].add(sequence)
                 if windows[entity]["first"] <= sequence <= windows[entity]["last"]:
                     window_sequences[entity].add(sequence)
-            stats = entity_stats.setdefault(entity, {
-                "accepted_count": 0, "first_server_tick": server_tick,
-                "last_server_tick": server_tick, "max_gap_ticks": 0,
-                "first_sequence": sequence, "last_sequence": sequence,
-                "last_client_tick": client_tick, "min_client_ahead_ticks": client_tick - server_tick,
-                "max_client_ahead_ticks": client_tick - server_tick,
-            })
+            stats = entity_stats.setdefault(
+                entity,
+                {
+                    "accepted_count": 0,
+                    "first_server_tick": server_tick,
+                    "last_server_tick": server_tick,
+                    "max_gap_ticks": 0,
+                    "first_sequence": sequence,
+                    "last_sequence": sequence,
+                    "last_client_tick": client_tick,
+                    "min_client_ahead_ticks": client_tick - server_tick,
+                    "max_client_ahead_ticks": client_tick - server_tick,
+                },
+            )
             if stats["accepted_count"]:
-                stats["max_gap_ticks"] = max(stats["max_gap_ticks"], server_tick - stats["last_server_tick"])
-            stats["accepted_count"] += 1  # Real kind=2 records, never inferred from maximum sequence.
+                stats["max_gap_ticks"] = max(
+                    stats["max_gap_ticks"], server_tick - stats["last_server_tick"]
+                )
+            stats[
+                "accepted_count"
+            ] += 1  # Real kind=2 records, never inferred from maximum sequence.
             stats["last_server_tick"] = server_tick
             stats["last_sequence"] = sequence
             stats["last_client_tick"] = client_tick
-            stats["min_client_ahead_ticks"] = min(stats["min_client_ahead_ticks"], client_tick - server_tick)
-            stats["max_client_ahead_ticks"] = max(stats["max_client_ahead_ticks"], client_tick - server_tick)
+            stats["min_client_ahead_ticks"] = min(
+                stats["min_client_ahead_ticks"], client_tick - server_tick
+            )
+            stats["max_client_ahead_ticks"] = max(
+                stats["max_client_ahead_ticks"], client_tick - server_tick
+            )
 
     expected = args.expected_input_hz * args.expected_duration_seconds
     minimum = int((expected * args.minimum_fraction).to_integral_value(rounding=ROUND_CEILING))
@@ -180,15 +211,32 @@ def audit(args):
 
     entities = {}
     for entity in sorted(set(joins) | required_entities):
-        stats = dict(entity_stats.get(entity, {
-            "accepted_count": 0, "first_server_tick": None, "last_server_tick": None,
-            "max_gap_ticks": None, "first_sequence": None, "last_sequence": None,
-            "last_client_tick": None, "min_client_ahead_ticks": None, "max_client_ahead_ticks": None,
-        }))
-        gap = None if stats["last_server_tick"] is None else footer["final_tick"] - stats["last_server_tick"]
+        stats = dict(
+            entity_stats.get(
+                entity,
+                {
+                    "accepted_count": 0,
+                    "first_server_tick": None,
+                    "last_server_tick": None,
+                    "max_gap_ticks": None,
+                    "first_sequence": None,
+                    "last_sequence": None,
+                    "last_client_tick": None,
+                    "min_client_ahead_ticks": None,
+                    "max_client_ahead_ticks": None,
+                },
+            )
+        )
+        gap = (
+            None
+            if stats["last_server_tick"] is None
+            else footer["final_tick"] - stats["last_server_tick"]
+        )
         stats.update(
-            join_server_tick=joins.get(entity), final_tick_gap=gap,
-            expected_count=str(expected), minimum_accepted_count=minimum,
+            join_server_tick=joins.get(entity),
+            final_tick_gap=gap,
+            expected_count=str(expected),
+            minimum_accepted_count=minimum,
             accepted_fraction=float(Decimal(stats["accepted_count"]) / expected),
             accepted_count_pass=stats["accepted_count"] >= minimum,
             final_tick_gap_pass=gap is not None and 0 <= gap <= args.maximum_final_gap_ticks,
@@ -202,18 +250,26 @@ def audit(args):
         entities[str(entity)] = stats
 
     report = {
-        "audit_version": 1, "replay": str(replay_path.resolve()), "sha256": digest.hexdigest(),
-        "header": header, "footer": footer, "parsed_record_count": record_count,
-        "tick_record_count": tick_records, "record_kind_counts": {str(k): v for k, v in kinds.items()},
+        "audit_version": 1,
+        "replay": str(replay_path.resolve()),
+        "sha256": digest.hexdigest(),
+        "header": header,
+        "footer": footer,
+        "parsed_record_count": record_count,
+        "tick_record_count": tick_records,
+        "record_kind_counts": {str(k): v for k, v in kinds.items()},
         "requirements": {
             "expected_input_hz": str(args.expected_input_hz),
             "expected_duration_seconds": str(args.expected_duration_seconds),
-            "minimum_fraction": str(args.minimum_fraction), "minimum_accepted_count_per_entity": minimum,
+            "minimum_fraction": str(args.minimum_fraction),
+            "minimum_accepted_count_per_entity": minimum,
             "maximum_final_gap_ticks": args.maximum_final_gap_ticks,
             "expected_entities": sorted(required_entities),
         },
-        "entities": entities, "connection_clears": clears,
-        "accepted_input_audit_passed": not failures, "failures": failures,
+        "entities": entities,
+        "connection_clears": clears,
+        "accepted_input_audit_passed": not failures,
+        "failures": failures,
         "state_hash_simulation_verified": False,
         "verification_note": "Run AiNative.ArenaReplay independently to re-simulate and verify every state hash.",
     }
@@ -230,21 +286,38 @@ def audit(args):
                     cursor = sequence + 1
                 if cursor <= window["last"]:
                     missing.append([cursor, window["last"]])
-            minimum = int((Decimal(window["count"]) * args.minimum_fraction).to_integral_value(rounding=ROUND_CEILING))
+            minimum = int(
+                (Decimal(window["count"]) * args.minimum_fraction).to_integral_value(
+                    rounding=ROUND_CEILING
+                )
+            )
             passed = len(accepted) >= minimum
             if not passed:
                 failures.append("too-few-measured-accepted-inputs:entity:" + str(entity))
             measured[str(entity)] = {
-                "entity_id": entity, "first_sequence": window["first"], "last_sequence": window["last"],
-                "measured_input_count": window["count"], "total_successful_send_count": window["total"],
-                "whole_capture_accepted_count": entity_stats.get(entity, {}).get("accepted_count", 0),
-                "accepted_count": len(accepted), "accepted_fraction": float(Decimal(len(accepted)) / window["count"]) if window["count"] else None,
-                "minimum_accepted_count": minimum, "missing_sequence_count": window["count"] - len(accepted),
-                "missing_sequence_ranges": missing, "excluded_zero_measurement": window["count"] == 0, "passed": passed,
+                "entity_id": entity,
+                "first_sequence": window["first"],
+                "last_sequence": window["last"],
+                "measured_input_count": window["count"],
+                "total_successful_send_count": window["total"],
+                "whole_capture_accepted_count": entity_stats.get(entity, {}).get(
+                    "accepted_count", 0
+                ),
+                "accepted_count": len(accepted),
+                "accepted_fraction": (
+                    float(Decimal(len(accepted)) / window["count"]) if window["count"] else None
+                ),
+                "minimum_accepted_count": minimum,
+                "missing_sequence_count": window["count"] - len(accepted),
+                "missing_sequence_ranges": missing,
+                "excluded_zero_measurement": window["count"] == 0,
+                "passed": passed,
             }
         report["window_entities"] = measured
         report["accepted_input_audit_passed"] = not failures
-        report["requirements"]["coverage_scope"] = "Actual kind=2 records in each declared measurement sequence interval"
+        report["requirements"][
+            "coverage_scope"
+        ] = "Actual kind=2 records in each declared measurement sequence interval"
     return report
 
 
@@ -255,12 +328,19 @@ def main():
     parser.add_argument("--expected-duration-seconds", type=Decimal, required=True)
     parser.add_argument("--minimum-fraction", type=Decimal, default=Decimal("0.8"))
     parser.add_argument("--maximum-final-gap-ticks", type=int, default=180)
-    parser.add_argument("--expected-entities", type=lambda text: [int(item) for item in text.split(",")])
+    parser.add_argument(
+        "--expected-entities", type=lambda text: [int(item) for item in text.split(",")]
+    )
     for field in ("room_id", "allocation_id", "match_id", "node_id", "boot_epoch"):
         parser.add_argument("--expected-" + field.replace("_", "-"))
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
-    if args.expected_input_hz <= 0 or args.expected_duration_seconds <= 0 or not 0 < args.minimum_fraction <= 1 or args.maximum_final_gap_ticks < 0:
+    if (
+        args.expected_input_hz <= 0
+        or args.expected_duration_seconds <= 0
+        or not 0 < args.minimum_fraction <= 1
+        or args.maximum_final_gap_ticks < 0
+    ):
         parser.error("Rate/duration must be positive, fraction in (0,1], final gap nonnegative")
     try:
         report = audit(args)
