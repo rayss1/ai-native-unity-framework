@@ -14,7 +14,7 @@
 | 生成协议代码及 Unity 包产物 | `dotnet build tools/ProtocolCodegen/ProtocolCodegen.csproj -p:GenerateProtocol=true`，随后 `python tools/ProtocolCodegen/package_unity.py` | 从 `.proto` 生成 C#，同步 Unity 协议产物；`package_unity.py --check` 检查漂移 |
 | C# 排版检查 | `python tools/formatting/format_csharp.py --check` | 使用固定版本 CSharpier；去掉 `--check` 才会改写文件，首次先 `dotnet tool restore`；[排版说明](formatting/README.md) |
 | 当前源码统一验收 | `tools/validation/run-current-source.ps1` | 按阶段验证 .NET、架构、Unity 等；当前源码必须显式选择 Development 并提供所需参数，见[完整命令与验收规则](validation/README.md#current-commands) |
-| Windows Unity 平台验收 | `tools/run-unity-windows-validation.ps1` | EditMode、真实 Host PlayMode、Windows Player 与重连冒烟；使用[当前 Development 命令](validation/README.md#current-commands)，不要直接采用历史默认值 |
+| Windows Unity 平台验收 | `tools/run-unity-windows-validation.ps1` | EditMode、真实 Host PlayMode、Windows Player 与重连冒烟；使用[当前 Development 命令](validation/README.md#current-commands)，必须显式选择 profile |
 | macOS Unity 平台验收 | `tools/run-unity-manual-validation.sh` | macOS Player、真实网络和 Regional 证据；需要 PowerShell 7（`pwsh`）读取共享验证契约，并需要脚本检查的 Unity、Docker／Colima 等依赖；[人工验收说明](../Docs/Architecture/unity-manual-validation.md) |
 | Android 构建验证 | `tools/validation/build-android.ps1` | 生成构建证据；构建通过不等于设备验收通过 |
 | Windows 自动拓扑验收 | `tools/topology/testserver.ps1` | 构建、初始化、启动七服务和真实 .NET 客户端，可验 Gate 重启／重复结算；[拓扑运维说明](../Docs/Architecture/server-topology-operations.md) |
@@ -35,6 +35,7 @@ Windows 可使用 `python` 或已安装的 `py -3`；macOS 通常使用 `python3
 | `topology/manual_runtime.py` | `manual.py` 的实现：依赖发现、进程归属、数据库、配置、IDE profile 和会话清理 |
 | `LocalDevelopment` | Python 启动器调用的 .NET 辅助程序：精确进程身份和 RSA 密钥生成／复用；不是另一套服务器启动器 |
 | `topology/common.ps1`、`build.ps1`、`initialize.ps1`、`start.ps1`、`stop.ps1`、`acceptance.ps1` | Windows 自动验收链的环境、构建、密钥、子进程及客户端调用；仍被 testserver／faultserver／容量流程使用 |
+| `topology/topology-manifest.json` | 三套拓扑工具共用的服务身份、默认环境和回放字段顺序；不被产品运行时读取 |
 | `topology/initialize-compose.py` | `linux.sh init` 使用，生成 Compose 私钥、公钥、peers 和容器网络配置 |
 | `topology/replay-identities.ps1` | 生成拓扑回放的源码、Fantasy 与协议身份 |
 | `topology/verify-replay.ps1`／`verify-all-replays.ps1` | 分别验证最近回放与全部完成回放；后者绑定容量验收的完整清单 |
@@ -59,10 +60,12 @@ Windows 可使用 `python` 或已安装的 `py -3`；macOS 通常使用 `python3
 | Python 拓扑、输入审计、TLS／云故障边界 | `python -m unittest discover -s tools/topology/tests -v` |
 | 日常本机启动器专项 | `python -m unittest discover -s tools/topology/tests -p test_manual.py -v` |
 | Windows 子进程失败清理 | `pwsh -NoProfile -File tools/topology/tests/test-manual-child.ps1`；名称中的 manual 不表示它已废弃，它验证仍在使用的 `common.ps1` |
-| 源码/profile、NUnit、入口边界、Unity 生成状态与 Windows 清理 | `tools/validation/tests/test-*.ps1`，按各脚本的平台与依赖条件执行 |
+| 源码/profile、NUnit、入口边界、Unity 生成状态与 Windows 清理 | `pwsh -NoProfile -File tools/validation/tests/run-tests.ps1`；默认运行当前平台适用的套件，CI 分别运行 `-Suite Portable`（Linux）与 `-Suite Windows` |
 | PostgreSQL 报告门禁 | `python -m unittest discover -s tools/validation/tests -p test_postgres_gate.py -v` |
 | macOS 共享测试契约桥接 | `pwsh -NoProfile -File tools/validation/tests/test-unity-test-contract.ps1`，不启动 Unity；CI 同时检查 Bash 语法 |
 | 发布证据反例 | `tools/release/test-*.sh`，与相应 `verify-*.sh` 配套 |
 
 Python 测试中依赖 PowerShell 的用例需要 `pwsh`；缺少依赖或平台不匹配导致的 skip 应单独报告。
+PowerShell 统一入口隔离运行 7 个跨平台回归脚本和 1 个 Windows 进程清理脚本，任一脚本失败即失败。
+有参数的 `validation/tests/test-current-source.ps1` 保留为真实 checkout／SDK 集成入口，需显式提供其参数，不计入上述套件的通过数量。
 工具单元测试不替代七服务、Unity 客户端、真实数据库、设备、云端故障和性能验收。

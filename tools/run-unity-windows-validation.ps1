@@ -11,7 +11,8 @@ param(
     [string] $SdkPath = 'dotnet',
     [ValidateRange(1, 1000000)]
     [int] $ExpectedEditModePassed = 95,
-    [ValidateSet('Baseline', 'Candidate', 'TerminalDelivery', 'Current', 'Development')][string] $Profile = 'Baseline',
+    [Parameter(Mandatory)]
+    [ValidateSet('Baseline', 'Candidate', 'TerminalDelivery', 'Current', 'Development')][string] $Profile,
     [ValidateSet('CleanCommit', 'Worktree')][string] $SourceMode = 'CleanCommit',
     [ValidatePattern('^[0-9a-f]{64}$')][string] $ExpectedSourceManifestSha256,
     [ValidateRange(10, 7200)]

@@ -12,6 +12,18 @@
 
 以下命令从仓库根目录运行。无需 Docker、云账号或 Unity 网络服务。
 
+### 工具配置的维护位置
+
+`topology-manifest.json` 是工具层共享清单：保存八个参与者（七个服务和验收客户端）的身份、
+本机健康端口、Compose 地址、自动验收默认环境参数，以及回放配置身份的字段顺序。
+Python 本机启动器、PowerShell 验收链和 Compose 配置生成器从这里读取，不再各自维护服务表。
+本机启动参数仍覆盖对应默认值，例如日常默认十分钟与自动验收默认 1200 Tick 各自保留。
+
+路径、数据库连接、进程生命周期和平台参数仍由各入口处理。运行中的 Host 不读取此文件，
+部署配置仍在 `infrastructure/topology`；修改清单时需运行 `test_manual.py` 和
+`test_topology_manifest.py`，核对 Fantasy/Compose 配置、七个 IDE Profile、生成的 peers 和回放身份。
+回放身份字段的排列顺序影响哈希，不应仅为排版而调整。
+
 ## 2. 启动和关闭服务器
 
 Mac 从终端执行：

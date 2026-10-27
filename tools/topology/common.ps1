@@ -13,74 +13,9 @@ if (-not $SdkPath) {
     }
 }
 $SdkPath = [IO.Path]::GetFullPath($SdkPath)
-$Services = @(
-    @{
-        Id = 'gate'
-        Role = 'Gate'
-        ProcessId = 1
-        SceneId = 1101
-        Host = 'GateHost'
-        Health = 24101
-    },
-    @{
-        Id = 'player'
-        Role = 'Player'
-        ProcessId = 2
-        SceneId = 1102
-        Host = 'PlayerHost'
-        Health = 24102
-    },
-    @{
-        Id = 'lobby'
-        Role = 'Lobby'
-        ProcessId = 3
-        SceneId = 1103
-        Host = 'LobbyHost'
-        Health = 24103
-    },
-    @{
-        Id = 'match'
-        Role = 'Match'
-        ProcessId = 4
-        SceneId = 1104
-        Host = 'MatchHost'
-        Health = 24104
-    },
-    @{
-        Id = 'coordinator'
-        Role = 'Coordinator'
-        ProcessId = 5
-        SceneId = 1105
-        Host = 'RoomCoordinatorHost'
-        Health = 24105
-    },
-    @{
-        Id = 'battle-1'
-        Role = 'Battle'
-        ProcessId = 100
-        SceneId = 1106
-        Host = 'BattleHost'
-        Health = 24106
-        Address = '127.0.0.1:22000'
-    },
-    @{
-        Id = 'battle-2'
-        Role = 'Battle'
-        ProcessId = 101
-        SceneId = 1107
-        Host = 'BattleHost'
-        Health = 24107
-        Address = '127.0.0.1:22001'
-    },
-    @{
-        Id = 'acceptance'
-        Role = 'Client'
-        ProcessId = 99
-        SceneId = 1099
-        Host = 'TopologyAcceptance'
-        Health = 24199
-    }
-)
+# Shared tool inventory; deployment-specific paths and overrides stay in this adapter.
+$Topology = Get-Content (Join-Path $PSScriptRoot 'topology-manifest.json') -Raw | ConvertFrom-Json -AsHashtable
+$Services = @($Topology.Services)
 function Get-ServiceEnvironment($Service, [hashtable]$Extra = @{}) {
     $variables = @{
         AINATIVE_SERVICE_ID = $Service.Id
@@ -94,24 +29,14 @@ function Get-ServiceEnvironment($Service, [hashtable]$Extra = @{}) {
         ASPNETCORE_URLS = ('http://127.0.0.1:' + $Service.Health)
 
         AINATIVE_POSTGRES_CONNECTION_STRING = $env:AINATIVE_TEST_POSTGRES
-        AINATIVE_SERVER_TOPOLOGY = 'true'
 
-        AINATIVE_BATTLE_WORKERS = '2'
-        AINATIVE_ROOMS_PER_WORKER = '2'
-        AINATIVE_BATTLE_MAILBOX_CAPACITY = '256'
-        AINATIVE_MATCH_LENGTH_TICKS = '1200'
-
-        AINATIVE_PLAYERS_PER_MATCH = '2'
-        AINATIVE_ARENA_REPLAY_CAPACITY = '4096'
-        AINATIVE_ARENA_REPLAY_MAX_FILES = '1024'
-        AINATIVE_ARENA_REPLAY_MAX_BYTES = '2147483648'
-
-        AINATIVE_OUTBOX_MAX_RESULTS = '128'
-        AINATIVE_OUTBOX_MAX_BYTES = '16777216'
         AINATIVE_OUTBOX_PATH = (Join-Path $Run ('outbox/' + $Service.Id))
 
         AINATIVE_ACCEPTANCE_REPORT = (Join-Path $Run 'acceptance.json')
         DOTNET_ROOT = (Split-Path $SdkPath)
+    }
+    foreach ($key in $Topology.EnvironmentDefaults.Keys) {
+        $variables[$key] = $Topology.EnvironmentDefaults[$key]
     }
     if ($Service.Address) {
         $variables.AINATIVE_BATTLE_ADDRESS = $Service.Address
@@ -122,18 +47,7 @@ function Get-ServiceEnvironment($Service, [hashtable]$Extra = @{}) {
     if ($Service.Role -eq 'Battle' -and $Service.Host -eq 'BattleHost') {
         $identity = Get-Content (Join-Path $Run 'replay-identities.json') -Raw | ConvertFrom-Json
         $configuration = (Get-FileHash (Join-Path $Repo 'infrastructure/topology/Fantasy.config')).Hash
-        foreach ($setting in @(
-                'AINATIVE_BATTLE_WORKERS',
-                'AINATIVE_ROOMS_PER_WORKER',
-                'AINATIVE_BATTLE_MAILBOX_CAPACITY',
-                'AINATIVE_MATCH_LENGTH_TICKS',
-                'AINATIVE_PLAYERS_PER_MATCH',
-                'AINATIVE_OUTBOX_MAX_RESULTS',
-                'AINATIVE_OUTBOX_MAX_BYTES',
-                'AINATIVE_ARENA_REPLAY_CAPACITY',
-                'AINATIVE_ARENA_REPLAY_MAX_FILES',
-                'AINATIVE_ARENA_REPLAY_MAX_BYTES'
-            )) {
+        foreach ($setting in $Topology.ReplayIdentitySettings) {
             $configuration += '|' + $setting + '=' + $variables[$setting]
         }
         $configurationHash = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($configuration)))

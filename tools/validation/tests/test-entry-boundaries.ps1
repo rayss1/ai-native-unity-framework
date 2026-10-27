@@ -166,11 +166,25 @@ $oldPostgres = $env:AINATIVE_TEST_POSTGRES
 $oldOrder = $env:AINATIVE_STUB_ORDER
 $oldMode = $env:AINATIVE_STUB_MODE
 Must-Reject {
-    & $entry -SourceRoot $SourceRoot -ExpectedCommit $ExpectedCommit -SdkPath $sdk -EvidenceDirectory (Join-Path $fixture 'bad-baseline') -Phases Architecture
+    & $entry -SourceRoot $SourceRoot -ExpectedCommit $ExpectedCommit -SdkPath $sdk -EvidenceDirectory (Join-Path $fixture 'bad-baseline') -Profile Baseline -Phases Architecture
 } 'Baseline profile requires'
 Must-Reject {
     & $entry -SourceRoot $SourceRoot -ExpectedCommit $ExpectedCommit -SdkPath $sdk -EvidenceDirectory (Join-Path $fixture 'implicit-candidate-count') -Profile Candidate -Phases Architecture
 } 'Candidate requires explicit'
+foreach ($case in @(
+        @{
+            Phases = @()
+            Message = 'At least one validation phase'
+        },
+        @{
+            Phases = @('Architecture', 'Architecture')
+            Message = 'Duplicate phases'
+        }
+    )) {
+    Must-Reject {
+        & $entry -SourceRoot $SourceRoot -ExpectedCommit $ExpectedCommit -SdkPath $sdk -EvidenceDirectory (Join-Path $fixture 'invalid-phases') -Profile Candidate -Phases $case.Phases
+    } $case.Message
+}
 try {
     $env:AINATIVE_TEST_POSTGRES = 'stub-no-network'
     $env:AINATIVE_STUB_ORDER = Join-Path $fixture 'order.txt'
@@ -199,6 +213,9 @@ try {
     if ($report.status -ne 'Passed' -or $report.phases[0].reports.Count -ne 13 -or $report.phases[0].freshProbe.Passed -ne 1) {
         throw 'Entry report lost independent/matrix evidence'
     }
+    Must-Reject {
+        & $entry -SourceRoot $SourceRoot -ExpectedCommit $ExpectedCommit -SdkPath $sdk -EvidenceDirectory $evidence -Profile Candidate -ExpectedDotnetPassed 13 -ExpectedEditModePassed 147 -Phases Dotnet
+    } 'Use a new evidence directory'
 } finally {
     $env:AINATIVE_TEST_POSTGRES = $oldPostgres
     $env:AINATIVE_STUB_ORDER = $oldOrder

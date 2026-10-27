@@ -1,25 +1,31 @@
 #!/usr/bin/env python3
 """Generate container peer keys and static per-process machine table under artifacts."""
-import json, pathlib, subprocess, xml.etree.ElementTree as ET
+import json
+import pathlib
+import subprocess
+import xml.etree.ElementTree as ET
 
 root = pathlib.Path(__file__).resolve().parents[2]
 run = root / "artifacts" / "topology-compose"
+topology = json.loads(
+    (pathlib.Path(__file__).parent / "topology-manifest.json").read_text(encoding="utf-8")
+)
+services = [
+    (
+        service["Id"],
+        service["Role"],
+        service["ProcessId"],
+        service["SceneId"],
+        topology["ComposeAddresses"][service["Id"]],
+    )
+    for service in topology["Services"]
+]
 run.mkdir(parents=True, exist_ok=True)
 public_dir = run / "public"
 private_dir = run / "private"
 public_dir.mkdir(exist_ok=True)
 private_dir.mkdir(exist_ok=True)
 private_dir.chmod(0o700)
-services = [
-    ("gate", "Gate", 1, 1101, 11),
-    ("player", "Player", 2, 1102, 12),
-    ("lobby", "Lobby", 3, 1103, 13),
-    ("match", "Match", 4, 1104, 14),
-    ("coordinator", "Coordinator", 5, 1105, 15),
-    ("battle-1", "Battle", 100, 1106, 16),
-    ("battle-2", "Battle", 101, 1107, 17),
-    ("acceptance", "Client", 99, 1099, 19),
-]
 peers = []
 for name, role, pid, scene, ip in services:
     service_dir = private_dir / name
@@ -95,9 +101,9 @@ for name, role, pid, scene, ip in services:
         "{" + ns["f"] + "}machine",
         dict(
             id=str(pid),
-            outerIP=f"172.28.0.{ip}",
-            outerBindIP=f"172.28.0.{ip}",
-            innerBindIP=f"172.28.0.{ip}",
+            outerIP=ip,
+            outerBindIP=ip,
+            innerBindIP=ip,
         ),
     )
     for proc in processes:

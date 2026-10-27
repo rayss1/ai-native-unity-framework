@@ -7,7 +7,7 @@ import io
 import json
 import os
 from pathlib import Path
-import re
+import shutil
 import signal
 import socket
 import subprocess
@@ -548,43 +548,77 @@ class ManualTests(unittest.TestCase):
             session.check_stop()
 
 
-class LegacyParityTests(unittest.TestCase):
-    def test_service_table_matches_retained_powershell(self):
-        text = (Path(runtime.__file__).parent / "common.ps1").read_text()
-        rows = re.findall(
-            r"@\{\s*Id\s*=\s*'([^']+)'[;\s]+Role\s*=\s*'([^']+)'[;\s]+"
-            r"ProcessId\s*=\s*(\d+)[;\s]+SceneId\s*=\s*(\d+)[;\s]+"
-            r"Host\s*=\s*'([^']+)'[;\s]+Health\s*=\s*(\d+)"
-            r"(?:[;\s]+Address\s*=\s*'([^']+)')?[;\s]*\}",
-            text,
-        )
-        actual = []
-        for sid, role, pid, scene, host, health, address in rows:
-            row = dict(
-                Id=sid,
-                Role=role,
-                ProcessId=int(pid),
-                SceneId=int(scene),
-                Host=host,
-                Health=int(health),
+class SharedTopologyTests(unittest.TestCase):
+    @unittest.skipUnless(shutil.which("pwsh"), "PowerShell is required for adapter parity")
+    def test_powershell_and_python_service_environments_match(self):
+        repo = Path(runtime.__file__).resolve().parents[2]
+        (repo / "artifacts").mkdir(exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=repo / "artifacts") as temporary:
+            run = Path(temporary)
+            identity = dict(Source="test-source", Fantasy="test-fantasy", Protocol="test-protocol")
+            (run / "replay-identities.json").write_text(json.dumps(identity))
+            probe = run / "probe.ps1"
+            probe.write_text(
+                "param($Common, $Sdk, $RunDirectory)\n"
+                "$ErrorActionPreference = 'Stop'\n"
+                "$env:AINATIVE_TEST_POSTGRES = 'test-database'\n"
+                ". $Common -SdkPath $Sdk -RunDirectory $RunDirectory\n"
+                "$environments = @($Services | ForEach-Object { Get-ServiceEnvironment $_ })\n"
+                "$extra = @{ AINATIVE_MATCH_LENGTH_TICKS = '7200'; AINATIVE_PLAYERS_PER_MATCH = '4' }\n"
+                "$overrides = @($Services | ForEach-Object { Get-ServiceEnvironment $_ $extra })\n"
+                "@{ Services = $Services; Environments = $environments; Overrides = $overrides } | ConvertTo-Json -Depth 8\n"
             )
-            if address:
-                row["Address"] = address
-            actual.append(row)
-        self.assertEqual(runtime.SERVICES, actual)
+            sdk = Path(shutil.which("pwsh")).resolve()
+            result = subprocess.run(
+                [
+                    str(sdk),
+                    "-NoProfile",
+                    "-NonInteractive",
+                    "-File",
+                    str(probe),
+                    str(repo / "tools/topology/common.ps1"),
+                    str(sdk),
+                    str(run.relative_to(repo)),
+                ],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                timeout=30,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            actual = json.loads(result.stdout)
+            self.assertEqual(actual["Services"], runtime.SERVICES)
+            expected = [
+                runtime.service_environment(service, run, sdk, "test-database", 1200, 2, identity)
+                for service in runtime.SERVICES
+            ]
+            self.assertEqual(actual["Environments"], expected)
+            overrides = [
+                runtime.service_environment(service, run, sdk, "test-database", 7200, 4, identity)
+                for service in runtime.SERVICES
+            ]
+            self.assertEqual(actual["Overrides"], overrides)
+            self.assertEqual(
+                runtime.TOPOLOGY["EnvironmentDefaults"]["AINATIVE_MATCH_LENGTH_TICKS"], "1200"
+            )
 
-    def test_environment_literals_match_retained_powershell(self):
-        text = (Path(runtime.__file__).parent / "common.ps1").read_text()
-        env = runtime.service_environment(
-            runtime.SERVICES[0], Path("/run"), Path("/sdk/dotnet"), "db", 1200, 2, {}
+    def test_replay_identity_setting_order_is_compatible(self):
+        # Changing this order changes existing replay identity hashes.
+        self.assertEqual(
+            runtime.CONFIG_SETTINGS,
+            (
+                "AINATIVE_BATTLE_WORKERS",
+                "AINATIVE_ROOMS_PER_WORKER",
+                "AINATIVE_BATTLE_MAILBOX_CAPACITY",
+                "AINATIVE_MATCH_LENGTH_TICKS",
+                "AINATIVE_PLAYERS_PER_MATCH",
+                "AINATIVE_OUTBOX_MAX_RESULTS",
+                "AINATIVE_OUTBOX_MAX_BYTES",
+                "AINATIVE_ARENA_REPLAY_CAPACITY",
+                "AINATIVE_ARENA_REPLAY_MAX_FILES",
+                "AINATIVE_ARENA_REPLAY_MAX_BYTES",
+            ),
         )
-        literals = re.findall(r"(AINATIVE_[A-Z_]+)\s*=\s*'([^']*)'", text)
-        self.assertTrue(literals, "No PowerShell environment literals were discovered")
-        for key, value in literals:
-            if key in env:
-                self.assertEqual(env[key], value, key)
-        ordered = re.search(r"foreach\s*\(\s*\$setting\s+in\s+@\(([^)]+)\)\s*\)", text).group(1)
-        self.assertEqual(tuple(re.findall(r"'([^']+)'", ordered)), runtime.CONFIG_SETTINGS)
 
     def test_profiles_keep_seven_ide_targets(self):
         repo = Path(runtime.__file__).resolve().parents[2]
