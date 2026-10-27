@@ -2,8 +2,8 @@
 set -euo pipefail
 
 if [[ $# -ne 5 ]]; then
-  echo "Usage: $0 <baseline-host.json> <outage-host.json> <baseline-load.json> <outage-load.json> <output.json>" >&2
-  exit 2
+    echo "Usage: $0 <baseline-host.json> <outage-host.json> <baseline-load.json> <outage-load.json> <output.json>" >&2
+    exit 2
 fi
 
 baseline_host="$1"
@@ -13,15 +13,15 @@ outage_load="$4"
 output_file="$5"
 
 for input_file in "$baseline_host" "$outage_host" "$baseline_load" "$outage_load"; do
-  if [[ ! -s "$input_file" ]]; then
-    echo "Required telemetry capacity input is missing or empty: $input_file" >&2
-    exit 2
-  fi
+    if [[ ! -s "$input_file" ]]; then
+        echo "Required telemetry capacity input is missing or empty: $input_file" >&2
+        exit 2
+    fi
 done
 
 if ! command -v jq >/dev/null 2>&1; then
-  echo "jq is required." >&2
-  exit 2
+    echo "jq is required." >&2
+    exit 2
 fi
 
 jq -e '
@@ -121,8 +121,8 @@ jq -e '
 ' "$outage_load" >/dev/null
 
 if ! jq -e -n \
-  --slurpfile baseline "$baseline_host" \
-  --slurpfile outage "$outage_host" '
+    --slurpfile baseline "$baseline_host" \
+    --slurpfile outage "$outage_host" '
     ($baseline[0].sourceCommit == $outage[0].sourceCommit)
     and ($baseline[0].fantasyCommit == $outage[0].fantasyCommit)
     and ($baseline[0].protocolIdentity == $outage[0].protocolIdentity)
@@ -133,29 +133,29 @@ if ! jq -e -n \
     and ($baseline[0].telemetryTraceExportFailures == 0)
     and ($baseline[0].telemetryTraceRecordsDropped == 0)
   ' >/dev/null; then
-  echo "Telemetry comparison failed: source/Fantasy/protocol identities differ or the disabled exporter recorded activity." >&2
-  exit 1
+    echo "Telemetry comparison failed: source/Fantasy/protocol identities differ or the disabled exporter recorded activity." >&2
+    exit 1
 fi
 
 if ! jq -e -n \
-  --slurpfile baseline "$baseline_host" \
-  --slurpfile outage "$outage_host" '
-    ($outage[0].tickP99Milliseconds - $baseline[0].tickP99Milliseconds) < 0.25
-  ' >/dev/null; then
-  jq -r -n \
     --slurpfile baseline "$baseline_host" \
     --slurpfile outage "$outage_host" '
+    ($outage[0].tickP99Milliseconds - $baseline[0].tickP99Milliseconds) < 0.25
+  ' >/dev/null; then
+    jq -r -n \
+        --slurpfile baseline "$baseline_host" \
+        --slurpfile outage "$outage_host" '
       "Telemetry Tick P99 increment failed: baseline=\($baseline[0].tickP99Milliseconds) ms, outage=\($outage[0].tickP99Milliseconds) ms, increment=\($outage[0].tickP99Milliseconds - $baseline[0].tickP99Milliseconds) ms; required < 0.25 ms."
     ' >&2
-  exit 1
+    exit 1
 fi
 
 mkdir -p "$(dirname "$output_file")"
 jq -n \
-  --slurpfile baseline "$baseline_host" \
-  --slurpfile outage "$outage_host" \
-  --slurpfile baselineLoad "$baseline_load" \
-  --slurpfile outageLoad "$outage_load" '
+    --slurpfile baseline "$baseline_host" \
+    --slurpfile outage "$outage_host" \
+    --slurpfile baselineLoad "$baseline_load" \
+    --slurpfile outageLoad "$outage_load" '
   {
     evidenceClass: "telemetry-capacity-comparison",
     sourceCommit: $baseline[0].sourceCommit,
@@ -207,6 +207,6 @@ jq -n \
       passed: true
     }
   }
-  ' > "$output_file"
+  ' >"$output_file"
 
 echo "Telemetry outage and one-room capacity gates passed."

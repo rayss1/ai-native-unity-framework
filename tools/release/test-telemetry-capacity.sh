@@ -4,24 +4,26 @@ set -euo pipefail
 repository_root="$(git rev-parse --show-toplevel)"
 verifier="$repository_root/tools/release/verify-telemetry-capacity.sh"
 fixture_dir="$(mktemp -d)"
-cleanup() { rm -rf "$fixture_dir"; }
+cleanup() {
+    rm -rf "$fixture_dir"
+}
 trap cleanup EXIT
 
 write_host() {
-  output="$1"
-  exporter_configured="$2"
-  tick_p99="$3"
-  attempts="$4"
-  failures="$5"
-  tag_violations="$6"
-  series_overflow="$7"
-  jq -n \
-    --argjson configured "$exporter_configured" \
-    --argjson tickP99 "$tick_p99" \
-    --argjson attempts "$attempts" \
-    --argjson failures "$failures" \
-    --argjson tagViolations "$tag_violations" \
-    --argjson seriesOverflow "$series_overflow" '
+    output="$1"
+    exporter_configured="$2"
+    tick_p99="$3"
+    attempts="$4"
+    failures="$5"
+    tag_violations="$6"
+    series_overflow="$7"
+    jq -n \
+        --argjson configured "$exporter_configured" \
+        --argjson tickP99 "$tick_p99" \
+        --argjson attempts "$attempts" \
+        --argjson failures "$failures" \
+        --argjson tagViolations "$tag_violations" \
+        --argjson seriesOverflow "$series_overflow" '
     {
       evidenceClass: "release-equivalent-host-core",
       roomCount: 1,
@@ -58,7 +60,7 @@ write_host() {
       projectMetricTagViolations: $tagViolations,
       projectMetricSeriesOverflow: $seriesOverflow
     }
-    ' > "$output"
+    ' >"$output"
 }
 
 jq -n '{
@@ -75,61 +77,61 @@ jq -n '{
   measuredInputBatchRateHz: 30,
   snapshotFrames: 38400,
   outerKcpMtu: 1150
-}' > "$fixture_dir/load.json"
+}' >"$fixture_dir/load.json"
 
 write_host "$fixture_dir/baseline.json" false 1.00 0 0 0 0
 write_host "$fixture_dir/outage.json" true 1.24 3 3 0 0
 
 verify() {
-  "$verifier" \
-    "$fixture_dir/baseline.json" \
-    "$1" \
-    "$fixture_dir/load.json" \
-    "$fixture_dir/load.json" \
-    "$fixture_dir/result.json"
+    "$verifier" \
+        "$fixture_dir/baseline.json" \
+        "$1" \
+        "$fixture_dir/load.json" \
+        "$fixture_dir/load.json" \
+        "$fixture_dir/result.json"
 }
 
 expect_failure() {
-  case_name="$1"
-  input="$2"
-  if verify "$input" > "$fixture_dir/$case_name.log" 2>&1; then
-    echo "Telemetry capacity negative case unexpectedly passed: $case_name" >&2
-    exit 1
-  fi
+    case_name="$1"
+    input="$2"
+    if verify "$input" >"$fixture_dir/$case_name.log" 2>&1; then
+        echo "Telemetry capacity negative case unexpectedly passed: $case_name" >&2
+        exit 1
+    fi
 }
 
 verify "$fixture_dir/outage.json"
 jq -e '.gates.passed == true and .exporterOutage.tickP99IncrementMilliseconds == 0.24' \
-  "$fixture_dir/result.json" >/dev/null
+    "$fixture_dir/result.json" >/dev/null
 
-jq '.tickP99Milliseconds = 1.25' "$fixture_dir/outage.json" > "$fixture_dir/delta-at-limit.json"
+jq '.tickP99Milliseconds = 1.25' "$fixture_dir/outage.json" >"$fixture_dir/delta-at-limit.json"
 expect_failure delta-at-limit "$fixture_dir/delta-at-limit.json"
 grep -E 'Telemetry Tick P99 increment failed: baseline=1(\.0+)? ms, outage=1\.25 ms, increment=0\.25 ms; required < 0\.25 ms\.' \
-  "$fixture_dir/delta-at-limit.log" >/dev/null
+    "$fixture_dir/delta-at-limit.log" >/dev/null
 
 # Preserve the strict gate for the measured PR #27 failure, including its diagnostic.
 write_host "$fixture_dir/baseline.json" false 0.3957 0 0 0 0
 write_host "$fixture_dir/pr27-outage.json" true 0.8143 332 332 0 0
 expect_failure pr27-outage "$fixture_dir/pr27-outage.json"
 grep -F 'Telemetry Tick P99 increment failed: baseline=0.3957 ms, outage=0.8143 ms' \
-  "$fixture_dir/pr27-outage.log" >/dev/null
+    "$fixture_dir/pr27-outage.log" >/dev/null
 write_host "$fixture_dir/baseline.json" false 1.00 0 0 0 0
 
 jq '.sourceCommit = "4444444444444444444444444444444444444444"' \
-  "$fixture_dir/outage.json" > "$fixture_dir/source-drift.json"
+    "$fixture_dir/outage.json" >"$fixture_dir/source-drift.json"
 expect_failure source-drift "$fixture_dir/source-drift.json"
 grep -F 'source/Fantasy/protocol identities differ' "$fixture_dir/source-drift.log" >/dev/null
 
-jq '.telemetryMetricExportFailures = 0' "$fixture_dir/outage.json" > "$fixture_dir/no-export-failure.json"
+jq '.telemetryMetricExportFailures = 0' "$fixture_dir/outage.json" >"$fixture_dir/no-export-failure.json"
 expect_failure no-export-failure "$fixture_dir/no-export-failure.json"
 
-jq '.projectMetricTagViolations = 1' "$fixture_dir/outage.json" > "$fixture_dir/tag-violation.json"
+jq '.projectMetricTagViolations = 1' "$fixture_dir/outage.json" >"$fixture_dir/tag-violation.json"
 expect_failure tag-violation "$fixture_dir/tag-violation.json"
 
-jq '.projectMetricSeriesOverflow = 1' "$fixture_dir/outage.json" > "$fixture_dir/series-overflow.json"
+jq '.projectMetricSeriesOverflow = 1' "$fixture_dir/outage.json" >"$fixture_dir/series-overflow.json"
 expect_failure series-overflow "$fixture_dir/series-overflow.json"
 
-jq '.roomCount = 2 | .totalBotCapacity = 128' "$fixture_dir/outage.json" > "$fixture_dir/room-drift.json"
+jq '.roomCount = 2 | .totalBotCapacity = 128' "$fixture_dir/outage.json" >"$fixture_dir/room-drift.json"
 expect_failure room-drift "$fixture_dir/room-drift.json"
 
 echo "Telemetry capacity contract tests passed."

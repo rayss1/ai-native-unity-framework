@@ -4,7 +4,7 @@
 
 ## 1. 准备环境
 
-- Python 3.11+、Git、仓库根目录 `global.json` 支持的 .NET 10 SDK。原生 Python／shell／cmd 入口不需要 PowerShell；仅旧 `.ps1` 包装需要 PowerShell 7。
+- Python 3.11+、Git、仓库根目录 `global.json` 支持的 .NET 10 SDK。原生 Python／shell／cmd 入口不需要 PowerShell。
 - PostgreSQL **17.11** 的完整工具目录。通过 `--postgres-bin-directory` 指定，或先从仓库 `artifacts/postgresql/17.11/bin`、再从 PATH／平台常见目录发现。Mac 检查 `/opt/homebrew/opt/postgresql@17/bin`、`/usr/local/opt/postgresql@17/bin`、`/Library/PostgreSQL/17/bin`；Windows 检查既有仓库便携版与 Program Files。工具不会自动安装或接受其他版本。
 - Unity 6000.3.23f1；工程已固定 Multiplayer Play Mode 2.0.2，不需要升级到 3.0。
 - 调试使用支持项目 .NET 10 目标的 Rider（Mac／Windows）或 Visual Studio（Windows）；打开仓库根目录 `AiNative.sln`，不是 Unity 自动生成的解决方案。
@@ -28,7 +28,7 @@ Windows 双击 `tools/topology/start-manual.cmd`，或执行：
 py -3 tools/topology/manual.py start
 ```
 
-原 `./tools/topology/start-manual.ps1 -PlayersPerRoom 4 -MatchTicks 7200` 继续有效，仅转发至 Python。`.cmd` 也保留 `-PlayersPerRoom` 等旧参数拼写。两平台执行同一套构建、配置、数据库和进程管理逻辑，不会运行另一套 PowerShell 初始化流程。
+Windows 使用 `tools\topology\start-manual.cmd --players-per-room 4 --match-ticks 7200`；macOS 使用 `./tools/topology/start-manual.sh` 加相同参数。Python 入口及这些包装继续兼容 `-PlayersPerRoom` 等旧参数拼写。两平台执行同一套构建、配置、数据库和进程管理逻辑。
 
 启动器编译当前源码，准备独立数据库，启动 Gate、Player、Lobby、Match、Coordinator 和两个 Battle。看到“服务器已就绪”再操作客户端。默认两人一局、每局十分钟；`--match-ticks 7200` 为两分钟，`--players-per-room 4` 为四人同房。修改配置前先停止原环境。
 
@@ -38,7 +38,7 @@ py -3 tools/topology/manual.py start
 python3 tools/topology/manual.py status
 python3 tools/topology/manual.py stop
 # Mac 停止包装：./tools/topology/stop-manual.sh
-# Windows 将 python3 换为 py -3；PowerShell 7 可使用 stop-manual.ps1
+# Windows 将 python3 换为 py -3，或执行 tools\topology\stop-manual.cmd
 ```
 
 Windows CMD、PowerShell 5.1 或 PowerShell 7 均可直接执行配套停止脚本：
@@ -110,7 +110,7 @@ python3 tools/topology/manual.py start --debug-service player --match-ticks 7200
 例如调试登录和结算的 Player 服务：
 
 ```powershell
-./tools/topology/start-manual.ps1 -DebugService player -MatchTicks 7200
+.\tools\topology\start-manual.cmd --debug-service player --match-ticks 7200
 ```
 
 1. 保持脚本窗口打开。显示“等待 VS 启动”是正常状态；脚本不会启动 Player。

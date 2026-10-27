@@ -1,4 +1,5 @@
 """Public test deployment boundaries; OpenSSL generation uses the installed binary."""
+
 import copy
 import importlib.util
 import json
@@ -11,12 +12,44 @@ import unittest
 
 def fixture():
     roles = ("gate", "player", "lobby", "match", "coordinator", "battle-1", "battle-2")
-    services = {name: {"image": "private-image:fixed", "environment": {"SECRET_TEST_VALUE": "do-not-print-this-secret"}, "ports": [{"target": 8080, "published": str(24101 + i), "host_ip": "127.0.0.1", "protocol": "tcp"}], "volumes": ["owned-data:/data"]} for i, name in enumerate(roles)}
-    services["gate"]["ports"].append({"target": 23001, "published": "32301", "host_ip": "127.0.0.1", "protocol": "tcp"})
+    services = {
+        name: {
+            "image": "private-image:fixed",
+            "environment": {"SECRET_TEST_VALUE": "do-not-print-this-secret"},
+            "ports": [
+                {
+                    "target": 8080,
+                    "published": str(24101 + i),
+                    "host_ip": "127.0.0.1",
+                    "protocol": "tcp",
+                }
+            ],
+            "volumes": ["owned-data:/data"],
+        }
+        for i, name in enumerate(roles)
+    }
+    services["gate"]["ports"].append(
+        {"target": 23001, "published": "32301", "host_ip": "127.0.0.1", "protocol": "tcp"}
+    )
     for n in (1, 2):
-        services[f"battle-{n}"]["ports"].append({"target": 21999 + n, "published": str(31999 + n), "host_ip": "127.0.0.1", "protocol": "udp"})
-        services[f"battle-{n}"]["environment"].update({"AINATIVE_BATTLE_ADDRESS": f"172.28.0.{15+n}:{21999+n}", "AINATIVE_MATCH_LENGTH_TICKS": "1200"})
-    services["postgres"] = {"environment": {"POSTGRES_PASSWORD": "do-not-print-this-secret"}, "volumes": ["postgres-data:/var/lib/postgresql/data"]}
+        services[f"battle-{n}"]["ports"].append(
+            {
+                "target": 21999 + n,
+                "published": str(31999 + n),
+                "host_ip": "127.0.0.1",
+                "protocol": "udp",
+            }
+        )
+        services[f"battle-{n}"]["environment"].update(
+            {
+                "AINATIVE_BATTLE_ADDRESS": f"172.28.0.{15+n}:{21999+n}",
+                "AINATIVE_MATCH_LENGTH_TICKS": "1200",
+            }
+        )
+    services["postgres"] = {
+        "environment": {"POSTGRES_PASSWORD": "do-not-print-this-secret"},
+        "volumes": ["postgres-data:/var/lib/postgresql/data"],
+    }
     return {"name": "ainative-cloud-test", "services": services, "volumes": {"postgres-data": {}}}
 
 
@@ -29,7 +62,15 @@ class PublicTLSBehaviorTests(unittest.TestCase):
             spec = importlib.util.spec_from_file_location("public_test_tls", path)
             cls.tool = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(cls.tool)
-        cls.openssl = os.environ.get("OPENSSL_BINARY") or shutil.which("openssl") or ("D:/Program Files/Git/usr/bin/openssl.exe" if Path("D:/Program Files/Git/usr/bin/openssl.exe").exists() else None)
+        cls.openssl = (
+            os.environ.get("OPENSSL_BINARY")
+            or shutil.which("openssl")
+            or (
+                "D:/Program Files/Git/usr/bin/openssl.exe"
+                if Path("D:/Program Files/Git/usr/bin/openssl.exe").exists()
+                else None
+            )
+        )
 
     def module(self):
         self.assertIsNotNone(self.tool, "Missing guarded public TLS preparation tool")
@@ -87,7 +128,14 @@ class PublicTLSBehaviorTests(unittest.TestCase):
     def test_public_gate_or_database_port_is_rejected(self):
         for target in ("gate", "postgres"):
             data = fixture()
-            data["services"][target]["ports"] = [{"target": 23001 if target == "gate" else 5432, "published": "32301" if target == "gate" else "5432", "host_ip": "0.0.0.0", "protocol": "tcp"}]
+            data["services"][target]["ports"] = [
+                {
+                    "target": 23001 if target == "gate" else 5432,
+                    "published": "32301" if target == "gate" else "5432",
+                    "host_ip": "0.0.0.0",
+                    "protocol": "tcp",
+                }
+            ]
             self.compose.write_text(json.dumps(data))
             with self.assertRaises(ValueError):
                 self.prepare()
@@ -123,6 +171,7 @@ class PublicTLSBehaviorTests(unittest.TestCase):
     def test_generated_certificate_verifies_ip_san_and_configuration_keeps_gate_private(self):
         self.prepare()
         import ssl
+
         certificate = ssl._ssl._test_decode_cert(str(self.tls / "gate-cert.pem"))
         self.assertIn(("IP Address", "111.230.230.247"), certificate["subjectAltName"])
         config = (self.tls / "stunnel.conf").read_text()
@@ -140,13 +189,17 @@ class PublicTLSBehaviorTests(unittest.TestCase):
         import socket
         import ssl
         import threading
+
         listener = socket.socket()
         listener.bind(("127.0.0.1", 0))
         listener.listen(1)
         listener.settimeout(3)
         server_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-        server_context.load_cert_chain(str(self.tls / "gate-cert.pem"), str(self.tls / "gate-key.pem"))
+        server_context.load_cert_chain(
+            str(self.tls / "gate-cert.pem"), str(self.tls / "gate-key.pem")
+        )
         errors = []
+
         def serve():
             try:
                 raw, _ = listener.accept()
@@ -154,12 +207,15 @@ class PublicTLSBehaviorTests(unittest.TestCase):
                     peer.sendall(b"tls-ready")
             except Exception as error:
                 errors.append(type(error).__name__)
+
         worker = threading.Thread(target=serve, daemon=True)
         worker.start()
         client_context = ssl.create_default_context(cafile=str(self.tls / "gate-cert.pem"))
         try:
             with socket.create_connection(listener.getsockname(), timeout=3) as connection:
-                with client_context.wrap_socket(connection, server_hostname="111.230.230.247") as peer:
+                with client_context.wrap_socket(
+                    connection, server_hostname="111.230.230.247"
+                ) as peer:
                     self.assertEqual(peer.recv(16), b"tls-ready")
         finally:
             listener.close()

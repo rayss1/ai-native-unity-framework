@@ -79,6 +79,12 @@ jobs:
       - name: Restore
         run: dotnet restore AiNative.sln
 
+      - name: Test Unity shell validation contract
+        shell: bash
+        run: |
+          bash -n tools/run-unity-manual-validation.sh
+          pwsh -NoProfile -File tools/validation/tests/test-unity-test-contract.ps1
+
       - name: Verify generated protocol artifacts
         run: |
           dotnet build tools/ProtocolCodegen/ProtocolCodegen.csproj --configuration Release --no-restore -p:GenerateProtocol=true

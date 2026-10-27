@@ -14,8 +14,12 @@ _parser_path = Path(__file__).with_name("accepted-input-audit.py")
 _spec = importlib.util.spec_from_file_location("accepted_input_audit", _parser_path)
 _parser = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_parser)
-IDENTITY_FIELDS = {"Source": "source_identity", "Fantasy": "fantasy_identity",
-                   "Protocol": "protocol_identity", "Configuration": "configuration_identity"}
+IDENTITY_FIELDS = {
+    "Source": "source_identity",
+    "Fantasy": "fantasy_identity",
+    "Protocol": "protocol_identity",
+    "Configuration": "configuration_identity",
+}
 
 
 def sha256(path):
@@ -34,6 +38,7 @@ def load_json(path):
                 raise ValueError("Duplicate JSON field: " + key)
             result[key] = value
         return result
+
     return json.loads(Path(path).read_text(encoding="utf-8-sig"), object_pairs_hook=unique)
 
 
@@ -56,7 +61,11 @@ def identity(value):
 
 
 def verify_hash(value, path, name):
-    if not isinstance(value, str) or not re.fullmatch(r"[0-9a-fA-F]{64}", value) or sha256(path) != value.lower():
+    if (
+        not isinstance(value, str)
+        or not re.fullmatch(r"[0-9a-fA-F]{64}", value)
+        or sha256(path) != value.lower()
+    ):
         raise ValueError("Missing or mismatched hash: " + name)
 
 
@@ -67,9 +76,13 @@ def result_binding(value):
     # Replay UInt64 output may be a JSON integer or an exact decimal string.
     if isinstance(final_hash, str) and re.fullmatch(r"[0-9]+", final_hash):
         final_hash = int(final_hash)
-    return (text(value.get("RoomId"), "RoomId"), text(value.get("MatchId"), "MatchId"),
-            integer(value.get("FinalTick"), "FinalTick", 1), integer(final_hash, "FinalHash"),
-            integer(value.get("Records"), "Records", 1, 100_000_000))
+    return (
+        text(value.get("RoomId"), "RoomId"),
+        text(value.get("MatchId"), "MatchId"),
+        integer(value.get("FinalTick"), "FinalTick", 1),
+        integer(final_hash, "FinalHash"),
+        integer(value.get("Records"), "Records", 1, 100_000_000),
+    )
 
 
 def index_captures(entries, path_key):
@@ -94,7 +107,11 @@ def audit_capacity(native_path, independent_path, minimum_fraction=Decimal("0.8"
     native, independent = load_json(native_path), load_json(independent_path)
     if not isinstance(native, dict) or type(native.get("passed")) is not bool:
         raise ValueError("Native qualification outcome missing")
-    if not isinstance(independent, dict) or independent.get("passed") is not True or independent.get("failure") is not None:
+    if (
+        not isinstance(independent, dict)
+        or independent.get("passed") is not True
+        or independent.get("failure") is not None
+    ):
         raise ValueError("Independent state-hash verification did not pass")
     identities = native.get("identities")
     if not isinstance(identities, list) or len(identities) != 2:
@@ -110,7 +127,11 @@ def audit_capacity(native_path, independent_path, minimum_fraction=Decimal("0.8"
     captures = index_captures(native.get("replay"), "capture")
     verified = index_captures(independent.get("verified"), "path")
     completed = integer(native.get("completedRooms"), "completedRooms", 1)
-    if completed != len(captures) or integer(independent.get("completedCount"), "completedCount", 1) != completed or set(captures) != set(verified):
+    if (
+        completed != len(captures)
+        or integer(independent.get("completedCount"), "completedCount", 1) != completed
+        or set(captures) != set(verified)
+    ):
         raise ValueError("Native and independently verified completed inventories differ")
     # An omitted published Complete capture cannot disappear from both reports.
     on_disk_complete = set()
@@ -151,8 +172,12 @@ def audit_capacity(native_path, independent_path, minimum_fraction=Decimal("0.8"
             raise ValueError("Native room has contradictory slot/generation")
         room_generations[room] = slot, generation
         player_ids.add(player_id)
-        window = {"first": player.get("firstMeasuredInputSequence"), "last": player.get("lastMeasuredInputSequence"),
-                  "count": player.get("measuredInputs"), "total": player.get("totalAcceptedInputs")}
+        window = {
+            "first": player.get("firstMeasuredInputSequence"),
+            "last": player.get("lastMeasuredInputSequence"),
+            "count": player.get("measuredInputs"),
+            "total": player.get("totalAcceptedInputs"),
+        }
         _parser.validate_window(window)
         by_room.setdefault(room, {})[entity] = {"player": player_id, "window": window}
     if len(set(room_generations.values())) != len(room_generations):
@@ -170,48 +195,101 @@ def audit_capacity(native_path, independent_path, minimum_fraction=Decimal("0.8"
         if result != result_binding(bound.get("result")):
             raise ValueError("Native and independent results contradict")
         room_id = result[0]
-        if room_id in observed_rooms or room_id not in by_room or len(by_room[room_id]) != players_per_room:
+        if (
+            room_id in observed_rooms
+            or room_id not in by_room
+            or len(by_room[room_id]) != players_per_room
+        ):
             raise ValueError("Missing, duplicate or incomplete room/player inventory")
         observed_rooms.add(room_id)
         windows = {entity: entry["window"] for entity, entry in by_room[room_id].items()}
-        args = argparse.Namespace(replay=path, expected_input_hz=Decimal(input_hz),
-            expected_duration_seconds=Decimal(match_ticks) / 60, minimum_fraction=minimum_fraction,
-            maximum_final_gap_ticks=180, expected_entities=list(windows), measurement_windows=windows,
-            expected_room_id=room_id, expected_match_id=result[1], expected_allocation_id=None,
-            expected_node_id=path.parent.name, expected_boot_epoch=None)
+        args = argparse.Namespace(
+            replay=path,
+            expected_input_hz=Decimal(input_hz),
+            expected_duration_seconds=Decimal(match_ticks) / 60,
+            minimum_fraction=minimum_fraction,
+            maximum_final_gap_ticks=180,
+            expected_entities=list(windows),
+            measurement_windows=windows,
+            expected_room_id=room_id,
+            expected_match_id=result[1],
+            expected_allocation_id=None,
+            expected_node_id=path.parent.name,
+            expected_boot_epoch=None,
+        )
         parsed = _parser.audit(args)
         if parsed["sha256"] != bound["sha256"].lower():
             raise ValueError("Capture changed during audit")
-        if any(parsed["header"][header_field] != bound_identity[field] for field, header_field in IDENTITY_FIELDS.items()):
+        if any(
+            parsed["header"][header_field] != bound_identity[field]
+            for field, header_field in IDENTITY_FIELDS.items()
+        ):
             raise ValueError("ANAR header identity mismatch")
-        if (parsed["footer"]["final_tick"], int(parsed["footer"]["final_hash"]), parsed["parsed_record_count"]) != result[2:]:
+        if (
+            parsed["footer"]["final_tick"],
+            int(parsed["footer"]["final_hash"]),
+            parsed["parsed_record_count"],
+        ) != result[2:]:
             raise ValueError("ANAR footer contradicts verified results")
-        room_players = [{"player": by_room[room_id][int(entity)]["player"], **stats}
-                        for entity, stats in parsed["window_entities"].items()]
+        room_players = [
+            {"player": by_room[room_id][int(entity)]["player"], **stats}
+            for entity, stats in parsed["window_entities"].items()
+        ]
         for reason in parsed["failures"]:
             failures.append(room_id + ":" + reason)
-        rooms.append({"room_id": room_id, "match_id": result[1], "slot": room_generations[room_id][0],
-                      "generation": room_generations[room_id][1], "capture": str(path), "capture_sha256": parsed["sha256"],
-                      "identity": bound_identity, "identity_path": str(identity_path), "identity_sha256": bound["identitySha256"].lower(),
-                      "final_tick": result[2], "final_hash": str(result[3]), "record_count": result[4], "players": room_players,
-                      "accepted_input_audit_passed": parsed["accepted_input_audit_passed"], "state_hash_simulation_verified": True})
+        rooms.append(
+            {
+                "room_id": room_id,
+                "match_id": result[1],
+                "slot": room_generations[room_id][0],
+                "generation": room_generations[room_id][1],
+                "capture": str(path),
+                "capture_sha256": parsed["sha256"],
+                "identity": bound_identity,
+                "identity_path": str(identity_path),
+                "identity_sha256": bound["identitySha256"].lower(),
+                "final_tick": result[2],
+                "final_hash": str(result[3]),
+                "record_count": result[4],
+                "players": room_players,
+                "accepted_input_audit_passed": parsed["accepted_input_audit_passed"],
+                "state_hash_simulation_verified": True,
+            }
+        )
     if observed_rooms != set(by_room):
         raise ValueError("Native player room has no completed capture")
-    measured = [player for room in rooms for player in room["players"] if not player["excluded_zero_measurement"]]
+    measured = [
+        player
+        for room in rooms
+        for player in room["players"]
+        if not player["excluded_zero_measurement"]
+    ]
     if not measured:
         failures.append("no-measured-players")
     if sha256(native_path) != native_hash or sha256(independent_path) != independent_hash:
         raise ValueError("Qualification reports changed during audit")
-    return {"audit_version": 1, "accepted_input_audit_passed": not failures, "failures": failures,
-            "native_report": str(native_path), "native_report_sha256": native_hash,
-            "native_qualification_passed": native["passed"], "independent_replay_report": str(independent_path),
-            "independent_replay_report_sha256": independent_hash, "verifier": str(verifier),
-            "verifier_sha256": independent["verifierSha256"].lower(), "audit_tool_sha256": sha256(__file__),
-            "parser_sha256": sha256(_parser_path), "minimum_fraction": str(minimum_fraction),
-            "completed_rooms": completed, "measured_players": len(measured), "excluded_zero_measurement_players": len(players) - len(measured),
-            "measured_inputs": sum(player["measured_input_count"] for player in measured),
-            "accepted_measured_inputs": sum(player["accepted_count"] for player in measured), "rooms": rooms,
-            "scope": "Actual ANAR kind=2 counts in declared measurement sequence intervals; each nonzero player window requires the existing 0.8 minimum fraction. Zero windows are explicitly excluded; whole-match and ACK counts cannot substitute."}
+    return {
+        "audit_version": 1,
+        "accepted_input_audit_passed": not failures,
+        "failures": failures,
+        "native_report": str(native_path),
+        "native_report_sha256": native_hash,
+        "native_qualification_passed": native["passed"],
+        "independent_replay_report": str(independent_path),
+        "independent_replay_report_sha256": independent_hash,
+        "verifier": str(verifier),
+        "verifier_sha256": independent["verifierSha256"].lower(),
+        "audit_tool_sha256": sha256(__file__),
+        "parser_sha256": sha256(_parser_path),
+        "minimum_fraction": str(minimum_fraction),
+        "completed_rooms": completed,
+        "measured_players": len(measured),
+        "excluded_zero_measurement_players": len(players) - len(measured),
+        "measured_inputs": sum(player["measured_input_count"] for player in measured),
+        "accepted_measured_inputs": sum(player["accepted_count"] for player in measured),
+        "rooms": rooms,
+        "scope": "Actual ANAR kind=2 counts in declared measurement sequence intervals; each nonzero player window requires the existing 0.8 minimum fraction. Zero windows are explicitly excluded; whole-match and ACK counts cannot substitute.",
+    }
 
 
 def main():
@@ -221,12 +299,21 @@ def main():
     cli.add_argument("--minimum-fraction", type=Decimal, default=Decimal("0.8"))
     cli.add_argument("--output", type=Path, required=True)
     args = cli.parse_args()
-    if args.output.exists() or args.output.resolve() in (args.native_report.resolve(), args.independent_replays.resolve()):
+    if args.output.exists() or args.output.resolve() in (
+        args.native_report.resolve(),
+        args.independent_replays.resolve(),
+    ):
         cli.error("Use a new output path; retained evidence cannot be overwritten")
-    provenance = {"native_report": str(args.native_report.resolve()),
-                  "independent_replay_report": str(args.independent_replays.resolve()),
-                  "audit_tool_sha256": sha256(__file__), "parser_sha256": sha256(_parser_path)}
-    for field, path in (("native_report_sha256", args.native_report), ("independent_replay_report_sha256", args.independent_replays)):
+    provenance = {
+        "native_report": str(args.native_report.resolve()),
+        "independent_replay_report": str(args.independent_replays.resolve()),
+        "audit_tool_sha256": sha256(__file__),
+        "parser_sha256": sha256(_parser_path),
+    }
+    for field, path in (
+        ("native_report_sha256", args.native_report),
+        ("independent_replay_report_sha256", args.independent_replays),
+    ):
         try:
             provenance[field] = sha256(path)
         except OSError:

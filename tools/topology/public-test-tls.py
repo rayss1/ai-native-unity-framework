@@ -41,9 +41,13 @@ def paths(compose_file, tls_directory):
     if compose_file.is_symlink() or tls_directory.is_symlink():
         raise ValueError("symlink-deployment-path-not-allowed")
     compose_file, tls_directory = compose_file.resolve(), tls_directory.resolve()
-    if tls_directory == compose_file.parent or not tls_directory.is_relative_to(compose_file.parent):
+    if tls_directory == compose_file.parent or not tls_directory.is_relative_to(
+        compose_file.parent
+    ):
         raise ValueError("tls-directory-must-stay-inside-deployment-directory")
-    if any(char.isspace() for char in str(tls_directory)) or any(char in str(tls_directory) for char in ('"', ';', '#')):
+    if any(char.isspace() for char in str(tls_directory)) or any(
+        char in str(tls_directory) for char in ('"', ";", "#")
+    ):
         raise ValueError("unsupported-tls-directory-characters")
     return compose_file, tls_directory
 
@@ -54,12 +58,23 @@ def load_compose(compose_file):
     if data.get("name") != PROJECT:
         raise ValueError("compose-project-must-be-ainative-cloud-test")
     services = data.get("services", {})
-    expected = {"gate": (23001, "32301", "tcp"), "battle-1": (22000, "32000", "udp"), "battle-2": (22001, "32001", "udp")}
+    expected = {
+        "gate": (23001, "32301", "tcp"),
+        "battle-1": (22000, "32000", "udp"),
+        "battle-2": (22001, "32001", "udp"),
+    }
     for name, mapping in expected.items():
         if name not in services:
             raise ValueError("required-test-service-missing")
-        matches = [p for p in services[name].get("ports", []) if isinstance(p, dict) and (p.get("target"), str(p.get("published")), p.get("protocol", "tcp")) == mapping]
-        if len(matches) != 1 or matches[0].get("host_ip") not in (("127.0.0.1", "0.0.0.0") if name.startswith("battle-") else ("127.0.0.1",)):
+        matches = [
+            p
+            for p in services[name].get("ports", [])
+            if isinstance(p, dict)
+            and (p.get("target"), str(p.get("published")), p.get("protocol", "tcp")) == mapping
+        ]
+        if len(matches) != 1 or matches[0].get("host_ip") not in (
+            ("127.0.0.1", "0.0.0.0") if name.startswith("battle-") else ("127.0.0.1",)
+        ):
             raise ValueError("expected-test-endpoint-mapping-missing-or-public-gate")
         if name.startswith("battle-") and not isinstance(services[name].get("environment"), dict):
             raise ValueError("battle-environment-must-be-resolved-object")
@@ -69,14 +84,26 @@ def load_compose(compose_file):
                 raise ValueError("resolved-compose-port-object-required")
             if port.get("host_ip") == "127.0.0.1":
                 continue
-            if name in ("battle-1", "battle-2") and (port.get("target"), str(port.get("published")), port.get("protocol", "tcp")) == expected[name] and port.get("host_ip") == "0.0.0.0":
+            if (
+                name in ("battle-1", "battle-2")
+                and (port.get("target"), str(port.get("published")), port.get("protocol", "tcp"))
+                == expected[name]
+                and port.get("host_ip") == "0.0.0.0"
+            ):
                 continue
             raise ValueError("non-battle-endpoint-must-remain-loopback")
     return raw, data
 
 
 def openssl_call(binary, arguments, input_data=None):
-    result = subprocess.run([str(binary)] + list(arguments), input=input_data, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=45, check=False)
+    result = subprocess.run(
+        [str(binary)] + list(arguments),
+        input=input_data,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        timeout=45,
+        check=False,
+    )
     if result.returncode:
         raise ValueError("openssl-operation-failed-existing-certificates-never-auto-rotate")
     return result.stdout
@@ -102,11 +129,32 @@ def certificate(binary, tls_directory):
         raise ValueError("partial-existing-credentials-require-explicit-operator-repair")
     if not cert.exists():
         suffix = uuid.uuid4().hex
-        temporary_cert, temporary_key = tls_directory / ("cert.tmp-" + suffix), tls_directory / ("key.tmp-" + suffix)
+        temporary_cert, temporary_key = tls_directory / ("cert.tmp-" + suffix), tls_directory / (
+            "key.tmp-" + suffix
+        )
         private_write(temporary_cert, b"")
         private_write(temporary_key, b"")
         try:
-            openssl_call(binary, ["req", "-x509", "-newkey", "rsa:3072", "-nodes", "-days", "7", "-subj", "/CN=" + PUBLIC_IP, "-addext", "subjectAltName=IP:" + PUBLIC_IP, "-keyout", str(temporary_key), "-out", str(temporary_cert)])
+            openssl_call(
+                binary,
+                [
+                    "req",
+                    "-x509",
+                    "-newkey",
+                    "rsa:3072",
+                    "-nodes",
+                    "-days",
+                    "7",
+                    "-subj",
+                    "/CN=" + PUBLIC_IP,
+                    "-addext",
+                    "subjectAltName=IP:" + PUBLIC_IP,
+                    "-keyout",
+                    str(temporary_key),
+                    "-out",
+                    str(temporary_cert),
+                ],
+            )
             verify_certificate(binary, temporary_cert, temporary_key)
             # Link without replacement: concurrent preparation cannot rotate a pair.
             os.link(temporary_key, key)
@@ -129,7 +177,9 @@ def prepare(compose_file, tls_directory, match_ticks=1200, openssl="openssl"):
     fingerprint = certificate(openssl, tls_directory)
     # stunnel paths use quoted absolute paths; no configuration interpolation.
     base = tls_directory.as_posix()
-    private_write(tls_directory / "stunnel.conf", f'''foreground = yes
+    private_write(
+        tls_directory / "stunnel.conf",
+        f"""foreground = yes
 pid =
 syslog = no
 sslVersionMin = TLSv1.2
@@ -139,8 +189,11 @@ accept = 0.0.0.0:443
 connect = 127.0.0.1:32301
 cert = {base}/gate-cert.pem
 key = {base}/gate-key.pem
-''')
-    private_write(tls_directory / "ainative-cloud-test-tls.service", f'''[Unit]
+""",
+    )
+    private_write(
+        tls_directory / "ainative-cloud-test-tls.service",
+        f"""[Unit]
 Description=Isolated AI Native cloud test Gate TLS
 After=network-online.target docker.service
 Wants=network-online.target
@@ -172,8 +225,22 @@ StandardError=journal
 
 [Install]
 WantedBy=multi-user.target
-''')
-    plan = {"project": PROJECT, "operation": "prepare", "composeSha256": hashlib.sha256(raw).hexdigest(), "certificateSha256": fingerprint, "gateTLS": PUBLIC_IP + ":443", "gateUpstream": "127.0.0.1:32301", "battleUDP": [PUBLIC_IP + ":32000", PUBLIC_IP + ":32001"], "matchTicks": match_ticks, "tlsDirectory": str(tls_directory), "requiresExplicitApply": True, "installsPackagesOrUnits": False, "runsDocker": False}
+""",
+    )
+    plan = {
+        "project": PROJECT,
+        "operation": "prepare",
+        "composeSha256": hashlib.sha256(raw).hexdigest(),
+        "certificateSha256": fingerprint,
+        "gateTLS": PUBLIC_IP + ":443",
+        "gateUpstream": "127.0.0.1:32301",
+        "battleUDP": [PUBLIC_IP + ":32000", PUBLIC_IP + ":32001"],
+        "matchTicks": match_ticks,
+        "tlsDirectory": str(tls_directory),
+        "requiresExplicitApply": True,
+        "installsPackagesOrUnits": False,
+        "runsDocker": False,
+    }
     private_write(tls_directory / "plan.json", json.dumps(plan, indent=2) + "\n")
     return plan
 
@@ -185,13 +252,21 @@ def apply(compose_file, tls_directory, openssl="openssl"):
         raise ValueError("prepare-and-review-plan-before-apply")
     plan = json.loads(plan_path.read_text())
     raw, data = load_compose(compose_file)
-    if plan.get("project") != PROJECT or plan.get("composeSha256") != hashlib.sha256(raw).hexdigest():
+    if (
+        plan.get("project") != PROJECT
+        or plan.get("composeSha256") != hashlib.sha256(raw).hexdigest()
+    ):
         raise ValueError("compose-changed-after-review-prepare-again")
     match_ticks = plan.get("matchTicks")
     if not isinstance(match_ticks, int) or not 120 <= match_ticks <= 360000:
         raise ValueError("reviewed-match-tick-budget-invalid")
     certificate_path, key_path = tls_directory / "gate-cert.pem", tls_directory / "gate-key.pem"
-    if certificate_path.is_symlink() or key_path.is_symlink() or not certificate_path.is_file() or not key_path.is_file():
+    if (
+        certificate_path.is_symlink()
+        or key_path.is_symlink()
+        or not certificate_path.is_file()
+        or not key_path.is_file()
+    ):
         raise ValueError("reviewed-credentials-must-exist-without-symlinks")
     if verify_certificate(openssl, certificate_path, key_path) != plan.get("certificateSha256"):
         raise ValueError("certificate-changed-after-review-prepare-again")
@@ -199,7 +274,11 @@ def apply(compose_file, tls_directory, openssl="openssl"):
     for n in (1, 2):
         service = updated["services"][f"battle-{n}"]
         for port in service["ports"]:
-            if port["target"] == 21999 + n and str(port.get("published")) == str(31999 + n) and port.get("protocol") == "udp":
+            if (
+                port["target"] == 21999 + n
+                and str(port.get("published")) == str(31999 + n)
+                and port.get("protocol") == "udp"
+            ):
                 port["host_ip"] = "0.0.0.0"
         service["environment"]["AINATIVE_BATTLE_ADDRESS"] = PUBLIC_IP + ":" + str(31999 + n)
         service["environment"]["AINATIVE_MATCH_LENGTH_TICKS"] = str(match_ticks)
@@ -214,25 +293,53 @@ def apply(compose_file, tls_directory, openssl="openssl"):
     if compose_file.read_bytes() != raw:
         raise ValueError("compose-changed-during-apply-review-again")
     private_write(compose_file, json.dumps(updated, indent=2) + "\n")
-    return {"project": PROJECT, "operation": "apply-config-only", "certificateSha256": plan["certificateSha256"], "battleUDP": [PUBLIC_IP + ":32000", PUBLIC_IP + ":32001"], "matchTicks": match_ticks, "backup": str(backup), "runsDocker": False}
+    return {
+        "project": PROJECT,
+        "operation": "apply-config-only",
+        "certificateSha256": plan["certificateSha256"],
+        "battleUDP": [PUBLIC_IP + ":32000", PUBLIC_IP + ":32001"],
+        "matchTicks": match_ticks,
+        "backup": str(backup),
+        "runsDocker": False,
+    }
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--compose-file", default=DEFAULT_COMPOSE)
-    parser.add_argument("--tls-directory", help="Private directory inside the Compose file's deployment directory; defaults to tls")
-    parser.add_argument("--match-ticks", type=int, default=1200, help="Preparation only; 36000 for ten-minute qualification")
+    parser.add_argument(
+        "--tls-directory",
+        help="Private directory inside the Compose file's deployment directory; defaults to tls",
+    )
+    parser.add_argument(
+        "--match-ticks",
+        type=int,
+        default=1200,
+        help="Preparation only; 36000 for ten-minute qualification",
+    )
     parser.add_argument("--openssl", default="openssl")
-    parser.add_argument("--apply", action="store_true", help="Explicitly apply the previously reviewed plan to Compose JSON; does not restart services")
+    parser.add_argument(
+        "--apply",
+        action="store_true",
+        help="Explicitly apply the previously reviewed plan to Compose JSON; does not restart services",
+    )
     args = parser.parse_args()
     directory = args.tls_directory or str(Path(args.compose_file).parent / "tls")
     try:
-        result = apply(args.compose_file, directory, args.openssl) if args.apply else prepare(args.compose_file, directory, args.match_ticks, args.openssl)
+        result = (
+            apply(args.compose_file, directory, args.openssl)
+            if args.apply
+            else prepare(args.compose_file, directory, args.match_ticks, args.openssl)
+        )
         print(json.dumps(result, indent=2))
         return 0
     except Exception as error:
         # All external stderr and credential-bearing JSON stay local and undisclosed.
-        reason = str(error) if isinstance(error, ValueError) and str(error).replace("-", "").isalnum() else "preparation-or-apply-failed"
+        reason = (
+            str(error)
+            if isinstance(error, ValueError) and str(error).replace("-", "").isalnum()
+            else "preparation-or-apply-failed"
+        )
         print(json.dumps({"project": PROJECT, "passed": False, "reason": reason}))
         return 1
 
