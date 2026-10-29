@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using AiNative.Client.Assets;
 using AiNative.Client.Fantasy;
 using AiNative.Client.UI;
+using Cysharp.Threading.Tasks;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
@@ -22,6 +23,7 @@ namespace AiNative.Client.Application.Tests
         {
             _owner = new GameObject("TopologyViewModelFixture");
             _flow = _owner.AddComponent<TopologyClientFlow>();
+            FrameworkClientRoot.GetOrCreate(_owner);
             _flow.Initialize(new GateConnectionOptions("127.0.0.1", 23001, false));
             _viewModel = new TopologyViewModel(_flow, _ => { });
         }
@@ -76,8 +78,10 @@ namespace AiNative.Client.Application.Tests
             int notifications = 0;
             _viewModel.Error.PropertyChanged += (_, __) => notifications++;
             _viewModel.Dispose();
-            await _flow.StopAsync();
+            Task stopping = _flow.StopAsync().AsTask();
+            Assert.That(stopping.IsCompleted, Is.False, "停止必须等待已受理操作收尾。");
             background.SetResult(true);
+            await stopping;
             await login;
             _viewModel.Refresh();
             Assert.That(notifications, Is.Zero);
@@ -98,12 +102,13 @@ namespace AiNative.Client.Application.Tests
         }
 
         [Test]
-        public async Task ThrowingCancellationStillClosesUiAndSharesStopTask()
+        public async Task ThrowingCancellationStillClosesUiAndSharesStopResult()
         {
             var owner = new GameObject("ThrowingCancellationFixture");
             var flow = owner.AddComponent<TopologyClientFlow>();
+            FrameworkClientRoot.GetOrCreate(owner);
             var ui = new UiService();
-            bool released = false;
+            int releases = 0;
             var page = new GameObject("OwnedUi");
             ui.Register(
                 "topology",
@@ -113,7 +118,7 @@ namespace AiNative.Client.Application.Tests
                         page,
                         () =>
                         {
-                            released = true;
+                            releases++;
                             UnityEngine.Object.DestroyImmediate(page);
                             return default;
                         }
@@ -145,9 +150,9 @@ namespace AiNative.Client.Application.Tests
                     failure.Flatten().InnerExceptions[0].Message,
                     Is.EqualTo("cancellation-fixture")
                 );
-                Assert.That(reentered, Is.SameAs(stopped));
-                Assert.That(flow.StopAsync().AsTask(), Is.SameAs(stopped));
-                Assert.That(released, Is.True);
+                Assert.ThrowsAsync<AggregateException>(async () => await reentered);
+                Assert.ThrowsAsync<AggregateException>(async () => await flow.StopAsync());
+                Assert.That(releases, Is.EqualTo(1));
                 Assert.That(ui.OpenCount, Is.Zero);
             }
             finally
@@ -196,10 +201,12 @@ namespace AiNative.Client.Application.Tests
         private async Task FailUiLoad()
         {
             LogAssert.Expect(LogType.Exception, "InvalidOperationException: ui-factory-fixture");
-            await (Task)
-                typeof(TopologyClientFlow)
-                    .GetMethod("LoadUiAsync", BindingFlags.Instance | BindingFlags.NonPublic)
-                    .Invoke(_flow, null);
+            await (
+                (UniTask)
+                    typeof(TopologyClientFlow)
+                        .GetMethod("LoadUiAsync", BindingFlags.Instance | BindingFlags.NonPublic)
+                        .Invoke(_flow, null)
+            ).AsTask();
             Assert.That(_flow.Error, Is.EqualTo("ui-load-failed"));
         }
 
@@ -240,7 +247,10 @@ namespace AiNative.Client.Application.Tests
         {
             typeof(TopologyClientFlow)
                 .GetMethod("Run", BindingFlags.NonPublic | BindingFlags.Instance)
-                .Invoke(_flow, new object[] { new Func<Task>(() => operation), false });
+                .Invoke(
+                    _flow,
+                    new object[] { new Func<UniTask>(() => operation.AsUniTask()), false }
+                );
         }
 
         private object Field(string name)

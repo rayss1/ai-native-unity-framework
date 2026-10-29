@@ -83,6 +83,61 @@ public sealed class ArchitectureValidatorTests
         );
     }
 
+    [TestCase("runtime")]
+    [TestCase("ui.ugui")]
+    [TestCase("assets.assetbundle")]
+    public void ApprovedClientImplementationsAllowPrivateUniTask(string package)
+    {
+        Write(
+            $"packages/com.ainative.client.{package}/Runtime/Service.cs",
+            "using Cysharp.Threading.Tasks; public class Service { private UniTask Execute() => default; public System.Threading.Tasks.ValueTask Start() { UniTask work = Execute(); return default; } }"
+        );
+        Assert.That(Validate().Diagnostics.Any(item => item.Code == "ARC010"), Is.False);
+    }
+
+    [TestCase("public UniTask Run() => default;")]
+    [TestCase("protected UniTask Run() => default;")]
+    [TestCase("public System.Collections.Generic.List<UniTask<int>> Results { get; }")]
+    [TestCase("public void Run(UniTask value) { }")]
+    [TestCase("public UniTask Pending;")]
+    public void ApprovedImplementationStillRejectsPublicTaskSignatures(string member)
+    {
+        Write(
+            "packages/com.ainative.client.runtime/Runtime/Service.cs",
+            "using Cysharp.Threading.Tasks; public class Service { " + member + " }"
+        );
+        Assert.That(Validate().Diagnostics.Any(item => item.Code == "ARC010"), Is.True);
+    }
+
+    [TestCase(
+        "using Work = Cysharp.Threading.Tasks.UniTask; public class Service { public Work Run() => default; }"
+    )]
+    [TestCase(
+        "using Tasks = Cysharp.Threading.Tasks; public interface IService { Tasks.UniTask Run(); }"
+    )]
+    [TestCase(
+        "public class Service { public global::Cysharp.Threading.Tasks.UniTask Run() => default; }"
+    )]
+    public void TaskSignatureDetectionHandlesAliasesAndImplicitInterfaceVisibility(string source)
+    {
+        Write("packages/com.ainative.client.ui.ugui/Runtime/Service.cs", source);
+        Assert.That(Validate().Diagnostics.Any(item => item.Code == "ARC010"), Is.True);
+    }
+
+    [TestCase("core")]
+    [TestCase("assets")]
+    [TestCase("network")]
+    [TestCase("prediction")]
+    [TestCase("protocol")]
+    public void ContractsAndNetworkPackagesCannotUsePrivateUniTaskEither(string package)
+    {
+        Write(
+            $"packages/com.ainative.client.{package}/Runtime/Service.cs",
+            "using Cysharp.Threading.Tasks; internal class Service { private UniTask Run() => default; }"
+        );
+        Assert.That(Validate().Diagnostics.Any(item => item.Code == "ARC010"), Is.True);
+    }
+
     [Test]
     public void UnityManifestCanReferenceAnInternalSharedPackage()
     {

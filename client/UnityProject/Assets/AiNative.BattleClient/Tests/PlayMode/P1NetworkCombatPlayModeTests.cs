@@ -25,6 +25,8 @@ namespace AiNative.Client.Application.PlayModeTests
                 var gate = new GateConnectionOptions("127.0.0.1", 23001, useTls: false);
                 first.Initialize(gate, automated: true, deadlineSeconds: 180);
                 second.Initialize(gate, automated: true, deadlineSeconds: 180);
+                yield return FrameworkTestLifecycle.Start(a);
+                yield return FrameworkTestLifecycle.Start(b);
                 float deadline = Time.realtimeSinceStartup + 60;
                 while (Time.realtimeSinceStartup < deadline)
                 {

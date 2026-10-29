@@ -10,7 +10,10 @@ namespace AiNative.Client.Async
     public static class UnityAsync
     {
         /// <summary>等待原生操作完成，在 Unity 主线程继续；不暴露第三方 awaitable。</summary>
-        public static async ValueTask CompleteAsync(AsyncOperation operation)
+        public static ValueTask CompleteAsync(AsyncOperation operation) =>
+            CompleteCoreAsync(operation).AsValueTask();
+
+        private static async UniTask CompleteCoreAsync(AsyncOperation operation)
         {
             if (operation == null)
             {
@@ -20,9 +23,7 @@ namespace AiNative.Client.Async
         }
 
         /// <summary>下一帧恢复；取消只结束当前等待。</summary>
-        public static async ValueTask NextFrameAsync(CancellationToken cancellationToken)
-        {
-            await UniTask.NextFrame(cancellationToken: cancellationToken);
-        }
+        public static ValueTask NextFrameAsync(CancellationToken cancellationToken) =>
+            UniTask.NextFrame(cancellationToken: cancellationToken).AsValueTask();
     }
 }

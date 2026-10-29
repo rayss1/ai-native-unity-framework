@@ -1,7 +1,7 @@
 using System;
 using System.Threading;
-using System.Threading.Tasks;
 using AiNative.Client.Fantasy;
+using Cysharp.Threading.Tasks;
 
 namespace AiNative.Client.Application
 {
@@ -16,7 +16,7 @@ namespace AiNative.Client.Application
         public GateParty Party { get; set; }
         public GateParty[] Invitations { get; set; } = Array.Empty<GateParty>();
 
-        public async Task AuthenticateAsync(
+        public async UniTask AuthenticateAsync(
             GateConnectionOptions options,
             string username,
             string password,
@@ -25,6 +25,7 @@ namespace AiNative.Client.Application
             CancellationToken cancellationToken
         )
         {
+            // Gate 网络端口仍返回 Task；这里直接 await，不改变请求顺序或网络执行线程。
             var candidate = new GateBackendSession(
                 await FantasyGateClient.ConnectAsync(options, cancellationToken)
             );
@@ -55,7 +56,7 @@ namespace AiNative.Client.Application
             }
         }
 
-        public async Task CreatePartyAsync(CancellationToken cancellationToken)
+        public async UniTask CreatePartyAsync(CancellationToken cancellationToken)
         {
             if (Party == null)
             {
@@ -63,7 +64,7 @@ namespace AiNative.Client.Application
             }
         }
 
-        public async Task InviteAsync(string playerId, CancellationToken cancellationToken)
+        public async UniTask InviteAsync(string playerId, CancellationToken cancellationToken)
         {
             if (Party != null)
             {
@@ -75,7 +76,10 @@ namespace AiNative.Client.Application
             }
         }
 
-        public async Task AcceptInvitationAsync(string partyId, CancellationToken cancellationToken)
+        public async UniTask AcceptInvitationAsync(
+            string partyId,
+            CancellationToken cancellationToken
+        )
         {
             if (Party != null)
             {
@@ -92,7 +96,7 @@ namespace AiNative.Client.Application
             throw new GateCallException("invitation_expired");
         }
 
-        public async Task SetReadyAsync(bool ready, CancellationToken cancellationToken)
+        public async UniTask SetReadyAsync(bool ready, CancellationToken cancellationToken)
         {
             if (Party != null)
             {
@@ -100,7 +104,7 @@ namespace AiNative.Client.Application
             }
         }
 
-        public async Task LeavePartyAsync(CancellationToken cancellationToken)
+        public async UniTask LeavePartyAsync(CancellationToken cancellationToken)
         {
             if (Party != null)
             {
@@ -109,7 +113,7 @@ namespace AiNative.Client.Application
             }
         }
 
-        public async Task RefreshLobbyAsync(CancellationToken cancellationToken)
+        public async UniTask RefreshLobbyAsync(CancellationToken cancellationToken)
         {
             // 顺序保留：资料与邀请成功后才刷新已有队伍，不并发改变会话请求顺序。
             Profile = await Backend.ProfileAsync(cancellationToken);

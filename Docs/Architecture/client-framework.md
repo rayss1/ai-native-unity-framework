@@ -1,6 +1,6 @@
 # 客户端框架开发指南
 
-本指南对应第一期代码，架构选择见 [ADR-0021](../ADR/0021-client-framework-foundation.md)，编码要求见 [客户端代码规范](client-coding-standards.md)。完成状态以 [当次验证记录](client-framework-validation-2026-10-29.md) 为准；接口存在不等于平台验收通过。
+本指南对应第一期代码，架构选择见 [ADR-0021](../ADR/0021-client-framework-foundation.md)，编码要求见 [客户端代码规范](client-coding-standards.md)。第一期结果保留在 [原验证记录](client-framework-validation-2026-10-29.md)，后续显式生命周期迁移以 [本轮验证记录](client-lifecycle-validation-2026-10-29.md) 为准；接口存在不等于平台验收通过。
 
 ## 模块与装配
 
@@ -17,11 +17,15 @@
 
 新增可复用能力时，在所属包的 Runtime 中实现；Editor 工具单独放 Editor 程序集。业务只引用需要的项目契约。不要让 Shared、协议或预测契约引用 Unity、UniTask 或 VContainer 类型。
 
-有启动和停止工作的对象实现 `IClientModule.StartAsync(CancellationToken)` 和 `StopAsync(CancellationToken)`。将实例以依赖先后的顺序传给 `ClientApplication`。它按注册顺序启动，逆序停止，启动部分失败也会清理。模块自己的停止必须允许部分启动与重复调用。调用方应显式等待 `ClientApplication.StopAsync()`，再销毁容器或 GameObject。
+有启动和停止工作的对象实现 `IClientModule.StartAsync(CancellationToken)` 和 `StopAsync(CancellationToken)`。通过 `ClientModuleRegistration` 声明稳定模块 ID、实例和依赖，再交给 `ClientApplication`；无依赖图的兼容构造仍按传入顺序运行。重复 ID、缺失依赖与依赖环应在装配阶段拒绝。依赖顺序启动、逆序停止，启动部分失败也会清理。模块自己的停止必须允许部分启动与重复调用。调用方应显式等待 `ClientApplication.StopAsync()`，再销毁容器或 GameObject。
 
 `ClientServiceScope` 只供组合根使用。`CreateChild(configure)` 创建流程或界面作用域；先停止其中的异步服务，再 Dispose 子作用域，最后 Dispose 父作用域。不要把容器传给业务对象充当服务查找器。
 
-应用入口为 `FrameworkClientRoot`。现有 UI 通过 `GetOrCreate(gameObject).AssetsAsync(token)` 和 `UiAsync(token)` 获取初始化后的服务。`FrameworkClientSettings` 保留应用拥有的配置，框架接收快照。新增模块必须明确拥有者、线程、取消、失败回滚与释放顺序；不能仅依赖异步 `OnDestroy`。
+应用由 `ClientSceneEntry` 或 `FrameworkBootstrap` 显式调用 `FrameworkClientRoot.StartAsync(token)`。`GetOrCreate` 仅供兼容和测试装配，不启动任何模块；`AssetsAsync`、`UiAsync` 只等待已经受理的启动，不能作为隐式启动入口。模块内部直接接收根注入的服务，不能反向等待根的整体启动，否则会形成等待环。`FrameworkClientSettings` 转换为只读快照。
+
+根注册顺序及依赖链为 `foundation → resources → ui → account → match → presentation → flow`。分别拥有基础作用域/帧通知/场景服务、本地资源、UI 与所属 EventSystem、账号大厅、对局、角色表现及交互流程。停止逆序执行：Flow 取消并等待请求、关闭页面；表现销毁实例后归还句柄；对局释放会话；账号释放 Gate；UI 释放输入系统；资源与基础作用域最后释放。模块内存在多个释放对象时必须分别尝试并聚合异常，不能让第一个失败跳过其余对象。
+
+`TopologyClientFlow.ConfigureServices`、`ConfigureUi` 接收借用服务，`StartFlowAsync` 建立本次 CTS 并初始化界面；Flow 停止不越权释放账号/对局服务。根重新启动创建新业务服务和 CTS。`BattleClientCompositionRoot.Awake` 只配置启动参数；根显式调用 `StartPresentationAsync(root, assets, token)`，旧单机会话仅由 `StartSession` 创建，由 Match 模块调用 `StopSessionAsync` 释放。切换到拓扑模式先完整停止根，再重新配置和启动，不能由另一个回调独立启动 Flow。新增模块同样必须明确线程、取消、失败回滚与释放顺序，不能仅依赖 `OnDestroy`。
 
 ## 添加 ViewModel 和页面
 
@@ -43,6 +47,8 @@ bindings.Bind(viewModel.Status, value => statusText.text = value);
 界面向 `UiService.Register(id, UiLayer.Page/Modal/Overlay, factory)` 注册异步工厂，通过 `OpenAsync`、`CloseAsync`、`BackAsync` 管理。工厂返回 `UiView(instance, release)`；release 必须解除绑定、销毁实例、等待实际销毁后释放资源句柄。工厂取消或失败时也必须清理已取得的对象。界面 ID 默认单实例。
 
 现有产品实现可参考 `TopologyViewModel`、`TopologyClientView` 和 `TopologyClientFlow.CreateUiAsync`。页面 ID 为 `topology`，其内部登录、大厅、匹配、战斗和结算状态由 ViewModel.Page 控制。应用业务按实际拥有权拆出 `TopologyAccountLobbyService` 和 `TopologyMatchController`：前者拥有 Gate 会话、账号资料、队伍与邀请，负责候选登录验证后的会话替换和大厅操作；后者拥有原始分配、排队请求 ID 和 Battle 会话，负责身份校验、启动与释放。Flow 的公共属性继续兼容转发，网络 Pump、Update 和 FixedUpdate 仍在原位置执行。恢复、结算和界面请求排队状态机仍由 Flow 协调，尚未把它简化成纯装配入口。
+
+每次权威分配建立独立的 `ClientApplication` 子生命周期，包含拥有该 `BattleClientSession` 的 Battle 模块。`TopologyMatchController.StartAllocatedBattleAsync` 启动此子生命周期，返回大厅或应用停止时统一 `StopAsync`；旧会话尚未停止时拒绝覆盖。测试/兼容入口手动注入的会话也由控制器释放。该子生命周期不新增 Pump 或 Tick 调度器，不替换既有逐帧网络顺序。
 
 调用方仍通过 Flow 的应用 API 操作业务，不直接替换服务内部状态。退出先等待 Flow 停止界面和账号请求，再由对局控制器释放 Battle；返回大厅同样经控制器释放对局。新增业务应归入具有实际状态与资源所有权的服务，不增加只转发一层的接口包装。
 
@@ -79,7 +85,9 @@ finally
 
 `ClientSceneService` 构造时接收 `SceneId` 到构建场景路径的映射。把内容场景加入 Player 的构建场景列表，保留启动场景，再通过 `SwitchAsync(id, token)` 串行切换。服务 Additive 加载新场景成功后才卸载旧场景；无法中断的 Unity 加载完成后，若取消已发生则卸载迟到结果。
 
-停止场景所属流程时等待 `UnloadAsync()`。不要让两个场景服务分别拥有同一个已加载场景，也不要使用新旧入口同时驱动网络或预测。Player 构建入口使用 `FrameworkBootstrapBuild.GetPlayerScenes()`：首场景为 `FrameworkBootstrap`，由其 Additive 加载既有 `BattleClient`。启动失败保留错误与重试入口；正常退出经 `FrameworkClientRoot.RequestQuit(exitCode)` 转交启动场景，先等应用停止，再卸载内容场景，最后保留退出码退出。直接打开旧场景的开发入口仍有效。
+停止场景所属流程时等待 `UnloadAsync()`。不要让两个场景服务分别拥有同一个已加载场景，也不要使用新旧入口同时驱动网络或预测。Player 构建入口使用 `FrameworkBootstrapBuild.GetPlayerScenes()`：首场景为 `FrameworkBootstrap`，由其 Additive 加载既有 `BattleClient`。启动失败保留错误与重试入口；正常退出经 `FrameworkClientRoot.RequestQuit(exitCode)` 转交启动场景，先等应用停止，再卸载内容场景，最后保留退出码退出。直接打开产品场景时由 `ClientSceneEntry` 启动。入口模式 `Direct` 自行启动、`External` 等待外部启动；默认 `Automatic` 仅按本场景路径是否被存活 Bootstrap 显式预留判断，不以任意全局根或任意 Bootstrap 存在作为依据。Bootstrap 加载前预留所属内容路径；原生加载不强行取消，迟到场景先停止根再卸载。重试先停止旧根，再传入 Bootstrap 的生命周期令牌重新启动。
+
+现有场景迁移助手为 `ClientSceneEntryMigration.Migrate`（菜单 `AI Native/Framework/Migrate Client Scene Entry`）。它通过 Editor API 在已有 Battle 对象补齐根与入口，保留场景 GUID 和已有引用；拒绝修改已打开且未保存的场景。提供助手不等于迁移或构建已经执行，结果须记录在当次验证报告。
 
 ## 开发检查
 
@@ -101,7 +109,7 @@ dotnet test AiNative.sln -c Release
 unity test client/UnityProject --mode EditMode --output artifacts/client-editmode.xml
 ```
 
-关闭域重载的重复生命周期用例应独立运行 `--mode PlayMode --filter FrameworkLifetimeTests`。真实交互流程筛选 `TopologyFrameworkEndToEndTests`，需先启动 2 人、1200 ticks 的独占本地拓扑。P1 战斗/复活用例需要独立的 7200 ticks 拓扑，不能复用短局配置。`Development` 配置已更新为当前 361 项 EditMode、39 个 fixture 的精确清单；Baseline、Candidate、TerminalDelivery、Current 历史配置保留原数量。本次 `editmode-final.xml` 为 361/361，`playmode-final.xml` 为 52/52，均无失败或跳过。已有本地 PowerShell 7.5.4，实际执行的 source-profile 和 NUnit 报告校验测试均通过。独立平台、Domain Reload 关闭、20 局联机及未关闭内存风险见 [验证记录](client-framework-validation-2026-10-29.md)。
+关闭域重载的重复生命周期用例应独立运行 `--mode PlayMode --filter FrameworkLifetimeTests`。真实交互流程筛选 `TopologyFrameworkEndToEndTests`，需先启动 2 人、1200 ticks 的独占本地拓扑。P1 战斗/复活用例需要独立的 7200 ticks 拓扑，不能复用短局配置。第一期验证时 `Development` 配置为 361 项 EditMode、39 个 fixture 的精确清单；Baseline、Candidate、TerminalDelivery、Current 历史配置保留原数量。第一期 `editmode-final.xml` 为 361/361，`playmode-final.xml` 为 52/52，均无失败或跳过。已有本地 PowerShell 7.5.4，实际执行的 source-profile 和 NUnit 报告校验测试均通过。独立平台、Domain Reload 关闭、20 局联机及未关闭内存风险见 [验证记录](client-framework-validation-2026-10-29.md)。
 
 ### 复现真实流程与稳定性检查
 
@@ -123,3 +131,16 @@ unity test client/UnityProject --mode PlayMode --filter FrameworkLifetimeTests -
 ```
 
 测试临时调整并恢复 Editor 设置；若上次测试崩溃留下恢复快照，应先检查并恢复，不覆盖未知状态。所有 Unity 构建和测试串行使用同一工程，避免互相修改活动平台或占用 Library。
+
+显式入口及 UniTask 内部实现迁移后的测试数量与平台结果见 [生命周期迁移验证](client-lifecycle-validation-2026-10-29.md)。上述第一期测试数字不得作为本轮源码的通过声明。
+
+### Live Editor 原始测试证据
+
+在调用 CLI `run_tests` 前，先通过 Editor eval 调用：
+
+```csharp
+AiNative.Client.Editor.ClientValidationCapture.Begin(
+    "/absolute/evidence/playmode-with-output.xml");
+```
+
+该 Editor 专用工具不启动测试；它跨 domain reload 恢复注册，在 RunFinished 使用 Test Runner 原始结果树保存 NUnit XML（包括 TestContext.Out），并清除本次登记。`*.xml.progress.txt` 逐项追加 UTC 测试开始记录，供卡住定位。每轮使用新的绝对路径；已有文件或尚未结束的捕获会被拒绝。CLI 汇总 JSON 没有 Output 时，内存采样应从该 XML 提取，不能补造日志。Editor 被强制终止可能只留下进度文件，不应视为完成报告。

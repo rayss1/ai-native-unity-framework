@@ -372,11 +372,11 @@ constant requires rebuilding both peers and a compatible protocol rollout.
 
 ## 客户端基础框架（ADR-0021）
 
-依据 [ADR-0021](../ADR/0021-client-framework-foundation.md)。这些类型仅属于客户端；不修改 Shared、协议或固定 Tick 契约。公共异步结果为 `ValueTask`，取消为 `CancellationToken`。以下约定对应当前源码，不是平台验收结论。
+依据 [ADR-0021](../ADR/0021-client-framework-foundation.md) 与 [ADR-0022](../ADR/0022-client-module-dependencies-and-async-boundaries.md)。这些类型仅属于客户端；不修改 Shared、协议或固定 Tick 契约。公共异步结果为 `ValueTask`，取消为 `CancellationToken`。以下约定对应当前源码，不是平台验收结论。
 
 | 所有者及源码 | 公开入口 | 线程、所有权和失败语义 |
 | --- | --- | --- |
-| [Core](../../packages/com.ainative.client.core/README.md) | `IClientModule.StartAsync/StopAsync`；`ClientApplication.StartAsync/StopAsync`、`IsRunning` | 同一所有者上下文调用；显式模块顺序启动，包含失败模块在内逆序清理；停止先取消启动并等待，受理后清理使用 None。重复停止共享结果，清理异常聚合，完成后可再次启动。 |
+| [Core](../../packages/com.ainative.client.core/README.md) | `IClientModule.StartAsync/StopAsync`；`ClientApplication.StartAsync/StopAsync`、`IsRunning` | 同一所有者上下文调用；旧构造保持传入顺序；注册项构造按稳定依赖顺序启动，包含失败模块在内逆序清理；停止先取消启动并等待，受理后清理使用 None。重复停止共享结果，清理异常聚合，完成后可再次启动。 |
 | Core MVVM | `BindableProperty<T>.Value`、`PropertyChanged`；`BindingScope.Add/Dispose` | 所属线程同步通知；相等值不通知；订阅所有权进入 BindingScope，逆序释放且聚合失败。 |
 | Core MVVM | `AsyncCommand.ExecuteAsync/Cancel/Dispose/RefreshCanExecute`；`IsExecuting/CanExecute/Error` | 执行中拒绝重入；业务异常保存于 Error，取消为正常结束。Dispose 请求取消并断开通知，不等待业务结束；调用方仍须等待 ExecuteAsync 观察收尾。 |
 | Core 诊断 | `IClientDiagnostics.Record/ReportException` | 事件和错误不携带凭据；调用上下文由所有者决定，不作为固定 Tick 热路径或业务成功前置条件。 |
@@ -385,6 +385,10 @@ constant requires rebuilding both peers and a compatible protocol rollout.
 | uGUI | `UiView.DisposeAsync`；`UguiBindings.Bind`；`KeyedViewList.Apply/Dispose` | UiView 重复释放共享同一结果，应用提供完整释放回调。绑定 scope 只解绑自身监听，不自动销毁 ViewModel。列表按稳定键复用，重复键在修改前拒绝；销毁时聚合释放异常。 |
 | [UniTask 适配](../../packages/com.ainative.client.async.unitask/README.md) | `UnityAsync.CompleteAsync/NextFrameAsync` | 主线程等待；原生操作不能被调用方取消，CompleteAsync 必须完成后由拥有者处理迟到资源。NextFrameAsync 支持取消。 |
 | [VContainer 装配](../../packages/com.ainative.client.composition.vcontainer/README.md) | `ClientServiceScope.Resolve/CreateChild/Dispose` | 仅组合根接触 VContainer 注册类型；父子所有权显式，先停止异步服务，再释放子作用域，最后父作用域。同步 Dispose 幂等。 |
+
+模块注册新增 `ClientModuleRegistration(string id, IClientModule module, params string[] dependencies)`，公开只读 `Id`、`Module`、`Dependencies : IReadOnlyList<string>`。依赖为防御复制快照，Ordinal 区分大小写，重复依赖按一条边处理。`ClientApplication(IEnumerable<ClientModuleRegistration>)` 构造期拒绝空注册、重复 ID/实例、缺失依赖与环；每步选择注册序最早的 ready 模块。旧 `IEnumerable<IClientModule>` 重载保留；传 null 字面量时需显式类型选择重载。验证阶段不启动模块。
+
+UniTask 可用于 Runtime、uGUI、AssetBundle 和原异步适配包的实现内部，复用包的公共/受保护签名仍不得暴露 UniTask；纯契约及网络/预测边界不放宽。依赖排序不改变线程所属、取消、异常聚合和逆序清理约束。
 
 资源端口仍使用上文 `IAssetService`。ADR-0021 本期实现只加载随 Player 分发的本地 catalog/Bundle；不提供远程 manifest 激活、热更新或回滚服务。`TryGetLoaded` 成功也返回独立持有令牌；共享底层请求不共享释放所有权，单调用方取消不取消其他持有者的加载。实例应先销毁，再释放源句柄；预加载由服务作用域持有。
 

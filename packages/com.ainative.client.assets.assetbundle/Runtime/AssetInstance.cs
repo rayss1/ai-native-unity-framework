@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 namespace AiNative.Client.Assets.AssetBundle
@@ -31,12 +32,28 @@ namespace AiNative.Client.Assets.AssetBundle
             _owner.AssertOwnerThread();
             if (_disposeTask == null)
             {
-                _disposeTask = DisposeCoreAsync();
+                // 公共边界缓存一次转换，重复释放不再次消费池化 UniTask。
+                var completion = new UniTaskCompletionSource();
+                _disposeTask = completion.Task.AsTask();
+                CompleteDisposalAsync(completion).Forget();
             }
             return new ValueTask(_disposeTask);
         }
 
-        private async Task DisposeCoreAsync()
+        private async UniTask CompleteDisposalAsync(UniTaskCompletionSource completion)
+        {
+            try
+            {
+                await DisposeCoreAsync();
+                completion.TrySetResult();
+            }
+            catch (Exception exception)
+            {
+                completion.TrySetException(exception);
+            }
+        }
+
+        private async UniTask DisposeCoreAsync()
         {
             if (Value != null)
             {
@@ -45,7 +62,7 @@ namespace AiNative.Client.Assets.AssetBundle
                     UnityEngine.Object.Destroy(Value);
                     while (Value != null)
                     {
-                        await Task.Yield();
+                        await UniTask.NextFrame();
                     }
                 }
                 else

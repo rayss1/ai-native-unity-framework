@@ -18,7 +18,8 @@
     "AiNative.Client.Assets",
     "AiNative.Client.UI.UGUI",
     "AiNative.Client.Assets.AssetBundle",
-    "AiNative.Client.Runtime.PlayMode.Tests"
+    "AiNative.Client.Runtime.PlayMode.Tests",
+    "UniTask"
   ],
   "optionalUnityReferences": [
     "TestAssemblies"

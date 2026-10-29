@@ -22,6 +22,8 @@ namespace AiNative.Client.Application.PlayModeTests
                 var gate = new GateConnectionOptions("127.0.0.1", 23001, useTls: false);
                 first.Initialize(gate, automated: true, deadlineSeconds: 120);
                 second.Initialize(gate, automated: true, deadlineSeconds: 120);
+                yield return FrameworkTestLifecycle.Start(a);
+                yield return FrameworkTestLifecycle.Start(b);
                 var firstRemote = new RemoteMotionEvidence();
                 var secondRemote = new RemoteMotionEvidence();
                 float deadline = Time.realtimeSinceStartup + 125;

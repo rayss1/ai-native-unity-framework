@@ -3,6 +3,7 @@ using System.Reflection;
 using AiNative.Client.Application;
 using AiNative.Client.Fantasy;
 using AiNative.Gameplay;
+using Cysharp.Threading.Tasks;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
@@ -23,6 +24,8 @@ namespace AiNative.Client.Application.PlayModeTests
                 var gate = new GateConnectionOptions("127.0.0.1", 23001, useTls: false);
                 first.Initialize(gate, automated: true, deadlineSeconds: 120);
                 second.Initialize(gate, automated: true, deadlineSeconds: 120);
+                yield return FrameworkTestLifecycle.Start(a);
+                yield return FrameworkTestLifecycle.Start(b);
                 float readyDeadline = Time.realtimeSinceStartup + 110;
                 while (
                     Time.realtimeSinceStartup < readyDeadline
@@ -177,10 +180,12 @@ namespace AiNative.Client.Application.PlayModeTests
             && b.Battle.ArenaRemainingTicks <= 120;
 
         private static System.Threading.Tasks.Task PollReceipt(TopologyClientFlow flow) =>
-            (System.Threading.Tasks.Task)
-                typeof(TopologyClientFlow)
-                    .GetMethod("PollAsync", BindingFlags.Instance | BindingFlags.NonPublic)
-                    .Invoke(flow, null);
+            (
+                (UniTask)
+                    typeof(TopologyClientFlow)
+                        .GetMethod("PollAsync", BindingFlags.Instance | BindingFlags.NonPublic)
+                        .Invoke(flow, null)
+            ).AsTask();
 
         // 通过只读测试检查，避免新增产品启动参数或公开网络端口。
         private static object TransportSlot(BattleClientSession session) =>

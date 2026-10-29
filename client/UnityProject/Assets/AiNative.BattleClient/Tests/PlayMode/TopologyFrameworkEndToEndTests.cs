@@ -577,6 +577,11 @@ namespace AiNative.Client.Application.PlayModeTests
 
         private IEnumerator Initialize(Client client)
         {
+            yield return Await(
+                client.Root.StartAsync().AsTask(),
+                30,
+                "explicit application startup"
+            );
             yield return Until(
                 () => View(client.Flow) != null,
                 15,

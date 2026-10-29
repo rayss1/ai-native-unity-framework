@@ -11,6 +11,7 @@ using AiNative.Client.Fantasy;
 using AiNative.Client.Protocol;
 using AiNative.Client.UI;
 using AiNative.Gameplay;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -24,36 +25,37 @@ namespace AiNative.Client.Application
         // 也可能报告 Application.isFocused；Runtime 不得引用 UnityEditor。
         public static Func<bool> EditorHasGameFocus { get; set; }
 #endif
-        private readonly TopologyAccountLobbyService _accountLobby =
-            new TopologyAccountLobbyService();
-        private readonly TopologyMatchController _matchController = new TopologyMatchController();
+        private TopologyAccountLobbyService _accountLobby;
+        private TopologyMatchController _matchController;
+        private FrameworkClientRoot _root;
+        private UniTaskCompletionSource _activeOperation;
         private GateBackendSession Backend
         {
-            get => _accountLobby.Backend;
+            get => _accountLobby?.Backend;
             set => _accountLobby.Backend = value;
         }
         private GateParty LobbyParty
         {
-            get => _accountLobby.Party;
+            get => _accountLobby?.Party;
             set => _accountLobby.Party = value;
         }
         private GateParty[] LobbyInvitations
         {
-            get => _accountLobby.Invitations;
+            get => _accountLobby?.Invitations;
             set => _accountLobby.Invitations = value;
         }
         private GateMatch CurrentMatch
         {
-            get => _matchController.Match;
+            get => _matchController?.Match;
             set => _matchController.Match = value;
         }
         private string QueueRequestId
         {
-            get => _matchController.RequestId;
+            get => _matchController?.RequestId;
             set => _matchController.RequestId = value;
         }
         private GateConnectionOptions _options;
-        private readonly CancellationTokenSource _lifetime = new CancellationTokenSource();
+        private CancellationTokenSource _lifetime = new CancellationTokenSource();
         private string _username = "";
         private string _password = "";
         private string _host = "127.0.0.1";
@@ -73,14 +75,14 @@ namespace AiNative.Client.Application
         private bool _textInputFocused;
         private bool _pointerOverUi;
         private bool _uiBusy;
-        private Func<Task> _pendingAction;
+        private Func<UniTask> _pendingAction;
         private TopologyClientView _view;
         private IAssetService _uiAssets;
         private UiService _uiService;
         private UiService _registeredUiService;
-        private Task _uiLoadTask;
-        private Task _stopTask;
-        private TaskCompletionSource<bool> _uiCompletion;
+        private ClientOperation _uiLoadTask;
+        private UniTaskCompletionSource _stopTask;
+        private UniTaskCompletionSource<bool> _uiCompletion;
         private TimeSpan _returnToLobbyTimeout = TimeSpan.FromSeconds(20);
         private const int ReturnToLobbyPollMilliseconds = 250;
         internal const string WaitingForRoomReleaseStatus = "正在等待房间释放…";
@@ -106,14 +108,14 @@ namespace AiNative.Client.Application
         private float _deadlineSeconds = 120;
         public BattleClientSession Battle
         {
-            get => _matchController.Battle;
+            get => _matchController?.Battle;
             private set => _matchController.Battle = value;
         }
         public CharacterOrbitCamera CharacterCamera { get; set; }
         public bool IsCharacterAiming => _manualAim && CanSampleCharacterInput && !_pointerOverUi;
         public GateProfile Profile
         {
-            get => _accountLobby.Profile;
+            get => _accountLobby?.Profile;
             private set => _accountLobby.Profile = value;
         }
         public string PlayerId => Backend?.PlayerId ?? "";
@@ -284,7 +286,7 @@ namespace AiNative.Client.Application
                     _nextPoll = 0;
                 }
 
-                return Task.CompletedTask;
+                return UniTask.CompletedTask;
             });
 
         public void ReturnToLobby() => Submit(ReturnToLobbyAsync);
@@ -297,7 +299,7 @@ namespace AiNative.Client.Application
             }
         }
 
-        private void Submit(Func<Task> action)
+        private void Submit(Func<UniTask> action)
         {
             if (_disposed || _uiBusy)
             {
@@ -305,9 +307,7 @@ namespace AiNative.Client.Application
             }
 
             _uiBusy = true;
-            _uiCompletion = new TaskCompletionSource<bool>(
-                TaskCreationOptions.RunContinuationsAsynchronously
-            );
+            _uiCompletion = new UniTaskCompletionSource<bool>();
             Error = "";
             if (_busy)
             {
@@ -322,7 +322,12 @@ namespace AiNative.Client.Application
         /// ViewModel 的可等待入口，沿用既有串行请求与排队逻辑。
         /// 取消只结束界面等待；实际网络操作由 Flow 生命周期拥有。
         /// </summary>
-        internal async ValueTask ExecuteUiActionAsync(
+        internal ValueTask ExecuteUiActionAsync(
+            Action action,
+            CancellationToken cancellationToken
+        ) => ExecuteUiActionCoreAsync(action, cancellationToken).AsValueTask();
+
+        private async UniTask ExecuteUiActionCoreAsync(
             Action action,
             CancellationToken cancellationToken
         )
@@ -333,17 +338,15 @@ namespace AiNative.Client.Application
                 return;
             }
             action();
-            TaskCompletionSource<bool> completion = _uiCompletion;
+            UniTaskCompletionSource<bool> completion = _uiCompletion;
             if (completion == null)
             {
                 return;
             }
-            var cancelled = new TaskCompletionSource<bool>(
-                TaskCreationOptions.RunContinuationsAsynchronously
-            );
+            var cancelled = new UniTaskCompletionSource<bool>();
             using (cancellationToken.Register(() => cancelled.TrySetResult(true)))
             {
-                await Task.WhenAny(completion.Task, cancelled.Task);
+                await UniTask.WhenAny(completion.Task, cancelled.Task);
                 cancellationToken.ThrowIfCancellationRequested();
                 await completion.Task;
             }
@@ -352,7 +355,7 @@ namespace AiNative.Client.Application
         /// <summary>启动前显式注入 UI 服务；服务所有权仍属于应用根或测试调用方。</summary>
         public void ConfigureUi(IAssetService assets, UiService uiService)
         {
-            if (_started)
+            if (_started && !_disposed)
             {
                 throw new InvalidOperationException("Topology flow already started.");
             }
@@ -368,7 +371,7 @@ namespace AiNative.Client.Application
             string runId = ""
         )
         {
-            if (_started)
+            if (_started && !_disposed)
             {
                 throw new InvalidOperationException("Topology flow already started.");
             }
@@ -389,21 +392,95 @@ namespace AiNative.Client.Application
             _runId = runId;
         }
 
-        private void Start()
+        /// <summary>装配期借用应用拥有的业务服务；不取得释放权，不触发启动。</summary>
+        internal void ConfigureServices(
+            FrameworkClientRoot root,
+            TopologyAccountLobbyService account,
+            TopologyMatchController match
+        )
         {
-            global::UnityEngine.Application.runInBackground = true;
+            if (_started && !_disposed)
+            {
+                if (!ReferenceEquals(_accountLobby, account))
+                {
+                    throw new InvalidOperationException("flow-already-started");
+                }
+                return;
+            }
+            _root = root;
+            _accountLobby = account;
+            _matchController = match;
+        }
+
+        internal async UniTask StartFlowAsync(CancellationToken token)
+        {
+            if (_started && !_disposed)
+            {
+                return;
+            }
+            if (_accountLobby == null || _matchController == null || _uiService == null)
+            {
+                throw new InvalidOperationException("flow-not-configured");
+            }
+            _lifetime.Dispose();
+            _lifetime = CancellationTokenSource.CreateLinkedTokenSource(token);
+            _disposed = false;
+            _started = true;
+            _stopTask = null;
+            _busy = false;
+            _uiBusy = false;
+            _pendingAction = null;
+            _uiCompletion = null;
+            _activeOperation = null;
+            _elapsed = 0;
+            _nextPoll = 0;
+            _queueStarted = 0;
+            _paused = false;
+            _resumePending = false;
+            _skipElapsedFrame = false;
+            _reconnectRequested = false;
+            _observedReconnecting = false;
+            _battleReceiveComplete = false;
+            _successExitPending = false;
+            _evidenceSuccess = false;
+            _successExitElapsed = 0;
+            _pauseGeneration = 0;
+            _priorSession = 0;
+            _inputTick = 0;
+            _priorEntity = 0;
+            _priorAcknowledgement = 0;
+            _observedAcknowledgement = 0;
+            _acknowledgementStall = 0;
+            _baselinePlayed = 0;
+            _textInputFocused = false;
+            _pointerOverUi = false;
+            State = "Disconnected";
+            Error = "";
+            BackendStatus = "";
+            Completed = false;
+            Reconnected = false;
+            SettlementConfirmed = false;
+            PreparedInputs = 0;
+            MaxAcknowledgementStallSeconds = 0;
+            BackendReconnectCount = 0;
+            PauseCount = 0;
+            ResumeCount = 0;
+            ResumeCompletedCount = 0;
+            ClearManualInput();
             if (_options == null)
             {
                 ConfigureFromArguments(Environment.GetCommandLineArgs());
             }
-
-            _started = true;
             if (!_automated)
             {
-                _uiLoadTask = LoadUiAsync();
+                _uiLoadTask = new ClientOperation(LoadUiAsync);
+                await _uiLoadTask.Task;
+                if (_view == null)
+                {
+                    throw new InvalidOperationException("ui-load-failed");
+                }
             }
-
-            if (_automated)
+            else
             {
                 Run(async () =>
                 {
@@ -418,7 +495,9 @@ namespace AiNative.Client.Application
         }
 
         /// <summary>主线程重试尚未创建视图的失败初始化；不重置账号或对局，停止后不再重试。</summary>
-        public async ValueTask RetryUiAsync()
+        public ValueTask RetryUiAsync() => RetryUiCoreAsync().AsValueTask();
+
+        private async UniTask RetryUiCoreAsync()
         {
             if (_disposed || _automated || _view != null || Error != "ui-load-failed")
             {
@@ -426,30 +505,26 @@ namespace AiNative.Client.Application
             }
             if (_uiLoadTask != null && !_uiLoadTask.IsCompleted)
             {
-                await _uiLoadTask;
+                await _uiLoadTask.Task;
             }
             if (_disposed || _view != null)
             {
                 return;
             }
-            // 重新取得应用根当前服务；启动失败可能重建服务，单个工厂失败则可能返回原实例。
-            _uiAssets = null;
-            _uiService = null;
+            // 服务由根显式注入；局部界面重试不重新创建应用。
             Error = "";
-            _uiLoadTask = LoadUiAsync();
-            await _uiLoadTask;
+            _uiLoadTask = new ClientOperation(LoadUiAsync);
+            await _uiLoadTask.Task;
         }
 
-        private async Task LoadUiAsync()
+        private async UniTask LoadUiAsync()
         {
             CancellationToken cancellationToken = _lifetime.Token;
             try
             {
                 if (_uiAssets == null || _uiService == null)
                 {
-                    FrameworkClientRoot root = FrameworkClientRoot.GetOrCreate(gameObject);
-                    _uiAssets = await root.AssetsAsync(cancellationToken);
-                    _uiService = await root.UiAsync(cancellationToken);
+                    throw new InvalidOperationException("flow-ui-not-configured");
                 }
                 cancellationToken.ThrowIfCancellationRequested();
                 if (!ReferenceEquals(_registeredUiService, _uiService))
@@ -473,7 +548,10 @@ namespace AiNative.Client.Application
             }
         }
 
-        private async ValueTask<UiView> CreateUiAsync(CancellationToken cancellationToken)
+        private ValueTask<UiView> CreateUiAsync(CancellationToken cancellationToken) =>
+            CreateUiCoreAsync(cancellationToken).AsValueTask();
+
+        private async UniTask<UiView> CreateUiCoreAsync(CancellationToken cancellationToken)
         {
             IAssetService assets = _uiAssets;
             UiService ownedUi = _uiService;
@@ -506,7 +584,13 @@ namespace AiNative.Client.Application
             }
         }
 
-        private async ValueTask ReleaseUiAsync(
+        private ValueTask ReleaseUiAsync(
+            GameObject instance,
+            AssetHandle<GameObject> handle,
+            IAssetService assets
+        ) => ReleaseUiCoreAsync(instance, handle, assets).AsValueTask();
+
+        private async UniTask ReleaseUiCoreAsync(
             GameObject instance,
             AssetHandle<GameObject> handle,
             IAssetService assets
@@ -578,7 +662,7 @@ namespace AiNative.Client.Application
             return index >= 0 && index + 1 < args.Length ? args[index + 1] : fallback;
         }
 
-        private async Task ConnectAccountAsync(bool register)
+        private async UniTask ConnectAccountAsync(bool register)
         {
             if (register && Battle != null)
             {
@@ -638,7 +722,7 @@ namespace AiNative.Client.Application
             BackendStatus = "";
         }
 
-        private async Task QueueAsync()
+        private async UniTask QueueAsync()
         {
             QueueRequestId = Guid.NewGuid().ToString("N");
             State = "Queued";
@@ -665,7 +749,7 @@ namespace AiNative.Client.Application
             // 超时或结果未知时保留请求 ID，用于后续查询或取消对账。
         }
 
-        private async Task ReturnToLobbyAsync()
+        private async UniTask ReturnToLobbyAsync()
         {
             if (_automated || !Completed || !SettlementConfirmed || Battle == null)
             {
@@ -700,7 +784,7 @@ namespace AiNative.Client.Application
             BackendStatus = "请重新准备后开始下一局。";
         }
 
-        private async Task<GateParty> WaitForLobbyReleaseAsync()
+        private async UniTask<GateParty> WaitForLobbyReleaseAsync()
         {
             if (LobbyParty == null)
             {
@@ -776,7 +860,11 @@ namespace AiNative.Client.Application
                             // CF002：Coordinator 已释放而 Match 尚未传播终态时，Gate 无法续签票据。
                             // 不据此认定释放，仅重查同一队伍与请求，直到权威 Lobby 清空队列。
                         }
-                        await Task.Delay(ReturnToLobbyPollMilliseconds, token);
+                        await UniTask.Delay(
+                            ReturnToLobbyPollMilliseconds,
+                            ignoreTimeScale: true,
+                            cancellationToken: token
+                        );
                     }
                 }
                 catch (OperationCanceledException)
@@ -904,7 +992,7 @@ namespace AiNative.Client.Application
 
         private void Update()
         {
-            if (_disposed || _paused)
+            if (!_started || _disposed || _paused)
             {
                 return;
             }
@@ -1040,7 +1128,9 @@ namespace AiNative.Client.Application
         {
             _view?.RefreshInputBlock();
             if (
-                _paused
+                !_started
+                || _disposed
+                || _paused
                 || _resumePending
                 || Completed
                 || State == "Settling"
@@ -1138,7 +1228,7 @@ namespace AiNative.Client.Application
             }
         }
 
-        private async Task PollAsync()
+        private async UniTask PollAsync()
         {
             try
             {
@@ -1155,7 +1245,7 @@ namespace AiNative.Client.Application
 
         // ADR-0017：Gate 恢复不能替换原对局身份；分配、结算与大厅队列分别向权威服务对账。
         // 见 Docs/ADR/0017-single-region-service-topology.md。
-        private async Task PollCoreAsync()
+        private async UniTask PollCoreAsync()
         {
             if (_paused)
             {
@@ -1316,7 +1406,7 @@ namespace AiNative.Client.Application
 
                 if (CurrentMatch.EntryTicket.Length > 0)
                 {
-                    _matchController.StartAllocatedBattle(PlayerId);
+                    await _matchController.StartAllocatedBattleAsync(PlayerId, _lifetime.Token);
                     State = "Battle";
                 }
 
@@ -1338,7 +1428,7 @@ namespace AiNative.Client.Application
             }
         }
 
-        private async Task<bool> PollOriginalSettlementAsync()
+        private async UniTask<bool> PollOriginalSettlementAsync()
         {
             Profile = await Backend.ProfileAsync(_lifetime.Token); // 同时维持 TCP 会话活跃。
             BackendStatus = "";
@@ -1426,14 +1516,24 @@ namespace AiNative.Client.Application
             WriteCheckpoint();
         }
 
-        private async void Run(Func<Task> action, bool foreground = false)
+        private void Run(Func<UniTask> action, bool foreground = false)
         {
             if (_busy || _disposed)
             {
                 return;
             }
-
             _busy = true;
+            var completion = new UniTaskCompletionSource();
+            _activeOperation = completion;
+            RunCoreAsync(action, foreground, completion).Forget(Debug.LogException);
+        }
+
+        private async UniTask RunCoreAsync(
+            Func<UniTask> action,
+            bool foreground,
+            UniTaskCompletionSource operation
+        )
+        {
             try
             {
                 await action();
@@ -1568,11 +1668,12 @@ namespace AiNative.Client.Application
                 if (foreground)
                 {
                     _uiBusy = false;
-                    TaskCompletionSource<bool> completion = _uiCompletion;
+                    UniTaskCompletionSource<bool> completion = _uiCompletion;
                     _uiCompletion = null;
                     completion?.TrySetResult(true);
                 }
 
+                operation.TrySetResult();
                 if (!_disposed && _pendingAction != null)
                 {
                     var pending = _pendingAction;
@@ -1688,7 +1789,7 @@ namespace AiNative.Client.Application
             }
 
 #if !UNITY_EDITOR
-            FrameworkClientRoot.GetOrCreate(gameObject).RequestQuit(success ? 0 : 1);
+            _root.RequestQuit(success ? 0 : 1);
 #endif
         }
 
@@ -1784,20 +1885,20 @@ namespace AiNative.Client.Application
         {
             if (_stopTask == null)
             {
-                var completion = new TaskCompletionSource<bool>();
-                _stopTask = completion.Task;
+                var completion = new UniTaskCompletionSource();
+                _stopTask = completion;
                 _disposed = true;
                 _pendingAction = null;
                 _password = "";
                 _uiBusy = false;
                 _uiCompletion?.TrySetCanceled();
                 _uiCompletion = null;
-                _ = StopCoreAsync(completion);
+                StopCoreAsync(completion).Forget(Debug.LogException);
             }
-            return new ValueTask(_stopTask);
+            return _stopTask.Task.AsValueTask();
         }
 
-        private async Task StopCoreAsync(TaskCompletionSource<bool> completion)
+        private async UniTask StopCoreAsync(UniTaskCompletionSource completion)
         {
             var errors = new List<Exception>();
             // 先发布停止任务再触发取消；回调重入必须观察同一次清理。
@@ -1809,19 +1910,22 @@ namespace AiNative.Client.Application
             {
                 errors.Add(exception);
             }
-            try
+            if (_activeOperation != null)
             {
-                _accountLobby.Dispose();
-            }
-            catch (Exception exception)
-            {
-                errors.Add(exception);
+                try
+                {
+                    await _activeOperation.Task;
+                }
+                catch (Exception exception)
+                {
+                    errors.Add(exception);
+                }
             }
             if (_uiLoadTask != null)
             {
                 try
                 {
-                    await _uiLoadTask;
+                    await _uiLoadTask.Task;
                 }
                 catch (Exception exception)
                 {
@@ -1839,17 +1943,11 @@ namespace AiNative.Client.Application
                     errors.Add(exception);
                 }
             }
-            if (Battle != null)
-            {
-                try
-                {
-                    await _matchController.StopAsync();
-                }
-                catch (Exception exception)
-                {
-                    errors.Add(exception);
-                }
-            }
+            // 对局与账号由后续 Core 模块释放；Flow 只停止所属工作与页面。
+            _registeredUiService = null;
+            _uiLoadTask = null;
+            _uiAssets = null;
+            _uiService = null;
             try
             {
                 _lifetime.Dispose();
@@ -1864,19 +1962,24 @@ namespace AiNative.Client.Application
             }
             else
             {
-                completion.TrySetResult(true);
+                completion.TrySetResult();
             }
         }
 
-        private async void OnDestroy()
+        private void OnDestroy()
         {
-            try
+            if (_disposed)
             {
-                await StopAsync();
+                return;
             }
-            catch (Exception exception)
+            _lifetime.Cancel();
+            if (_root != null)
             {
-                Debug.LogException(exception);
+                _root.StopAsync().AsUniTask().Forget(Debug.LogException);
+            }
+            else
+            {
+                StopAsync().AsUniTask().Forget(Debug.LogException);
             }
         }
     }

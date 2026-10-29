@@ -201,6 +201,95 @@ namespace AiNative.Client.UI.Tests
             Assert.That(released, Is.EqualTo(2));
         }
 
+        [TestCase(false)]
+        [TestCase(true)]
+        public async Task ConcurrentViewDisposalSharesCompletionAndFailure(bool fail)
+        {
+            var release = new TaskCompletionSource<bool>();
+            int calls = 0;
+            var view = new UiView(
+                Create("shared"),
+                () =>
+                {
+                    calls++;
+                    return new ValueTask(release.Task);
+                }
+            );
+            Task first = view.DisposeAsync().AsTask();
+            Task second = view.DisposeAsync().AsTask();
+            Assert.That(first.IsCompleted, Is.False);
+            Assert.That(second.IsCompleted, Is.False);
+            if (fail)
+            {
+                release.SetException(new InvalidOperationException("shared-release"));
+                Assert.That(await FailureOf(first), Is.TypeOf<InvalidOperationException>());
+                Assert.That(await FailureOf(second), Is.TypeOf<InvalidOperationException>());
+                Assert.That(
+                    await FailureOf(view.DisposeAsync().AsTask()),
+                    Is.TypeOf<InvalidOperationException>()
+                );
+            }
+            else
+            {
+                release.SetResult(true);
+                await Task.WhenAll(first, second);
+                await view.DisposeAsync();
+            }
+            Assert.That(calls, Is.EqualTo(1));
+        }
+
+        [Test]
+        public async Task ConcurrentServiceStopWaitersObserveLateFactoryCleanup()
+        {
+            var service = new UiService();
+            var factory = new TaskCompletionSource<UiView>();
+            int releases = 0;
+            service.Register("late", UiLayer.Page, _ => new ValueTask<UiView>(factory.Task));
+            Task opening = service.OpenAsync("late").AsTask();
+            Task first = service.DisposeAsync().AsTask();
+            Task second = service.DisposeAsync().AsTask();
+            Assert.That(first.IsCompleted, Is.False);
+            Assert.That(second.IsCompleted, Is.False);
+            factory.SetResult(View("late", () => releases++));
+            Assert.That(await FailureOf(opening), Is.InstanceOf<OperationCanceledException>());
+            await Task.WhenAll(first, second);
+            await service.DisposeAsync();
+            Assert.That(releases, Is.EqualTo(1));
+            Assert.That(service.OpenCount, Is.Zero);
+        }
+
+        [Test]
+        public async Task QueuedOpenCancellationDoesNotCancelCurrentFactory()
+        {
+            var service = new UiService();
+            var factory = new TaskCompletionSource<UiView>();
+            int queuedCalls = 0;
+            service.Register("first", UiLayer.Page, _ => new ValueTask<UiView>(factory.Task));
+            service.Register(
+                "queued",
+                UiLayer.Modal,
+                _ =>
+                {
+                    queuedCalls++;
+                    return new ValueTask<UiView>(View("queued"));
+                }
+            );
+            Task first = service.OpenAsync("first").AsTask();
+            using (var cancellation = new CancellationTokenSource())
+            {
+                Task queued = service.OpenAsync("queued", cancellation.Token).AsTask();
+                cancellation.Cancel();
+                Assert.That(await FailureOf(queued), Is.InstanceOf<OperationCanceledException>());
+                Assert.That(first.IsCompleted, Is.False);
+                Assert.That(queuedCalls, Is.Zero);
+                factory.SetResult(View("first"));
+                await first;
+                Assert.That(service.OpenCount, Is.EqualTo(1));
+            }
+            await service.DisposeAsync();
+            Assert.That(service.OpenCount, Is.Zero);
+        }
+
         private GameObject Create(string name)
         {
             var instance = new GameObject(name);

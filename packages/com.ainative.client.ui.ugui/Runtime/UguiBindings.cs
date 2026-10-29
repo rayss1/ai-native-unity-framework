@@ -1,6 +1,7 @@
 using System;
 using System.ComponentModel;
 using AiNative.Client.Core.Mvvm;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.UI;
@@ -54,17 +55,7 @@ namespace AiNative.Client.UI
         {
             PropertyChangedEventHandler changed = (_, __) =>
                 button.interactable = command.CanExecute;
-            UnityAction clicked = async () =>
-            {
-                try
-                {
-                    await command.ExecuteAsync();
-                }
-                catch (Exception exception)
-                {
-                    Debug.LogException(exception);
-                }
-            };
+            UnityAction clicked = () => ExecuteObservedAsync(command).Forget();
             changed(null, null);
             command.PropertyChanged += changed;
             button.onClick.AddListener(clicked);
@@ -73,6 +64,18 @@ namespace AiNative.Client.UI
                 command.PropertyChanged -= changed;
                 button.onClick.RemoveListener(clicked);
             });
+        }
+
+        private static async UniTask ExecuteObservedAsync(AsyncCommand command)
+        {
+            try
+            {
+                await command.ExecuteAsync();
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
+            }
         }
     }
 }

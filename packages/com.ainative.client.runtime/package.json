@@ -5,6 +5,7 @@
   "unity": "6000.3",
   "dependencies": {
     "com.ainative.client.core": "0.1.0",
-    "com.ainative.client.async.unitask": "0.1.0"
+    "com.ainative.client.async.unitask": "0.1.0",
+    "com.cysharp.unitask": "2.5.11"
   }
 }

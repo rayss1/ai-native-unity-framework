@@ -35,6 +35,9 @@ namespace AiNative.Client.Application.PlayModeTests
                 secondFlow.Initialize(options);
                 firstRoot = FrameworkClientRoot.GetOrCreate(firstOwner);
                 secondRoot = FrameworkClientRoot.GetOrCreate(secondOwner);
+                yield return Await(
+                    Task.WhenAll(firstRoot.StartAsync().AsTask(), secondRoot.StartAsync().AsTask())
+                );
                 Task<AiNative.Client.UI.UiService> firstStarting = firstRoot
                     .UiAsync(CancellationToken.None)
                     .AsTask();
@@ -118,6 +121,7 @@ namespace AiNative.Client.Application.PlayModeTests
                 LocalAssetBundleService assets = null;
                 try
                 {
+                    yield return Await(root.StartAsync().AsTask());
                     Task<AiNative.Client.Assets.IAssetService> starting = root.AssetsAsync(
                             CancellationToken.None
                         )

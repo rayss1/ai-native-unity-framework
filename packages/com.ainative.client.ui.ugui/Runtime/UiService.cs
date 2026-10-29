@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.EventSystems;
 
@@ -26,7 +27,9 @@ namespace AiNative.Client.UI
         /// <summary>此视图拥有的根对象；调用方不得提前销毁或另行释放。</summary>
         public GameObject Root { get; }
         private readonly Func<ValueTask> _release;
-        private Task _releaseTask;
+
+        // 非池化完成源支持多个关闭调用方同时等待；不缓存单次消费的 UniTask。
+        private UniTaskCompletionSource _releaseCompletion;
 
         /// <summary>在主线程接收根对象和完整释放回调；回调必须清理绑定、实例及源资源。</summary>
         public UiView(GameObject root, Func<ValueTask> release)
@@ -38,21 +41,21 @@ namespace AiNative.Client.UI
         /// <summary>主线程幂等释放；并发调用共享完成或失败，释放异常交给调用方观察。</summary>
         public ValueTask DisposeAsync()
         {
-            if (_releaseTask == null)
+            if (_releaseCompletion == null)
             {
-                var completion = new TaskCompletionSource<bool>();
-                _releaseTask = completion.Task;
-                _ = ReleaseCoreAsync(completion);
+                var completion = new UniTaskCompletionSource();
+                _releaseCompletion = completion;
+                ReleaseCoreAsync(completion).Forget();
             }
-            return new ValueTask(_releaseTask);
+            return _releaseCompletion.Task.AsValueTask();
         }
 
-        private async Task ReleaseCoreAsync(TaskCompletionSource<bool> completion)
+        private async UniTask ReleaseCoreAsync(UniTaskCompletionSource completion)
         {
             try
             {
                 await _release();
-                completion.TrySetResult(true);
+                completion.TrySetResult();
             }
             catch (Exception exception)
             {
@@ -113,7 +116,9 @@ namespace AiNative.Client.UI
         private readonly List<Entry> _open = new List<Entry>();
         private readonly SemaphoreSlim _serial = new SemaphoreSlim(1, 1);
         private readonly CancellationTokenSource _lifetime = new CancellationTokenSource();
-        private Task _disposeTask;
+
+        // 关闭完成源可被多个拥有者等待，重复 Dispose 不重复执行清理。
+        private UniTaskCompletionSource _disposeCompletion;
         private bool _disposed;
 
         /// <inheritdoc/>
@@ -150,7 +155,10 @@ namespace AiNative.Client.UI
         }
 
         /// <inheritdoc/>
-        public async ValueTask OpenAsync(string id, CancellationToken cancellationToken = default)
+        public ValueTask OpenAsync(string id, CancellationToken cancellationToken = default) =>
+            OpenCoreAsync(id, cancellationToken).AsValueTask();
+
+        private async UniTask OpenCoreAsync(string id, CancellationToken cancellationToken)
         {
             using (
                 var linked = CancellationTokenSource.CreateLinkedTokenSource(
@@ -159,6 +167,7 @@ namespace AiNative.Client.UI
                 )
             )
             {
+                // 直接等待同步原语的 Task，保留空闲锁立即进入的时序；AsUniTask 会额外调度续体。
                 await _serial.WaitAsync(linked.Token);
                 try
                 {
@@ -222,8 +231,12 @@ namespace AiNative.Client.UI
         }
 
         /// <inheritdoc/>
-        public async ValueTask CloseAsync(string id, CancellationToken cancellationToken = default)
+        public ValueTask CloseAsync(string id, CancellationToken cancellationToken = default) =>
+            CloseCoreAsync(id, cancellationToken).AsValueTask();
+
+        private async UniTask CloseCoreAsync(string id, CancellationToken cancellationToken)
         {
+            // 直接等待同步原语的 Task，保留空闲锁立即进入的时序；AsUniTask 会额外调度续体。
             await _serial.WaitAsync(cancellationToken);
             try
             {
@@ -243,8 +256,12 @@ namespace AiNative.Client.UI
         }
 
         /// <inheritdoc/>
-        public async ValueTask BackAsync(CancellationToken cancellationToken = default)
+        public ValueTask BackAsync(CancellationToken cancellationToken = default) =>
+            BackCoreAsync(cancellationToken).AsValueTask();
+
+        private async UniTask BackCoreAsync(CancellationToken cancellationToken)
         {
+            // 直接等待同步原语的 Task，保留空闲锁立即进入的时序；AsUniTask 会额外调度续体。
             await _serial.WaitAsync(cancellationToken);
             try
             {
@@ -263,7 +280,7 @@ namespace AiNative.Client.UI
             }
         }
 
-        private async ValueTask CloseAtAsync(int index)
+        private async UniTask CloseAtAsync(int index)
         {
             Entry entry = _open[index];
             _open.RemoveAt(index);
@@ -333,17 +350,17 @@ namespace AiNative.Client.UI
         /// <summary>主线程幂等释放；并发调用共享完成或失败，释放异常交给调用方观察。</summary>
         public ValueTask DisposeAsync()
         {
-            if (_disposeTask == null)
+            if (_disposeCompletion == null)
             {
                 _disposed = true;
-                var completion = new TaskCompletionSource<bool>();
-                _disposeTask = completion.Task;
-                _ = DisposeObservedAsync(completion);
+                var completion = new UniTaskCompletionSource();
+                _disposeCompletion = completion;
+                DisposeObservedAsync(completion).Forget();
             }
-            return new ValueTask(_disposeTask);
+            return _disposeCompletion.Task.AsValueTask();
         }
 
-        private async Task DisposeObservedAsync(TaskCompletionSource<bool> completion)
+        private async UniTask DisposeObservedAsync(UniTaskCompletionSource completion)
         {
             Exception cancellationError = null;
             try
@@ -361,7 +378,7 @@ namespace AiNative.Client.UI
                 {
                     throw cancellationError;
                 }
-                completion.TrySetResult(true);
+                completion.TrySetResult();
             }
             catch (Exception exception)
             {
@@ -369,8 +386,9 @@ namespace AiNative.Client.UI
             }
         }
 
-        private async Task DisposeCoreAsync()
+        private async UniTask DisposeCoreAsync()
         {
+            // 直接等待同步原语的 Task，保留空闲锁立即进入的时序；AsUniTask 会额外调度续体。
             await _serial.WaitAsync();
             var errors = new List<Exception>();
             try

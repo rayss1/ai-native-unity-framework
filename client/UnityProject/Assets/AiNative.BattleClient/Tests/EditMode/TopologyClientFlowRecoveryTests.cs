@@ -11,6 +11,7 @@ using System.Threading.Tasks;
 using AiNative.Client.Fantasy;
 using AiNative.Client.Protocol;
 using AiNative.Client.Protocol.Protobuf;
+using Cysharp.Threading.Tasks;
 using NUnit.Framework;
 using UnityEngine;
 
@@ -120,7 +121,7 @@ namespace AiNative.Client.Application.Tests
             var owner = new GameObject("ReceiptBeforeTerminal");
             try
             {
-                var flow = CreateFlow(owner, gate.Options, backend, false);
+                var flow = CreateFlow(owner, gate.Options, backend, false, createBattle: false);
                 var transport = new FakeTransport();
                 var battle = ActiveBattle(transport, new FakeConnector(transport));
                 SetProperty(flow, "Battle", battle);
@@ -169,11 +170,14 @@ namespace AiNative.Client.Application.Tests
             GameObject owner,
             GateConnectionOptions options,
             GateBackendSession backend,
-            bool automated
+            bool automated,
+            string resultPath = "",
+            bool createBattle = true
         )
         {
             var flow = owner.AddComponent<TopologyClientFlow>();
-            flow.Initialize(options, automated);
+            FrameworkClientRoot.GetOrCreate(owner);
+            flow.Initialize(options, automated, resultPath: resultPath);
             SetField(flow, "Backend", backend);
             SetField(flow, "_username", "original-user");
             SetField(flow, "_password", "original-password");
@@ -184,23 +188,28 @@ namespace AiNative.Client.Application.Tests
             SetProperty(match, "NodeId", "original-node");
             SetField(flow, "CurrentMatch", match);
             SetField(flow, "QueueRequestId", "original-request");
-            SetProperty(
-                flow,
-                "Battle",
-                new BattleClientSession(
-                    new ProtobufBattleProtocolCodec(),
-                    "127.0.0.1",
-                    22000,
-                    new BattleAdmissionInfo(
-                        "original-room",
-                        "original-boot",
-                        "ticket",
-                        "original-node",
-                        "original-player"
+            if (createBattle)
+            {
+                SetProperty(
+                    flow,
+                    "Battle",
+                    new BattleClientSession(
+                        new ProtobufBattleProtocolCodec(),
+                        "127.0.0.1",
+                        22000,
+                        new BattleAdmissionInfo(
+                            "original-room",
+                            "original-boot",
+                            "ticket",
+                            "original-node",
+                            "original-player"
+                        )
                     )
-                )
-            );
+                );
+            }
             SetProperty(flow, "State", "Battle");
+            // 单元夹具手动驱动运行态帧，真实模块启动由 PlayMode 覆盖。
+            SetField(flow, "_started", true);
             return flow;
         }
 
@@ -219,7 +228,10 @@ namespace AiNative.Client.Application.Tests
                 gate.RejectNextProfile = true;
                 typeof(TopologyClientFlow)
                     .GetMethod("Run", BindingFlags.Instance | BindingFlags.NonPublic)
-                    .Invoke(flow, new object[] { new Func<Task>(() => Poll(flow)), false });
+                    .Invoke(
+                        flow,
+                        new object[] { new Func<UniTask>(() => Poll(flow).AsUniTask()), false }
+                    );
                 while (
                     (bool)
                         typeof(TopologyClientFlow)
@@ -309,7 +321,7 @@ namespace AiNative.Client.Application.Tests
             var owner = new GameObject("RecoveringBattleFlow");
             try
             {
-                var flow = CreateFlow(owner, gate.Options, backend, true);
+                var flow = CreateFlow(owner, gate.Options, backend, true, createBattle: false);
                 var transport = new FakeTransport();
                 var battle = new BattleClientSession(
                     new ProtobufBattleProtocolCodec(),
@@ -394,7 +406,7 @@ namespace AiNative.Client.Application.Tests
             Task recovering = null;
             try
             {
-                var flow = CreateFlow(owner, gate.Options, backend, true);
+                var flow = CreateFlow(owner, gate.Options, backend, true, createBattle: false);
                 var transport = new FakeTransport();
                 var battle = ActiveBattle(
                     transport,
@@ -471,7 +483,7 @@ namespace AiNative.Client.Application.Tests
             var owner = new GameObject("ResumingOriginalBattle");
             try
             {
-                var flow = CreateFlow(owner, gate.Options, backend, true);
+                var flow = CreateFlow(owner, gate.Options, backend, true, createBattle: false);
                 var transport = new FakeTransport();
                 var replacement = new FakeTransport();
                 var connector = new FakeConnector(
@@ -573,7 +585,7 @@ namespace AiNative.Client.Application.Tests
             var owner = new GameObject("RejectingResumeAllocation");
             try
             {
-                var flow = CreateFlow(owner, gate.Options, backend, true);
+                var flow = CreateFlow(owner, gate.Options, backend, true, createBattle: false);
                 var transport = new FakeTransport();
                 var connector = new FakeConnector(transport, new FakeTransport());
                 var battle = ActiveBattle(transport, connector);
@@ -631,7 +643,7 @@ namespace AiNative.Client.Application.Tests
             var owner = new GameObject("PausedBattle");
             try
             {
-                var flow = CreateFlow(owner, gate.Options, backend, false);
+                var flow = CreateFlow(owner, gate.Options, backend, false, createBattle: false);
                 var transport = new FakeTransport();
                 var connector = new FakeConnector(transport);
                 var battle = ActiveBattle(transport, connector);
@@ -710,8 +722,7 @@ namespace AiNative.Client.Application.Tests
             var owner = new GameObject("CheckpointBattle");
             try
             {
-                var flow = CreateFlow(owner, gate.Options, backend, true);
-                flow.Initialize(gate.Options, true, 120, result);
+                var flow = CreateFlow(owner, gate.Options, backend, true, result);
                 Pause(flow, true);
                 Assert.That(
                     File.Exists(result),
@@ -766,7 +777,7 @@ namespace AiNative.Client.Application.Tests
             var owner = new GameObject("LostQueueResume");
             try
             {
-                var flow = CreateFlow(owner, gate.Options, backend, true);
+                var flow = CreateFlow(owner, gate.Options, backend, true, createBattle: false);
                 var transport = new FakeTransport();
                 var replacement = new FakeTransport();
                 var connector = new FakeConnector(transport, replacement);
@@ -835,7 +846,7 @@ namespace AiNative.Client.Application.Tests
             var owner = new GameObject("MismatchedReceiptResume");
             try
             {
-                var flow = CreateFlow(owner, gate.Options, backend, true);
+                var flow = CreateFlow(owner, gate.Options, backend, true, createBattle: false);
                 var transport = new FakeTransport();
                 var connector = new FakeConnector(transport, new FakeTransport());
                 var battle = ActiveBattle(transport, connector);
@@ -1197,6 +1208,7 @@ namespace AiNative.Client.Application.Tests
             try
             {
                 flow = owner.AddComponent<TopologyClientFlow>();
+                FrameworkClientRoot.GetOrCreate(owner);
                 flow.Initialize(gate.Options, false);
                 SetField(flow, "Backend", backend);
                 SetField(flow, "QueueRequestId", "original-request");
@@ -1207,13 +1219,15 @@ namespace AiNative.Client.Application.Tests
                 {
                     // 仅暂停本次操作的主线程继续执行，不暂停测试运行器。
                     SynchronizationContext.SetSynchronizationContext(held);
-                    polling = (Task)
-                        typeof(TopologyClientFlow)
-                            .GetMethod(
-                                "PollCoreAsync",
-                                BindingFlags.Instance | BindingFlags.NonPublic
-                            )
-                            .Invoke(flow, null);
+                    polling = (
+                        (UniTask)
+                            typeof(TopologyClientFlow)
+                                .GetMethod(
+                                    "PollCoreAsync",
+                                    BindingFlags.Instance | BindingFlags.NonPublic
+                                )
+                                .Invoke(flow, null)
+                    ).AsTask();
                 }
                 finally
                 {
@@ -1297,10 +1311,15 @@ namespace AiNative.Client.Application.Tests
         }
 
         private static Task Return(TopologyClientFlow flow) =>
-            (Task)
-                typeof(TopologyClientFlow)
-                    .GetMethod("ReturnToLobbyAsync", BindingFlags.Instance | BindingFlags.NonPublic)
-                    .Invoke(flow, null);
+            (
+                (UniTask)
+                    typeof(TopologyClientFlow)
+                        .GetMethod(
+                            "ReturnToLobbyAsync",
+                            BindingFlags.Instance | BindingFlags.NonPublic
+                        )
+                        .Invoke(flow, null)
+            ).AsTask();
 
         private static object GetField(object target, string field)
         {
@@ -1317,10 +1336,12 @@ namespace AiNative.Client.Application.Tests
                 ?.Invoke(flow, new object[] { paused });
 
         private static Task Poll(TopologyClientFlow flow) =>
-            (Task)
-                typeof(TopologyClientFlow)
-                    .GetMethod("PollAsync", BindingFlags.Instance | BindingFlags.NonPublic)
-                    .Invoke(flow, null);
+            (
+                (UniTask)
+                    typeof(TopologyClientFlow)
+                        .GetMethod("PollAsync", BindingFlags.Instance | BindingFlags.NonPublic)
+                        .Invoke(flow, null)
+            ).AsTask();
 
         private static void SetField(object target, string field, object value)
         {

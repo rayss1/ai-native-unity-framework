@@ -189,8 +189,8 @@ namespace AiNative.Client.Application.Tests
                 first = CreateFlow(firstOwner, new FakeTransport());
                 second = CreateFlow(secondOwner, new FakeTransport());
                 BattleClientSession firstBattle = first.Battle;
-                await first.StopAsync();
-                await first.StopAsync();
+                await firstOwner.GetComponent<FrameworkClientRoot>().StopAsync();
+                await firstOwner.GetComponent<FrameworkClientRoot>().StopAsync();
                 Assert.That(firstBattle.State, Is.EqualTo(BattleClientState.Disposed));
                 Assert.That(second.Battle.State, Is.EqualTo(BattleClientState.Active));
                 Assert.That(second.Battle.IsPredictionInitialized, Is.True);
@@ -199,11 +199,11 @@ namespace AiNative.Client.Application.Tests
             {
                 if (first != null)
                 {
-                    await first.StopAsync();
+                    await firstOwner.GetComponent<FrameworkClientRoot>().StopAsync();
                 }
                 if (second != null)
                 {
-                    await second.StopAsync();
+                    await secondOwner.GetComponent<FrameworkClientRoot>().StopAsync();
                 }
                 UnityEngine.Object.DestroyImmediate(firstOwner);
                 UnityEngine.Object.DestroyImmediate(secondOwner);
@@ -223,9 +223,8 @@ namespace AiNative.Client.Application.Tests
             try
             {
                 TopologyClientFlow.EditorHasGameFocus = () => true;
-                flow = CreateFlow(owner, new FakeTransport());
+                flow = CreateFlow(owner, new FakeTransport(), ui: ui);
                 other = CreateFlow(otherOwner, new FakeTransport());
-                flow.ConfigureUi(new UnusedAssets(), ui);
                 Set(flow, "State", "Battle");
                 Set(other, "State", "Battle");
                 typeof(TopologyClientFlow)
@@ -335,10 +334,12 @@ namespace AiNative.Client.Application.Tests
         private static TopologyClientFlow CreateFlow(
             GameObject owner,
             FakeTransport transport,
-            string path = ""
+            string path = "",
+            UiService ui = null
         )
         {
             var flow = owner.AddComponent<TopologyClientFlow>();
+            FrameworkClientRoot.GetOrCreate(owner);
             flow.Initialize(new GateConnectionOptions("127.0.0.1", 23001, false), resultPath: path);
             var battle = new BattleClientSession(
                 new ProtobufBattleProtocolCodec(),
@@ -355,6 +356,14 @@ namespace AiNative.Client.Application.Tests
             transport.Enqueue(Frame(100), BattleClientProtocolV1.SnapshotChannel, 1);
             battle.Pump(0);
             Set(flow, "Battle", battle);
+            if (ui != null)
+            {
+                flow.ConfigureUi(new UnusedAssets(), ui);
+            }
+            // 单元夹具手动驱动运行态帧，真实模块启动由 PlayMode 覆盖。
+            typeof(TopologyClientFlow)
+                .GetField("_started", BindingFlags.Instance | BindingFlags.NonPublic)
+                .SetValue(flow, true);
             return flow;
         }
 

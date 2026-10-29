@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using AiNative.Client.Core.Mvvm;
 using AiNative.Client.UI;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
@@ -327,7 +328,10 @@ namespace AiNative.Client.Application
         }
 
         // 键盘 Enter 是 Unity 输入入口；命令负责业务错误，入口观察非业务异常。
-        private async void Authenticate(bool register)
+        private void Authenticate(bool register) =>
+            AuthenticateObservedAsync(register).Forget(Debug.LogException);
+
+        private async UniTask AuthenticateObservedAsync(bool register)
         {
             try
             {
