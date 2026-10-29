@@ -6,7 +6,11 @@ Unity 与 .NET 使用同一组测试源码。Core 不引用容器、任务库、
 ## 使用
 
 ```csharp
-var application = new ClientApplication(new IClientModule[] { assetsModule, uiModule });
+var application = new ClientApplication(new[]
+{
+    new ClientModuleRegistration("ui", uiModule, "assets"),
+    new ClientModuleRegistration("assets", assetsModule),
+});
 await application.StartAsync(lifetimeToken);
 // 正常退出必须等待释放完成，而不是仅依赖 MonoBehaviour.OnDestroy。
 await application.StopAsync();
@@ -20,7 +24,7 @@ bindings.Add(() => name.PropertyChanged -= handler);
 await login.ExecuteAsync();
 ```
 
-示例中的业务、模块和显示由应用提供；Core 不自行寻找全局对象。
+示例中的业务、模块和显示由应用提供；Core 不自行寻找全局对象。构造时验证依赖图，每次选择注册序最早的可启动模块；示例先 assets 后 ui。重复 ID/实例、缺失依赖和环在启动前失败，依赖数组为只读副本。旧模块列表构造仍按原列表顺序执行。
 
 ## 生命周期与线程
 

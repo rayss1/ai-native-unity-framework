@@ -55,6 +55,12 @@
 上述全部采样的 GC 估计等于 MonoUsed，reserved 独立变化；路由、调度场景、待释放场景、待执行动作、程序集生命周期和 sceneId 计数均为零。这说明不联网的角色资源路径和安装校验路径也可复现大幅增长，而本次仅 UI 路径增幅小得多；不能据此归因 Fantasy 会话，也不能据数值接近 Bundle 大小就认定 byte[] 的 GC 保留根。诊断通过表示用例完成，未对内存稳定作通过断言。CF-003 继续保持未解决，下一步仍需对象快照和保留根证据，并补独立 Player/设备验证。
 
 
+### 本轮生命周期迁移后的同口径观察
+
+`artifacts/client-lifecycle-20261029/playmode-full.xml` 的预热加 20 局用例通过（640.868 秒），21 个样本保存在 `soak-analysis.json` 和 `soak-samples.csv`。仍在显式停止、销毁后执行完整 GC：GC 后估计从 891,899,904 增至 930,930,688 字节（+37.22 MiB），最后 5 局仍增长 12.55 MiB；UnityAllocated 全程净变化为 -6.76 MiB，最后 5 局增长 6.16 MiB。拥有权断言全部通过。
+
+相对于第一期 +468.43 MiB 的观察，本轮净增长较小，但两次处于不同 Editor 进程及测试预热顺序，不能据此把差异归因于某项迁移或推断保留根已经消失。CF-003 仍未解决，尚缺对象快照保留根及独立 Player/真机内存证据。详见[本轮验证记录](client-lifecycle-validation-2026-10-29.md)。
+
 ## CF-004：关闭 Domain Reload 的双应用输入框延迟激活串焦点
 
 状态：已修复并通过定向与产品回归。原始失败保留在 `artifacts/client-framework-20261029/domain-reload-disabled-final.xml`：双应用隔离测试在跨帧后期待第一应用 Username，却得到第二应用 Password；不得用降低焦点断言或换成无输入行为的对象绕过。
@@ -66,3 +72,22 @@
 View 在交互前注入所属系统；Tab 改为对该实例 SetSelectedGameObject。Prefab 生成器改建派生输入框，原 View 的 InputField 序列化字段和旧 Bind 入口保留；现有资产通过 `MigrateExistingInputFields` 使用 SerializedObject 迁移，仅 6 处脚本引用变化；原 GUID、组件 fileID、六个 View 字段与组件总数均通过保存后的重新导入检查，已重建真实 Bundle。完整 Build 入口保留用于显式重建。旧手工资产仍可加载，但多应用资产需要使用 ScopedInputField 并配置所属系统。本次不改 vendor、网络驱动和 Tick 顺序。
 
 新增 `UiFocusPlayModeTests.ScopedInputFieldsKeepDelayedActivationInsideTheirOwnedEventSystems`，覆盖两输入框实际激活、两帧延迟、同步取消选择、全局上下文恢复和一个系统销毁后另一系统保留焦点。既有真实双应用 Domain Reload 关闭用例保持断言不变。实际回归：`domain-reload-disabled-fixed.xml` 2/2 通过；`playmode-final.xml` 52/52 通过，含新增输入框用例和真实交互联机。新增小测试首次漏配 Canvas，导致基类生成光标时访问 null；已补完整 Canvas/Text 夹具并保留全部焦点断言，未忽略异常。
+
+
+## CF-005：正常 Battle 轮询在房间关闭与结算回执传播之间刷新票据失败
+
+状态：本轮已复现，未修复，必须后续专项处理。此项与 CF-002 共用终态传播背景，但发生在正常 Battle 轮询、结算尚未确认时；CF-002 的返回大厅等待修复不覆盖该入口。
+
+本轮证据：`artifacts/client-lifecycle-20261029/playmode-partial.json` 中 `data.result.result` 的 failures 记录 `TerminalDeliveryPlayModeTests.RealNetworkContinuesWhileApplicationPumpPausesThenConsumesTerminalAfterClose` 执行约 24.95 秒后失败，错误为 `GateCallException: invalid_allocation`。栈从测试第 94 行观察异步结果，进入 `TopologyClientFlow.PollCoreAsync` 第 1344 行的 `Backend.MatchAsync`。该文件是运行中快照，不是整批最终结论；最终验收见[本轮生命周期验证](client-lifecycle-validation-2026-10-29.md)。测试保持真实双客户端、每局 1200 Tick 的拓扑配置，没有改为只查询结算或增加任意等待绕过失败。
+
+已核实的代码边界：
+
+- `TopologyClientFlow.PollOriginalSettlementAsync` 先查询 Profile 和原 Match 的结算；结算尚未确认、客户端尚未消费 Finished 帧且 State 不是 Settling 时返回 false。`PollCoreAsync` 随后调用 MatchAsync 刷新票据。本次堆栈到达该分支，说明该次结算检查未进入终态等待分支。
+- `TopologyBattleEngine.FlushResultsAsync` 第 714–723 行在本地 outbox 保存成功且 TerminalRecorded 后释放房间。`DurableResultOutbox.StoreAsync` 保存的是待投递结果；`RetryAsync` 第 340–356 行才向 Player 调用 Settle 并检查确认回执。房间的 durable outbox 保存不等于 Player receipt 已确认。
+- `BattleTopologyComposition` 分别以 250 毫秒执行结果保存/释放、1000 毫秒执行 outbox 投递；Match、Coordinator、Lobby 的状态传播另有调度。因此，传输已关闭不能作为 Player 结算已确认的证据。
+- `GateService.WithTicketAsync` 对仍为 ready 的 Match 查询结果调用 Player.IssueTicket；`PlayerService` 第 188/206 行会在分配无效或当前权威房间不再为 Ready、身份不符时返回 invalid_allocation。现有证据没有逐请求房间快照，不能断言这次具体命中了哪个检查，也不能把该错误一律解释为可忽略的正常关闭。
+- `TopologyClientFlow.RunCoreAsync` 的对局后台临时错误重试列表不包含 invalid_allocation，自动模式会进入 Fail；该缺口不限于测试反射调用的异常观察方式。
+
+与 HEAD 比较，测试的关闭后全量 Poll 顺序，以及生产代码的“原结算查询返回 false 后刷新 Match”逻辑已经存在。本轮测试变化是显式启动应用和适配 UniTask；未发现新生命周期引入上述业务分支的证据，但异步调度变化可能影响既有窗口的命中，不能用历史通过宣称该路径稳定。
+
+后续专项应保留原 Battle、玩家及队列身份，在明确的有界、可取消对账策略下处理结算与释放传播，继续拒绝实际身份变化及其他后端错误；需要覆盖正常轮询入口和真实终态传输用例。本轮不修改协议、服务端或结算行为，不将测试改为绕过全量 Poll，也不因单次复跑通过关闭本项。

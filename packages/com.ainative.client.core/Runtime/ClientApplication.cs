@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 namespace AiNative.Client.Core
 {
     /// <summary>
-    /// 按注册顺序启动、逆序停止模块。生命周期入口应由同一所有者上下文调用；
+    /// 按显式依赖排序启动、逆序停止模块；旧构造保持传入顺序。生命周期入口应由同一所有者上下文调用；
     /// 异步等待期间允许 StopAsync 中断启动，不启动线程池工作。
     /// </summary>
     public sealed class ClientApplication
@@ -44,6 +44,102 @@ namespace AiNative.Client.Core
                 ordered.Add(module);
             }
             _modules = ordered.ToArray();
+        }
+
+        /// <summary>
+        /// 复制注册项并在构造时验证全部依赖；无副作用地拒绝重复 ID/实例、缺失依赖和环。
+        /// 每次选择注册顺序最早的可启动模块；失败清理及停止按实际启动顺序逆序执行。
+        /// </summary>
+        public ClientApplication(IEnumerable<ClientModuleRegistration> registrations)
+        {
+            if (registrations == null)
+            {
+                throw new ArgumentNullException(nameof(registrations));
+            }
+            var entries = new List<ClientModuleRegistration>();
+            var indices = new Dictionary<string, int>(StringComparer.Ordinal);
+            foreach (ClientModuleRegistration registration in registrations)
+            {
+                if (registration == null)
+                {
+                    throw new ArgumentException(
+                        "Registration cannot be null.",
+                        nameof(registrations)
+                    );
+                }
+                if (indices.ContainsKey(registration.Id))
+                {
+                    throw new ArgumentException(
+                        "Duplicate module ID: " + registration.Id,
+                        nameof(registrations)
+                    );
+                }
+                foreach (ClientModuleRegistration prior in entries)
+                {
+                    if (ReferenceEquals(prior.Module, registration.Module))
+                    {
+                        throw new ArgumentException(
+                            "Module instance registered twice.",
+                            nameof(registrations)
+                        );
+                    }
+                }
+                indices.Add(registration.Id, entries.Count);
+                entries.Add(registration);
+            }
+            var remainingDependencies = new int[entries.Count];
+            var dependents = new List<int>[entries.Count];
+            for (int index = 0; index < entries.Count; index++)
+            {
+                dependents[index] = new List<int>();
+            }
+            for (int index = 0; index < entries.Count; index++)
+            {
+                var distinct = new HashSet<string>(StringComparer.Ordinal);
+                foreach (string dependency in entries[index].Dependencies)
+                {
+                    if (!indices.TryGetValue(dependency, out int dependencyIndex))
+                    {
+                        throw new ArgumentException(
+                            "Missing dependency: " + dependency,
+                            nameof(registrations)
+                        );
+                    }
+                    if (distinct.Add(dependency))
+                    {
+                        dependents[dependencyIndex].Add(index);
+                        remainingDependencies[index]++;
+                    }
+                }
+            }
+            _modules = new IClientModule[entries.Count];
+            var selected = new bool[entries.Count];
+            for (int position = 0; position < entries.Count; position++)
+            {
+                int ready = -1;
+                // 每选出一个节点就重新比较注册顺序，避免整批 ready 入队改变稳定次序。
+                for (int index = 0; index < entries.Count; index++)
+                {
+                    if (!selected[index] && remainingDependencies[index] == 0)
+                    {
+                        ready = index;
+                        break;
+                    }
+                }
+                if (ready < 0)
+                {
+                    throw new ArgumentException(
+                        "Module dependency cycle detected.",
+                        nameof(registrations)
+                    );
+                }
+                selected[ready] = true;
+                _modules[position] = entries[ready].Module;
+                foreach (int dependent in dependents[ready])
+                {
+                    remainingDependencies[dependent]--;
+                }
+            }
         }
 
         /// <summary>全部模块完成启动后为真，开始停止时立即为假。</summary>

@@ -9,54 +9,31 @@ using AiNative.Client.Composition;
 using AiNative.Client.Core;
 using AiNative.Client.Runtime;
 using AiNative.Client.UI;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.InputSystem.UI;
 using VContainer;
 
 namespace AiNative.Client.Application
 {
-    /// <summary>应用组合入口；每个本地玩家独立拥有资源、UI 和容器，不使用静态服务定位器。</summary>
+    /// <summary>显式应用组合根；所有模块由 Core 依赖表统一启动及逆序释放。</summary>
     [DisallowMultipleComponent]
     public sealed class FrameworkClientRoot : MonoBehaviour
     {
-        private sealed class ResourceModule : IClientModule
+        private sealed class Module : IClientModule
         {
-            private readonly FrameworkClientRoot _owner;
+            private readonly Func<CancellationToken, UniTask> _start;
+            private readonly Func<UniTask> _stop;
 
-            public ResourceModule(FrameworkClientRoot owner)
+            public Module(Func<CancellationToken, UniTask> start, Func<UniTask> stop)
             {
-                _owner = owner;
+                _start = start;
+                _stop = stop;
             }
 
-            public async ValueTask StartAsync(CancellationToken cancellationToken)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                string directory = await LocalContentInstaller.PrepareAsync(
-                    Path.Combine(
-                        global::UnityEngine.Application.streamingAssetsPath,
-                        "AiNativeContent"
-                    ),
-                    Path.Combine(
-                        global::UnityEngine.Application.persistentDataPath,
-                        "AiNativeContent"
-                    ),
-                    LocalAssetBundleService.CurrentPlatform,
-                    cancellationToken
-                );
-                _owner._assets = new LocalAssetBundleService(
-                    directory,
-                    LocalAssetBundleService.CurrentPlatform
-                );
-            }
+            public ValueTask StartAsync(CancellationToken token) => _start(token).AsValueTask();
 
-            public async ValueTask StopAsync(CancellationToken cancellationToken)
-            {
-                if (_owner._assets != null)
-                {
-                    await _owner._assets.DisposeAsync();
-                    _owner._assets = null;
-                }
-            }
+            public ValueTask StopAsync(CancellationToken token) => _stop().AsValueTask();
         }
 
         [SerializeField]
@@ -69,26 +46,30 @@ namespace AiNative.Client.Application
         private UiService _ui;
         private GameObject _ownedEventSystem;
         private ClientSceneService _scenes;
-        private CancellationTokenSource _lifetime = new CancellationTokenSource();
-        private Task _startTask;
-        private Task _stopTask;
-        private Task _retryTask;
+        private ClientFrameEvents _frames;
+        private bool _ownsFrames;
+        private CancellationTokenSource _lifetime;
+        private UniTaskCompletionSource _start;
+        private UniTaskCompletionSource _stop;
+        private UniTaskCompletionSource _retry;
         private Func<int, ValueTask> _quit;
         private string _failure;
         private TopologyClientFlow _flow;
         private BattleClientCompositionRoot _battleRoot;
+        private TopologyAccountLobbyService _accountLobby;
+        private TopologyMatchController _matchController;
+        private bool _destroyed;
+
+        /// <summary>全部模块就绪后为真；停止受理后立即为假。</summary>
+        public bool IsRunning => _stop == null && _application?.IsRunning == true;
 
         private void Awake()
         {
             _configuration =
                 _settings != null ? _settings.Capture() : new ClientSettingsSnapshot(60, true);
-            global::UnityEngine.Application.targetFrameRate = _configuration.TargetFrameRate;
-            global::UnityEngine.Application.runInBackground = _configuration.RunInBackground;
-            _flow = GetComponent<TopologyClientFlow>();
-            _battleRoot = GetComponent<BattleClientCompositionRoot>();
         }
 
-        /// <summary>只供现有场景入口过渡装配；返回同一 GameObject 拥有的根。</summary>
+        /// <summary>兼容装配入口，只创建根及业务对象，绝不启动资源或网络。业务代码使用注入引用。</summary>
         public static FrameworkClientRoot GetOrCreate(GameObject owner)
         {
             var root = owner.GetComponent<FrameworkClientRoot>();
@@ -96,293 +77,511 @@ namespace AiNative.Client.Application
             {
                 root = owner.AddComponent<FrameworkClientRoot>();
             }
-            root._flow = owner.GetComponent<TopologyClientFlow>();
-            root._battleRoot = owner.GetComponent<BattleClientCompositionRoot>();
+            root.PrepareServices();
             return root;
         }
 
-        /// <summary>等待应用资源启动；调用方取消不取消其他消费者的启动。</summary>
-        public async ValueTask<IAssetService> AssetsAsync(CancellationToken cancellationToken)
+        private void PrepareServices()
         {
-            if (_stopTask != null)
+            _flow = GetComponent<TopologyClientFlow>();
+            _battleRoot = GetComponent<BattleClientCompositionRoot>();
+            if (_accountLobby == null)
+            {
+                _accountLobby = new TopologyAccountLobbyService();
+                _matchController = new TopologyMatchController();
+            }
+            if (_flow != null)
+            {
+                _flow.ConfigureServices(this, _accountLobby, _matchController);
+            }
+        }
+
+        /// <summary>显式启动；首次令牌控制此次启动，重复调用共享结果。停止完成后创建全新运行作用域。</summary>
+        public ValueTask StartAsync(CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (_destroyed)
             {
                 throw new ObjectDisposedException(nameof(FrameworkClientRoot));
             }
-            if (_startTask == null)
+            if (_stop != null && !_stop.Task.Status.IsCompleted())
             {
-                _startTask = StartCoreAsync();
+                throw new InvalidOperationException("client-stopping");
             }
-            await _startTask;
-            cancellationToken.ThrowIfCancellationRequested();
-            _lifetime.Token.ThrowIfCancellationRequested();
-            return _assets;
+            if (_start != null && _stop == null)
+            {
+                return _start.Task.AsValueTask();
+            }
+            _stop = null;
+            _failure = null;
+            _lifetime?.Dispose();
+            _lifetime = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            _application = null;
+            _start = new UniTaskCompletionSource();
+            // 配置和装配也属于同一次启动；同步校验失败必须由共享结果观察。
+            ObserveStartAsync(_start).Forget(Debug.LogException);
+            return _start.Task.AsValueTask();
         }
 
-        /// <summary>组合根提供当前应用拥有的界面管理器；不跨本地玩家共享。</summary>
-        public async ValueTask<UiService> UiAsync(CancellationToken cancellationToken)
+        private ClientApplication CreateApplication()
         {
-            await AssetsAsync(cancellationToken);
-            return _ui;
+            return new ClientApplication(
+                new[]
+                {
+                    new ClientModuleRegistration(
+                        "foundation",
+                        new Module(StartFoundationAsync, StopFoundationAsync)
+                    ),
+                    new ClientModuleRegistration(
+                        "resources",
+                        new Module(StartResourcesAsync, StopResourcesAsync),
+                        "foundation"
+                    ),
+                    new ClientModuleRegistration(
+                        "ui",
+                        new Module(StartUiAsync, StopUiAsync),
+                        "resources"
+                    ),
+                    new ClientModuleRegistration(
+                        "account",
+                        new Module(StartAccountAsync, StopAccountAsync),
+                        "ui"
+                    ),
+                    new ClientModuleRegistration(
+                        "match",
+                        new Module(StartMatchAsync, StopMatchAsync),
+                        "account"
+                    ),
+                    new ClientModuleRegistration(
+                        "presentation",
+                        new Module(StartPresentationAsync, StopPresentationAsync),
+                        "match"
+                    ),
+                    new ClientModuleRegistration(
+                        "flow",
+                        new Module(StartFlowAsync, StopFlowAsync),
+                        "presentation"
+                    ),
+                }
+            );
         }
 
-        private async Task StartCoreAsync()
+        private async UniTask ObserveStartAsync(UniTaskCompletionSource completion)
         {
             try
             {
-                _ownedEventSystem = new GameObject("Application UI EventSystem");
-                _ownedEventSystem.SetActive(false);
-                _ownedEventSystem.transform.SetParent(transform, false);
-                var eventSystem = _ownedEventSystem.AddComponent<MultiplayerEventSystem>();
-                eventSystem.playerRoot = gameObject;
-                _ownedEventSystem.AddComponent<InputSystemUIInputModule>();
-                _ownedEventSystem.SetActive(true);
-                _ui = new UiService(eventSystem);
-                _scenes = new ClientSceneService(id => id.Value);
-                _scope = new ClientServiceScope(builder =>
-                {
-                    builder.RegisterInstance<IUIService>(_ui);
-                    builder.RegisterInstance<IClientDiagnostics>(_diagnostics);
-                    builder.RegisterInstance<ISceneService>(_scenes);
-                });
-                _application = new ClientApplication(
-                    new IClientModule[] { new ResourceModule(this) }
-                );
+                _battleRoot = GetComponent<BattleClientCompositionRoot>();
+                _battleRoot?.ConfigureLaunch();
+                PrepareServices();
+                _application = CreateApplication();
                 await _application.StartAsync(_lifetime.Token);
-                _diagnostics.Record("CLIENT_FRAMEWORK_STARTED", "Local content ready");
+                _diagnostics.Record("CLIENT_FRAMEWORK_STARTED", "All modules ready");
+                completion.TrySetResult();
+            }
+            catch (OperationCanceledException)
+            {
+                completion.TrySetCanceled();
             }
             catch (Exception exception)
             {
                 _failure = exception.Message;
-                Debug.LogException(exception);
-                throw;
+                completion.TrySetException(exception);
             }
         }
 
-        /// <summary>先释放 UI，再关闭资源模块和容器；正常流程退出应显式等待。</summary>
-        public ValueTask StopAsync()
+        /// <summary>只等待显式启动，不触发启动；调用方取消不影响其他消费者。</summary>
+        public ValueTask<IAssetService> AssetsAsync(CancellationToken token) =>
+            GetAssetsAsync(token).AsValueTask();
+
+        private async UniTask<IAssetService> GetAssetsAsync(CancellationToken token)
         {
-            if (_stopTask == null)
+            if (_stop != null)
             {
-                var completion = new TaskCompletionSource<bool>();
-                _stopTask = completion.Task;
-                _ = StopObservedAsync(completion);
+                throw new ObjectDisposedException(nameof(FrameworkClientRoot));
             }
-            return new ValueTask(_stopTask);
+            if (_start == null)
+            {
+                throw new InvalidOperationException("client-not-started");
+            }
+            await _start.Task.AttachExternalCancellation(token);
+            token.ThrowIfCancellationRequested();
+            if (_stop != null)
+            {
+                throw new ObjectDisposedException(nameof(FrameworkClientRoot));
+            }
+            return _assets;
         }
 
-        private async Task StopObservedAsync(TaskCompletionSource<bool> completion)
+        /// <summary>获取已显式启动的 UI 服务；不会隐式启动应用。</summary>
+        public ValueTask<UiService> UiAsync(CancellationToken token) =>
+            GetUiAsync(token).AsValueTask();
+
+        private async UniTask<UiService> GetUiAsync(CancellationToken token)
         {
-            var errors = new List<Exception>();
+            await GetAssetsAsync(token);
+            return _ui;
+        }
+
+        private UniTask StartFoundationAsync(CancellationToken token)
+        {
+            token.ThrowIfCancellationRequested();
+            global::UnityEngine.Application.targetFrameRate = _configuration.TargetFrameRate;
+            global::UnityEngine.Application.runInBackground = _configuration.RunInBackground;
+            _scenes = new ClientSceneService(id => id.Value);
+            _frames = GetComponent<ClientFrameEvents>();
+            _ownsFrames = _frames == null;
+            if (_ownsFrames)
+            {
+                _frames = gameObject.AddComponent<ClientFrameEvents>();
+            }
+            _scope = new ClientServiceScope(builder =>
+            {
+                builder.RegisterInstance<IClientDiagnostics>(_diagnostics);
+                builder.RegisterInstance<ISceneService>(_scenes);
+                builder.RegisterInstance(_configuration);
+            });
+            return UniTask.CompletedTask;
+        }
+
+        private async UniTask StopFoundationAsync()
+        {
             try
             {
-                _lifetime.Cancel();
-            }
-            catch (Exception exception)
-            {
-                errors.Add(exception);
-            }
-            if (_startTask != null)
-            {
-                try
-                {
-                    await _startTask;
-                }
-                catch (Exception)
-                { /* 启动异常已记录。 */
-                }
-            }
-            if (!ReferenceEquals(_flow, null))
-            {
-                try
-                {
-                    await _flow.StopAsync();
-                }
-                catch (Exception exception)
-                {
-                    errors.Add(exception);
-                }
-            }
-            if (!ReferenceEquals(_battleRoot, null))
-            {
-                try
-                {
-                    await _battleRoot.StopAsync();
-                }
-                catch (Exception exception)
-                {
-                    errors.Add(exception);
-                }
-            }
-            try
-            {
-                await ReleaseServicesAsync();
-            }
-            catch (Exception exception)
-            {
-                errors.Add(exception);
-            }
-            if (errors.Count > 0)
-            {
-                completion.TrySetException(new AggregateException(errors));
-            }
-            else
-            {
-                completion.TrySetResult(true);
-            }
-        }
-
-        private async ValueTask ReleaseServicesAsync()
-        {
-            var errors = new List<Exception>();
-            if (_ui != null)
-            {
-                try
-                {
-                    await _ui.DisposeAsync();
-                }
-                catch (Exception exception)
-                {
-                    errors.Add(exception);
-                }
-            }
-            if (_ownedEventSystem != null)
-            {
-                GameObject eventSystem = _ownedEventSystem;
-                _ownedEventSystem = null;
-                eventSystem.SetActive(false);
-                Destroy(eventSystem);
-                // 重试在同一帧创建新根之前，先完成旧系统的 Unity 销毁。
-                await AiNative.Client.Async.UnityAsync.NextFrameAsync(CancellationToken.None);
-            }
-            if (_scenes != null)
-            {
-                try
+                if (_scenes != null)
                 {
                     await _scenes.UnloadAsync();
                 }
-                catch (Exception exception)
+            }
+            finally
+            {
+                _scope?.Dispose();
+                _scope = null;
+                _scenes = null;
+                if (_ownsFrames && _frames != null)
                 {
-                    errors.Add(exception);
+                    Destroy(_frames);
+                    await UniTask.NextFrame();
+                }
+                _frames = null;
+                _accountLobby = null;
+                _matchController = null;
+            }
+        }
+
+        private async UniTask StartResourcesAsync(CancellationToken token)
+        {
+            string directory = await LocalContentInstaller.PrepareAsync(
+                Path.Combine(
+                    global::UnityEngine.Application.streamingAssetsPath,
+                    "AiNativeContent"
+                ),
+                Path.Combine(global::UnityEngine.Application.persistentDataPath, "AiNativeContent"),
+                LocalAssetBundleService.CurrentPlatform,
+                token
+            );
+            _assets = new LocalAssetBundleService(
+                directory,
+                LocalAssetBundleService.CurrentPlatform
+            );
+        }
+
+        private async UniTask StopResourcesAsync()
+        {
+            if (_assets != null)
+            {
+                await _assets.DisposeAsync();
+                _assets = null;
+            }
+        }
+
+        private UniTask StartUiAsync(CancellationToken token)
+        {
+            token.ThrowIfCancellationRequested();
+            _ownedEventSystem = new GameObject("Application UI EventSystem");
+            _ownedEventSystem.SetActive(false);
+            _ownedEventSystem.transform.SetParent(transform, false);
+            var events = _ownedEventSystem.AddComponent<MultiplayerEventSystem>();
+            events.playerRoot = gameObject;
+            _ownedEventSystem.AddComponent<InputSystemUIInputModule>();
+            _ownedEventSystem.SetActive(true);
+            _ui = new UiService(events);
+            return UniTask.CompletedTask;
+        }
+
+        private async UniTask StopUiAsync()
+        {
+            try
+            {
+                if (_ui != null)
+                {
+                    await _ui.DisposeAsync();
                 }
             }
-            if (_application != null)
+            finally
             {
-                try
+                _ui = null;
+                if (_ownedEventSystem != null)
                 {
-                    await _application.StopAsync(CancellationToken.None);
+                    _ownedEventSystem.SetActive(false);
+                    Destroy(_ownedEventSystem);
+                    _ownedEventSystem = null;
+                    await UniTask.NextFrame();
                 }
-                catch (Exception exception)
+            }
+        }
+
+        private UniTask StartAccountAsync(CancellationToken token)
+        {
+            token.ThrowIfCancellationRequested();
+            return UniTask.CompletedTask;
+        }
+
+        private UniTask StopAccountAsync()
+        {
+            _accountLobby?.Dispose();
+            _accountLobby = null;
+            return UniTask.CompletedTask;
+        }
+
+        private UniTask StartMatchAsync(CancellationToken token)
+        {
+            token.ThrowIfCancellationRequested();
+            return UniTask.CompletedTask;
+        }
+
+        private async UniTask StopMatchAsync()
+        {
+            var errors = new List<Exception>();
+            try
+            {
+                if (_matchController != null)
                 {
-                    errors.Add(exception);
+                    await _matchController.StopAsync();
                 }
+            }
+            catch (Exception error)
+            {
+                errors.Add(error);
             }
             try
             {
-                _scope?.Dispose();
+                if (_battleRoot != null)
+                {
+                    await _battleRoot.StopSessionAsync();
+                }
             }
-            catch (Exception exception)
+            catch (Exception error)
             {
-                errors.Add(exception);
+                errors.Add(error);
             }
+            _matchController = null;
             if (errors.Count > 0)
             {
                 throw new AggregateException(errors);
             }
         }
 
-        /// <summary>仅重试失败的启动；不会重置已经建立的对局或登录状态。</summary>
-        public ValueTask RetryStartupAsync()
+        private async UniTask StartPresentationAsync(CancellationToken token)
         {
-            if (_retryTask == null || _retryTask.IsCompleted)
+            if (_battleRoot != null && _battleRoot.isActiveAndEnabled)
             {
-                _retryTask = RetryStartupCoreAsync();
+                await _battleRoot.StartPresentationAsync(this, _assets, token);
             }
-            return new ValueTask(_retryTask);
         }
 
-        private async Task RetryStartupCoreAsync()
+        private async UniTask StopPresentationAsync()
         {
-            if (_stopTask != null)
+            if (_battleRoot != null)
             {
-                return;
+                await _battleRoot.ReleaseVisualsAsync();
             }
-            if (string.IsNullOrEmpty(_failure))
+        }
+
+        private async UniTask StartFlowAsync(CancellationToken token)
+        {
+            if (_flow != null)
             {
-                if (_flow != null)
+                _flow.ConfigureUi(_assets, _ui);
+                await _flow.StartFlowAsync(token);
+            }
+            else
+            {
+                _battleRoot?.StartSession();
+            }
+        }
+
+        private async UniTask StopFlowAsync()
+        {
+            if (_flow != null)
+            {
+                await _flow.StopAsync();
+            }
+        }
+
+        /// <summary>取消所属工作并等待 Core 逆序停止；重复调用共享结果，停止失败仍尝试剩余模块。</summary>
+        public ValueTask StopAsync()
+        {
+            if (_stop == null)
+            {
+                _stop = new UniTaskCompletionSource();
+                StopObservedAsync(_stop).Forget(Debug.LogException);
+            }
+            return _stop.Task.AsValueTask();
+        }
+
+        private async UniTask StopObservedAsync(UniTaskCompletionSource completion)
+        {
+            var errors = new List<Exception>();
+            try
+            {
+                _lifetime?.Cancel();
+            }
+            catch (Exception error)
+            {
+                errors.Add(error);
+            }
+            try
+            {
+                if (_application != null)
+                {
+                    await _application.StopAsync();
+                }
+            }
+            catch (Exception error)
+            {
+                errors.Add(error);
+            }
+            if (_application == null)
+            {
+                try
+                {
+                    if (_flow != null)
+                    {
+                        await _flow.StopAsync();
+                    }
+                }
+                catch (Exception error)
+                {
+                    errors.Add(error);
+                }
+                try
+                {
+                    if (_matchController != null)
+                    {
+                        await _matchController.StopAsync();
+                    }
+                }
+                catch (Exception error)
+                {
+                    errors.Add(error);
+                }
+                try
+                {
+                    _accountLobby?.Dispose();
+                }
+                catch (Exception error)
+                {
+                    errors.Add(error);
+                }
+                _accountLobby = null;
+                _matchController = null;
+            }
+            // 所有模块停止后再解除父令牌注册，避免模块清理期间访问已释放的令牌源。
+            try
+            {
+                _lifetime?.Dispose();
+            }
+            catch (Exception error)
+            {
+                errors.Add(error);
+            }
+            finally
+            {
+                _lifetime = null;
+            }
+            if (errors.Count == 0)
+            {
+                completion.TrySetResult();
+            }
+            else
+            {
+                completion.TrySetException(new AggregateException(errors));
+            }
+        }
+
+        /// <summary>失败启动通过停止旧运行作用域后重新启动恢复；运行中的应用不重置账号。</summary>
+        public ValueTask RetryStartupAsync()
+        {
+            if (_retry == null || _retry.Task.Status.IsCompleted())
+            {
+                _retry = new UniTaskCompletionSource();
+                RetryCoreAsync(_retry).Forget(Debug.LogException);
+            }
+            return _retry.Task.AsValueTask();
+        }
+
+        private async UniTask RetryCoreAsync(UniTaskCompletionSource completion)
+        {
+            try
+            {
+                if (!IsRunning)
+                {
+                    await StopAsync();
+                    await StartAsync();
+                }
+                else if (_flow != null)
                 {
                     await _flow.RetryUiAsync();
                 }
+                completion.TrySetResult();
+            }
+            catch (Exception error)
+            {
+                completion.TrySetException(error);
+            }
+        }
+
+        private void RetryObserved() => RetryStartupAsync().AsUniTask().Forget(Debug.LogException);
+
+        /// <summary>注入外层退出拥有者；停止内容根之后才允许卸载内容场景。</summary>
+        public void ConfigureQuit(Func<int, ValueTask> quit) =>
+            _quit = quit ?? throw new ArgumentNullException(nameof(quit));
+
+        /// <summary>显式退出，观察异常并保留退出码。</summary>
+        public void RequestQuit(int exitCode) =>
+            QuitObservedAsync(exitCode).Forget(Debug.LogException);
+
+        private async UniTask QuitObservedAsync(int exitCode)
+        {
+            if (_quit != null)
+            {
+                await _quit(exitCode);
                 return;
             }
-            await ReleaseServicesAsync();
-            _failure = null;
-            _startTask = null;
-            await AssetsAsync(_lifetime.Token);
-            if (_flow != null)
-            {
-                await _flow.RetryUiAsync();
-            }
-            if (_battleRoot != null && _battleRoot.isActiveAndEnabled)
-            {
-                _battleRoot.enabled = false;
-                _battleRoot.enabled = true;
-            }
-        }
-
-        private async void RetryObserved()
-        {
-            try
-            {
-                await RetryStartupAsync();
-            }
-            catch (Exception exception)
-            {
-                _failure = exception.Message;
-                Debug.LogException(exception);
-            }
-        }
-
-        /// <summary>由持久启动场景注入退出流程，保持退出码并等待内容清理；限主线程装配。</summary>
-        public void ConfigureQuit(Func<int, ValueTask> quit)
-        {
-            _quit = quit ?? throw new ArgumentNullException(nameof(quit));
-        }
-
-        /// <summary>请求退出并观察异常；场景独立启动时也先等待当前应用停止。</summary>
-        public void RequestQuit(int exitCode)
-        {
-            _ = QuitObservedAsync(exitCode);
-        }
-
-        private async Task QuitObservedAsync(int exitCode)
-        {
-            try
-            {
-                if (_quit != null)
-                {
-                    await _quit(exitCode);
-                    return;
-                }
-                await StopAsync();
-                global::UnityEngine.Application.Quit(exitCode);
-            }
-            catch (Exception exception)
-            {
-                Debug.LogException(exception);
-                global::UnityEngine.Application.Quit(1);
-            }
-        }
-
-        private async void OnDestroy()
-        {
             try
             {
                 await StopAsync();
             }
-            catch (Exception exception)
+            catch (Exception error)
             {
-                Debug.LogException(exception);
+                Debug.LogException(error);
+                exitCode = 1;
             }
+            global::UnityEngine.Application.Quit(exitCode);
+        }
+
+        private void OnDestroy()
+        {
+            _destroyed = true;
+            try
+            {
+                _lifetime?.Cancel();
+            }
+            catch (Exception error)
+            {
+                Debug.LogException(error);
+            }
+            StopAsync().AsUniTask().Forget(Debug.LogException);
         }
 
         private void OnGUI()

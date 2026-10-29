@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using AiNative.Client.Async;
+using Cysharp.Threading.Tasks;
 using UnityEngine.SceneManagement;
 
 namespace AiNative.Client.Runtime
@@ -65,11 +66,12 @@ namespace AiNative.Client.Runtime
         }
 
         /// <inheritdoc />
-        public async ValueTask SwitchAsync(
-            SceneId id,
-            CancellationToken cancellationToken = default
-        )
+        public ValueTask SwitchAsync(SceneId id, CancellationToken cancellationToken = default) =>
+            SwitchCoreAsync(id, cancellationToken).AsValueTask();
+
+        private async UniTask SwitchCoreAsync(SceneId id, CancellationToken cancellationToken)
         {
+            // 直接等待同步原语的 Task，保留空闲锁立即进入的时序；AsUniTask 会额外调度续体。
             await _transition.WaitAsync(cancellationToken);
             try
             {
@@ -123,8 +125,12 @@ namespace AiNative.Client.Runtime
         }
 
         /// <inheritdoc />
-        public async ValueTask UnloadAsync(CancellationToken cancellationToken = default)
+        public ValueTask UnloadAsync(CancellationToken cancellationToken = default) =>
+            UnloadCoreAsync(cancellationToken).AsValueTask();
+
+        private async UniTask UnloadCoreAsync(CancellationToken cancellationToken)
         {
+            // 直接等待同步原语的 Task，保留空闲锁立即进入的时序；AsUniTask 会额外调度续体。
             await _transition.WaitAsync(cancellationToken);
             try
             {
@@ -156,7 +162,7 @@ namespace AiNative.Client.Runtime
             }
         }
 
-        private async ValueTask<Scene> LoadOwnedAsync(string path)
+        private async UniTask<Scene> LoadOwnedAsync(string path)
         {
             try
             {
@@ -185,7 +191,7 @@ namespace AiNative.Client.Runtime
             }
         }
 
-        private async ValueTask UnloadOwnedAsync(string path)
+        private async UniTask UnloadOwnedAsync(string path)
         {
             Scene scene = _ownedScenes[path];
             if (!scene.IsValid())

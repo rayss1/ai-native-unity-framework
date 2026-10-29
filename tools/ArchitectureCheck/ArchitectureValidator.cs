@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
+using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
@@ -77,13 +78,37 @@ public sealed class ArchitectureValidator
                     "packages/com.ainative.client.assets/",
                     StringComparison.Ordinal
                 );
+            bool allowsTaskImplementation = new[]
+            {
+                "async.unitask",
+                "runtime",
+                "ui.ugui",
+                "assets.assetbundle",
+            }.Any(package =>
+                path.StartsWith(
+                    "packages/com.ainative.client." + package + "/",
+                    StringComparison.Ordinal
+                )
+            );
             var syntax = CSharpSyntaxTree
                 .ParseText(File.ReadAllText(source))
                 .GetCompilationUnitRoot();
+            bool publicTaskLeak = ExposesTaskLibrary(syntax);
             var names = syntax
                 .DescendantNodes()
                 .OfType<NameSyntax>()
                 .Select(node => node.ToString());
+            if (publicTaskLeak)
+            {
+                diagnostics.Add(
+                    new ArchitectureDiagnostic(
+                        "ARC010",
+                        path,
+                        "Public client APIs must not expose UniTask library types; use project contracts and ValueTask."
+                    )
+                );
+                continue;
+            }
             foreach (string name in names)
             {
                 string normalized = name.Replace("global::", "", StringComparison.Ordinal);
@@ -100,13 +125,7 @@ public sealed class ArchitectureValidator
                     || normalized.StartsWith("VContainer.", StringComparison.Ordinal);
                 if (
                     (pureContract && (unity || taskLibrary || container))
-                    || (
-                        taskLibrary
-                        && !path.StartsWith(
-                            "packages/com.ainative.client.async.unitask/",
-                            StringComparison.Ordinal
-                        )
-                    )
+                    || (taskLibrary && (!allowsTaskImplementation || publicTaskLeak))
                     || (
                         container
                         && !path.StartsWith(
@@ -120,13 +139,143 @@ public sealed class ArchitectureValidator
                         new ArchitectureDiagnostic(
                             "ARC010",
                             path,
-                            "Client contracts must remain engine-neutral; optional libraries terminate in their adapters."
+                            "Client contracts must remain engine-neutral; implementation libraries are limited to ADR-0022 approved boundaries."
                         )
                     );
                     break;
                 }
             }
         }
+    }
+
+    private static bool ExposesTaskLibrary(CompilationUnitSyntax syntax)
+    {
+        var aliases = syntax
+            .DescendantNodes()
+            .OfType<UsingDirectiveSyntax>()
+            .Where(import => import.Alias != null && import.Name != null)
+            .GroupBy(import => import.Alias!.Name.Identifier.ValueText, StringComparer.Ordinal)
+            .ToDictionary(
+                group => group.Key,
+                group =>
+                    group
+                        .Select(import => import.Name!.ToString())
+                        .FirstOrDefault(name =>
+                            name.Contains("Cysharp", StringComparison.Ordinal)
+                            || name.Contains("UniTask", StringComparison.Ordinal)
+                        )
+                    ?? group.First().Name!.ToString(),
+                StringComparer.Ordinal
+            );
+        bool IsLibraryName(NameSyntax name)
+        {
+            string normalized = name.ToString().Replace("global::", "", StringComparison.Ordinal);
+            string first = normalized.Split('.', '<', ':')[0];
+            if (aliases.TryGetValue(first, out string? target))
+            {
+                normalized =
+                    target.Replace("global::", "", StringComparison.Ordinal)
+                    + normalized[first.Length..];
+            }
+            return normalized == "Cysharp"
+                || normalized.StartsWith("Cysharp.", StringComparison.Ordinal)
+                || normalized == "UniTask"
+                || normalized.StartsWith("UniTask<", StringComparison.Ordinal)
+                || first.StartsWith("UniTask", StringComparison.Ordinal)
+                || first.StartsWith("IUniTask", StringComparison.Ordinal)
+                || first == "AsyncUnit"
+                || first == "PlayerLoopTiming";
+        }
+        foreach (
+            MemberDeclarationSyntax member in syntax
+                .DescendantNodes()
+                .OfType<MemberDeclarationSyntax>()
+        )
+        {
+            if (!IsPublicSurface(member))
+            {
+                continue;
+            }
+            IEnumerable<Microsoft.CodeAnalysis.SyntaxNode> signature = member switch
+            {
+                MethodDeclarationSyntax method => new Microsoft.CodeAnalysis.SyntaxNode[]
+                {
+                    method.ReturnType,
+                    method.ParameterList,
+                }.Concat(method.ConstraintClauses),
+                ConstructorDeclarationSyntax constructor => new[] { constructor.ParameterList },
+                PropertyDeclarationSyntax property => new[] { property.Type },
+                IndexerDeclarationSyntax indexer => new Microsoft.CodeAnalysis.SyntaxNode[]
+                {
+                    indexer.Type,
+                    indexer.ParameterList,
+                },
+                FieldDeclarationSyntax field => new[] { field.Declaration.Type },
+                EventFieldDeclarationSyntax field => new[] { field.Declaration.Type },
+                EventDeclarationSyntax eventDeclaration => new[] { eventDeclaration.Type },
+                DelegateDeclarationSyntax declaration => new Microsoft.CodeAnalysis.SyntaxNode[]
+                {
+                    declaration.ReturnType,
+                    declaration.ParameterList,
+                }.Concat(declaration.ConstraintClauses),
+                TypeDeclarationSyntax type => (
+                    type.BaseList == null
+                        ? Enumerable.Empty<Microsoft.CodeAnalysis.SyntaxNode>()
+                        : new[] { type.BaseList }
+                ).Concat(type.ConstraintClauses),
+                OperatorDeclarationSyntax operation => new Microsoft.CodeAnalysis.SyntaxNode[]
+                {
+                    operation.ReturnType,
+                    operation.ParameterList,
+                },
+                ConversionOperatorDeclarationSyntax conversion =>
+                    new Microsoft.CodeAnalysis.SyntaxNode[]
+                    {
+                        conversion.Type,
+                        conversion.ParameterList,
+                    },
+                _ => Enumerable.Empty<Microsoft.CodeAnalysis.SyntaxNode>(),
+            };
+            if (
+                signature
+                    .SelectMany(node => node.DescendantNodesAndSelf().OfType<NameSyntax>())
+                    .Any(IsLibraryName)
+            )
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static bool IsPublicSurface(MemberDeclarationSyntax member)
+    {
+        foreach (
+            MemberDeclarationSyntax ancestor in member
+                .AncestorsAndSelf()
+                .OfType<MemberDeclarationSyntax>()
+        )
+        {
+            if (ancestor is BaseNamespaceDeclarationSyntax)
+            {
+                continue;
+            }
+            if (
+                ancestor.Modifiers.Any(token =>
+                    token.IsKind(SyntaxKind.PublicKeyword)
+                    || token.IsKind(SyntaxKind.ProtectedKeyword)
+                )
+            )
+            {
+                continue;
+            }
+            if (ancestor.Parent is InterfaceDeclarationSyntax)
+            {
+                continue;
+            }
+            return false;
+        }
+        return true;
     }
 
     private static Graph BuildGraph(

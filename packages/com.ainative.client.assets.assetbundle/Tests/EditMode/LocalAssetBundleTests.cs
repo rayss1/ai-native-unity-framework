@@ -6,6 +6,7 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using AiNative.Client.Assets.AssetBundle.Editor;
+using Cysharp.Threading.Tasks;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
@@ -541,14 +542,16 @@ namespace AiNative.Client.Assets.AssetBundle.Tests
                     BindingFlags.NonPublic
                 );
                 object native = Activator.CreateInstance(nativeType, true);
-                var loading =
-                    (Task<UnityEngine.AssetBundle>)
+                var nativeOperation =
+                    (UniTask<UnityEngine.AssetBundle>)
                         typeof(LocalAssetBundleService)
                             .GetMethod(
                                 "LoadNativeBundleAsync",
                                 BindingFlags.Static | BindingFlags.NonPublic
                             )
                             .Invoke(null, new object[] { native, buffer });
+                // 此测试刻意持有完成任务；只在观察边界转换一次，不重复消费池化 UniTask。
+                Task<UnityEngine.AssetBundle> loading = nativeOperation.AsTask();
                 UnityEngine.AssetBundle bundle = null;
                 try
                 {
@@ -584,6 +587,135 @@ namespace AiNative.Client.Assets.AssetBundle.Tests
                     }
                     ((IDisposable)buffer).Dispose();
                 }
+            });
+        }
+
+        [UnityTest]
+        public IEnumerator SharedWaitersAndLateWaiterSurviveWorkerCancellation()
+        {
+            return Run(async () =>
+            {
+                _service = new LocalAssetBundleService(_output, _platform);
+                using (var cancellation = new CancellationTokenSource())
+                {
+                    Task<AssetHandle<TextAsset>> cancelled = _service
+                        .LoadAsync<TextAsset>(new AssetId("first"), cancellation.Token)
+                        .AsTask();
+                    Task<AssetHandle<TextAsset>> first = _service
+                        .LoadAsync<TextAsset>(new AssetId("first"))
+                        .AsTask();
+                    Task<AssetHandle<TextAsset>> repeated = _service
+                        .LoadAsync<TextAsset>(new AssetId("first"))
+                        .AsTask();
+                    Task<AssetHandle<TextAsset>> sibling = _service
+                        .LoadAsync<TextAsset>(new AssetId("second"))
+                        .AsTask();
+                    await Task.Run(() => cancellation.Cancel());
+                    try
+                    {
+                        await cancelled;
+                        Assert.Fail("独立等待者应观察取消。");
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        // 工作线程取消也必须先回 Unity 主线程，再释放本次兴趣。
+                    }
+                    AssetHandle<TextAsset>[] handles = await Task.WhenAll(first, repeated, sibling);
+                    AssetHandle<TextAsset> late = await _service.LoadAsync<TextAsset>(
+                        new AssetId("first")
+                    );
+                    Assert.That(handles[0].Value, Is.SameAs(handles[1].Value));
+                    Assert.That(late.Value, Is.SameAs(handles[0].Value));
+                    Assert.That(handles[2].Value.text, Is.EqualTo("second-resource"));
+                    Assert.That(_service.ActiveHandleCount, Is.EqualTo(4));
+                    foreach (AssetHandle<TextAsset> handle in handles)
+                    {
+                        await _service.ReleaseAsync(handle);
+                    }
+                    Assert.That(late.Value.text, Is.EqualTo("first-resource"));
+                    await _service.ReleaseAsync(late);
+                    Task stop = _service.DisposeAsync().AsTask();
+                    Task repeatedStop = _service.DisposeAsync().AsTask();
+                    Assert.That(repeatedStop, Is.SameAs(stop));
+                    await Task.WhenAll(stop, repeatedStop);
+                    Assert.That(_service.LoadedBundleCount, Is.Zero);
+                }
+            });
+        }
+
+        [UnityTest]
+        public IEnumerator PublicCancellationRemainsCanceledBeforeAndDuringLoad()
+        {
+            return Run(async () =>
+            {
+                _service = new LocalAssetBundleService(_output, _platform);
+                using (var beforeCall = new CancellationTokenSource())
+                {
+                    beforeCall.Cancel();
+                    Task[] cancelledCalls =
+                    {
+                        _service
+                            .LoadAsync<TextAsset>(new AssetId("first"), beforeCall.Token)
+                            .AsTask(),
+                        _service
+                            .PreloadAsync(new AssetGroupId("default"), beforeCall.Token)
+                            .AsTask(),
+                        _service
+                            .InstantiateAsync(new AssetId("instance"), null, beforeCall.Token)
+                            .AsTask(),
+                        LocalContentInstaller
+                            .PrepareAsync(
+                                Path.Combine(
+                                    Application.streamingAssetsPath,
+                                    "CancelledContentProbe"
+                                ),
+                                Path.Combine(
+                                    Application.persistentDataPath,
+                                    "CancelledContentProbe"
+                                ),
+                                _platform,
+                                beforeCall.Token
+                            )
+                            .AsTask(),
+                    };
+                    foreach (Task cancelled in cancelledCalls)
+                    {
+                        try
+                        {
+                            await cancelled;
+                            Assert.Fail("预取消调用不能成功。");
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            Assert.That(
+                                cancelled.IsCanceled,
+                                Is.True,
+                                "公开 ValueTask 转换为 Task 后必须保留取消状态，不能变为 Faulted。"
+                            );
+                        }
+                    }
+                }
+                using (var duringLoad = new CancellationTokenSource())
+                {
+                    Task<AssetHandle<TextAsset>> loading = _service
+                        .LoadAsync<TextAsset>(new AssetId("first"), duringLoad.Token)
+                        .AsTask();
+                    Assert.That(loading.IsCompleted, Is.False, "必须覆盖正在运行的真实加载。");
+                    duringLoad.Cancel();
+                    try
+                    {
+                        await loading;
+                        Assert.Fail("加载中取消不能成功。");
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        Assert.That(loading.IsCanceled, Is.True);
+                    }
+                }
+                // 取消只结束调用者兴趣；关闭继续等待原生迟到结果并收回全部持有。
+                await _service.DisposeAsync();
+                Assert.That(_service.ActiveHandleCount, Is.Zero);
+                Assert.That(_service.LoadedBundleCount, Is.Zero);
             });
         }
 

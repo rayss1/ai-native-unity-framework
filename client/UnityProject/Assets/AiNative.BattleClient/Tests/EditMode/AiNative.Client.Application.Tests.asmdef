@@ -14,7 +14,8 @@
     "AiNative.Client.Application.TestSupport",
     "AiNative.Client.Core",
     "AiNative.Client.Assets",
-    "AiNative.Client.UI.UGUI"
+    "AiNative.Client.UI.UGUI",
+    "UniTask"
   ],
   "optionalUnityReferences": [
     "TestAssemblies"

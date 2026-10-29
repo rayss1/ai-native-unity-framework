@@ -3,7 +3,8 @@
   "references": [
     "AiNative.Client.Core",
     "UnityEngine.UI",
-    "Unity.InputSystem"
+    "Unity.InputSystem",
+    "UniTask"
   ],
   "autoReferenced": false
 }

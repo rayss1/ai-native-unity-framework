@@ -3,6 +3,7 @@ using System.IO;
 using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.Networking;
 
@@ -15,11 +16,22 @@ namespace AiNative.Client.Assets.AssetBundle
         /// 主线程调用。streamingRoot 必须位于本应用 StreamingAssets，destinationRoot 必须位于
         /// persistentDataPath。仅在全部校验成功后发布目录，取消或失败保留旧目录。
         /// </summary>
-        public static async ValueTask<string> PrepareAsync(
+        public static ValueTask<string> PrepareAsync(
             string streamingRoot,
             string destinationRoot,
             string platform,
             CancellationToken cancellationToken = default
+        )
+        {
+            return PrepareCoreAsync(streamingRoot, destinationRoot, platform, cancellationToken)
+                .AsValueTask();
+        }
+
+        private static async UniTask<string> PrepareCoreAsync(
+            string streamingRoot,
+            string destinationRoot,
+            string platform,
+            CancellationToken cancellationToken
         )
         {
             string source = ValidateSource(streamingRoot);
@@ -119,7 +131,7 @@ namespace AiNative.Client.Assets.AssetBundle
             return normalized;
         }
 
-        private static async Task<byte[]> ReadBundledAsync(string path, CancellationToken token)
+        private static async UniTask<byte[]> ReadBundledAsync(string path, CancellationToken token)
         {
             string uri = path.Contains("://") ? path : new Uri(Path.GetFullPath(path)).AbsoluteUri;
             using (UnityWebRequest request = UnityWebRequest.Get(uri))
@@ -132,7 +144,7 @@ namespace AiNative.Client.Assets.AssetBundle
                         request.Abort();
                         token.ThrowIfCancellationRequested();
                     }
-                    await Task.Yield();
+                    await UniTask.Yield(PlayerLoopTiming.Update);
                 }
                 token.ThrowIfCancellationRequested();
                 if (request.result != UnityWebRequest.Result.Success)

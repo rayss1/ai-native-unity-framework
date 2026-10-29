@@ -219,6 +219,164 @@ namespace AiNative.Client.Core.Tests
             await second.StopAsync();
         }
 
+        [Test]
+        public async Task DependenciesUseEarliestReadyRegistrationAndRestartInSameOrder()
+        {
+            var history = new List<string>();
+            var dependencies = new[] { "base", "base" };
+            var dependent = new ClientModuleRegistration(
+                "dependent",
+                Module.Recording("dependent", history),
+                dependencies
+            );
+            dependencies[0] = "missing";
+            Assert.Throws<NotSupportedException>(() =>
+                ((IList<string>)dependent.Dependencies)[0] = "changed"
+            );
+            var application = new ClientApplication(
+                new[]
+                {
+                    dependent,
+                    new ClientModuleRegistration("base", Module.Recording("base", history)),
+                    new ClientModuleRegistration(
+                        "independent",
+                        Module.Recording("independent", history)
+                    ),
+                }
+            );
+            for (int cycle = 0; cycle < 2; cycle++)
+            {
+                await application.StartAsync();
+                await application.StopAsync();
+            }
+            Assert.That(
+                history,
+                Is.EqualTo(
+                    new[]
+                    {
+                        "start-base",
+                        "start-dependent",
+                        "start-independent",
+                        "stop-independent",
+                        "stop-dependent",
+                        "stop-base",
+                        "start-base",
+                        "start-dependent",
+                        "start-independent",
+                        "stop-independent",
+                        "stop-dependent",
+                        "stop-base",
+                    }
+                )
+            );
+        }
+
+        [TestCase("duplicate-id")]
+        [TestCase("duplicate-instance")]
+        [TestCase("missing")]
+        [TestCase("cycle")]
+        [TestCase("self-cycle")]
+        public void InvalidDependencyGraphIsRejectedBeforeStartingAnyModule(string scenario)
+        {
+            var history = new List<string>();
+            Module first = Module.Recording("first", history);
+            Module second = Module.Recording("second", history);
+            string[] dependencies = Array.Empty<string>();
+            if (scenario == "cycle")
+            {
+                dependencies = new[] { "second" };
+            }
+            if (scenario == "self-cycle")
+            {
+                dependencies = new[] { "first" };
+            }
+            if (scenario == "missing")
+            {
+                dependencies = new[] { "absent" };
+            }
+            var registrations = new[]
+            {
+                new ClientModuleRegistration("first", first, dependencies),
+                new ClientModuleRegistration(
+                    scenario == "duplicate-id" ? "first" : "second",
+                    scenario == "duplicate-instance" ? first : second,
+                    "first"
+                ),
+            };
+            Assert.Throws<ArgumentException>(() => new ClientApplication(registrations));
+            Assert.That(history, Is.Empty);
+        }
+
+        [TestCase(null)]
+        [TestCase("")]
+        [TestCase(" ")]
+        public void RegistrationRejectsBlankIds(string? id)
+        {
+            Assert.Throws<ArgumentException>(() => new ClientModuleRegistration(id!, new Module()));
+            Assert.Throws<ArgumentException>(() =>
+                new ClientModuleRegistration("valid", new Module(), new[] { id! })
+            );
+        }
+
+        [Test]
+        public void DependencyStartupFailureCleansCurrentAndPredecessorsOnly()
+        {
+            var history = new List<string>();
+            Module failing = Module.Recording("failure", history);
+            failing.Start = _ =>
+            {
+                history.Add("start-failure");
+                throw new InvalidOperationException("failed");
+            };
+            var application = new ClientApplication(
+                new[]
+                {
+                    new ClientModuleRegistration("failure", failing, "base"),
+                    new ClientModuleRegistration(
+                        "unstarted",
+                        Module.Recording("unstarted", history),
+                        "failure"
+                    ),
+                    new ClientModuleRegistration("base", Module.Recording("base", history)),
+                }
+            );
+            Assert.ThrowsAsync<InvalidOperationException>(async () =>
+                await application.StartAsync()
+            );
+            Assert.That(
+                history,
+                Is.EqualTo(new[] { "start-base", "start-failure", "stop-failure", "stop-base" })
+            );
+        }
+
+        [Test]
+        public async Task StopCancelsDependencyStartupAndWaitsForReverseCleanup()
+        {
+            var history = new List<string>();
+            Module waiting = Module.Recording("waiting", history);
+            waiting.Start = async token =>
+            {
+                history.Add("start-waiting");
+                await Task.Delay(Timeout.Infinite, token);
+            };
+            var application = new ClientApplication(
+                new[]
+                {
+                    new ClientModuleRegistration("waiting", waiting, "base"),
+                    new ClientModuleRegistration("base", Module.Recording("base", history)),
+                }
+            );
+            Task start = application.StartAsync().AsTask();
+            await application.StopAsync();
+            Assert.That(start.IsCanceled, Is.True);
+            Assert.That(
+                history,
+                Is.EqualTo(new[] { "start-base", "start-waiting", "stop-waiting", "stop-base" })
+            );
+            await application.StopAsync();
+            Assert.That(history.Count, Is.EqualTo(4));
+        }
+
         private sealed class Module : IClientModule
         {
             internal Func<CancellationToken, ValueTask> Start = _ => default;

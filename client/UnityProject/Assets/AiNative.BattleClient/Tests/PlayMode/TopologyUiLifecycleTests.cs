@@ -3,6 +3,7 @@ using System.Collections;
 using System.Reflection;
 using System.Threading.Tasks;
 using AiNative.Client.Fantasy;
+using Cysharp.Threading.Tasks;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
@@ -24,6 +25,7 @@ namespace AiNative.Client.Application.PlayModeTests
                 {
                     var flow = owner.AddComponent<TopologyClientFlow>();
                     flow.Initialize(new GateConnectionOptions("127.0.0.1", 23001, false));
+                    yield return FrameworkTestLifecycle.Start(owner);
                     yield return WaitForView(flow);
                     var view = (TopologyClientView)Field(flow, "_view");
                     Assert.That(
@@ -35,20 +37,27 @@ namespace AiNative.Client.Application.PlayModeTests
                     Assert.That(canvas != null, Is.True);
                     GameObject ownedEventSystem = (GameObject)Field(view, "_ownedEventSystem");
                     int calls = 0;
-                    Invoke(flow, "Run", new Func<Task>(() => refresh.Task), false);
+                    Invoke(flow, "Run", new Func<UniTask>(() => refresh.Task.AsUniTask()), false);
                     Invoke(
                         flow,
                         "Submit",
-                        new Func<Task>(() =>
+                        new Func<UniTask>(() =>
                         {
                             calls++;
-                            return Task.CompletedTask;
+                            return UniTask.CompletedTask;
                         })
                     );
                     Assert.That(flow.UiBusy, Is.True);
                     UnityEngine.Object.Destroy(owner);
                     yield return null;
-                    yield return null; // The view schedules its owned EventSystem for destruction.
+                    Assert.That(calls, Is.Zero);
+                    // 已受理操作不可强制抛弃；释放它后等待应用逆序完成 UI 清理。
+                    refresh.TrySetResult(true);
+                    float cleanupDeadline = Time.realtimeSinceStartup + 10f;
+                    while (view != null && Time.realtimeSinceStartup < cleanupDeadline)
+                    {
+                        yield return null;
+                    }
                     yield return null;
                     Assert.That(
                         view == null,

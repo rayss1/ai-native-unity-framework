@@ -10,6 +10,7 @@ using AiNative.Client.Prediction;
 using AiNative.Client.Protocol;
 using AiNative.Client.Protocol.Protobuf;
 using AiNative.Gameplay;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -55,54 +56,82 @@ namespace AiNative.Client.Application
         ];
         public BattleClientSession Session => _topology != null ? _topology.Battle : _session;
 
+        private FrameworkClientRoot _framework;
+        private bool _launchConfigured;
+        private bool _forceTopology;
+        private bool _switching;
+
+        // 场景激活只采集组件，配置校验和装配由显式应用启动执行。
         private void Awake()
         {
+            _topology = GetComponent<TopologyClientFlow>();
+        }
+
+        internal void ConfigureLaunch() => ConfigureLaunch(Environment.GetCommandLineArgs());
+
+        internal void ConfigureLaunch(string[] arguments)
+        {
+            if (arguments == null)
+            {
+                throw new ArgumentNullException(nameof(arguments));
+            }
+            _topology = GetComponent<TopologyClientFlow>();
+            if (_launchConfigured)
+            {
+                if (_forceTopology && _topology == null)
+                {
+                    _topology = gameObject.AddComponent<TopologyClientFlow>();
+                }
+                return;
+            }
+            if (_topology != null)
+            {
+                _launchConfigured = true;
+                return;
+            }
             global::UnityEngine.Application.runInBackground = true;
             QualitySettings.vSyncCount = 0;
             global::UnityEngine.Application.targetFrameRate = 60;
 #if UNITY_ANDROID && !UNITY_EDITOR
-            _topology = gameObject.AddComponent<TopologyClientFlow>();
+            AndroidClientLaunchConfiguration configuration;
+            bool rejectedIntent = false;
             try
             {
-                AndroidClientLaunchConfiguration configuration =
-                    AndroidClientLaunchConfiguration.ReadCurrentIntent();
-                _topology.Initialize(
-                    configuration.GateOptions,
-                    configuration.Automated,
-                    configuration.TimeoutSeconds,
-                    configuration.ResultPath,
-                    configuration.RunId
-                );
+                configuration = AndroidClientLaunchConfiguration.ReadCurrentIntent();
             }
             catch (ArgumentException)
             {
-                // 无效的公开 Intent 不得启用账号自动化；仍保留普通登录界面。
-                AndroidClientLaunchConfiguration configuration =
-                    AndroidClientLaunchConfiguration.Parse(
-                        new System.Collections.Generic.Dictionary<string, string>(),
-                        global::UnityEngine.Application.persistentDataPath
-                    );
-                _topology.Initialize(
-                    configuration.GateOptions,
-                    false,
-                    configuration.TimeoutSeconds,
-                    configuration.ResultPath,
-                    configuration.RunId
+                // 无效的公开 Intent 不得启用账号自动化；先完成降级配置再创建流程组件。
+                configuration = AndroidClientLaunchConfiguration.Parse(
+                    new System.Collections.Generic.Dictionary<string, string>(),
+                    global::UnityEngine.Application.persistentDataPath
                 );
+                rejectedIntent = true;
+            }
+            _topology = gameObject.AddComponent<TopologyClientFlow>();
+            _topology.Initialize(
+                configuration.GateOptions,
+                !rejectedIntent && configuration.Automated,
+                configuration.TimeoutSeconds,
+                configuration.ResultPath,
+                configuration.RunId
+            );
+            if (rejectedIntent)
+            {
                 Debug.LogWarning(
                     "Android launch configuration was rejected; interactive login is available."
                 );
             }
-
+            _launchConfigured = true;
             return;
 #else
-            string[] arguments = Environment.GetCommandLineArgs();
             if (
                 Array.IndexOf(arguments, "--ainative-topology") >= 0
                 || Array.IndexOf(arguments, "--ainative-topology-smoke") >= 0
             )
             {
                 _topology = gameObject.AddComponent<TopologyClientFlow>();
+                _launchConfigured = true;
                 return;
             }
 
@@ -113,69 +142,122 @@ namespace AiNative.Client.Application
                 _topology.Initialize(
                     new AiNative.Client.Fantasy.GateConnectionOptions("127.0.0.1", 23001, false, "")
                 );
+                _launchConfigured = true;
                 return;
             }
 
 #endif
-            _launch = BattleClientLaunchOptions.Parse(arguments);
+            // 校验成功后才发布配置及完成标记，失败后的重试必须重新验证原参数。
+            BattleClientLaunchOptions launch = BattleClientLaunchOptions.Parse(arguments);
+            _launch = launch;
+            _launchConfigured = true;
+#endif
+        }
+
+        private UniTaskCompletionSource _sessionStop;
+
+        internal void StartSession()
+        {
+            if (_topology != null || _session != null)
+            {
+                return;
+            }
+            _sessionStop = null;
+            _roomTick = 0;
+            _smokeElapsed = 0;
+            _smokeReconnectRequested = false;
+            _preReconnectAcknowledgement = 0;
+            _regionalWarmupElapsed = 0;
+            _regionalMeasurementElapsed = 0;
+            _regionalMeasurementStarted = false;
+            _finished = false;
             _session = new BattleClientSession(
                 new ProtobufBattleProtocolCodec(),
                 _launch.Host,
                 _launch.Port,
                 global::UnityEngine.Application.version
             );
-#endif
+            _session.Start();
         }
 
-        private void Start() => _session?.Start();
+        internal ValueTask StopSessionAsync()
+        {
+            if (_sessionStop == null)
+            {
+                _sessionStop = new UniTaskCompletionSource();
+                StopSessionObservedAsync(_sessionStop).Forget();
+            }
+            return _sessionStop.Task.AsValueTask();
+        }
+
+        private async UniTask StopSessionObservedAsync(UniTaskCompletionSource completion)
+        {
+            BattleClientSession session = _session;
+            _session = null;
+            try
+            {
+                if (session != null)
+                {
+                    await session.DisposeAsync();
+                }
+                completion.TrySetResult();
+            }
+            catch (Exception exception)
+            {
+                completion.TrySetException(exception);
+            }
+        }
 
         private CancellationTokenSource _visualLifetime;
         private IAssetService _visualAssets;
         private AssetHandle<GameObject> _characterAsset;
         private AssetHandle<Material> _playerMaterial;
-        private Task _visualLoad;
-        private Task _visualRelease;
+        private UniTaskCompletionSource _visualLoad;
+        private UniTaskCompletionSource _visualRelease;
 
-        private int _visualGeneration;
-
-        private async void OnEnable()
+        internal async UniTask StartPresentationAsync(
+            FrameworkClientRoot root,
+            IAssetService assets,
+            CancellationToken cancellationToken
+        )
         {
-            int generation = ++_visualGeneration;
+            _framework = root ?? throw new ArgumentNullException(nameof(root));
+            if (_visualRelease != null)
+            {
+                await _visualRelease.Task;
+            }
+            if (_visualLoad != null && _visualRelease == null)
+            {
+                await _visualLoad.Task;
+                return;
+            }
+            _stopTask = null;
+            _visualRelease = null;
+            _visualAssets = assets ?? throw new ArgumentNullException(nameof(assets));
+            _visualLifetime = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            _visualLoad = new UniTaskCompletionSource();
+            InitializeVisualsObservedAsync(_visualLoad, _visualLifetime.Token).Forget();
+            await _visualLoad.Task;
+        }
+
+        private async UniTask InitializeVisualsObservedAsync(
+            UniTaskCompletionSource completion,
+            CancellationToken token
+        )
+        {
             try
             {
-                if (_visualRelease != null)
-                {
-                    await _visualRelease;
-                }
-                if (!isActiveAndEnabled || generation != _visualGeneration)
-                {
-                    return;
-                }
-                _visualRelease = null;
-                _visualLifetime = new CancellationTokenSource();
-                _visualLoad = InitializeVisualsAsync(_visualLifetime.Token);
-                await _visualLoad;
+                await InitializeVisualsAsync(token);
+                completion.TrySetResult();
             }
-            catch (OperationCanceledException) { }
             catch (Exception exception)
             {
-                Debug.LogException(exception);
-                try
-                {
-                    await ReleaseVisualsAsync();
-                }
-                catch (Exception cleanupError)
-                {
-                    Debug.LogException(cleanupError);
-                }
+                completion.TrySetException(exception);
             }
         }
 
-        private async Task InitializeVisualsAsync(CancellationToken cancellationToken)
+        private async UniTask InitializeVisualsAsync(CancellationToken cancellationToken)
         {
-            _visualAssets = await FrameworkClientRoot
-                .GetOrCreate(gameObject)
-                .AssetsAsync(cancellationToken);
             _characterAsset = await _visualAssets.LoadAsync<GameObject>(
                 new AssetId("character.network"),
                 cancellationToken
@@ -270,53 +352,55 @@ namespace AiNative.Client.Application
             }
         }
 
-        private async void SwitchToTopology()
+        private void SwitchToTopology()
         {
-            BattleClientSession previous = _session;
-            _session = null;
-            _topology = gameObject.AddComponent<TopologyClientFlow>();
-            _topology.CharacterCamera = _orbitCamera;
-            if (previous != null)
+            if (_switching || _framework == null)
             {
-                try
-                {
-                    await previous.DisposeAsync();
-                }
-                catch (Exception exception)
-                {
-                    Debug.LogException(exception);
-                }
+                return;
             }
+            _switching = true;
+            SwitchToTopologyAsync().Forget(Debug.LogException);
         }
 
-        private void OnDisable()
-        {
-            _visualGeneration++;
-            ReleaseVisualsObserved();
-        }
-
-        private async void ReleaseVisualsObserved()
+        private async UniTask SwitchToTopologyAsync()
         {
             try
             {
-                await ReleaseVisualsAsync();
+                await _framework.StopAsync();
+                _forceTopology = true;
+                await _framework.StartAsync();
             }
-            catch (Exception exception)
+            finally
             {
-                Debug.LogException(exception);
+                _switching = false;
             }
         }
 
+        /// <summary>主线程幂等释放表现；等待迟到加载及实例销毁后释放借用资源服务的句柄。</summary>
         public ValueTask ReleaseVisualsAsync()
         {
             if (_visualRelease == null)
             {
-                _visualRelease = ReleaseVisualsCoreAsync();
+                _visualRelease = new UniTaskCompletionSource();
+                ReleaseVisualsObservedAsync(_visualRelease).Forget();
             }
-            return new ValueTask(_visualRelease);
+            return _visualRelease.Task.AsValueTask();
         }
 
-        private async Task ReleaseVisualsCoreAsync()
+        private async UniTask ReleaseVisualsObservedAsync(UniTaskCompletionSource completion)
+        {
+            try
+            {
+                await ReleaseVisualsCoreAsync();
+                completion.TrySetResult();
+            }
+            catch (Exception exception)
+            {
+                completion.TrySetException(exception);
+            }
+        }
+
+        private async UniTask ReleaseVisualsCoreAsync()
         {
             var errors = new List<Exception>();
             try
@@ -331,7 +415,7 @@ namespace AiNative.Client.Application
             {
                 try
                 {
-                    await _visualLoad;
+                    await _visualLoad.Task;
                 }
                 catch (Exception)
                 { /* 加载错误由入口记录。 */
@@ -740,21 +824,21 @@ namespace AiNative.Client.Application
             );
         }
 
-        private Task _stopTask;
+        private UniTaskCompletionSource _stopTask;
 
         /// <summary>主线程停止表现与旧入口会话；重复调用共享结果，正常退出应在销毁对象前等待。</summary>
         public ValueTask StopAsync()
         {
             if (_stopTask == null)
             {
-                var completion = new TaskCompletionSource<bool>();
-                _stopTask = completion.Task;
-                _ = StopObservedAsync(completion);
+                var completion = new UniTaskCompletionSource();
+                _stopTask = completion;
+                StopObservedAsync(completion).Forget();
             }
-            return new ValueTask(_stopTask);
+            return _stopTask.Task.AsValueTask();
         }
 
-        private async Task StopObservedAsync(TaskCompletionSource<bool> completion)
+        private async UniTask StopObservedAsync(UniTaskCompletionSource completion)
         {
             var errors = new List<Exception>();
             try
@@ -765,22 +849,17 @@ namespace AiNative.Client.Application
             {
                 errors.Add(exception);
             }
-            BattleClientSession session = _session;
-            _session = null;
-            if (session != null)
+            try
             {
-                try
-                {
-                    await session.DisposeAsync();
-                }
-                catch (Exception exception)
-                {
-                    errors.Add(exception);
-                }
+                await StopSessionAsync();
+            }
+            catch (Exception exception)
+            {
+                errors.Add(exception);
             }
             if (errors.Count == 0)
             {
-                completion.TrySetResult(true);
+                completion.TrySetResult();
             }
             else
             {
@@ -788,7 +867,9 @@ namespace AiNative.Client.Application
             }
         }
 
-        private async void OnDestroy()
+        private void OnDestroy() => ObserveStopAsync().Forget();
+
+        private async UniTask ObserveStopAsync()
         {
             try
             {
@@ -833,7 +914,7 @@ namespace AiNative.Client.Application
 
             Debug.Log(success ? "WS-26 smoke passed." : "WS-26 smoke failed: " + error);
 #if !UNITY_EDITOR
-            FrameworkClientRoot.GetOrCreate(gameObject).RequestQuit(success ? 0 : 1);
+            _framework.RequestQuit(success ? 0 : 1);
 #endif
         }
 
@@ -955,7 +1036,7 @@ namespace AiNative.Client.Application
                     : "WS-27 Regional correction validation failed: " + result.error
             );
 #if !UNITY_EDITOR
-            FrameworkClientRoot.GetOrCreate(gameObject).RequestQuit(gatesPassed ? 0 : 1);
+            _framework.RequestQuit(gatesPassed ? 0 : 1);
 #endif
         }
 

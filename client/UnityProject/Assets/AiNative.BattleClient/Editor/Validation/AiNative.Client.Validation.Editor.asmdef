@@ -1,0 +1,6 @@
+{
+  "name": "AiNative.Client.Validation.Editor",
+  "references": ["UnityEditor.TestRunner"],
+  "includePlatforms": ["Editor"],
+  "autoReferenced": true
+}

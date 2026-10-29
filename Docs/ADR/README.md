@@ -1,6 +1,6 @@
 # Architecture Decision Records
 
-客户端框架新增已接受决策：[ADR-0021](0021-client-framework-foundation.md)。
+客户端框架已接受决策：[ADR-0021](0021-client-framework-foundation.md)、[ADR-0022](0022-client-module-dependencies-and-async-boundaries.md)。
 
 This directory is the decision log for the first vertical slice. An accepted ADR is authoritative for its subject; the architecture baseline summarizes the set but does not override it.
 

@@ -2,11 +2,19 @@
 
 更新时间：2026-10-29。本文是当前状态入口；ADR 决定架构约束，日期报告保留当时的结果，不能直接替代新版本验证。
 
+## 10 月 29 日：显式生命周期与异步实现迁移
+
+当前代码继续收敛启动与停止职责：场景入口/Bootstrap 显式调用应用根，根以依赖注册表启动 `foundation → resources → ui → account → match → presentation → flow`，停止逆序执行。Flow 借用注入的业务和 UI 服务；角色表现、账号大厅、对局会话各自有明确释放者。每场 Battle 建立独立子生命周期，返回大厅后释放，原网络 Pump 与固定 Tick 驱动顺序保留。
+
+本轮范围内 Unity 侧内部异步已统一为 UniTask，公共契约仍为 ValueTask；共享完成源用于重复启动/停止等待。Core、按原帧轮询的网络任务、后台文件读取及公共转换缓存保留有理由的 Task 例外，详见 [代码规范](client-coding-standards.md)。直接打开产品场景由 `ClientSceneEntry` 管理，Bootstrap 只管理其明确预留的内容场景，不引入全局应用根单例。
+
+本轮 EditMode 380 项通过；PlayMode 75 项通过、1 项失败、0 跳过，20 局拥有权循环通过。CF-003 内存增长仍存在，CF-005 终局传播窗口已复现；用户要求保留的根解决方案引用使架构检查仍有 3 项失败。不能宣称整体验收通过。平台验证及最新实际结果与未完成项由 [生命周期迁移验证](client-lifecycle-validation-2026-10-29.md) 单独记录；下方第一期报告保留历史，不能替代新入口和新释放链路的回归。
+
 ## 10 月 29 日：客户端框架第一期
 
 本轮优先建设客户端底座：已有自有客户端代码统一规范，新增纯 C# Core、UniTask/VContainer 适配、uGUI MVVM、本地 AssetBundle、场景与帧生命周期。产品通过持久启动场景装配，账号大厅与对局状态分离，既有网络/预测 Tick 保持原驱动顺序。服务端权威和协议未改变。
 
-开发入口见 [客户端框架指南](client-framework.md)，实际测试数量、平台构建、未完成项以 [本轮验证记录](client-framework-validation-2026-10-29.md) 为准。独立会话 ID 路由、结算终态等待和双 EventSystem 文本焦点问题均作为[集成问题](client-framework-known-issues.md)单独修复，不归入可读性整理。重复运行的托管内存增长仍在诊断，未宣称内存稳定或第一期全部发布验收完成。Windows 与移动真机不能用本机 macOS 结果替代。
+开发入口见 [客户端框架指南](client-framework.md)，第一期测试数量、平台构建、未完成项保留在 [第一期验证记录](client-framework-validation-2026-10-29.md)。独立会话 ID 路由、结算终态等待和双 EventSystem 文本焦点问题均作为[集成问题](client-framework-known-issues.md)单独修复，不归入可读性整理。重复运行的托管内存增长仍在诊断，未宣称内存稳定或第一期全部发布验收完成。Windows 与移动真机不能用本机 macOS 结果替代。
 
 以下保留历史版本背景，其中“当前”仅指相应日期，不作为新增框架的完成声明。
 

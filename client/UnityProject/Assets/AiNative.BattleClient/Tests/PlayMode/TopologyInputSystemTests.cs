@@ -27,6 +27,7 @@ namespace AiNative.Client.Application.PlayModeTests
             _mouse = InputSystem.AddDevice<Mouse>();
             _owner = new GameObject("TopologyInputSystemFixture");
             _flow = _owner.AddComponent<TopologyClientFlow>();
+            FrameworkClientRoot.GetOrCreate(_owner);
             // UnityTest 在进入枚举器前也可能推进一帧；只由 UI 用例显式启动。
             _flow.enabled = false;
             _flow.Initialize(new GateConnectionOptions("127.0.0.1", 23001, false));
@@ -235,8 +236,9 @@ namespace AiNative.Client.Application.PlayModeTests
 
         private IEnumerator WaitForView()
         {
-            LogAssert.Expect(LogType.Log, "[Client] CLIENT_FRAMEWORK_STARTED: Local content ready");
+            LogAssert.Expect(LogType.Log, "[Client] CLIENT_FRAMEWORK_STARTED: All modules ready");
             _flow.enabled = true;
+            yield return FrameworkTestLifecycle.Start(_owner);
             float deadline = Time.realtimeSinceStartup + 10f;
             while (
                 Field(_flow, "_view") == null

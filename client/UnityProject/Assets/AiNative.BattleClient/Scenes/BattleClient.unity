@@ -31,7 +31,7 @@ RenderSettings:
   m_FlareStrength: 1
   m_FlareFadeSpeed: 3
   m_HaloTexture: {fileID: 0}
-  m_SpotCookie: {fileID: 0}
+  m_SpotCookie: {fileID: 10001, guid: 0000000000000000e000000000000000, type: 0}
   m_DefaultReflectionMode: 0
   m_DefaultReflectionResolution: 128
   m_ReflectionBounces: 1
@@ -66,9 +66,6 @@ LightmapSettings:
     m_LightmapParameters: {fileID: 0}
     m_LightmapsBakeMode: 1
     m_TextureCompression: 1
-    m_FinalGather: 0
-    m_FinalGatherFiltering: 1
-    m_FinalGatherRayCount: 256
     m_ReflectionCompression: 2
     m_MixedBakeMode: 2
     m_BakeBackend: 1
@@ -132,6 +129,8 @@ GameObject:
   m_Component:
   - component: {fileID: 1001}
   - component: {fileID: 1002}
+  - component: {fileID: 1004}
+  - component: {fileID: 1003}
   m_Layer: 0
   m_Name: BattleClient
   m_TagString: Untagged
@@ -164,8 +163,35 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 8932dbf51ed841d7b06f2314f7d99979, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: AiNative.Client.Application::AiNative.Client.Application.BattleClientCompositionRoot
+  editorLocalTopology: 0
+--- !u!114 &1003
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1000}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9bfc8acf351a494faf79acabb9fc3542, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: AiNative.Client.Application::AiNative.Client.Application.ClientSceneEntry
+  _mode: 0
+--- !u!114 &1004
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1000}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ca7ff89080fc44cbcb56aac0d9e3715b, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: AiNative.Client.Application::AiNative.Client.Application.FrameworkClientRoot
+  _settings: {fileID: 0}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

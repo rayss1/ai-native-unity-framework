@@ -4,6 +4,7 @@ using System.IO;
 using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityBundle = UnityEngine.AssetBundle;
 using UnityObject = UnityEngine.Object;
@@ -38,7 +39,7 @@ namespace AiNative.Client.Assets.AssetBundle
         {
             public BundleRecord Record;
             public int References;
-            public Task<UnityBundle> Loading;
+            public UniTaskCompletionSource<UnityBundle> Loading;
             public UnityBundle Value;
             public NativeBundle Native;
         }
@@ -49,7 +50,7 @@ namespace AiNative.Client.Assets.AssetBundle
             public string Name;
             public string DependencyIdentity;
             public int References;
-            public Task<UnityBundle> Loading;
+            public UniTaskCompletionSource<UnityBundle> Loading;
             public UnityBundle Value;
         }
 
@@ -81,7 +82,7 @@ namespace AiNative.Client.Assets.AssetBundle
             public List<BundleState> Dependencies;
             public int References;
             public bool IsLoading = true;
-            public Task<UnityObject> Loading;
+            public UniTaskCompletionSource<UnityObject> Loading;
             public UnityObject Value;
         }
 
@@ -208,7 +209,15 @@ namespace AiNative.Client.Assets.AssetBundle
         }
 
         /// <summary>获取独立句柄；取消仅撤销本调用兴趣，Unity 加载结束后清理无人持有结果。</summary>
-        public async ValueTask<AssetHandle<T>> LoadAsync<T>(
+        public ValueTask<AssetHandle<T>> LoadAsync<T>(
+            AssetId id,
+            CancellationToken cancellationToken = default
+        )
+        {
+            return LoadCoreAsync<T>(id, cancellationToken).AsValueTask();
+        }
+
+        private async UniTask<AssetHandle<T>> LoadCoreAsync<T>(
             AssetId id,
             CancellationToken cancellationToken = default
         )
@@ -239,7 +248,7 @@ namespace AiNative.Client.Assets.AssetBundle
                     bundle.References++;
                 }
                 _assets.Add(record.Id, asset);
-                asset.Loading = LoadEntryAsync(asset);
+                asset.Loading = Share(LoadEntryAsync(asset));
             }
             else
             {
@@ -248,7 +257,10 @@ namespace AiNative.Client.Assets.AssetBundle
             bool transferred = false;
             try
             {
-                UnityObject loaded = await AwaitInterestAsync(asset.Loading, cancellationToken);
+                UnityObject loaded = await AwaitInterestAsync(
+                    asset.Loading.Task,
+                    cancellationToken
+                );
                 CheckAvailable();
                 cancellationToken.ThrowIfCancellationRequested();
                 if (!(loaded is T value))
@@ -290,7 +302,15 @@ namespace AiNative.Client.Assets.AssetBundle
         }
 
         /// <summary>成功预加载由本服务作用域持有；失败或取消释放本次已取得的资源。</summary>
-        public async ValueTask PreloadAsync(
+        public ValueTask PreloadAsync(
+            AssetGroupId group,
+            CancellationToken cancellationToken = default
+        )
+        {
+            return PreloadCoreAsync(group, cancellationToken).AsValueTask();
+        }
+
+        private async UniTask PreloadCoreAsync(
             AssetGroupId group,
             CancellationToken cancellationToken = default
         )
@@ -306,7 +326,10 @@ namespace AiNative.Client.Assets.AssetBundle
                     {
                         found = true;
                         acquired.Add(
-                            await LoadAsync<UnityObject>(new AssetId(record.Id), cancellationToken)
+                            await LoadCoreAsync<UnityObject>(
+                                new AssetId(record.Id),
+                                cancellationToken
+                            )
                         );
                     }
                 }
@@ -340,13 +363,22 @@ namespace AiNative.Client.Assets.AssetBundle
         }
 
         /// <summary>实例持有源 Prefab；DisposeAsync 销毁实例后才释放资源。</summary>
-        public async ValueTask<AssetInstance> InstantiateAsync(
+        public ValueTask<AssetInstance> InstantiateAsync(
             AssetId id,
             Transform parent = null,
             CancellationToken cancellationToken = default
         )
         {
-            AssetHandle<GameObject> handle = await LoadAsync<GameObject>(id, cancellationToken);
+            return InstantiateCoreAsync(id, parent, cancellationToken).AsValueTask();
+        }
+
+        private async UniTask<AssetInstance> InstantiateCoreAsync(
+            AssetId id,
+            Transform parent = null,
+            CancellationToken cancellationToken = default
+        )
+        {
+            AssetHandle<GameObject> handle = await LoadCoreAsync<GameObject>(id, cancellationToken);
             try
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -387,7 +419,7 @@ namespace AiNative.Client.Assets.AssetBundle
             return handle;
         }
 
-        private async Task<UnityObject> LoadEntryAsync(AssetState asset)
+        private async UniTask<UnityObject> LoadEntryAsync(AssetState asset)
         {
             try
             {
@@ -395,9 +427,9 @@ namespace AiNative.Client.Assets.AssetBundle
                 {
                     if (bundle.Loading == null)
                     {
-                        bundle.Loading = LoadBundleAsync(bundle);
+                        bundle.Loading = Share(LoadBundleAsync(bundle));
                     }
-                    await bundle.Loading;
+                    await bundle.Loading.Task;
                 }
                 AssetBundleRequest request = _bundles[asset.Record.Bundle]
                     .Value.LoadAssetAsync(asset.Record.AssetPath);
@@ -431,13 +463,14 @@ namespace AiNative.Client.Assets.AssetBundle
             }
         }
 
-        private async Task<UnityBundle> LoadBundleAsync(BundleState state)
+        private async UniTask<UnityBundle> LoadBundleAsync(BundleState state)
         {
             string path = Path.Combine(_root, state.Record.Name);
             BundleBytes bytes = null;
             try
             {
                 // 校验与加载使用同一份字节，避免文件在校验与原生读取之间改变。
+                // 真正的文件 I/O 放在线程池执行；保留 Task.Run，await 后回到调用方 Unity 上下文。
                 bytes = await Task.Run(() => ReadBundleBytes(path));
                 string hash;
                 using (SHA256 sha = SHA256.Create())
@@ -470,7 +503,7 @@ namespace AiNative.Client.Assets.AssetBundle
                     };
                     NativeBundles.Add(state.Record.Name, native);
                     ownsNativeLoad = true;
-                    native.Loading = LoadNativeBundleAsync(native, bytes);
+                    native.Loading = Share(LoadNativeBundleAsync(native, bytes));
                 }
                 else if (native.Hash != hash || native.DependencyIdentity != dependencyIdentity)
                 {
@@ -487,7 +520,7 @@ namespace AiNative.Client.Assets.AssetBundle
                 }
                 native.References++;
                 state.Native = native;
-                state.Value = await native.Loading;
+                state.Value = await native.Loading.Task;
                 return state.Value;
             }
             catch (AssetLoadException)
@@ -530,7 +563,7 @@ namespace AiNative.Client.Assets.AssetBundle
             return identity.ToString();
         }
 
-        private static async Task<UnityBundle> LoadNativeBundleAsync(
+        private static async UniTask<UnityBundle> LoadNativeBundleAsync(
             NativeBundle native,
             BundleBytes bytes
         )
@@ -575,18 +608,18 @@ namespace AiNative.Client.Assets.AssetBundle
             }
         }
 
-        private static Task AwaitOperationAsync(AsyncOperation operation)
+        private static UniTask AwaitOperationAsync(AsyncOperation operation)
         {
             if (operation.isDone)
             {
-                return Task.CompletedTask;
+                return UniTask.CompletedTask;
             }
-            var completion = new TaskCompletionSource<bool>();
+            var completion = new UniTaskCompletionSource();
             Action<AsyncOperation> completed = null;
             completed = finished =>
             {
                 finished.completed -= completed;
-                completion.TrySetResult(true);
+                completion.TrySetResult();
             };
             operation.completed += completed;
             // 注册前后若原生操作刚好完成，也确保回调被移除；TrySetResult 支持重复通知。
@@ -597,34 +630,59 @@ namespace AiNative.Client.Assets.AssetBundle
             return completion.Task;
         }
 
-        private static async Task<T> AwaitInterestAsync<T>(Task<T> task, CancellationToken token)
+        // 只把完成源存入合并加载缓存；普通 UniTask 可能来自池化状态机，不能被重复 await。
+        private static UniTaskCompletionSource<T> Share<T>(UniTask<T> operation)
         {
-            if (!token.CanBeCanceled)
-            {
-                return await task;
-            }
-            var cancelled = new TaskCompletionSource<bool>();
-            using (token.Register(() => cancelled.TrySetResult(true)))
-            {
-                if (await Task.WhenAny(task, cancelled.Task) != task)
-                {
-                    // 仍观察共享任务失败，取消调用方不留下未观察异常。
-                    _ = ObserveAsync(task);
-                    throw new OperationCanceledException(token);
-                }
-                return await task;
-            }
+            var completion = new UniTaskCompletionSource<T>();
+            CompleteSharedAsync(operation, completion).Forget();
+            return completion;
         }
 
-        private static async Task ObserveAsync(Task task)
+        private static async UniTask CompleteSharedAsync<T>(
+            UniTask<T> operation,
+            UniTaskCompletionSource<T> completion
+        )
         {
             try
             {
-                await task;
+                completion.TrySetResult(await operation);
+            }
+            catch (OperationCanceledException exception)
+            {
+                completion.TrySetCanceled(exception.CancellationToken);
+            }
+            catch (Exception exception)
+            {
+                completion.TrySetException(exception);
+            }
+        }
+
+        private static async UniTask<T> AwaitInterestAsync<T>(
+            UniTask<T> shared,
+            CancellationToken token
+        )
+        {
+            try
+            {
+                // 包装器只取消本次等待；它仍观察共享操作的迟到结果及失败。
+                return await shared.AttachExternalCancellation(token);
+            }
+            finally
+            {
+                // 取消可能来自工作线程，引用计数及 Unity 对象清理必须返回主线程。
+                await UniTask.SwitchToMainThread();
+            }
+        }
+
+        private static async UniTask ObserveAsync(UniTask operation)
+        {
+            try
+            {
+                await operation;
             }
             catch
             {
-                // 加载失败已回传仍感兴趣的调用方；这里仅观察无人持有的结束结果。
+                // 加载失败由仍感兴趣的调用方观察；关闭仅等待全部已启动加载完成。
             }
         }
 
@@ -689,23 +747,39 @@ namespace AiNative.Client.Assets.AssetBundle
             if (_disposeTask == null)
             {
                 _disposed = true;
-                _disposeTask = DisposeCoreAsync();
+                // 公共 ValueTask 边界只转换一次，重复释放等待同一个 Task。
+                var completion = new UniTaskCompletionSource();
+                _disposeTask = completion.Task.AsTask();
+                CompleteDisposalAsync(completion).Forget();
             }
             return new ValueTask(_disposeTask);
         }
 
-        private async Task DisposeCoreAsync()
+        private async UniTask CompleteDisposalAsync(UniTaskCompletionSource completion)
+        {
+            try
+            {
+                await DisposeCoreAsync();
+                completion.TrySetResult();
+            }
+            catch (Exception exception)
+            {
+                completion.TrySetException(exception);
+            }
+        }
+
+        private async UniTask DisposeCoreAsync()
         {
             foreach (AssetInstance instance in _instances.ToArray())
             {
                 await instance.DisposeAsync();
             }
-            var pending = new List<Task>();
+            var pending = new List<UniTask>();
             foreach (AssetState asset in _assets.Values)
             {
-                pending.Add(asset.Loading);
+                pending.Add(ObserveAsync(asset.Loading.Task));
             }
-            await ObserveAsync(Task.WhenAll(pending));
+            await UniTask.WhenAll(pending);
             foreach (AssetHandle handle in new List<AssetHandle>(_handles))
             {
                 handle.Release(this);

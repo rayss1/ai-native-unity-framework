@@ -54,6 +54,17 @@ namespace AiNative.Client.Application.Tests
                     Is.Null,
                     "The old standalone Battle transport must never be initialized."
                 );
+                Assert.That(
+                    root.GetComponent<TopologyClientFlow>(),
+                    Is.Null,
+                    "Awake 只采集组件，显式启动前不得装配交互流程。"
+                );
+                root.ConfigureLaunch();
+                Assert.That(
+                    root.Session,
+                    Is.Null,
+                    "显式配置本地拓扑也不得创建旧单机 Battle 会话。"
+                );
                 var flow = root.GetComponent<TopologyClientFlow>();
                 Assert.That(flow, Is.Not.Null);
                 Assert.That(flow.Automated, Is.False);

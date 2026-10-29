@@ -69,11 +69,22 @@ namespace AiNative.Client.Editor
 
         public static void BuildMacOsArm64Smoke()
         {
-            BattleClientRendering.ValidateUrpConfiguration();
             string output = ReadRequiredAbsolutePath(
                 Environment.GetCommandLineArgs(),
                 "--ainative-build-output"
             );
+            BuildMacOsArm64AtPath(output);
+        }
+
+        /// <summary>在 Editor 主线程构建 ARM64 Player；输出为绝对路径，结束后恢复临时构建设置。</summary>
+        public static void BuildMacOsArm64AtPath(string output)
+        {
+            if (!Path.IsPathRooted(output))
+            {
+                throw new ArgumentException("Player output must be an absolute path.");
+            }
+            output = Path.GetFullPath(output);
+            BattleClientRendering.ValidateUrpConfiguration();
             if (!output.EndsWith(".app", StringComparison.OrdinalIgnoreCase))
             {
                 throw new ArgumentException("--ainative-build-output must name a .app bundle.");

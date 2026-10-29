@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using AiNative.Client.Fantasy;
 using AiNative.Client.Protocol;
 using AiNative.Client.Protocol.Protobuf;
+using Cysharp.Threading.Tasks;
 using NUnit.Framework;
 using UnityEngine;
 
@@ -19,6 +20,7 @@ namespace AiNative.Client.Application.Tests
         {
             _owner = new GameObject("TopologyUiFlowFixture");
             _flow = _owner.AddComponent<TopologyClientFlow>();
+            FrameworkClientRoot.GetOrCreate(_owner);
             _flow.Initialize(new GateConnectionOptions("127.0.0.1", 23001, false));
         }
 
@@ -242,12 +244,15 @@ namespace AiNative.Client.Application.Tests
         private void Run(Func<Task> action) =>
             typeof(TopologyClientFlow)
                 .GetMethod("Run", BindingFlags.NonPublic | BindingFlags.Instance)
-                .Invoke(_flow, new object[] { action, false });
+                .Invoke(
+                    _flow,
+                    new object[] { new Func<UniTask>(() => action().AsUniTask()), false }
+                );
 
         private void Submit(Func<Task> action) =>
             typeof(TopologyClientFlow)
                 .GetMethod("Submit", BindingFlags.NonPublic | BindingFlags.Instance)
-                .Invoke(_flow, new object[] { action });
+                .Invoke(_flow, new object[] { new Func<UniTask>(() => action().AsUniTask()) });
 
         private object Field(string name)
         {

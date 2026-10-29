@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using AiNative.Client.Runtime;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -20,12 +21,36 @@ namespace AiNative.Client.Application
         public const string ContentScenePath =
             "Assets/AiNative.BattleClient/Scenes/BattleClient.unity";
 
+        // 按内容路径预留所属启动器，不把任意应用根当作全局单例。
+        private static readonly Dictionary<string, FrameworkBootstrap> ContentOwners =
+            new Dictionary<string, FrameworkBootstrap>(StringComparer.OrdinalIgnoreCase);
+
+        internal static bool IsExternallyManaged(Scene scene)
+        {
+            return ContentOwners.TryGetValue(scene.path, out FrameworkBootstrap owner)
+                && owner != null
+                && !owner._destroyed;
+        }
+
+        private void ReserveContent()
+        {
+            if (
+                ContentOwners.TryGetValue(ContentScenePath, out FrameworkBootstrap owner)
+                && owner != null
+                && owner != this
+            )
+            {
+                throw new InvalidOperationException("bootstrap-content-already-owned");
+            }
+            ContentOwners[ContentScenePath] = this;
+        }
+
         private readonly CancellationTokenSource _lifetime = new CancellationTokenSource();
         private ClientSceneService _scenes;
         private Scene _bootstrapScene;
-        private Task _startupTask;
-        private Task _stopTask;
-        private Task _quitTask;
+        private UniTaskCompletionSource _startupTask;
+        private UniTaskCompletionSource _stopTask;
+        private UniTaskCompletionSource _quitTask;
         private bool _quitAllowed;
         private bool _destroyed;
         private string _failure;
@@ -51,7 +76,7 @@ namespace AiNative.Client.Application
         {
             if (_stopTask == null)
             {
-                _ = ObserveStartupAsync();
+                ObserveStartupAsync().Forget();
             }
         }
 
@@ -64,11 +89,11 @@ namespace AiNative.Client.Application
             }
             if (_startupTask == null)
             {
-                var completion = new TaskCompletionSource<bool>();
-                _startupTask = completion.Task;
-                _ = StartObservedAsync(completion);
+                var completion = new UniTaskCompletionSource();
+                _startupTask = completion;
+                StartObservedAsync(completion).Forget();
             }
-            return new ValueTask(_startupTask);
+            return _startupTask.Task.AsValueTask();
         }
 
         /// <summary>主线程重试失败启动，保留已加载内容场景；关闭中不允许重试，重复调用等待当前启动。</summary>
@@ -78,19 +103,19 @@ namespace AiNative.Client.Application
             {
                 throw new ObjectDisposedException(nameof(FrameworkBootstrap));
             }
-            if (_startupTask == null || !_startupTask.IsFaulted)
+            if (_startupTask == null || !(_startupTask.Task.Status == UniTaskStatus.Faulted))
             {
                 return StartAsync();
             }
-            var completion = new TaskCompletionSource<bool>();
-            _startupTask = completion.Task;
+            var completion = new UniTaskCompletionSource();
+            _startupTask = completion;
             _failure = null;
-            _ = StartObservedAsync(completion, true);
-            return new ValueTask(_startupTask);
+            StartObservedAsync(completion, true).Forget();
+            return _startupTask.Task.AsValueTask();
         }
 
-        private async Task StartObservedAsync(
-            TaskCompletionSource<bool> completion,
+        private async UniTask StartObservedAsync(
+            UniTaskCompletionSource completion,
             bool retry = false
         )
         {
@@ -98,6 +123,7 @@ namespace AiNative.Client.Application
             {
                 // 不把原生加载取消直接交给场景服务：必须先发现迟到的内容根并等待其 Stop，
                 // 然后才允许卸载，避免资源启动仍在继续时销毁它们的 MonoBehaviour。
+                ReserveContent();
                 Scene content = SceneManager.GetSceneByPath(ContentScenePath);
                 if (!content.IsValid() || !content.isLoaded)
                 {
@@ -119,12 +145,12 @@ namespace AiNative.Client.Application
                     {
                         if (retry)
                         {
-                            await root.RetryStartupAsync();
+                            await root.StopAsync();
                         }
-                        await root.AssetsAsync(_lifetime.Token);
+                        await root.StartAsync(_lifetime.Token);
                     }
                 }
-                completion.TrySetResult(true);
+                completion.TrySetResult();
             }
             catch (OperationCanceledException) when (_lifetime.IsCancellationRequested)
             {
@@ -137,7 +163,7 @@ namespace AiNative.Client.Application
             }
         }
 
-        private async Task ObserveStartupAsync()
+        private async UniTask ObserveStartupAsync()
         {
             try
             {
@@ -158,14 +184,14 @@ namespace AiNative.Client.Application
         {
             if (_stopTask == null)
             {
-                var completion = new TaskCompletionSource<bool>();
-                _stopTask = completion.Task;
-                _ = StopObservedAsync(completion);
+                var completion = new UniTaskCompletionSource();
+                _stopTask = completion;
+                StopObservedAsync(completion).Forget();
             }
-            return new ValueTask(_stopTask);
+            return _stopTask.Task.AsValueTask();
         }
 
-        private async Task StopObservedAsync(TaskCompletionSource<bool> completion)
+        private async UniTask StopObservedAsync(UniTaskCompletionSource completion)
         {
             var errors = new List<Exception>();
             try
@@ -180,7 +206,7 @@ namespace AiNative.Client.Application
             {
                 try
                 {
-                    await _startupTask;
+                    await _startupTask.Task;
                 }
                 catch (OperationCanceledException) { }
                 catch (Exception exception)
@@ -214,10 +240,17 @@ namespace AiNative.Client.Application
             {
                 errors.Add(exception);
             }
+            if (
+                ContentOwners.TryGetValue(ContentScenePath, out FrameworkBootstrap owner)
+                && owner == this
+            )
+            {
+                ContentOwners.Remove(ContentScenePath);
+            }
             _lifetime.Dispose();
             if (errors.Count == 0)
             {
-                completion.TrySetResult(true);
+                completion.TrySetResult();
             }
             else
             {
@@ -230,14 +263,14 @@ namespace AiNative.Client.Application
         {
             if (_quitTask == null)
             {
-                var completion = new TaskCompletionSource<bool>();
-                _quitTask = completion.Task;
-                _ = QuitObservedAsync(exitCode, completion);
+                var completion = new UniTaskCompletionSource();
+                _quitTask = completion;
+                QuitObservedAsync(exitCode, completion).Forget();
             }
-            return new ValueTask(_quitTask);
+            return _quitTask.Task.AsValueTask();
         }
 
-        private async Task QuitObservedAsync(int exitCode, TaskCompletionSource<bool> completion)
+        private async UniTask QuitObservedAsync(int exitCode, UniTaskCompletionSource completion)
         {
             try
             {
@@ -252,7 +285,7 @@ namespace AiNative.Client.Application
                 }
             }
             _quitAllowed = true;
-            completion.TrySetResult(true);
+            completion.TrySetResult();
             if (!_destroyed)
             {
                 global::UnityEngine.Application.Quit(exitCode);
@@ -266,13 +299,20 @@ namespace AiNative.Client.Application
                 return true;
             }
             // 操作系统窗口关闭没有业务退出码；显式 smoke 退出使用注入的 RequestQuitAsync。
-            _ = RequestQuitAsync();
+            RequestQuitAsync().AsUniTask().Forget(Debug.LogException);
             return false;
         }
 
-        private static List<FrameworkClientRoot> CollectContentRoots()
+        private List<FrameworkClientRoot> CollectContentRoots()
         {
             var result = new List<FrameworkClientRoot>();
+            if (
+                !ContentOwners.TryGetValue(ContentScenePath, out FrameworkBootstrap owner)
+                || owner != this
+            )
+            {
+                return result;
+            }
             Scene content = SceneManager.GetSceneByPath(ContentScenePath);
             if (!content.IsValid() || !content.isLoaded)
             {
@@ -289,10 +329,10 @@ namespace AiNative.Client.Application
         {
             _destroyed = true;
             global::UnityEngine.Application.wantsToQuit -= HandleWantsToQuit;
-            _ = ObserveFallbackStopAsync();
+            ObserveFallbackStopAsync().Forget();
         }
 
-        private async Task ObserveFallbackStopAsync()
+        private async UniTask ObserveFallbackStopAsync()
         {
             try
             {
@@ -312,16 +352,16 @@ namespace AiNative.Client.Application
                 if (
                     _stopTask == null
                     && _startupTask != null
-                    && _startupTask.IsFaulted
+                    && (_startupTask.Task.Status == UniTaskStatus.Faulted)
                     && GUI.Button(new Rect(16, 78, 160, 36), "重试场景启动")
                 )
                 {
-                    _ = ObserveRetryAsync();
+                    ObserveRetryAsync().Forget();
                 }
             }
         }
 
-        private async Task ObserveRetryAsync()
+        private async UniTask ObserveRetryAsync()
         {
             try
             {

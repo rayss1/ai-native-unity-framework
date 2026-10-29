@@ -152,6 +152,8 @@ namespace AiNative.Client.Application
 
         // 发送完成前由传输层借用此内存；重连清空环形队列不得影响它。
         private readonly byte[] _inputSendBuffer;
+
+        // 网络契约返回 Task；此处按原帧阶段轮询完成，避免引入 PlayerLoop 延续改变预测时序。
         private Task<SendResult> _pendingInputSend;
         private int _pendingInputLength;
         private ulong _inputGeneration;
@@ -699,6 +701,7 @@ namespace AiNative.Client.Application
             return true;
         }
 
+        // 纯传输清理保留 Task，不依赖 Unity PlayerLoop，关闭编辑器后仍可观察连接释放。
         private static async Task DisposeAbandonedConnectionAsync(
             Task<BattleTransportConnection> abandoned
         )

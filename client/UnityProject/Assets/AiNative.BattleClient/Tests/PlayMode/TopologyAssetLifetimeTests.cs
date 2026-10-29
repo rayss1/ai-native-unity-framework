@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using AiNative.Client.Assets;
 using AiNative.Client.Fantasy;
 using AiNative.Client.UI;
+using Cysharp.Threading.Tasks;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
@@ -26,7 +27,17 @@ namespace AiNative.Client.Application.PlayModeTests
             {
                 var flow = owner.AddComponent<TopologyClientFlow>();
                 flow.Initialize(new GateConnectionOptions("127.0.0.1", 23001, false));
+                FrameworkClientRoot.GetOrCreate(owner);
                 flow.ConfigureUi(assets, ui);
+                Task starting = (
+                    (UniTask)
+                        typeof(TopologyClientFlow)
+                            .GetMethod(
+                                "StartFlowAsync",
+                                BindingFlags.Instance | BindingFlags.NonPublic
+                            )
+                            .Invoke(flow, new object[] { CancellationToken.None })
+                ).AsTask();
                 yield return null;
                 Assert.That(assets.Loads, Is.EqualTo(1));
                 Task stopped = flow.StopAsync().AsTask();
@@ -43,6 +54,15 @@ namespace AiNative.Client.Application.PlayModeTests
                 }
                 Assert.That(stopped.IsCompleted, Is.True, "停止等待不得无限挂起。");
                 stopped.GetAwaiter().GetResult();
+                Assert.That(starting.IsCompleted, Is.True);
+                Assert.That(starting.IsCanceled || starting.IsFaulted, Is.True);
+                if (starting.IsFaulted)
+                {
+                    Assert.That(
+                        starting.Exception.GetBaseException().Message,
+                        Is.EqualTo("ui-load-failed")
+                    );
+                }
                 Assert.That(assets.Releases, Is.EqualTo(1));
                 Assert.That(ui.OpenCount, Is.Zero);
                 Assert.That(
