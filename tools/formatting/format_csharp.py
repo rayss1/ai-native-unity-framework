@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Format tracked project-owned C# sources with the pinned local CSharpier tool."""
+"""Format project-owned C# sources, including nonignored untracked files."""
 
 import argparse
 from pathlib import Path
@@ -8,21 +8,29 @@ import subprocess
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--check", action="store_true", help="Check without writing files.")
-    args = parser.parse_args()
+def discover_sources(root: Path, scope: str = "all") -> list[str]:
+    """发现工作树中的自有源码；新文件无需暂存，忽略规则由 Git 统一解释。"""
+    if scope not in ("all", "client"):
+        raise ValueError(f"Unknown formatting scope: {scope}")
     paths = (
-        subprocess.check_output(["git", "ls-files", "-z", "--", "*.cs"], cwd=ROOT)
+        subprocess.check_output(
+            ["git", "ls-files", "--cached", "--others", "--exclude-standard", "-z", "--", "*.cs"],
+            cwd=root,
+        )
         .decode("utf-8")
         .split("\0")
     )
     sources = []
-    for relative in filter(None, paths):
-        path = ROOT / relative
+    for relative in sorted(set(filter(None, paths))):
+        if scope == "client" and not (
+            relative.startswith("packages/com.ainative.client.")
+            or relative.startswith("client/UnityProject/Assets/AiNative.")
+        ):
+            continue
+        path = root / relative
         if (
-            "vendor" in path.parts
-            or "ThirdParty" in path.parts
+            "vendor" in Path(relative).parts
+            or "ThirdParty" in Path(relative).parts
             or relative.startswith("shared/generated/")
             or not path.is_file()
         ):
@@ -32,10 +40,21 @@ def main():
             continue
         sources.append(relative)
 
+    return sources
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--check", action="store_true", help="Check without writing files.")
+    parser.add_argument("--scope", choices=("all", "client"), default="all")
+    parser.add_argument("--dotnet", default="dotnet", help="Compatible SDK executable.")
+    args = parser.parse_args()
+    sources = discover_sources(ROOT, args.scope)
+
     command = "check" if args.check else "format"
     for start in range(0, len(sources), 40):
         subprocess.run(
-            ["dotnet", "csharpier", command, *sources[start : start + 40]],
+            [args.dotnet, "csharpier", command, *sources[start : start + 40]],
             cwd=ROOT,
             check=True,
         )

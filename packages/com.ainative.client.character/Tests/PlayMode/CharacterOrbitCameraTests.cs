@@ -8,11 +8,11 @@ namespace AiNative.Client.Character.Tests
 {
     public sealed class CharacterOrbitCameraTests
     {
-        private readonly List<GameObject> objects = new List<GameObject>();
-        private CharacterMotor motor;
-        private CharacterOrbitCamera orbit;
-        private Vector3 pivot;
-        private Vector3 boomDirection;
+        private readonly List<GameObject> _objects = new List<GameObject>();
+        private CharacterMotor _motor;
+        private CharacterOrbitCamera _orbit;
+        private Vector3 _pivot;
+        private Vector3 _boomDirection;
 
         [SetUp]
         public void SetUp()
@@ -24,21 +24,26 @@ namespace AiNative.Client.Character.Tests
             controller.center = Vector3.up * .9f;
             controller.height = 1.8f;
             controller.radius = .3f;
-            motor = character.AddComponent<CharacterMotor>();
-            orbit = Create("Camera test rig").AddComponent<CharacterOrbitCamera>();
-            orbit.Configure(motor, null);
-            pivot = character.transform.position + Vector3.up * 1.45f;
-            boomDirection = -(Quaternion.Euler(15, 0, 0) * Vector3.forward);
+            _motor = character.AddComponent<CharacterMotor>();
+            _orbit = Create("Camera test rig").AddComponent<CharacterOrbitCamera>();
+            _orbit.Configure(_motor, null);
+            _pivot = character.transform.position + Vector3.up * 1.45f;
+            _boomDirection = -(Quaternion.Euler(15, 0, 0) * Vector3.forward);
             Physics.SyncTransforms();
         }
 
         [TearDown]
         public void TearDown()
         {
-            foreach (var item in objects)
+            foreach (var item in _objects)
+            {
                 if (item != null)
+                {
                     Object.DestroyImmediate(item);
-            objects.Clear();
+                }
+            }
+
+            _objects.Clear();
         }
 
         [UnityTest]
@@ -47,20 +52,20 @@ namespace AiNative.Client.Character.Tests
             yield return null;
             yield return null;
             Assert.That(
-                Vector3.Distance(orbit.transform.position, pivot),
+                Vector3.Distance(_orbit.transform.position, _pivot),
                 Is.EqualTo(4).Within(.02f)
             );
             var wall = Create("Camera obstacle");
-            wall.transform.position = pivot + boomDirection * 2;
+            wall.transform.position = _pivot + _boomDirection * 2;
             wall.AddComponent<BoxCollider>().size = new Vector3(5, 5, .2f);
             Physics.SyncTransforms();
             yield return null;
-            float blocked = Vector3.Distance(orbit.transform.position, pivot);
+            float blocked = Vector3.Distance(_orbit.transform.position, _pivot);
             Assert.That(blocked, Is.InRange(1.3f, 2f), "Camera must retract in front of the wall.");
             wall.SetActive(false);
             Physics.SyncTransforms();
             yield return null;
-            float recovering = Vector3.Distance(orbit.transform.position, pivot);
+            float recovering = Vector3.Distance(_orbit.transform.position, _pivot);
             Assert.That(
                 recovering,
                 Is.GreaterThan(blocked),
@@ -73,7 +78,7 @@ namespace AiNative.Client.Character.Tests
             );
             yield return new WaitForSeconds(.8f);
             Assert.That(
-                Vector3.Distance(orbit.transform.position, pivot),
+                Vector3.Distance(_orbit.transform.position, _pivot),
                 Is.EqualTo(4).Within(.03f)
             );
         }
@@ -81,25 +86,25 @@ namespace AiNative.Client.Character.Tests
         [UnityTest]
         public IEnumerator IgnoreRaycastCharacterChildrenDoNotRetractCamera()
         {
-            // Put a character-owned collider directly across the boom. It would
-            // retract the camera if the demo's self-exclusion layer were included.
+            // 将角色自身碰撞体放在相机臂上；若错误包含角色排除层，
+            // 它将导致相机回缩。
             var accessory = Create("Character accessory collider");
-            accessory.transform.SetParent(motor.transform);
+            accessory.transform.SetParent(_motor.transform);
             accessory.layer = 2;
-            accessory.transform.position = pivot + boomDirection;
+            accessory.transform.position = _pivot + _boomDirection;
             accessory.AddComponent<BoxCollider>().size = Vector3.one * .4f;
             Physics.SyncTransforms();
             yield return null;
             yield return null;
             Assert.That(
-                Vector3.Distance(orbit.transform.position, pivot),
+                Vector3.Distance(_orbit.transform.position, _pivot),
                 Is.EqualTo(4).Within(.02f)
             );
-            // Positive control: the same shape on the environment layer must block.
+            // 正向对照：相同形状置于环境层时必须遮挡相机。
             accessory.layer = 0;
             Physics.SyncTransforms();
             yield return null;
-            Assert.That(Vector3.Distance(orbit.transform.position, pivot), Is.LessThan(1));
+            Assert.That(Vector3.Distance(_orbit.transform.position, _pivot), Is.LessThan(1));
         }
 
         [UnityTest]
@@ -107,9 +112,11 @@ namespace AiNative.Client.Character.Tests
         {
             var remote = Create("Externally driven character");
             remote.transform.position = new Vector3(1200, 1000, 1000);
-            orbit.ConfigurePresentation(remote.transform);
-            orbit.SetPresentationState(new CharacterMotionState { Aiming = true, Crouched = true });
-            orbit.ApplyLook(new Vector2(100, 50));
+            _orbit.ConfigurePresentation(remote.transform);
+            _orbit.SetPresentationState(
+                new CharacterMotionState { Aiming = true, Crouched = true }
+            );
+            _orbit.ApplyLook(new Vector2(100, 50));
             yield return null;
             yield return null;
             var rotation = Quaternion.Euler(9, 12, 0);
@@ -117,9 +124,9 @@ namespace AiNative.Client.Character.Tests
                 remote.transform.position
                 + Vector3.up * .9f
                 + rotation * new Vector3(.45f, 0, -2.2f);
-            Assert.That(orbit.Yaw, Is.EqualTo(12).Within(.001f));
-            Assert.That(orbit.Pitch, Is.EqualTo(9).Within(.001f));
-            Assert.That(Vector3.Distance(orbit.transform.position, expected), Is.LessThan(.02f));
+            Assert.That(_orbit.Yaw, Is.EqualTo(12).Within(.001f));
+            Assert.That(_orbit.Pitch, Is.EqualTo(9).Within(.001f));
+            Assert.That(Vector3.Distance(_orbit.transform.position, expected), Is.LessThan(.02f));
             Assert.That(remote.GetComponent<CharacterMotor>(), Is.Null);
         }
 
@@ -128,18 +135,20 @@ namespace AiNative.Client.Character.Tests
         {
             var remote = Create("Temporary external target");
             remote.transform.position = new Vector3(1200, 1000, 1000);
-            orbit.ConfigurePresentation(remote.transform);
-            orbit.SetPresentationState(new CharacterMotionState { Aiming = true, Crouched = true });
+            _orbit.ConfigurePresentation(remote.transform);
+            _orbit.SetPresentationState(
+                new CharacterMotionState { Aiming = true, Crouched = true }
+            );
             yield return null;
-            orbit.Configure(motor, null);
+            _orbit.Configure(_motor, null);
             yield return null;
             yield return null;
             Assert.That(
-                Vector3.Distance(orbit.transform.position, pivot),
+                Vector3.Distance(_orbit.transform.position, _pivot),
                 Is.EqualTo(4).Within(.02f)
             );
             Assert.That(
-                Vector3.Distance(orbit.transform.position, pivot + boomDirection * 4),
+                Vector3.Distance(_orbit.transform.position, _pivot + _boomDirection * 4),
                 Is.LessThan(.02f)
             );
         }
@@ -147,7 +156,7 @@ namespace AiNative.Client.Character.Tests
         private GameObject Create(string name)
         {
             var item = new GameObject(name);
-            objects.Add(item);
+            _objects.Add(item);
             return item;
         }
     }

@@ -34,11 +34,17 @@ namespace AiNative.Client.Character.Tests
                         "ReleaseCursor",
                     }
                 )
+                {
                     Assert.That(gameplay.FindAction(name), Is.Not.Null, name);
+                }
+
                 foreach (
                     var name in new[] { "Point", "Click", "Scroll", "Navigate", "Submit", "Cancel" }
                 )
+                {
                     Assert.That(ui.FindAction(name), Is.Not.Null, name);
+                }
+
                 Assert.That(gameplay.FindAction("Move").expectedControlType, Is.EqualTo("Vector2"));
                 Assert.That(gameplay.FindAction("Look").expectedControlType, Is.EqualTo("Vector2"));
                 gameplay.Enable();
@@ -46,7 +52,7 @@ namespace AiNative.Client.Character.Tests
             }
             finally
             {
-                // EditMode cannot use the generated wrapper's deferred runtime Destroy.
+                // EditMode 不能使用生成包装器在运行时延迟执行的 Destroy。
                 Object.DestroyImmediate(first.asset);
                 Object.DestroyImmediate(second.asset);
             }

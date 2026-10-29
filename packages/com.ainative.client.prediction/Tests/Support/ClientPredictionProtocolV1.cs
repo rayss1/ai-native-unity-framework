@@ -31,9 +31,7 @@ namespace AiNative.Client.Prediction
         }
 
         public KinematicState State { get; }
-
         public bool IsReconnect { get; }
-
         public uint ReconnectConnectionEpoch { get; }
     }
 
@@ -45,19 +43,16 @@ namespace AiNative.Client.Prediction
         public const ushort InputCommandMessageId = 1100;
         public const ushort SnapshotMessageId = 1101;
         public const ushort ReconnectResponseMessageId = 1201;
-
         public static readonly TransportChannel ControlChannel = new TransportChannel(
             0,
             TransportDelivery.Reliable,
             TransportOrdering.Ordered
         );
-
         public static readonly TransportChannel SnapshotChannel = new TransportChannel(
             1,
             TransportDelivery.Unreliable,
             TransportOrdering.Sequenced
         );
-
         public static readonly TransportChannel InputChannel = new TransportChannel(
             2,
             TransportDelivery.Unreliable,
@@ -162,7 +157,6 @@ namespace AiNative.Client.Prediction
             bool hasResumeTick = false;
             bool hasSnapshot = false;
             DecodedAuthoritativeSnapshot nested = default;
-
             while (offset < payload.Length)
             {
                 if (!TryReadKey(payload, ref offset, out int fieldNumber, out int wireType))
@@ -256,7 +250,6 @@ namespace AiNative.Client.Prediction
             bool foundPlayer = false;
             int positionX = 0;
             int positionZ = 0;
-
             while (offset < payload.Length)
             {
                 if (!TryReadKey(payload, ref offset, out int fieldNumber, out int wireType))

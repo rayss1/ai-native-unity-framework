@@ -28,6 +28,7 @@ namespace AiNative.Client.Prediction.Tests
             codec.Snapshot(snapshot, 101, uint.MaxValue - 1, 0, arena);
             Apply(arena, legacy, fps, codec, snapshot, 2);
             if (arena)
+            {
                 Assert.That(
                     fps.PrepareInput(
                         102,
@@ -41,11 +42,14 @@ namespace AiNative.Client.Prediction.Tests
                     ).Status,
                     Is.EqualTo(ArenaPredictionPrepareStatus.SequenceExhausted)
                 );
+            }
             else
+            {
                 Assert.That(
                     legacy.PrepareInput(102, 1000, 0, input).Status,
                     Is.EqualTo(PredictionPrepareStatus.SequenceExhausted)
                 );
+            }
         }
 
         [TestCase(false)]
@@ -133,6 +137,7 @@ namespace AiNative.Client.Prediction.Tests
                 legacy.TryGetPredictedState(out var after);
                 Assert.That(after, Is.EqualTo(beforeLegacy));
             }
+
             codec.RejectEncoding = false;
             Prepare(arena, legacy, fps, input);
             Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(input.AsSpan(10)), Is.EqualTo(6));
@@ -169,15 +174,21 @@ namespace AiNative.Client.Prediction.Tests
                 arena
             );
             if (failure == 0)
+            {
                 snapshot[0] = 0;
+            }
+
             Apply(arena, legacy, fps, codec, snapshot, failure == 2 ? 1u : 2u);
             if (arena)
+            {
                 Assert.That(fps.Current, Is.EqualTo(beforeArena));
+            }
             else
             {
                 legacy.TryGetPredictedState(out var after);
                 Assert.That(after, Is.EqualTo(beforeLegacy));
             }
+
             Prepare(arena, legacy, fps, input);
             Assert.That(
                 BinaryPrimitives.ReadUInt32LittleEndian(input.AsSpan(10)),
@@ -200,14 +211,19 @@ namespace AiNative.Client.Prediction.Tests
             codec.Snapshot(snapshot, 100, 0, 0, arena);
             Apply(arena, legacy, fps, codec, snapshot, 2);
             for (int i = 0; i < 1000; i++)
+            {
                 Cycle(arena, legacy, fps, codec, snapshot, input, i);
+            }
 
             int replayed = 0;
             using var allocationMeter = new CalibratedAllocationMeter();
             allocationMeter.RequireSupported();
             allocationMeter.Begin();
             for (int i = 1000; i < 11000; i++)
+            {
                 replayed += Cycle(arena, legacy, fps, codec, snapshot, input, i);
+            }
+
             long allocated = allocationMeter.End();
             Assert.That(allocated, Is.Zero);
             Assert.That(
@@ -246,6 +262,7 @@ namespace AiNative.Client.Prediction.Tests
         )
         {
             if (arena)
+            {
                 fps.PrepareInput(
                     101,
                     1000,
@@ -256,8 +273,11 @@ namespace AiNative.Client.Prediction.Tests
                     ArenaWeaponId.Machinegun,
                     input
                 );
+            }
             else
+            {
                 legacy.PrepareInput(101, 1000, 0, input);
+            }
         }
 
         private static int Apply(
@@ -277,11 +297,14 @@ namespace AiNative.Client.Prediction.Tests
                 epoch
             );
             if (arena)
+            {
                 return fps.ApplySnapshot(snapshot, packet).Reconciliation.ReplayedInputCount;
+            }
+
             return legacy.ApplyPacket(snapshot, packet).Reconciliation.ReplayedInputCount;
         }
 
-        // Test-only fixed-width format. It has neither protobuf fields nor the production envelope.
+        // 仅用于测试的定长格式，不包含 Protobuf 字段或生产信封。
         private sealed class FixtureCodec : IBattleProtocolCodec
         {
             public const int FrameBytes = 32;
@@ -338,7 +361,10 @@ namespace AiNative.Client.Prediction.Tests
             {
                 written = 0;
                 if (_disposed || RejectEncoding || bytes.Length < FrameBytes)
+                {
                     return false;
+                }
+
                 bytes.Slice(0, FrameBytes).Clear();
                 bytes[0] = 0xD7;
                 bytes[1] = 1;
@@ -368,12 +394,21 @@ namespace AiNative.Client.Prediction.Tests
             )
             {
                 if (_disposed)
+                {
                     return BattleDecodeStatus.Disposed;
+                }
+
                 if (bytes.Length != FrameBytes || bytes[0] != 0xD7 || bytes[1] != 2)
+                {
                     return BattleDecodeStatus.MalformedPayload;
+                }
+
                 ulong tick = BinaryPrimitives.ReadUInt64LittleEndian(bytes.Slice(2));
                 if (tick > long.MaxValue)
+                {
                     return BattleDecodeStatus.MalformedPayload;
+                }
+
                 uint ack = BinaryPrimitives.ReadUInt32LittleEndian(bytes.Slice(10));
                 var state = new ArenaPlayerState(
                     (long)tick,

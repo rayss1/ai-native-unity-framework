@@ -51,6 +51,38 @@ public sealed class ArchitectureValidatorTests
         Assert.That(result.Diagnostics, Is.Empty);
     }
 
+    [TestCase("core", "UnityEngine")]
+    [TestCase("assets", "Cysharp.Threading.Tasks")]
+    [TestCase("ui.ugui", "VContainer")]
+    public void ClientFoundationRejectsImplementationLibraryLeaks(
+        string package,
+        string importedNamespace
+    )
+    {
+        Write(
+            $"packages/com.ainative.client.{package}/Runtime/Leak.cs",
+            $"using {importedNamespace}; public class Leak {{ }}"
+        );
+        Assert.That(Validate().Diagnostics.Any(diagnostic => diagnostic.Code == "ARC010"), Is.True);
+    }
+
+    [Test]
+    public void ClientAdaptersMayReferenceTheirExplicitLibraries()
+    {
+        Write(
+            "packages/com.ainative.client.async.unitask/Runtime/Adapter.cs",
+            "using Cysharp.Threading.Tasks;"
+        );
+        Write(
+            "packages/com.ainative.client.composition.vcontainer/Runtime/Adapter.cs",
+            "using VContainer;"
+        );
+        Assert.That(
+            Validate().Diagnostics.Any(diagnostic => diagnostic.Code == "ARC010"),
+            Is.False
+        );
+    }
+
     [Test]
     public void UnityManifestCanReferenceAnInternalSharedPackage()
     {

@@ -1,9 +1,13 @@
 using System;
 using System.IO;
 using System.Reflection;
+using System.Threading;
+using System.Threading.Tasks;
+using AiNative.Client.Assets;
 using AiNative.Client.Fantasy;
 using AiNative.Client.Protocol;
 using AiNative.Client.Protocol.Protobuf;
+using AiNative.Client.UI;
 using AiNative.Gameplay;
 using NUnit.Framework;
 using UnityEngine;
@@ -36,11 +40,14 @@ namespace AiNative.Client.Application.Tests
                     "Receipt-tail states must not predict new input."
                 );
                 for (int i = 0; i < 300; i++)
+                {
                     transport.Enqueue(
                         Frame((ulong)(101 + i)),
                         BattleClientProtocolV1.SnapshotChannel,
                         1
                     );
+                }
+
                 transport.Enqueue(Frame(401, true), BattleClientProtocolV1.SnapshotChannel, 1);
                 transport.Close();
                 Update(flow);
@@ -124,7 +131,9 @@ namespace AiNative.Client.Application.Tests
             {
                 UnityEngine.Object.DestroyImmediate(owner);
                 if (File.Exists(path))
+                {
                     File.Delete(path);
+                }
             }
         }
 
@@ -162,7 +171,164 @@ namespace AiNative.Client.Application.Tests
             {
                 UnityEngine.Object.DestroyImmediate(owner);
                 if (File.Exists(path))
+                {
                     File.Delete(path);
+                }
+            }
+        }
+
+        [Test]
+        public async Task StoppingOneApplicationReleasesOnlyItsOwnedBattle()
+        {
+            var firstOwner = new GameObject("FirstBattleOwner");
+            var secondOwner = new GameObject("SecondBattleOwner");
+            TopologyClientFlow first = null;
+            TopologyClientFlow second = null;
+            try
+            {
+                first = CreateFlow(firstOwner, new FakeTransport());
+                second = CreateFlow(secondOwner, new FakeTransport());
+                BattleClientSession firstBattle = first.Battle;
+                await first.StopAsync();
+                await first.StopAsync();
+                Assert.That(firstBattle.State, Is.EqualTo(BattleClientState.Disposed));
+                Assert.That(second.Battle.State, Is.EqualTo(BattleClientState.Active));
+                Assert.That(second.Battle.IsPredictionInitialized, Is.True);
+            }
+            finally
+            {
+                if (first != null)
+                {
+                    await first.StopAsync();
+                }
+                if (second != null)
+                {
+                    await second.StopAsync();
+                }
+                UnityEngine.Object.DestroyImmediate(firstOwner);
+                UnityEngine.Object.DestroyImmediate(secondOwner);
+            }
+        }
+
+        [Test]
+        public async Task ModalBlocksOwnedFlowsInputWithoutStoppingPrediction()
+        {
+            var owner = new GameObject("ModalInputFixture");
+            var otherOwner = new GameObject("OtherInputFixture");
+            var ui = new UiService();
+            var modal = new GameObject("Modal");
+            Func<bool> previousFocus = TopologyClientFlow.EditorHasGameFocus;
+            TopologyClientFlow flow = null;
+            TopologyClientFlow other = null;
+            try
+            {
+                TopologyClientFlow.EditorHasGameFocus = () => true;
+                flow = CreateFlow(owner, new FakeTransport());
+                other = CreateFlow(otherOwner, new FakeTransport());
+                flow.ConfigureUi(new UnusedAssets(), ui);
+                Set(flow, "State", "Battle");
+                Set(other, "State", "Battle");
+                typeof(TopologyClientFlow)
+                    .GetField("_manualMove", BindingFlags.Instance | BindingFlags.NonPublic)
+                    .SetValue(flow, new Vector2Int(1000, 0));
+                typeof(TopologyClientFlow)
+                    .GetField("_manualAim", BindingFlags.Instance | BindingFlags.NonPublic)
+                    .SetValue(flow, true);
+                Assert.That(flow.IsCharacterAiming, Is.True);
+                Assert.That(flow.Battle.TryGetArenaState(out var before), Is.True);
+                ui.Register(
+                    "test-modal",
+                    UiLayer.Modal,
+                    _ => new ValueTask<UiView>(
+                        new UiView(
+                            modal,
+                            () =>
+                            {
+                                UnityEngine.Object.DestroyImmediate(modal);
+                                return default;
+                            }
+                        )
+                    )
+                );
+                await ui.OpenAsync("test-modal");
+                Assert.That(flow.IsCharacterAiming, Is.False, "模态窗口必须阻止动态输入采样。");
+                Assert.That(
+                    (bool)
+                        typeof(TopologyClientFlow)
+                            .GetProperty(
+                                "CanSampleCharacterInput",
+                                BindingFlags.Instance | BindingFlags.NonPublic
+                            )
+                            .GetValue(other),
+                    Is.True,
+                    "其他应用的 UI 不得阻止此应用采样。"
+                );
+                Invoke(flow, "FixedUpdate");
+                Assert.That(
+                    flow.PreparedInputs,
+                    Is.EqualTo(1),
+                    "模态窗口只抑制输入，固定 Tick 仍推进。"
+                );
+                Assert.That(flow.Battle.TryGetArenaState(out var blocked), Is.True);
+                Assert.That(blocked.PositionXMillimetres, Is.EqualTo(before.PositionXMillimetres));
+                await ui.CloseAsync("test-modal");
+                Assert.That(flow.IsCharacterAiming, Is.True);
+                Invoke(flow, "FixedUpdate");
+                Assert.That(flow.Battle.TryGetArenaState(out var resumed), Is.True);
+                Assert.That(
+                    resumed.PositionXMillimetres,
+                    Is.GreaterThan(blocked.PositionXMillimetres)
+                );
+                Assert.That(flow.PreparedInputs, Is.EqualTo(2));
+            }
+            finally
+            {
+                TopologyClientFlow.EditorHasGameFocus = previousFocus;
+                if (flow != null)
+                {
+                    await flow.StopAsync();
+                }
+                if (other != null)
+                {
+                    await other.StopAsync();
+                }
+                await ui.DisposeAsync();
+                UnityEngine.Object.DestroyImmediate(owner);
+                UnityEngine.Object.DestroyImmediate(otherOwner);
+                if (modal != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(modal);
+                }
+            }
+        }
+
+        private sealed class UnusedAssets : IAssetService
+        {
+            public ValueTask<AssetHandle<T>> LoadAsync<T>(
+                AssetId id,
+                CancellationToken cancellationToken = default
+            )
+            {
+                throw new InvalidOperationException("This input fixture does not load UI assets.");
+            }
+
+            public bool TryGetLoaded<T>(AssetId id, out AssetHandle<T> handle)
+            {
+                handle = null;
+                return false;
+            }
+
+            public ValueTask PreloadAsync(
+                AssetGroupId group,
+                CancellationToken cancellationToken = default
+            )
+            {
+                throw new InvalidOperationException("This input fixture does not preload assets.");
+            }
+
+            public ValueTask ReleaseAsync(AssetHandle handle)
+            {
+                throw new InvalidOperationException("This input fixture owns no asset handles.");
             }
         }
 

@@ -26,7 +26,9 @@ namespace AiNative.Client.Application.Tests
         public void TearDown()
         {
             if (_owner != null)
+            {
                 UnityEngine.Object.DestroyImmediate(_owner);
+            }
         }
 
         [Test]
@@ -127,7 +129,7 @@ namespace AiNative.Client.Application.Tests
             await Idle();
             Assert.That(_flow.Error, Is.EqualTo("invalid_credentials"));
             Assert.That(_flow.State, Is.EqualTo("Disconnected"));
-            Assert.That(Field("_backend"), Is.Null);
+            Assert.That(Field("Backend"), Is.Null);
             Assert.That(
                 Field("_password"),
                 Is.EqualTo(""),
@@ -142,7 +144,7 @@ namespace AiNative.Client.Application.Tests
             _flow.Authenticate(true, "valid_user", new string('a', length), "", "23001", false, "");
             await Idle();
             Assert.That(_flow.Error, Is.EqualTo("invalid-address"));
-            Assert.That(Field("_backend"), Is.Null);
+            Assert.That(Field("Backend"), Is.Null);
         }
 
         [TestCase("", "23001")]
@@ -158,7 +160,7 @@ namespace AiNative.Client.Application.Tests
             await Idle();
             Assert.That(_flow.Error, Is.EqualTo("invalid-address"));
             Assert.That(_flow.State, Is.EqualTo("Disconnected"));
-            Assert.That(Field("_backend"), Is.Null);
+            Assert.That(Field("Backend"), Is.Null);
             Assert.That(_flow.ConnectionHost, Is.EqualTo("127.0.0.1"));
             Assert.That(_flow.ConnectionPort, Is.EqualTo("23001"));
         }
@@ -219,8 +221,8 @@ namespace AiNative.Client.Application.Tests
                 calls++;
                 return Task.CompletedTask;
             });
-            // Plain MonoBehaviours do not receive OnDestroy in this EditMode fixture.
-            // PlayMode coverage separately verifies Unity invokes the lifecycle itself.
+            // 此 EditMode 用例中的普通 MonoBehaviour 不会自动收到 OnDestroy。
+            // PlayMode 用例另行验证 Unity 自动调用生命周期。
             typeof(TopologyClientFlow)
                 .GetMethod("OnDestroy", BindingFlags.NonPublic | BindingFlags.Instance)
                 .Invoke(_flow, null);
@@ -247,10 +249,14 @@ namespace AiNative.Client.Application.Tests
                 .GetMethod("Submit", BindingFlags.NonPublic | BindingFlags.Instance)
                 .Invoke(_flow, new object[] { action });
 
-        private object Field(string name) =>
-            typeof(TopologyClientFlow)
-                .GetField(name, BindingFlags.NonPublic | BindingFlags.Instance)
-                .GetValue(_flow);
+        private object Field(string name)
+        {
+            const BindingFlags flags = BindingFlags.NonPublic | BindingFlags.Instance;
+            FieldInfo member = typeof(TopologyClientFlow).GetField(name, flags);
+            return member != null
+                ? member.GetValue(_flow)
+                : typeof(TopologyClientFlow).GetProperty(name, flags).GetValue(_flow);
+        }
 
         private void SetField(string name, object value) =>
             typeof(TopologyClientFlow)
@@ -269,7 +275,10 @@ namespace AiNative.Client.Application.Tests
         {
             DateTime deadline = DateTime.UtcNow.AddSeconds(3);
             while (!condition() && DateTime.UtcNow < deadline)
+            {
                 await Task.Yield();
+            }
+
             Assert.That(
                 condition(),
                 Is.True,

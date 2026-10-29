@@ -1,0 +1,10 @@
+{
+  "name": "com.ainative.client.runtime",
+  "version": "0.1.0",
+  "displayName": "AiNative.Client.Runtime",
+  "unity": "6000.3",
+  "dependencies": {
+    "com.ainative.client.core": "0.1.0",
+    "com.ainative.client.async.unitask": "0.1.0"
+  }
+}

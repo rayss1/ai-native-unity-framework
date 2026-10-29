@@ -50,6 +50,44 @@ Rows are consumers and columns are dependencies.
 - Per ADR-0019, `com.ainative.client.protocol` owns client codec contracts and depends only on Shared Gameplay/Realtime. Prediction depends on those contracts, never the Protobuf implementation. `com.ainative.client.protocol.protobuf` owns generated-message mapping and depends inward on the contract. The application selects and injects the implementation. Gate depends on the Protobuf facade; generated types do not escape its business API. Tests may reference implementation assemblies explicitly.
 - `com.ainative.client.fantasy` is the only Client package allowed to reference `Fantasy` namespaces. Its Runtime assembly depends on `AiNative.Realtime` and pinned `Fantasy.Unity`; Fantasy Session, generated registration, KCP, and socket types terminate there. The prediction package and Unity application Composition Root consume only project-owned contracts and application state.
 
+### 客户端基础框架（ADR-0021）
+
+[ADR-0021](../ADR/0021-client-framework-foundation.md) 冻结以下方向；箭头表示运行时程序集引用。
+
+| 包 | 允许的直接依赖 | 所有权与限制 |
+| --- | --- | --- |
+| `com.ainative.client.core` | BCL | 无 Unity 引用；生命周期、MVVM 和诊断端口 |
+| `com.ainative.client.async.unitask` | UniTask 2.5.11、Unity | 将 Unity 等待转换为 `ValueTask`；第三方任务类型止于适配实现 |
+| `com.ainative.client.composition.vcontainer` | Core、VContainer 1.19.0 | 仅装配层注册/解析；容器类型不进入业务或 Shared 端口 |
+| `com.ainative.client.runtime` | Core、UniTask 适配包、Unity | 内容场景串行切换和 Unity 诊断 |
+| `com.ainative.client.assets` | BCL | 项目自有资源 ID、句柄及服务契约 |
+| `com.ainative.client.assets.assetbundle` | Assets、Unity | 随包目录、Bundle 加载和实例所有权；Editor 构建引用本包 Runtime |
+| `com.ainative.client.ui.ugui` | Core、uGUI、Input System、Unity | 强类型绑定、列表与页面层级；业务 ViewModel 留在应用 |
+| `client/UnityProject` | 上述选用包及既有协议、传输、预测包 | 配置快照、登录/对局流程和场景组合；唯一驱动网络/预测时序 |
+
+```mermaid
+flowchart TD
+    App[Unity 应用组合根与业务] --> Runtime[Unity Runtime]
+    App --> UI[uGUI]
+    App --> Bundle[AssetBundle 实现]
+    App --> DI[VContainer 适配]
+    App --> Network[既有协议 / 传输 / 预测包]
+    Runtime --> Core[纯 C# Core]
+    Runtime --> Async[UniTask 适配]
+    UI --> Core
+    DI --> Core
+    DI --> VContainer[VContainer 1.19.0]
+    Async --> UniTask[UniTask 2.5.11]
+    Bundle --> Assets[纯 C# Assets 契约]
+```
+
+图中省略 BCL、Unity/uGUI/Input System 基础程序集；箭头表示允许的依赖方向，
+不是要求每个业务对象都引用所有实现包。Editor 与 Tests 的额外引用不进入 Runtime。
+
+Assets 与 Core 均不引入 Unity 或第三方任务/容器类型。应用拥有子作用域，按“界面/流程停止 → 子容器释放 → 应用资源释放”收尾；容器 Dispose 不替代异步停止。
+此表是依赖约束，不代表 Windows/macOS Player、Android IL2CPP 或移动真机已验收。
+实际方法与所有权见 [公共契约](public-api-contracts.md#客户端基础框架adr-0021)。
+
 ### Server
 
 - Hosts reference module public contracts/registration packages, never module internals. Per ADR-0017, Gate, Player, Lobby, Match, Room Coordinator and Battle are independent composition roots; no Host may reference another Host (ARC009). These six Hosts may reference the pinned `Fantasy-Net` package only for compile-time generated startup metadata; handwritten Fantasy runtime namespace usage remains inside `AiNative.Server.Fantasy`.

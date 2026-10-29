@@ -2,7 +2,7 @@ using UnityEngine;
 
 namespace AiNative.Client.Character
 {
-    /// <summary>Optional sample overlay. No gameplay input is read by IMGUI.</summary>
+    /// <summary>可选示例覆盖层；IMGUI 不读取玩法输入。</summary>
     public sealed class CharacterDemoHud : MonoBehaviour
     {
         [SerializeField]
@@ -20,7 +20,10 @@ namespace AiNative.Client.Character
         private void OnGUI()
         {
             if (motor == null || input == null)
+            {
                 return;
+            }
+
             GUI.Box(new Rect(16, 16, 530, 150), "CHARACTER LAB | " + motor.State.Mode);
             GUI.Label(
                 new Rect(30, 43, 510, 90),
@@ -35,12 +38,17 @@ namespace AiNative.Client.Character
             );
             var rifle = motor.GetComponent<CharacterRifle>();
             if (rifle != null)
+            {
                 GUI.Label(
                     new Rect(30, 135, 510, 25),
                     "Shots " + rifle.Shots + " | Hits " + rifle.Hits + " | " + rifle.LastHit
                 );
+            }
+
             if (motor.State.Mode == CharacterMode.Shooter)
+            {
                 GUI.Label(new Rect(Screen.width / 2f - 4, Screen.height / 2f - 10, 20, 20), "+");
+            }
         }
     }
 }

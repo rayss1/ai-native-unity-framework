@@ -19,9 +19,15 @@ namespace AiNative.Client.Fantasy
         {
             var m = GateProtocolCodec.Response(bytes);
             if (m.Correlation != correlation)
+            {
                 throw new InvalidDataException("gate-response-correlation");
+            }
+
             if (m.Error.Length != 0)
+            {
                 throw new GateCallException(m.Error);
+            }
+
             return m.Payload;
         }
 
@@ -44,11 +50,14 @@ namespace AiNative.Client.Fantasy
         {
             var members = new GatePartyMember[m.Members.Length];
             for (int i = 0; i < members.Length; i++)
+            {
                 members[i] = new GatePartyMember
                 {
                     PlayerId = m.Members[i].PlayerId,
                     Ready = m.Members[i].Ready,
                 };
+            }
+
             return new GateParty
             {
                 PartyId = m.PartyId,

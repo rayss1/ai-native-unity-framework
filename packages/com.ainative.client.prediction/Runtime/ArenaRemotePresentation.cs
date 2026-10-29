@@ -44,11 +44,11 @@ namespace AiNative.Client.Prediction
         public double YawMillidegrees { get; }
         public bool Alive => State.Alive;
 
-        /// <summary>Presentation sample only; never feed interpolated state back into simulation.</summary>
+        /// <summary>仅为表现采样，插值状态不得反向写入模拟。</summary>
         public ArenaPlayerState State { get; }
     }
 
-    /// <summary>Owner-thread only. Bounded remote render history; never changes local prediction.</summary>
+    /// <summary>仅限所属线程；有界远端渲染历史，不修改本地预测。</summary>
     public sealed class ArenaRemotePresentation
     {
         public const int HistoryCapacity = 16;
@@ -76,14 +76,22 @@ namespace AiNative.Client.Prediction
                 || count > BattlePacketBuffer.MaxArenaPlayers
                 || tick <= _latestTick
             )
+            {
                 return false;
-            // All validation completes before membership or history changes.
+            }
+
+            // 修改成员或历史前，必须完成所有验证。
             for (int slot = 0; slot < _ids.Length; slot++)
             {
                 bool present = false;
                 for (int i = 0; i < count; i++)
+                {
                     if (players[i].EntityId != localEntityId && players[i].EntityId == _ids[slot])
+                    {
                         present = true;
+                    }
+                }
+
                 if (!present)
                 {
                     _ids[slot] = 0;
@@ -91,16 +99,21 @@ namespace AiNative.Client.Prediction
                     _heads[slot] = 0;
                 }
             }
+
             for (int i = 0; i < count; i++)
             {
                 if (players[i].EntityId == localEntityId)
+                {
                     continue;
+                }
+
                 int slot = Array.IndexOf(_ids, players[i].EntityId);
                 if (slot < 0)
                 {
                     slot = Array.IndexOf(_ids, 0u);
                     _ids[slot] = players[i].EntityId;
                 }
+
                 ArenaPlayerState next = players[i].State;
                 if (_counts[slot] > 0)
                 {
@@ -118,46 +131,67 @@ namespace AiNative.Client.Prediction
                         _heads[slot] = 0;
                     }
                 }
+
                 if (_counts[slot] == HistoryCapacity)
                 {
                     _heads[slot] = (_heads[slot] + 1) % HistoryCapacity;
                     _counts[slot]--;
                 }
+
                 _history[
                     slot * HistoryCapacity + (_heads[slot] + _counts[slot]) % HistoryCapacity
                 ] = next;
                 _counts[slot]++;
             }
+
             _latestTick = tick;
             _renderTick = Math.Max(_renderTick, tick - DelayTicks);
             return true;
         }
 
-        /// <summary>Supply capacity for eight players. Invalid time is treated as zero; starvation holds latest authority.</summary>
+        /// <summary>调用方提供八人容量；无效时间按零处理，断流时保持最近权威状态。</summary>
         public int Advance(float deltaSeconds, Span<ArenaRemotePose> output)
         {
             if (output.Length < BattlePacketBuffer.MaxArenaPlayers)
+            {
                 throw new ArgumentException("Eight pose slots are required.", nameof(output));
+            }
+
             if (_latestTick < 0)
+            {
                 return 0;
+            }
+
             if (float.IsNaN(deltaSeconds) || float.IsInfinity(deltaSeconds) || deltaSeconds < 0)
+            {
                 deltaSeconds = 0;
-            // After starvation hold the monotonic cursor until the delayed window has rebuilt.
-            // Without this pause each new arrival would be consumed immediately forever.
+            }
+
+            // 断流后保持单调游标，直到延迟窗口重新建立。
+            // 否则新快照将一直被立即消费，无法恢复插值延迟。
             if (_rebuffering && _latestTick - _renderTick >= DelayTicks)
+            {
                 _rebuffering = false;
+            }
+
             if (!_rebuffering)
             {
                 double requestedTick = _renderTick + deltaSeconds * 60d;
                 _renderTick = Math.Min(_latestTick, requestedTick);
                 if (requestedTick >= _latestTick && deltaSeconds > 0)
+                {
                     _rebuffering = true;
+                }
             }
+
             int written = 0;
             for (int slot = 0; slot < _ids.Length; slot++)
             {
                 if (_ids[slot] == 0)
+                {
                     continue;
+                }
+
                 ArenaPlayerState before = At(slot, 0),
                     after = before;
                 for (int i = 1; i < _counts[slot] && after.Tick < _renderTick; i++)
@@ -165,6 +199,7 @@ namespace AiNative.Client.Prediction
                     before = after;
                     after = At(slot, i);
                 }
+
                 double t =
                     after.Tick == before.Tick
                         ? 0
@@ -174,17 +209,26 @@ namespace AiNative.Client.Prediction
                         );
                 double yawDelta = ((double)after.YawMillidegrees - before.YawMillidegrees) % 360000;
                 if (yawDelta > 180000)
+                {
                     yawDelta -= 360000;
+                }
+
                 if (yawDelta < -180000)
+                {
                     yawDelta += 360000;
+                }
+
                 double yaw = (before.YawMillidegrees + yawDelta * t) % 360000;
                 if (yaw < 0)
+                {
                     yaw += 360000;
+                }
+
                 double x = Lerp(before.PositionXMillimetres, after.PositionXMillimetres, t);
                 double y = Lerp(before.PositionYMillimetres, after.PositionYMillimetres, t);
                 double z = Lerp(before.PositionZMillimetres, after.PositionZMillimetres, t);
-                // Do not expose future weapon, health or grounded transitions before their render tick.
-                // Lifecycle changes already reset history, so death/respawn still snap immediately.
+                // 在对应渲染 Tick 前，不暴露未来的武器、生命值或落地状态变化。
+                // 生命周期变化已重置历史，因此死亡和重生仍立即跳转。
                 ArenaPlayerState sample = t >= 1 ? after : before;
                 sample.PositionXMillimetres = (int)Math.Round(x);
                 sample.PositionYMillimetres = (int)Math.Round(y);
@@ -218,6 +262,7 @@ namespace AiNative.Client.Prediction
                     );
                 output[written++] = new ArenaRemotePose(_ids[slot], x, y, z, yaw, sample);
             }
+
             return written;
         }
 

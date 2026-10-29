@@ -82,6 +82,7 @@ namespace AiNative.Client.Application.Tests
             {
                 session.DisposeAsync().GetAwaiter().GetResult();
             }
+
             Assert.That(session.AdvanceRemotePresentation(0, poses), Is.Zero);
         }
 
@@ -111,10 +112,13 @@ namespace AiNative.Client.Application.Tests
                     BattleClientProtocolV1.ControlChannel,
                     1
                 );
-                // Match the real legacy Host: 64 entities all carry the original health field.
+                // 与真实旧版 Host 一致：64 个实体均包含原有生命值字段。
                 var frame = new List<byte> { 0x4d, 0x04, 0x08, 1, 0x11, 100, 0, 0, 0, 0, 0, 0, 0 };
                 for (byte id = 1; id <= 64; id++)
+                {
                     frame.AddRange(new byte[] { 0x22, 4, 0x08, id, 0x30, 100 });
+                }
+
                 frame.AddRange(new byte[] { 0x30, 42 });
                 transport.Enqueue(frame.ToArray(), BattleClientProtocolV1.SnapshotChannel, 1);
                 session.Pump(0);
@@ -132,7 +136,10 @@ namespace AiNative.Client.Application.Tests
         {
             var bytes = new List<byte> { 0x4d, 0x04, 0x08, 1, 0x11, tick, 0, 0, 0, 0, 0, 0, 0 };
             foreach (byte id in new byte[] { 7, remote })
+            {
                 bytes.AddRange(new byte[] { 0x22, 8, 0x08, id, 0x30, 100, 0x50, 1, 0x60, 1 });
+            }
+
             return bytes.ToArray();
         }
     }

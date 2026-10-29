@@ -1,20 +1,21 @@
 using AiNative.Client.Application;
+using AiNative.Client.UI;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UI;
 
 namespace AiNative.Client.Editor
 {
-    /// <summary>Creates editable UGUI assets through Unity serialization, never hand-written YAML.</summary>
+    /// <summary>通过 Unity 序列化创建可编辑的 uGUI 资产，不手写 YAML。</summary>
     public static class TopologyUiPrefabBuilder
     {
-        private static readonly Color Ink = new Color(.055f, .073f, .105f, 1);
-        private static readonly Color PanelColor = new Color(.085f, .115f, .16f, .98f);
-        private static readonly Color Accent = new Color(57f / 255, 124f / 255, 246f / 255);
+        private static readonly Color _ink = new Color(.055f, .073f, .105f, 1);
+        private static readonly Color _panelColor = new Color(.085f, .115f, .16f, .98f);
+        private static readonly Color _accent = new Color(57f / 255, 124f / 255, 246f / 255);
         private static Font _font;
-        private static readonly System.Collections.Generic.List<RectTransform> Columns =
+        private static readonly System.Collections.Generic.List<RectTransform> _columns =
             new System.Collections.Generic.List<RectTransform>();
-        private static readonly System.Collections.Generic.List<float> Widths =
+        private static readonly System.Collections.Generic.List<float> _widths =
             new System.Collections.Generic.List<float>();
 
         [MenuItem("AI Native/Local Test/Rebuild UGUI Prefab")]
@@ -22,9 +23,12 @@ namespace AiNative.Client.Editor
         {
             const string directory = "Assets/AiNative.BattleClient/Resources";
             if (!AssetDatabase.IsValidFolder(directory))
+            {
                 AssetDatabase.CreateFolder("Assets/AiNative.BattleClient", "Resources");
-            Columns.Clear();
-            Widths.Clear();
+            }
+
+            _columns.Clear();
+            _widths.Clear();
             _font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             var root = new GameObject(
                 "TopologyClientUI",
@@ -50,18 +54,19 @@ namespace AiNative.Client.Editor
                             i
                         ],
                         root.transform,
-                        i == 3 ? (Color?)null : Ink
+                        i == 3 ? (Color?)null : _ink
                     );
                     Stretch(page);
                     view.Pages[i] = page.gameObject;
                 }
+
                 BuildLogin(view);
                 BuildLobby(view);
                 BuildQueue(view);
                 BuildBattle(view);
                 BuildResult(view);
-                view.ContentColumns = Columns.ToArray();
-                view.ContentWidths = Widths.ToArray();
+                view.ContentColumns = _columns.ToArray();
+                view.ContentWidths = _widths.ToArray();
                 var notification = Box(
                     "Notifications",
                     root.transform,
@@ -76,10 +81,13 @@ namespace AiNative.Client.Editor
                 view.Status = Label("Status", notification, "", 17, 22);
                 view.Error = Label("Error", notification, "", 17, 60);
                 view.Error.color = new Color(1, .55f, .5f);
-                // Notifications must not consume pointer input over empty text in battle.
+                // 战斗通知的空白文本区域不得消耗指针输入。
                 notification.GetComponent<Image>().raycastTarget = false;
                 for (int i = 1; i < view.Pages.Length; i++)
+                {
                     view.Pages[i].SetActive(false);
+                }
+
                 PrefabUtility.SaveAsPrefabAsset(root, directory + "/TopologyClientUI.prefab");
                 AssetDatabase.SaveAssets();
             }
@@ -89,10 +97,145 @@ namespace AiNative.Client.Editor
             }
         }
 
+        /// <summary>
+        /// 迁移已有 Prefab 的输入框脚本，保留 GameObject、组件 fileID 和序列化字段。
+        /// 仅用于原生 InputField 到兼容派生类型的迁移；保存并重新导入后检查引用。
+        /// </summary>
+        [MenuItem("AI Native/Local Test/Migrate Existing UI Input Fields")]
+        public static void MigrateExistingInputFields()
+        {
+            const string prefabPath =
+                "Assets/AiNative.BattleClient/Resources/TopologyClientUI.prefab";
+            const string scriptPath =
+                "Packages/com.ainative.client.ui.ugui/Runtime/ScopedInputField.cs";
+            MonoScript script = AssetDatabase.LoadAssetAtPath<MonoScript>(scriptPath);
+            if (script == null || script.GetClass() != typeof(ScopedInputField))
+            {
+                throw new System.InvalidOperationException(
+                    "ScopedInputField script is not compiled."
+                );
+            }
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+            if (prefab == null)
+            {
+                throw new System.InvalidOperationException("Existing UI prefab is missing.");
+            }
+            TopologyClientView view = prefab.GetComponent<TopologyClientView>();
+            if (view == null)
+            {
+                throw new System.InvalidOperationException("Existing UI view is missing.");
+            }
+            string[] fieldNames = { "Username", "Password", "Host", "Port", "Pin", "Invite" };
+            var fieldIds = new System.Collections.Generic.Dictionary<string, long>();
+            var originalView = new SerializedObject(view);
+            foreach (string fieldName in fieldNames)
+            {
+                Object reference = originalView.FindProperty(fieldName).objectReferenceValue;
+                if (
+                    !(reference is InputField)
+                    || !AssetDatabase.TryGetGUIDAndLocalFileIdentifier(
+                        reference,
+                        out string _,
+                        out long id
+                    )
+                )
+                {
+                    throw new System.InvalidOperationException(
+                        "Invalid input reference: " + fieldName
+                    );
+                }
+                fieldIds.Add(fieldName, id);
+            }
+            InputField[] inputs = prefab.GetComponentsInChildren<InputField>(true);
+            // 先验证全部目标，避免不兼容派生类型被覆盖后才发现错误。
+            foreach (InputField input in inputs)
+            {
+                if (
+                    input.GetType() != typeof(InputField)
+                    && input.GetType() != typeof(ScopedInputField)
+                )
+                {
+                    throw new System.InvalidOperationException(
+                        "Unsupported input subtype: " + input.GetType()
+                    );
+                }
+            }
+            int expectedInputCount = inputs.Length;
+            int migrated = 0;
+            for (int index = 0; index < expectedInputCount; index++)
+            {
+                // 替换脚本会使旧托管 wrapper 失效，每一步重新获取当前资产和组件。
+                GameObject currentPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+                InputField target = null;
+                foreach (
+                    InputField candidate in currentPrefab.GetComponentsInChildren<InputField>(true)
+                )
+                {
+                    if (candidate.GetType() == typeof(InputField))
+                    {
+                        target = candidate;
+                        break;
+                    }
+                }
+                if (target == null)
+                {
+                    break;
+                }
+                var serializedInput = new SerializedObject(target);
+                SerializedProperty scriptProperty = serializedInput.FindProperty("m_Script");
+                if (scriptProperty == null)
+                {
+                    throw new System.InvalidOperationException(
+                        "InputField script property is missing."
+                    );
+                }
+                scriptProperty.objectReferenceValue = script;
+                // Apply 自行标记序列化改动；之后不得再访问 target 或旧属性 wrapper。
+                serializedInput.ApplyModifiedPropertiesWithoutUndo();
+                migrated++;
+            }
+            AssetDatabase.SaveAssets();
+            AssetDatabase.ImportAsset(prefabPath, ImportAssetOptions.ForceUpdate);
+            GameObject imported = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+            var importedView = new SerializedObject(imported.GetComponent<TopologyClientView>());
+            foreach (string fieldName in fieldNames)
+            {
+                Object reference = importedView.FindProperty(fieldName).objectReferenceValue;
+                if (
+                    !(reference is ScopedInputField)
+                    || !AssetDatabase.TryGetGUIDAndLocalFileIdentifier(
+                        reference,
+                        out string _,
+                        out long id
+                    )
+                    || id != fieldIds[fieldName]
+                )
+                {
+                    throw new System.InvalidOperationException(
+                        "Input migration failed validation: " + fieldName
+                    );
+                }
+            }
+            if (
+                imported.GetComponentsInChildren<ScopedInputField>(true).Length
+                != expectedInputCount
+            )
+            {
+                throw new System.InvalidOperationException(
+                    "Input migration changed component count."
+                );
+            }
+            Debug.Log(
+                "Migrated UI input scripts: "
+                    + migrated
+                    + "; verified original View references and fileIDs."
+            );
+        }
+
         private static void BuildLogin(TopologyClientView v)
         {
             var content = PageContent(v.Pages[0].transform, "欢迎进入对战", "本机对战", 620);
-            content.gameObject.AddComponent<Image>().color = PanelColor;
+            content.gameObject.AddComponent<Image>().color = _panelColor;
             Label("Intro", content, "使用不同账号，在多个客户端中一起进入对局。", 20, 35);
             Label("UsernameLabel", content, "账号 · 3–32 位字母、数字或下划线", 18, 28);
             v.Username = Field("Username", content, "请输入账号");
@@ -103,7 +246,7 @@ namespace AiNative.Client.Editor
             v.Login = Button("Login", row, "登录", true);
             v.Register = Button("Register", row, "注册新账号");
             v.AdvancedButton = Button("AdvancedButton", content, "连接设置  ▾");
-            var advanced = Box("Advanced", content, PanelColor);
+            var advanced = Box("Advanced", content, _panelColor);
             Layout(advanced, 8, 12);
             Fit(advanced);
             v.Advanced = advanced.gameObject;
@@ -126,7 +269,7 @@ namespace AiNative.Client.Editor
             Width(v.CopyId.gameObject, 170);
             v.Statistics = Label("Statistics", c, "累计战绩", 18, 28);
             var columns = Row("LobbyColumns", c, 320);
-            var team = Box("TeamPanel", columns, PanelColor);
+            var team = Box("TeamPanel", columns, _panelColor);
             Layout(team, 6, 16);
             Element(team.gameObject).flexibleWidth = 1.5f;
             Label("TeamTitle", team, "我的队伍", 26, 42);
@@ -136,7 +279,7 @@ namespace AiNative.Client.Editor
             v.MemberContent = members;
             v.MemberTemplate = Label("MemberTemplate", members, "玩家", 18, 42);
             v.MemberTemplate.gameObject.SetActive(false);
-            var invitationPanel = Box("InvitePanel", columns, PanelColor);
+            var invitationPanel = Box("InvitePanel", columns, _panelColor);
             Layout(invitationPanel, 8, 16);
             Element(invitationPanel.gameObject).flexibleWidth = 1;
             Label("InviteTitle", invitationPanel, "邀请玩家", 26, 42);
@@ -177,19 +320,19 @@ namespace AiNative.Client.Editor
         private static void BuildBattle(TopologyClientView v)
         {
             Transform page = v.Pages[3].transform;
-            var upper = Box("VitalsPanel", page, PanelColor);
+            var upper = Box("VitalsPanel", page, _panelColor);
             Corner(upper, new Vector2(0, 1), new Vector2(20, -20), new Vector2(280, 84));
             v.BattleVitals = Label("Vitals", upper, "生命 —\n护甲 —", 22, 70);
             Stretch(v.BattleVitals.rectTransform, 10);
             v.BattleVitals.rectTransform.offsetMax = new Vector2(-160, -10);
             v.HealthBar = Bar("Health", upper, new Vector2(120, -18), new Color(.32f, .8f, .25f));
-            v.ArmorBar = Bar("Armor", upper, new Vector2(120, -50), Accent);
-            var clock = Box("Clock", page, PanelColor);
+            v.ArmorBar = Bar("Armor", upper, new Vector2(120, -50), _accent);
+            var clock = Box("Clock", page, _panelColor);
             Corner(clock, new Vector2(.5f, 1), new Vector2(0, -20), new Vector2(120, 64));
             v.BattleClock = Label("Time", clock, "对战中", 30, 60);
             Stretch(v.BattleClock.rectTransform);
             v.BattleClock.alignment = TextAnchor.MiddleCenter;
-            var actions = Box("TopRight", page, PanelColor);
+            var actions = Box("TopRight", page, _panelColor);
             Corner(actions, new Vector2(1, 1), new Vector2(-20, -20), new Vector2(340, 64));
             var actionRow = Row("Actions", actions);
             Stretch(actionRow, 8);
@@ -199,13 +342,13 @@ namespace AiNative.Client.Editor
             Flexible(v.BattleConnection.gameObject);
             v.DiagnosticButton = Button("DiagnosticsButton", actionRow, "诊断 ▾");
             Width(v.DiagnosticButton.gameObject, 90);
-            var diagnostic = Box("DiagnosticsPanel", page, PanelColor);
+            var diagnostic = Box("DiagnosticsPanel", page, _panelColor);
             Corner(diagnostic, new Vector2(1, 1), new Vector2(-20, -100), new Vector2(500, 155));
             v.DiagnosticPanel = diagnostic.gameObject;
             v.Diagnostics = Label("Diagnostics", diagnostic, "", 16, 145);
             Stretch(v.Diagnostics.rectTransform, 12);
             diagnostic.gameObject.SetActive(false);
-            var weapon = Box("WeaponPanel", page, PanelColor);
+            var weapon = Box("WeaponPanel", page, _panelColor);
             Corner(weapon, new Vector2(1, 0), new Vector2(-20, 94), new Vector2(330, 75));
             var weaponRow = Row("Weapon", weapon, 54);
             Stretch(weaponRow, 10);
@@ -241,7 +384,7 @@ namespace AiNative.Client.Editor
         private static void BuildResult(TopologyClientView v)
         {
             var c = PageContent(v.Pages[4].transform, "对局结果", "MATCH COMPLETE", 820);
-            c.gameObject.AddComponent<Image>().color = PanelColor;
+            c.gameObject.AddComponent<Image>().color = _panelColor;
             v.ResultTitle = Label("ResultTitle", c, "等待结算确认", 27, 54);
             v.ResultTitle.alignment = TextAnchor.MiddleCenter;
             v.ResultStats = Label("LocalKills", c, "", 22, 38);
@@ -294,16 +437,22 @@ namespace AiNative.Client.Editor
             c.anchorMax = new Vector2(.5f, 1);
             c.pivot = new Vector2(.5f, 1);
             c.sizeDelta = new Vector2(width, 0);
-            Columns.Add(c);
-            Widths.Add(width);
+            _columns.Add(c);
+            _widths.Add(width);
             Layout(c, 8, 16);
             Fit(c);
             scroll.content = c;
             scroll.viewport = viewport;
             if (subtitle.Length > 0)
-                Label("Subtitle", c, subtitle, 17, 32).color = Accent;
+            {
+                Label("Subtitle", c, subtitle, 17, 32).color = _accent;
+            }
+
             if (title.Length > 0)
+            {
                 Label("Title", c, title, 38, 62);
+            }
+
             return c;
         }
 
@@ -312,7 +461,10 @@ namespace AiNative.Client.Editor
             var go = new GameObject(name, typeof(RectTransform));
             go.transform.SetParent(parent, false);
             if (color.HasValue)
+            {
                 go.AddComponent<Image>().color = color.Value;
+            }
+
             return go.GetComponent<RectTransform>();
         }
 
@@ -346,7 +498,7 @@ namespace AiNative.Client.Editor
             bool primary = false
         )
         {
-            var rt = Box(name, parent, primary ? Accent : new Color(.16f, .21f, .29f));
+            var rt = Box(name, parent, primary ? _accent : new Color(.16f, .21f, .29f));
             Height(rt.gameObject, 46);
             Flexible(rt.gameObject);
             var button = rt.gameObject.AddComponent<Button>();
@@ -369,7 +521,7 @@ namespace AiNative.Client.Editor
         {
             var rt = Box(name, parent, new Color(.035f, .055f, .083f));
             Height(rt.gameObject, 48);
-            var field = rt.gameObject.AddComponent<InputField>();
+            var field = rt.gameObject.AddComponent<ScopedInputField>();
             field.targetGraphic = rt.GetComponent<Image>();
             field.characterLimit = password ? 32 : 256;
             var text = Label("Text", rt, "", 20, 44);
@@ -392,7 +544,7 @@ namespace AiNative.Client.Editor
             var toggle = rt.gameObject.AddComponent<Toggle>();
             var box = Box("Box", rt, new Color(.2f, .25f, .32f));
             Corner(box, new Vector2(0, .5f), new Vector2(14, 0), new Vector2(24, 24));
-            var check = Box("Check", box, Accent);
+            var check = Box("Check", box, _accent);
             Stretch(check, 4);
             toggle.targetGraphic = box.GetComponent<Image>();
             toggle.graphic = check.GetComponent<Image>();

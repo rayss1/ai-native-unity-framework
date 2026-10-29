@@ -4,17 +4,16 @@ using NUnit.Framework;
 #if UNITY_5_3_OR_NEWER
 using Unity.Profiling;
 #endif
-
 namespace AiNative.Client.Prediction.Tests
 {
-    /// <summary>Calibrates a known allocation and an empty interval before trusting zero.
-    /// Unity uses its native profiler because some Mono versions return a constant zero from GC.</summary>
+    /// <summary>先用已知分配和空区间校准，再信任零分配结果。
+    /// Unity 使用原生 Profiler，因为部分 Mono 版本的 GC 计数始终返回零。</summary>
     internal sealed class CalibratedAllocationMeter : IDisposable
     {
 #if UNITY_5_3_OR_NEWER
         private ProfilerRecorder recorder;
 #else
-        private long baseline;
+        private long _baseline;
 #endif
         public bool IsSupported { get; }
         public string Source =>
@@ -44,7 +43,7 @@ namespace AiNative.Client.Prediction.Tests
             if (!recorder.Valid)
                 return;
 #endif
-            // Warm the measurement/allocator methods before checking an empty interval.
+            // 检查空区间前，先预热测量与分配方法。
             Begin();
             AllocateKnownArray();
             EndRaw();
@@ -65,10 +64,12 @@ namespace AiNative.Client.Prediction.Tests
         public void RequireSupported()
         {
             if (!IsSupported)
+            {
                 Assert.Ignore(
                     "Allocation result UNVERIFIED: calibrated meter failed known-allocation or empty-interval checks: "
                         + Source
                 );
+            }
         }
 
         public void Begin()
@@ -79,7 +80,7 @@ namespace AiNative.Client.Prediction.Tests
             recorder.Reset();
             recorder.Start();
 #else
-            baseline = GC.GetAllocatedBytesForCurrentThread();
+            _baseline = GC.GetAllocatedBytesForCurrentThread();
 #endif
         }
 
@@ -89,13 +90,13 @@ namespace AiNative.Client.Prediction.Tests
             if (!recorder.Valid)
                 return -1;
             recorder.Stop();
-            // Synchronous test intervals never cross a frame. SumAllSamplesInFrame aggregates
-            // all allocation events into one sample, so event count cannot saturate the ring.
+            // 同步测试区间不跨帧；SumAllSamplesInFrame 将该帧全部分配事件
+            // 聚合为一个样本，避免事件数量超出环形缓冲区容量。
             if (recorder.Count > 1)
                 return -1;
             return recorder.Count == 0 ? 0 : recorder.GetSample(0).Count;
 #else
-            return GC.GetAllocatedBytesForCurrentThread() - baseline;
+            return GC.GetAllocatedBytesForCurrentThread() - _baseline;
 #endif
         }
 

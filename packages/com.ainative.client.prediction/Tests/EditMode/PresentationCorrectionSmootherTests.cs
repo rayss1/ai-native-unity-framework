@@ -13,14 +13,12 @@ namespace AiNative.Client.Prediction.Tests
             KinematicState before = State(1, 100);
             KinematicState after = State(1, 80);
             smoother.Initialize(before);
-
             PresentationCorrectionAction action = smoother.ApplyReconciliation(
                 Reconciliation(ReconciliationStatus.Corrected, before, after)
             );
             PresentationPosition initial = smoother.Advance(after, 0);
             PresentationPosition halfway = smoother.Advance(after, 0.05f);
             PresentationPosition settled = smoother.Advance(after, 0.05f);
-
             Assert.That(action, Is.EqualTo(PresentationCorrectionAction.Smoothed));
             Assert.That(initial.XMillimetres, Is.EqualTo(100d));
             Assert.That(halfway.XMillimetres, Is.EqualTo(90d).Within(0.0001d));
@@ -41,12 +39,10 @@ namespace AiNative.Client.Prediction.Tests
             PresentationPosition prior = smoother.Advance(firstAfter, 0.025f);
             KinematicState secondBefore = State(2, 130);
             KinematicState secondAfter = State(2, 120);
-
             smoother.ApplyReconciliation(
                 Reconciliation(ReconciliationStatus.Corrected, secondBefore, secondAfter)
             );
             PresentationPosition current = smoother.Advance(secondAfter, 0);
-
             Assert.That(prior.XMillimetres, Is.EqualTo(95d).Within(0.0001d));
             Assert.That(current.XMillimetres, Is.EqualTo(145d).Within(0.0001d));
             Assert.That(current.XMillimetres - prior.XMillimetres, Is.EqualTo(50d).Within(0.0001d));
@@ -59,7 +55,6 @@ namespace AiNative.Client.Prediction.Tests
             KinematicState before = State(1, 0);
             KinematicState largeAfter = State(1, 251);
             smoother.Initialize(before);
-
             PresentationCorrectionAction large = smoother.ApplyReconciliation(
                 Reconciliation(ReconciliationStatus.Corrected, before, largeAfter)
             );
@@ -67,7 +62,6 @@ namespace AiNative.Client.Prediction.Tests
             PresentationCorrectionAction historyMiss = smoother.ApplyReconciliation(
                 Reconciliation(ReconciliationStatus.HistoryMiss, largeAfter, State(2, 400))
             );
-
             Assert.That(large, Is.EqualTo(PresentationCorrectionAction.Snapped));
             Assert.That(snapped.XMillimetres, Is.EqualTo(251d));
             Assert.That(historyMiss, Is.EqualTo(PresentationCorrectionAction.Snapped));
@@ -84,10 +78,8 @@ namespace AiNative.Client.Prediction.Tests
             smoother.ApplyReconciliation(
                 Reconciliation(ReconciliationStatus.Corrected, before, after)
             );
-
             smoother.ResetState();
             PresentationPosition rebound = smoother.Advance(State(2, 500), 0);
-
             Assert.That(rebound.XMillimetres, Is.EqualTo(500d));
             Assert.That(smoother.Diagnostics.IsSmoothing, Is.False);
             Assert.That(smoother.Diagnostics.ResidualMillimetres, Is.Zero);

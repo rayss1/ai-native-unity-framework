@@ -1,0 +1,9 @@
+{
+  "name": "AiNative.Client.UI.UGUI.Tests",
+  "rootNamespace": "AiNative.Client.UI.Tests",
+  "references": ["AiNative.Client.UI.UGUI", "AiNative.Client.Core", "UnityEngine.UI"],
+  "includePlatforms": ["Editor"],
+  "autoReferenced": false,
+  "defineConstraints": ["UNITY_INCLUDE_TESTS"],
+  "optionalUnityReferences": ["TestAssemblies"]
+}

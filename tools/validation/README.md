@@ -1,6 +1,6 @@
 # Current-source validation
 
-Current project progress is maintained in [one status page](../../Docs/Architecture/current-status.md). For the client codec migration, directional naming and October 21 opcode cleanup, select `Development` using the commands below. Counts are the current discovered inventory, not a claim that unavailable database/device tests passed; see [current validation evidence](../../Docs/Architecture/client-protocol-validation-2026-10-20.md). Strict release gates reject skipped tests. The unified, Windows and macOS entries reuse the Unity fixture contract in [nunit-report.ps1](nunit-report.ps1); the macOS entry requires PowerShell 7 and selects `Development`. The unified and Windows entries require an explicit `-Profile`; omitted profiles fail before validation in non-interactive runs. Historical profiles remain available only when selected explicitly. Existing automation that relied on the old default must add `-Profile Baseline` for historical evidence, or the current `Development` arguments below.
+Current project progress is maintained in [one status page](../../Docs/Architecture/current-status.md). For the current client framework and integration regressions, select `Development` using the commands below. Counts are the current discovered inventory, not a claim that unavailable database/device tests passed; see [current validation evidence](../../Docs/Architecture/client-protocol-validation-2026-10-20.md). Strict release gates reject skipped tests. The unified, Windows and macOS entries reuse the Unity fixture contract in [nunit-report.ps1](nunit-report.ps1); the macOS entry requires PowerShell 7 and selects `Development`. The unified and Windows entries require an explicit `-Profile`; omitted profiles fail before validation in non-interactive runs. Historical profiles remain available only when selected explicitly. Existing automation that relied on the old default must add `-Profile Baseline` for historical evidence, or the current `Development` arguments below.
 
 October 20 documentation sync is based on PR #44 merged at `aa06c05`. The earlier 132-test local review used the pre-#44 worktree at `2d92bcb`; it does not validate the training map or combat repairs. See the [review scope and commands](../../Docs/Architecture/current-status.md).
 
@@ -11,7 +11,7 @@ October 20 documentation sync is based on PR #44 merged at `aa06c05`. The earlie
 | Candidate | 147 | Earlier socket/lifecycle source generation, Fantasy `df4ad5f`; explicit .NET count |
 | TerminalDelivery | 164 | October 6 terminal-receive tests, Fantasy `df4ad5f`; explicit .NET count (historically 530) |
 | Current | 166 | Legacy-health/additive-field regressions, Fantasy `df4ad5f`; 536 .NET tests (including four snapshot-fanout regressions) |
-| Development | 294 | October 20 codec injection, generated Protobuf, GC, stale/overflow and async send regressions; Fantasy `df4ad5f`; expected .NET inventory 660 |
+| Development | 361 | October 29 client framework, Core lifecycle/MVVM, Bundle, runtime/UI and session identity and CF-002 return-to-lobby regressions; Fantasy `df4ad5f`; .NET inventory is validated separately |
 
 Wrong totals, missing fixtures, failed/skipped cases and source changes fail the gate. Historical 128-test observations below remain evidence records, not a selectable current inventory.
 
@@ -20,7 +20,7 @@ Wrong totals, missing fixtures, failed/skipped cases and source changes fail the
 For the standalone Windows Unity/Host/Player gate on a clean current commit:
 
 ```powershell
-./tools/run-unity-windows-validation.ps1 -Profile Development -ExpectedEditModePassed 294
+./tools/run-unity-windows-validation.ps1 -Profile Development -ExpectedEditModePassed 361
 ```
 
 For macOS Apple Silicon, follow [the macOS procedure](../../Docs/Architecture/unity-manual-validation.md). It uses the same `Development` EditMode inventory and named three-test legacy KCP PlayMode suite, then retains its ARM64 Mono Player and Regional correction checks. It requires `pwsh` 7 in addition to the macOS tools. Historical bundles retain their original totals; changes to the runner do not qualify the current source without a new platform run.
@@ -35,11 +35,13 @@ For a clean current commit, start an isolated PostgreSQL 17.11, set `AINATIVE_TE
   -SdkPath (Get-Command dotnet).Source `
   -UnityEditorPath 'C:/Program Files/Unity/Hub/Editor/6000.3.23f1/Editor/Unity.exe' `
   -EvidenceDirectory ./artifacts/validation/new-current-run `
-  -Profile Development -ExpectedDotnetPassed 660 -ExpectedEditModePassed 294 `
+  -Profile Development -ExpectedDotnetPassed $RequiredDotnetPassed -ExpectedEditModePassed 361 `
   -Phases Dotnet,Architecture,WindowsLegacy
 ```
 
 `WindowsLegacy` includes the selected profile's EditMode tests, three real-host legacy KCP PlayMode tests, Windows Player build and reconnect smoke; a separate `EditMode` phase is optional, not necessary to duplicate this run. SDK 10.0.202 is required. The caller owns the database; the runner owns its test Host/Player. Use an isolated checkout when another Editor is open. Character and topology PlayMode suites are separate from the legacy KCP gate.
+
+The 2026-10-29 full .NET run discovered 716 cases: 706 passed, 10 were not executed and none failed (`artifacts/client-framework-20261029/dotnet-final` evidence). This is incomplete platform/database coverage, not 716 passes. In the commands above and below, set `$RequiredDotnetPassed` to the reviewed all-required-test count for the target validation environment; do not copy 706 to waive the 10 unavailable cases. Strict release gates continue to reject skipped tests, and historical profile counts remain unchanged.
 
 ## Explicit worktree development validation
 
@@ -54,7 +56,7 @@ $validationManifest = Get-AiNativeSourceManifest -Root $validationSource
   -SdkPath (Get-Command dotnet).Source `
   -UnityEditorPath 'C:/Program Files/Unity/Hub/Editor/6000.3.23f1/Editor/Unity.exe' `
   -EvidenceDirectory ./artifacts/validation/new-worktree-run `
-  -Profile Development -ExpectedDotnetPassed 660 -ExpectedEditModePassed 294 `
+  -Profile Development -ExpectedDotnetPassed $RequiredDotnetPassed -ExpectedEditModePassed 361 `
   -SourceMode Worktree -ExpectedSourceManifestSha256 $validationManifest.sha256 `
   -Phases Dotnet,Architecture,WindowsLegacy
 ```

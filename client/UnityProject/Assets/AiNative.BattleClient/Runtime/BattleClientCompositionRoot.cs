@@ -1,5 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
+using AiNative.Client.Assets;
+using AiNative.Client.Async;
 using AiNative.Client.Character;
 using AiNative.Client.Prediction;
 using AiNative.Client.Protocol;
@@ -48,7 +53,6 @@ namespace AiNative.Client.Application
         private readonly ArenaRemotePose[] _remotePoses = new ArenaRemotePose[
             BattlePacketBuffer.MaxArenaPlayers
         ];
-
         public BattleClientSession Session => _topology != null ? _topology.Battle : _session;
 
         private void Awake()
@@ -72,7 +76,7 @@ namespace AiNative.Client.Application
             }
             catch (ArgumentException)
             {
-                // Invalid public intent never enables account automation. The ordinary login UI remains available.
+                // 无效的公开 Intent 不得启用账号自动化；仍保留普通登录界面。
                 AndroidClientLaunchConfiguration configuration =
                     AndroidClientLaunchConfiguration.Parse(
                         new System.Collections.Generic.Dictionary<string, string>(),
@@ -89,6 +93,7 @@ namespace AiNative.Client.Application
                     "Android launch configuration was rejected; interactive login is available."
                 );
             }
+
             return;
 #else
             string[] arguments = Environment.GetCommandLineArgs();
@@ -100,6 +105,7 @@ namespace AiNative.Client.Application
                 _topology = gameObject.AddComponent<TopologyClientFlow>();
                 return;
             }
+
 #if UNITY_EDITOR
             if (editorLocalTopology)
             {
@@ -109,6 +115,7 @@ namespace AiNative.Client.Application
                 );
                 return;
             }
+
 #endif
             _launch = BattleClientLaunchOptions.Parse(arguments);
             _session = new BattleClientSession(
@@ -122,19 +129,75 @@ namespace AiNative.Client.Application
 
         private void Start() => _session?.Start();
 
-        private void OnEnable()
+        private CancellationTokenSource _visualLifetime;
+        private IAssetService _visualAssets;
+        private AssetHandle<GameObject> _characterAsset;
+        private AssetHandle<Material> _playerMaterial;
+        private Task _visualLoad;
+        private Task _visualRelease;
+
+        private int _visualGeneration;
+
+        private async void OnEnable()
         {
-            // Resource material references retain the URP shaders in standalone builds.
-            GameObject prefab = Resources.Load<GameObject>("BattleClient/NetworkCharacter");
+            int generation = ++_visualGeneration;
+            try
+            {
+                if (_visualRelease != null)
+                {
+                    await _visualRelease;
+                }
+                if (!isActiveAndEnabled || generation != _visualGeneration)
+                {
+                    return;
+                }
+                _visualRelease = null;
+                _visualLifetime = new CancellationTokenSource();
+                _visualLoad = InitializeVisualsAsync(_visualLifetime.Token);
+                await _visualLoad;
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
+                try
+                {
+                    await ReleaseVisualsAsync();
+                }
+                catch (Exception cleanupError)
+                {
+                    Debug.LogException(cleanupError);
+                }
+            }
+        }
+
+        private async Task InitializeVisualsAsync(CancellationToken cancellationToken)
+        {
+            _visualAssets = await FrameworkClientRoot
+                .GetOrCreate(gameObject)
+                .AssetsAsync(cancellationToken);
+            _characterAsset = await _visualAssets.LoadAsync<GameObject>(
+                new AssetId("character.network"),
+                cancellationToken
+            );
+            _playerMaterial = await _visualAssets.LoadAsync<Material>(
+                new AssetId("material.player"),
+                cancellationToken
+            );
+            cancellationToken.ThrowIfCancellationRequested();
+            GameObject prefab = _characterAsset.Value;
             if (prefab == null)
+            {
                 throw new InvalidOperationException(
                     "Missing NetworkCharacter prefab; run AiNative/Battle Client/Build Network Character."
                 );
+            }
+
             _playerVisual = Instantiate(prefab, transform);
             _playerVisual.name = "LocalNetworkCharacter";
             _playerVisual.transform.localPosition = Vector3.zero;
             _character = _playerVisual.GetComponent<NetworkCharacterPresenter>();
-            _remoteVisuals = new ArenaRemoteVisualPool(LoadGreyboxMaterial("Player"), prefab);
+            _remoteVisuals = new ArenaRemoteVisualPool(_playerMaterial.Value, prefab);
             GameObject cameraObject = new GameObject("LocalPlayerCamera");
             _playerCamera = cameraObject.AddComponent<Camera>();
             _playerCamera.nearClipPlane = .1f;
@@ -143,7 +206,10 @@ namespace AiNative.Client.Application
             _orbitCamera = cameraObject.AddComponent<CharacterOrbitCamera>();
             _orbitCamera.ConfigurePresentation(transform);
             if (_topology != null)
+            {
                 _topology.CharacterCamera = _orbitCamera;
+            }
+
             _floorVisual = new GameObject("ArenaTrainingGround");
             _floorVisual.AddComponent<ArenaTrainingGroundPresentation>();
             GameObject lightObject = new GameObject("ArenaGreyboxLight");
@@ -158,17 +224,26 @@ namespace AiNative.Client.Application
         {
             DrawCharacterHud();
             if (_topology != null)
-                return; // Interactive topology owns its UGUI, including the HUD.
+            {
+                return; // 交互流程统一拥有 uGUI 与战斗 HUD，此入口不再重复绘制。
+            }
+
             if (
                 _topology == null
                 && !_launch.Smoke
                 && !_launch.RegionalCorrection
                 && GUI.Button(new Rect(740, 16, 180, 32), "登录大厅与匹配")
             )
+            {
                 SwitchToTopology();
+            }
+
             BattleClientSession session = Session;
             if (session is null)
+            {
                 return;
+            }
+
             _hudStyle ??= new GUIStyle(GUI.skin.label)
             {
                 fontSize = 16,
@@ -179,7 +254,6 @@ namespace AiNative.Client.Application
                 $"BattleClient  {session.State}  epoch={session.ConnectionEpoch} tick={session.LastReceivedTick} ack={session.LastAcknowledgedSequence} dropped={session.DroppedInputFrames}",
                 _hudStyle
             );
-
             if (session.TryGetArenaState(out ArenaPlayerState arenaState))
             {
                 GUI.Label(
@@ -203,52 +277,153 @@ namespace AiNative.Client.Application
             _topology = gameObject.AddComponent<TopologyClientFlow>();
             _topology.CharacterCamera = _orbitCamera;
             if (previous != null)
-                await previous.DisposeAsync();
+            {
+                try
+                {
+                    await previous.DisposeAsync();
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogException(exception);
+                }
+            }
         }
 
         private void OnDisable()
         {
-            // Unity may have already destroyed native objects during Player shutdown.
-            // The orbit camera has independent world-space rotation.
+            _visualGeneration++;
+            ReleaseVisualsObserved();
+        }
+
+        private async void ReleaseVisualsObserved()
+        {
+            try
+            {
+                await ReleaseVisualsAsync();
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
+            }
+        }
+
+        public ValueTask ReleaseVisualsAsync()
+        {
+            if (_visualRelease == null)
+            {
+                _visualRelease = ReleaseVisualsCoreAsync();
+            }
+            return new ValueTask(_visualRelease);
+        }
+
+        private async Task ReleaseVisualsCoreAsync()
+        {
+            var errors = new List<Exception>();
+            try
+            {
+                _visualLifetime?.Cancel();
+            }
+            catch (Exception exception)
+            {
+                errors.Add(exception);
+            }
+            if (_visualLoad != null)
+            {
+                try
+                {
+                    await _visualLoad;
+                }
+                catch (Exception)
+                { /* 加载错误由入口记录。 */
+                }
+            }
+            if (_topology != null)
+            {
+                _topology.CharacterCamera = null;
+            }
             if (_playerCamera != null)
+            {
                 Destroy(_playerCamera.gameObject);
-            _remoteVisuals?.Dispose();
+            }
+            try
+            {
+                _remoteVisuals?.Dispose();
+            }
+            catch (Exception exception)
+            {
+                errors.Add(exception);
+            }
             _remoteVisuals = null;
             if (_playerVisual != null)
+            {
                 Destroy(_playerVisual);
+            }
             if (_floorVisual != null)
+            {
                 Destroy(_floorVisual);
+            }
             if (_arenaLight != null)
+            {
                 Destroy(_arenaLight.gameObject);
+            }
             _playerVisual = null;
             _floorVisual = null;
             _playerCamera = null;
             _arenaLight = null;
+            // Destroy 在帧尾生效；句柄必须在场景实例销毁之后释放。
+            if (_visualAssets != null && (_characterAsset != null || _playerMaterial != null))
+            {
+                await UnityAsync.NextFrameAsync(CancellationToken.None);
+                if (_characterAsset != null)
+                {
+                    try
+                    {
+                        await _visualAssets.ReleaseAsync(_characterAsset);
+                    }
+                    catch (Exception exception)
+                    {
+                        errors.Add(exception);
+                    }
+                }
+                if (_playerMaterial != null)
+                {
+                    try
+                    {
+                        await _visualAssets.ReleaseAsync(_playerMaterial);
+                    }
+                    catch (Exception exception)
+                    {
+                        errors.Add(exception);
+                    }
+                }
+                _characterAsset = null;
+                _playerMaterial = null;
+            }
+            _visualLifetime?.Dispose();
+            _visualLifetime = null;
+            if (errors.Count > 0)
+            {
+                throw new AggregateException(errors);
+            }
         }
 
-        private static Material LoadGreyboxMaterial(string name)
-        {
-            Material material = Resources.Load<Material>("BattleClient/" + name);
-            if (material == null)
-                throw new InvalidOperationException("Missing greybox material: " + name);
-            return material;
-        }
-
-        // Sample devices in Update (Input System dynamic update). Fixed ticks consume
-        // the snapshot without querying devices from the wrong input-update phase.
         private Vector2Int _manualMove;
         private bool _manualFire;
 
         private void SampleManualInput()
         {
             Keyboard keyboard = Keyboard.current;
-            _manualMove =
-                keyboard == null
-                    ? Vector2Int.zero
-                    : new Vector2Int(
-                        (keyboard.dKey.isPressed ? 1000 : 0) - (keyboard.aKey.isPressed ? 1000 : 0),
-                        (keyboard.wKey.isPressed ? 1000 : 0) - (keyboard.sKey.isPressed ? 1000 : 0)
-                    );
+            if (keyboard == null)
+            {
+                _manualMove = Vector2Int.zero;
+            }
+            else
+            {
+                _manualMove = new Vector2Int(
+                    (keyboard.dKey.isPressed ? 1000 : 0) - (keyboard.aKey.isPressed ? 1000 : 0),
+                    (keyboard.wKey.isPressed ? 1000 : 0) - (keyboard.sKey.isPressed ? 1000 : 0)
+                );
+            }
             _manualFire = Mouse.current != null && Mouse.current.leftButton.isPressed;
         }
 
@@ -264,11 +439,16 @@ namespace AiNative.Client.Application
         private void Update()
         {
             if (_topology != null || _session == null)
+            {
                 return;
+            }
+
             SampleManualInput();
             _session.Pump(Time.unscaledDeltaTime);
             if (_finished)
+            {
                 return;
+            }
 
             if (_launch.RegionalCorrection)
             {
@@ -277,7 +457,9 @@ namespace AiNative.Client.Application
             }
 
             if (!_launch.Smoke)
+            {
                 return;
+            }
 
             _smokeElapsed += Time.unscaledDeltaTime;
             if (_session.State == BattleClientState.Faulted)
@@ -317,24 +499,40 @@ namespace AiNative.Client.Application
         private void FixedUpdate()
         {
             if (_topology != null || _session == null)
+            {
                 return;
+            }
+
             if (!_session.IsPredictionInitialized || _session.State != BattleClientState.Active)
+            {
                 return;
+            }
+
             _roomTick = Math.Max(_roomTick + 1, _session.LastReceivedTick + 1);
             int moveX;
             int moveZ;
             if (_launch.Smoke || _launch.RegionalCorrection)
             {
-                // A repeating, deterministic pattern keeps smoke evidence reproducible.
+                // 使用可重复的确定性输入模式，使冒烟验收证据可复现。
                 ulong phase = (_roomTick / 30) & 3;
-                moveX =
-                    phase == 0 ? MoveScaleMilli
-                    : phase == 2 ? -MoveScaleMilli
-                    : 0;
-                moveZ =
-                    phase == 1 ? MoveScaleMilli
-                    : phase == 3 ? -MoveScaleMilli
-                    : 0;
+                moveX = 0;
+                moveZ = 0;
+                if (phase == 0)
+                {
+                    moveX = MoveScaleMilli;
+                }
+                else if (phase == 2)
+                {
+                    moveX = -MoveScaleMilli;
+                }
+                if (phase == 1)
+                {
+                    moveZ = MoveScaleMilli;
+                }
+                else if (phase == 3)
+                {
+                    moveZ = -MoveScaleMilli;
+                }
             }
             else
             {
@@ -365,6 +563,10 @@ namespace AiNative.Client.Application
 
         private void LateUpdate()
         {
+            if (_playerVisual == null)
+            {
+                return;
+            }
             BattleClientSession session = Session;
             int remoteCount =
                 session?.AdvanceRemotePresentation(Time.unscaledDeltaTime, _remotePoses) ?? 0;
@@ -372,19 +574,27 @@ namespace AiNative.Client.Application
             if (session is null)
             {
                 if (_playerVisual != null)
+                {
                     _playerVisual.SetActive(false);
+                }
+
                 _visualEpoch = 0;
                 return;
             }
+
             if (_visualEpoch != session.ConnectionEpoch)
             {
                 _visualEpoch = session.ConnectionEpoch;
                 _orbitCamera?.Snap();
                 _combatFeedback = "";
             }
+
             int eventCount = session.DrainCombatEvents(_combatEvents);
             for (int i = 0; i < eventCount; i++)
+            {
                 PresentCombatEvent(_combatEvents[i], session.EntityId);
+            }
+
             if (
                 session.TryAdvancePresentation(
                     Time.unscaledDeltaTime,
@@ -433,19 +643,24 @@ namespace AiNative.Client.Application
                             ?.GetComponent<NetworkCharacterPresenter>();
                 shooter?.NotifyShot();
             }
+
             if (
                 item.Kind == ArenaPresentationEventKind.Hit
                 && (item.SourceEntityId == localId || item.TargetEntityId == localId)
             )
+            {
                 _combatFeedback =
                     item.TargetEntityId == localId
                         ? $"受到伤害 {item.Damage}"
                         : $"命中 {item.Damage}";
+            }
             else if (item.Kind == ArenaPresentationEventKind.Kill)
+            {
                 _combatFeedback =
                     item.TargetEntityId == localId
                         ? "已阵亡"
                         : $"玩家 {item.SourceEntityId} 击败 {item.TargetEntityId}";
+            }
             else if (
                 item.Kind == ArenaPresentationEventKind.Respawn
                 && item.SourceEntityId == localId
@@ -455,7 +670,10 @@ namespace AiNative.Client.Application
                 _orbitCamera?.Snap();
             }
             else
+            {
                 return;
+            }
+
             _feedbackUntil = Time.unscaledTime + 2;
         }
 
@@ -478,7 +696,10 @@ namespace AiNative.Client.Application
                     out double distance
                 )
             )
+            {
                 range = (float)(distance / 1000d);
+            }
+
             Vector3 point =
                 _remoteVisuals != null ? _remoteVisuals.AimPoint(ray, range) : ray.GetPoint(range);
             return ray.GetPoint(Mathf.Min(range, Vector3.Dot(point - ray.origin, ray.direction)));
@@ -492,17 +713,26 @@ namespace AiNative.Client.Application
                 || !session.TryGetArenaState(out var state)
                 || session.ArenaPhase == ArenaMatchPhase.Finished
             )
+            {
                 return;
+            }
+
             if (_topology != null)
+            {
                 GUI.Label(
                     new Rect(16, Screen.height - 50, 1000, 24),
                     "WASD 移动  |  按住右键转向/瞄准  |  左键开火  |  Space 跳跃  |  1/2/3 武器"
                 );
+            }
+
             if (Time.unscaledTime < _feedbackUntil)
+            {
                 GUI.Label(
                     new Rect(Screen.width / 2 - 100, Screen.height / 2 + 35, 260, 30),
                     _combatFeedback
                 );
+            }
+
             GUI.Label(new Rect(Screen.width / 2 - 6, Screen.height / 2 - 10, 24, 24), "+");
             GUI.Label(
                 new Rect(16, Screen.height - 75, 800, 24),
@@ -510,11 +740,63 @@ namespace AiNative.Client.Application
             );
         }
 
+        private Task _stopTask;
+
+        /// <summary>主线程停止表现与旧入口会话；重复调用共享结果，正常退出应在销毁对象前等待。</summary>
+        public ValueTask StopAsync()
+        {
+            if (_stopTask == null)
+            {
+                var completion = new TaskCompletionSource<bool>();
+                _stopTask = completion.Task;
+                _ = StopObservedAsync(completion);
+            }
+            return new ValueTask(_stopTask);
+        }
+
+        private async Task StopObservedAsync(TaskCompletionSource<bool> completion)
+        {
+            var errors = new List<Exception>();
+            try
+            {
+                await ReleaseVisualsAsync();
+            }
+            catch (Exception exception)
+            {
+                errors.Add(exception);
+            }
+            BattleClientSession session = _session;
+            _session = null;
+            if (session != null)
+            {
+                try
+                {
+                    await session.DisposeAsync();
+                }
+                catch (Exception exception)
+                {
+                    errors.Add(exception);
+                }
+            }
+            if (errors.Count == 0)
+            {
+                completion.TrySetResult(true);
+            }
+            else
+            {
+                completion.TrySetException(new AggregateException(errors));
+            }
+        }
+
         private async void OnDestroy()
         {
-            if (_session is not null)
+            try
             {
-                await _session.DisposeAsync();
+                await StopAsync();
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
             }
         }
 
@@ -533,12 +815,14 @@ namespace AiNative.Client.Application
                 lastReceivedTick = _session.LastReceivedTick.ToString(),
                 droppedInputFrames = _session.DroppedInputFrames,
             };
-
             try
             {
                 string directory = Path.GetDirectoryName(_launch.ResultPath);
                 if (!string.IsNullOrEmpty(directory))
+                {
                     Directory.CreateDirectory(directory);
+                }
+
                 File.WriteAllText(_launch.ResultPath, JsonUtility.ToJson(result, true));
             }
             catch (Exception exception)
@@ -549,7 +833,7 @@ namespace AiNative.Client.Application
 
             Debug.Log(success ? "WS-26 smoke passed." : "WS-26 smoke failed: " + error);
 #if !UNITY_EDITOR
-            global::UnityEngine.Application.Quit(success ? 0 : 1);
+            FrameworkClientRoot.GetOrCreate(gameObject).RequestQuit(success ? 0 : 1);
 #endif
         }
 
@@ -570,7 +854,10 @@ namespace AiNative.Client.Application
             {
                 _regionalWarmupElapsed += Time.unscaledDeltaTime;
                 if (_regionalWarmupElapsed < RegionalWarmupSeconds)
+                {
                     return;
+                }
+
                 if (
                     !_session.ResetPredictionDiagnostics()
                     || !_session.ResetPresentationDiagnostics()
@@ -618,13 +905,17 @@ namespace AiNative.Client.Application
                 && _session.DroppedInputFrames == 0
                 && _session.State == BattleClientState.Active;
             _finished = true;
+            string failureReason = string.Empty;
+            if (!gatesPassed)
+            {
+                failureReason = string.IsNullOrEmpty(error)
+                    ? "Regional correction gates failed."
+                    : error;
+            }
             RegionalCorrectionResult result = new RegionalCorrectionResult
             {
                 success = gatesPassed,
-                error =
-                    gatesPassed ? string.Empty
-                    : string.IsNullOrEmpty(error) ? "Regional correction gates failed."
-                    : error,
+                error = failureReason,
                 evidenceClass = "macos-arm64-mono-regional-real-client",
                 profile = "Regional",
                 configuredRttMilliseconds = 100,
@@ -657,7 +948,6 @@ namespace AiNative.Client.Application
                 presentationSnappedCorrections = presentation.SnappedCorrections,
                 presentationResidualMillimetres = presentation.ResidualMillimetres,
             };
-
             WriteResult(result, ref gatesPassed);
             Debug.Log(
                 gatesPassed
@@ -665,7 +955,7 @@ namespace AiNative.Client.Application
                     : "WS-27 Regional correction validation failed: " + result.error
             );
 #if !UNITY_EDITOR
-            global::UnityEngine.Application.Quit(gatesPassed ? 0 : 1);
+            FrameworkClientRoot.GetOrCreate(gameObject).RequestQuit(gatesPassed ? 0 : 1);
 #endif
         }
 
@@ -675,7 +965,10 @@ namespace AiNative.Client.Application
             {
                 string directory = Path.GetDirectoryName(_launch.ResultPath);
                 if (!string.IsNullOrEmpty(directory))
+                {
                     Directory.CreateDirectory(directory);
+                }
+
                 File.WriteAllText(_launch.ResultPath, JsonUtility.ToJson(result, true));
             }
             catch (Exception exception)
@@ -756,13 +1049,9 @@ namespace AiNative.Client.Application
         }
 
         internal bool Smoke { get; }
-
         internal bool RegionalCorrection { get; }
-
         internal string Host { get; }
-
         internal int Port { get; }
-
         internal string ResultPath { get; }
 
         internal static BattleClientLaunchOptions Parse(string[] arguments)
@@ -777,7 +1066,6 @@ namespace AiNative.Client.Application
                     "ainative-ws26-smoke.json"
                 )
             );
-
             for (int index = 0; index < arguments.Length; index++)
             {
                 string argument = arguments[index];

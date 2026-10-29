@@ -1,0 +1,8 @@
+{
+  "name": "com.ainative.client.core",
+  "version": "0.1.0",
+  "displayName": "AI-Native Client Core",
+  "description": "Engine-independent lifecycle and strongly typed MVVM primitives.",
+  "unity": "6000.3",
+  "author": { "name": "AI-Native Unity Framework" }
+}

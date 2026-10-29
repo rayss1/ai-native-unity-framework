@@ -9,13 +9,12 @@ namespace AiNative.Client.Prediction.Tests
 {
     public sealed class ClientPredictionAdapterTests
     {
-        private static readonly TransportChannel SnapshotChannel = new TransportChannel(
+        private static readonly TransportChannel _snapshotChannel = new TransportChannel(
             1,
             TransportDelivery.Unreliable,
             TransportOrdering.Sequenced
         );
-
-        private static readonly TransportChannel ControlChannel = new TransportChannel(
+        private static readonly TransportChannel _controlChannel = new TransportChannel(
             0,
             TransportDelivery.Reliable,
             TransportOrdering.Ordered
@@ -115,7 +114,7 @@ namespace AiNative.Client.Prediction.Tests
             byte[] snapshot = ProtocolFrameFixtures.Snapshot(1, 103, 0, 0, 0);
             adapter.ApplySnapshot(
                 snapshot,
-                ProtocolFrameFixtures.Packet(snapshot, SnapshotChannel, 1)
+                ProtocolFrameFixtures.Packet(snapshot, _snapshotChannel, 1)
             );
             Assert.That(
                 adapter.Current.Tick,
@@ -144,12 +143,10 @@ namespace AiNative.Client.Prediction.Tests
         {
             FakeRealtimeTransport transport = new FakeRealtimeTransport();
             ClientPredictionAdapter adapter = InitializedAdapter(transport, 7, 1);
-
             PredictionSendResult result = adapter
                 .SendInputAsync(42, 1000, -500)
                 .GetAwaiter()
                 .GetResult();
-
             Assert.That(result.Status, Is.EqualTo(PredictionSendStatus.Accepted));
             Assert.That(result.PredictedState.PositionXMillimetres, Is.EqualTo(50));
             Assert.That(result.PredictedState.PositionZMillimetres, Is.EqualTo(-25));
@@ -183,7 +180,6 @@ namespace AiNative.Client.Prediction.Tests
                     }
                 )
             );
-
             FakeRealtimeTransport maximumTransport = new FakeRealtimeTransport();
             ClientPredictionAdapter maximumAdapter = new ClientPredictionAdapter(
                 maximumTransport,
@@ -194,7 +190,7 @@ namespace AiNative.Client.Prediction.Tests
             byte[] maximumBaseline = ProtocolFrameFixtures.Snapshot(7, 10, uint.MaxValue - 1, 0, 0);
             maximumAdapter.ApplyPacket(
                 maximumBaseline,
-                ProtocolFrameFixtures.Packet(maximumBaseline, SnapshotChannel, 1)
+                ProtocolFrameFixtures.Packet(maximumBaseline, _snapshotChannel, 1)
             );
             byte[] exactBuffer = new byte[64];
             PredictionPrepareResult maximum = maximumAdapter.PrepareInput(
@@ -215,12 +211,10 @@ namespace AiNative.Client.Prediction.Tests
             adapter.SendInputAsync(11, 1000, 0).GetAwaiter().GetResult();
             adapter.SendInputAsync(12, 1000, 0).GetAwaiter().GetResult();
             byte[] snapshot = ProtocolFrameFixtures.Snapshot(7, 11, 1, 40, 0);
-
             SnapshotApplyResult applied = adapter.ApplyPacket(
                 snapshot,
-                ProtocolFrameFixtures.Packet(snapshot, SnapshotChannel, 1)
+                ProtocolFrameFixtures.Packet(snapshot, _snapshotChannel, 1)
             );
-
             Assert.That(applied.Status, Is.EqualTo(SnapshotApplyStatus.Reconciled));
             Assert.That(applied.Reconciliation.Status, Is.EqualTo(ReconciliationStatus.Corrected));
             Assert.That(applied.Reconciliation.DiscardedInputCount, Is.EqualTo(1));
@@ -237,12 +231,10 @@ namespace AiNative.Client.Prediction.Tests
             ClientPredictionAdapter adapter = InitializedAdapter(transport, 7, 1);
             adapter.SendInputAsync(11, 1000, 0).GetAwaiter().GetResult();
             byte[] snapshot = ProtocolFrameFixtures.Snapshot(7, 11, 1, 50, 0);
-
             SnapshotApplyResult applied = adapter.ApplyPacket(
                 snapshot,
-                ProtocolFrameFixtures.Packet(snapshot, SnapshotChannel, 1)
+                ProtocolFrameFixtures.Packet(snapshot, _snapshotChannel, 1)
             );
-
             Assert.That(applied.Reconciliation.Status, Is.EqualTo(ReconciliationStatus.Matched));
             Assert.That(applied.CorrectionMagnitudeMillimetres, Is.Zero);
             Assert.That(adapter.Diagnostics.Corrections, Is.Zero);
@@ -266,7 +258,7 @@ namespace AiNative.Client.Prediction.Tests
                 );
                 adapter.ApplyPacket(
                     snapshot,
-                    ProtocolFrameFixtures.Packet(snapshot, SnapshotChannel, 1)
+                    ProtocolFrameFixtures.Packet(snapshot, _snapshotChannel, 1)
                 );
             }
 
@@ -275,9 +267,7 @@ namespace AiNative.Client.Prediction.Tests
             Assert.That(measured.CorrectionP95Millimetres, Is.EqualTo(95));
             Assert.That(measured.CorrectionP99Millimetres, Is.EqualTo(99));
             Assert.That(measured.MaximumCorrectionMillimetres, Is.EqualTo(100));
-
             adapter.ResetDiagnostics();
-
             PredictionDiagnostics reset = adapter.Diagnostics;
             Assert.That(reset.AcceptedSnapshots, Is.Zero);
             Assert.That(reset.ReconciliationSamples, Is.Zero);
@@ -296,16 +286,14 @@ namespace AiNative.Client.Prediction.Tests
             );
             byte[] missing = ProtocolFrameFixtures.Snapshot(7, 10, 0, 0, 0, includePlayer: false);
             byte[] incompatible = ProtocolFrameFixtures.Snapshot(7, 10, 0, 0, 0, protocolMajor: 2);
-
             SnapshotApplyResult missingResult = adapter.ApplyPacket(
                 missing,
-                ProtocolFrameFixtures.Packet(missing, SnapshotChannel, 1)
+                ProtocolFrameFixtures.Packet(missing, _snapshotChannel, 1)
             );
             SnapshotApplyResult incompatibleResult = adapter.ApplyPacket(
                 incompatible,
-                ProtocolFrameFixtures.Packet(incompatible, SnapshotChannel, 1)
+                ProtocolFrameFixtures.Packet(incompatible, _snapshotChannel, 1)
             );
-
             Assert.That(missingResult.Status, Is.EqualTo(SnapshotApplyStatus.PlayerMissing));
             Assert.That(
                 incompatibleResult.Status,
@@ -322,15 +310,17 @@ namespace AiNative.Client.Prediction.Tests
             byte[] snapshot = ProtocolFrameFixtures.Snapshot(7, 11, 0, 50, 0);
             ReceivedPacket truncated = ProtocolFrameFixtures.Packet(
                 snapshot,
-                SnapshotChannel,
+                _snapshotChannel,
                 1,
                 snapshot.Length + 1
             );
-            ReceivedPacket wrongChannel = ProtocolFrameFixtures.Packet(snapshot, ControlChannel, 1);
-
+            ReceivedPacket wrongChannel = ProtocolFrameFixtures.Packet(
+                snapshot,
+                _controlChannel,
+                1
+            );
             SnapshotApplyResult truncatedResult = adapter.ApplyPacket(snapshot, truncated);
             SnapshotApplyResult wrongChannelResult = adapter.ApplyPacket(snapshot, wrongChannel);
-
             Assert.That(truncatedResult.Status, Is.EqualTo(SnapshotApplyStatus.Truncated));
             Assert.That(wrongChannelResult.Status, Is.EqualTo(SnapshotApplyStatus.WrongChannel));
             Assert.That(adapter.Diagnostics.AcceptedSnapshots, Is.EqualTo(1));
@@ -344,21 +334,18 @@ namespace AiNative.Client.Prediction.Tests
             adapter.SendInputAsync(11, 1000, 0).GetAwaiter().GetResult();
             byte[] snapshot = ProtocolFrameFixtures.Snapshot(7, 11, 1, 45, 0);
             byte[] reconnect = ProtocolFrameFixtures.Reconnect(2, 11, snapshot);
-
             SnapshotApplyResult applied = adapter.ApplyPacket(
                 reconnect,
-                ProtocolFrameFixtures.Packet(reconnect, ControlChannel, 2)
+                ProtocolFrameFixtures.Packet(reconnect, _controlChannel, 2)
             );
-
             Assert.That(applied.Status, Is.EqualTo(SnapshotApplyStatus.Reconciled));
             Assert.That(applied.ConnectionEpoch, Is.EqualTo(2));
             Assert.That(applied.Reconciliation.Status, Is.EqualTo(ReconciliationStatus.Corrected));
             Assert.That(adapter.ConnectionEpoch, Is.EqualTo(2));
-
             byte[] stale = ProtocolFrameFixtures.Snapshot(7, 12, 1, 45, 0);
             SnapshotApplyResult staleResult = adapter.ApplyPacket(
                 stale,
-                ProtocolFrameFixtures.Packet(stale, SnapshotChannel, 1)
+                ProtocolFrameFixtures.Packet(stale, _snapshotChannel, 1)
             );
             Assert.That(staleResult.Status, Is.EqualTo(SnapshotApplyStatus.StaleConnectionEpoch));
         }
@@ -371,12 +358,10 @@ namespace AiNative.Client.Prediction.Tests
                 NextSendStatus = SendStatus.WouldBlock,
             };
             ClientPredictionAdapter adapter = InitializedAdapter(transport, 7, 1);
-
             PredictionSendResult result = adapter
                 .SendInputAsync(11, 1000, 0)
                 .GetAwaiter()
                 .GetResult();
-
             Assert.That(result.Status, Is.EqualTo(PredictionSendStatus.WouldBlock));
             Assert.That(result.Predicted, Is.True);
             Assert.That(adapter.TryGetPredictedState(out KinematicState state), Is.True);
@@ -397,7 +382,7 @@ namespace AiNative.Client.Prediction.Tests
             byte[] acknowledged = ProtocolFrameFixtures.Snapshot(7, 2010, 2000, 0, 0);
             adapter.ApplyPacket(
                 acknowledged,
-                ProtocolFrameFixtures.Packet(acknowledged, SnapshotChannel, 1)
+                ProtocolFrameFixtures.Packet(acknowledged, _snapshotChannel, 1)
             );
             for (ulong tick = 2001; tick <= 3000; tick++)
             {
@@ -407,14 +392,12 @@ namespace AiNative.Client.Prediction.Tests
             byte[] secondAcknowledgement = ProtocolFrameFixtures.Snapshot(7, 3010, 3000, 0, 0);
             adapter.ApplyPacket(
                 secondAcknowledgement,
-                ProtocolFrameFixtures.Packet(secondAcknowledgement, SnapshotChannel, 1)
+                ProtocolFrameFixtures.Packet(secondAcknowledgement, _snapshotChannel, 1)
             );
             PredictionPrepareStatus lastStatus = PredictionPrepareStatus.NotInitialized;
-
             using var allocationMeter = new CalibratedAllocationMeter();
             allocationMeter.RequireSupported();
             allocationMeter.Begin();
-
             for (ulong tick = 3001; tick <= 13000; tick++)
             {
                 lastStatus = adapter.PrepareInput(tick, 1, -1, inputBuffer).Status;
@@ -447,7 +430,7 @@ namespace AiNative.Client.Prediction.Tests
             byte[] baseline = ProtocolFrameFixtures.Snapshot(entityId, 10, 0, 0, 0);
             SnapshotApplyResult initialized = adapter.ApplyPacket(
                 baseline,
-                ProtocolFrameFixtures.Packet(baseline, SnapshotChannel, connectionEpoch)
+                ProtocolFrameFixtures.Packet(baseline, _snapshotChannel, connectionEpoch)
             );
             Assert.That(initialized.Status, Is.EqualTo(SnapshotApplyStatus.Initialized));
             return adapter;

@@ -37,7 +37,7 @@ namespace AiNative.Client.Fantasy
         protected override async FTask Run(Session session, FantasyRealtimeEnvelope message)
         {
             FantasyClientSessionRouter.Deliver(
-                session.RuntimeId,
+                session,
                 message.ChannelId,
                 message.Payload,
                 message.Sequence

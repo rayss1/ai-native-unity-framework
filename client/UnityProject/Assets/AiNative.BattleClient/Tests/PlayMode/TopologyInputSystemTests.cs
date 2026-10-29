@@ -1,5 +1,7 @@
 using System.Collections;
+using System.Collections.Generic;
 using System.Reflection;
+using System.Threading.Tasks;
 using AiNative.Client.Fantasy;
 using NUnit.Framework;
 using UnityEngine;
@@ -25,6 +27,8 @@ namespace AiNative.Client.Application.PlayModeTests
             _mouse = InputSystem.AddDevice<Mouse>();
             _owner = new GameObject("TopologyInputSystemFixture");
             _flow = _owner.AddComponent<TopologyClientFlow>();
+            // UnityTest 在进入枚举器前也可能推进一帧；只由 UI 用例显式启动。
+            _flow.enabled = false;
             _flow.Initialize(new GateConnectionOptions("127.0.0.1", 23001, false));
         }
 
@@ -32,18 +36,28 @@ namespace AiNative.Client.Application.PlayModeTests
         public IEnumerator DestroyUiBeforeRestoringInputSystem()
         {
             if (_owner != null)
+            {
+                Task stopped = _flow.StopAsync().AsTask();
+                yield return WaitForCompletion(stopped, "Flow cleanup");
+                FrameworkClientRoot root = _owner.GetComponent<FrameworkClientRoot>();
+                if (root != null)
+                {
+                    yield return WaitForCompletion(root.StopAsync().AsTask(), "Root cleanup");
+                }
                 Object.Destroy(_owner);
+            }
+
             _owner = null;
-            // Flow -> view -> owned EventSystem destruction spans three frames.
-            yield return null;
-            yield return null;
             yield return null;
         }
 
         public override void TearDown()
         {
             if (_owner != null)
+            {
                 Object.DestroyImmediate(_owner);
+            }
+
             base.TearDown();
         }
 
@@ -83,7 +97,7 @@ namespace AiNative.Client.Application.PlayModeTests
         [UnityTest]
         public IEnumerator LoginUiHasNewModuleAndTabShiftTabEnterWork()
         {
-            yield return null;
+            yield return WaitForView();
             var view = (TopologyClientView)Field(_flow, "_view");
             yield return null;
             var module = EventSystem.current.GetComponent<InputSystemUIInputModule>();
@@ -91,7 +105,6 @@ namespace AiNative.Client.Application.PlayModeTests
             Assert.That(module.enabled, Is.True);
             Assert.That(module.actionsAsset, Is.Not.Null);
             Assert.That(EventSystem.current.GetComponent<StandaloneInputModule>(), Is.Null);
-
             Press(_keyboard.tabKey);
             yield return null;
             Assert.That(
@@ -110,7 +123,6 @@ namespace AiNative.Client.Application.PlayModeTests
             Release(_keyboard.tabKey);
             Release(_keyboard.leftShiftKey);
             yield return null;
-
             view.Username.text = "ab";
             view.Password.text = "short";
             view.Password.Select();
@@ -132,7 +144,7 @@ namespace AiNative.Client.Application.PlayModeTests
         public IEnumerator PointerClickUsesNewModuleAndDestroyedUiDoesNotLeakEventSystem()
         {
             yield return null;
-            yield return null;
+            yield return WaitForView();
             var view = (TopologyClientView)Field(_flow, "_view");
             GameObject eventSystem = EventSystem.current.gameObject;
             Canvas.ForceUpdateCanvases();
@@ -141,6 +153,22 @@ namespace AiNative.Client.Application.PlayModeTests
                 null,
                 rect.TransformPoint(rect.rect.center)
             );
+            var hits = new List<RaycastResult>();
+            EventSystem.current.RaycastAll(
+                new PointerEventData(EventSystem.current) { position = position },
+                hits
+            );
+            Assert.That(
+                hits.Count,
+                Is.GreaterThan(0),
+                "Rendered button must receive a UI raycast."
+            );
+            Assert.That(
+                hits[0].gameObject.GetComponentInParent<UnityEngine.UI.Button>(),
+                Is.SameAs(view.AdvancedButton),
+                "The visible click position must hit AdvancedButton."
+            );
+            Assert.That(view.AdvancedButton.IsInteractable(), Is.True);
             bool prior = view.Advanced.activeSelf;
             Set(_mouse.position, position);
             yield return null;
@@ -153,10 +181,11 @@ namespace AiNative.Client.Application.PlayModeTests
                 Is.Not.EqualTo(prior),
                 "A real Input System pointer click must reach the UGUI button."
             );
+            yield return WaitForCompletion(_flow.StopAsync().AsTask(), "Explicit UI cleanup");
+            FrameworkClientRoot root = _owner.GetComponent<FrameworkClientRoot>();
+            yield return WaitForCompletion(root.StopAsync().AsTask(), "Explicit root cleanup");
             Object.Destroy(_owner);
             _owner = null;
-            yield return null;
-            yield return null;
             yield return null;
             Assert.That(eventSystem == null, Is.True);
             LogAssert.NoUnexpectedReceived();
@@ -165,9 +194,14 @@ namespace AiNative.Client.Application.PlayModeTests
         [UnityTest]
         public IEnumerator BorrowedLegacyEventSystemMigratesWithoutBeingDestroyed()
         {
+            // 此用例显式创建视图，避免 Flow.Start 另行异步打开第二个 UI。
+            _flow.enabled = false;
             EventSystem previous = EventSystem.current;
             if (previous != null)
+            {
                 previous.gameObject.SetActive(false);
+            }
+
             var borrowed = new GameObject(
                 "Borrowed EventSystem",
                 typeof(EventSystem),
@@ -176,7 +210,7 @@ namespace AiNative.Client.Application.PlayModeTests
             EventSystem.current = borrowed.GetComponent<EventSystem>();
             try
             {
-                // Bind before the first EventSystem.Update can poll the disabled legacy backend.
+                // 在 EventSystem 首次 Update 轮询已禁用的旧输入后端前完成绑定。
                 var prefab = Resources.Load<GameObject>("TopologyClientUI");
                 var ui = Object.Instantiate(prefab);
                 var view = ui.GetComponent<TopologyClientView>();
@@ -193,8 +227,49 @@ namespace AiNative.Client.Application.PlayModeTests
             {
                 Object.DestroyImmediate(borrowed);
                 if (previous != null)
+                {
                     previous.gameObject.SetActive(true);
+                }
             }
+        }
+
+        private IEnumerator WaitForView()
+        {
+            LogAssert.Expect(LogType.Log, "[Client] CLIENT_FRAMEWORK_STARTED: Local content ready");
+            _flow.enabled = true;
+            float deadline = Time.realtimeSinceStartup + 10f;
+            while (
+                Field(_flow, "_view") == null
+                && Time.realtimeSinceStartup < deadline
+                && _flow.Error != "ui-load-failed"
+            )
+            {
+                yield return null;
+            }
+            Assert.That(
+                Field(_flow, "_view"),
+                Is.Not.Null,
+                "UI initialization must complete within 10 seconds; error=" + _flow.Error
+            );
+            // Bundle 回调可能在帧尾创建视图；等待其首轮 LateUpdate 和布局重建后采样控件坐标。
+            yield return null;
+            Canvas.ForceUpdateCanvases();
+            yield return null;
+        }
+
+        private static IEnumerator WaitForCompletion(Task operation, string phase)
+        {
+            float deadline = Time.realtimeSinceStartup + 10f;
+            while (!operation.IsCompleted && Time.realtimeSinceStartup < deadline)
+            {
+                yield return null;
+            }
+            Assert.That(
+                operation.IsCompleted,
+                Is.True,
+                phase + " must complete within 10 seconds."
+            );
+            operation.GetAwaiter().GetResult();
         }
 
         private static object Field(object target, string name) =>

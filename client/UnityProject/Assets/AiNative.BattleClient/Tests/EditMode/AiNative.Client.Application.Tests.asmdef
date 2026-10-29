@@ -11,7 +11,10 @@
     "AiNative.Client.Protocol",
     "AiNative.Client.Protocol.Protobuf",
     "AiNative.Client.Prediction.TestSupport",
-    "AiNative.Client.Application.TestSupport"
+    "AiNative.Client.Application.TestSupport",
+    "AiNative.Client.Core",
+    "AiNative.Client.Assets",
+    "AiNative.Client.UI.UGUI"
   ],
   "optionalUnityReferences": [
     "TestAssemblies"

@@ -12,9 +12,8 @@ namespace AiNative.Client.Fantasy
         public const int MaximumFrameBytes = 1200;
         public const int DefaultMaximumQueuedPackets = 1024;
         public const int DefaultMaximumQueuedBytes = 256 * 1024;
-
         private readonly IFantasyClientSession _session;
-        private readonly long _sessionRuntimeId;
+        private readonly object _sessionIdentity;
         private readonly BoundedPacketQueue _inbound;
         private readonly BoundedPacketQueue _outbound;
         private readonly Action _drainOutboundAction;
@@ -42,25 +41,22 @@ namespace AiNative.Client.Fantasy
         )
         {
             _session = session ?? throw new ArgumentNullException(nameof(session));
-            _sessionRuntimeId = session.RuntimeId;
+            _sessionIdentity = session.RoutingIdentity;
             _inbound = new BoundedPacketQueue(maximumQueuedPackets, maximumQueuedBytes);
             _outbound = new BoundedPacketQueue(maximumQueuedPackets, maximumQueuedBytes);
             _drainOutboundAction = DrainOutboundOnFantasyThread;
             _state = (int)TransportState.Connected;
-
-            if (!FantasyClientSessionRouter.Register(_sessionRuntimeId, this))
+            if (!FantasyClientSessionRouter.Register(_sessionIdentity, this))
             {
                 _state = (int)TransportState.Faulted;
                 throw new InvalidOperationException(
-                    $"A Fantasy client transport is already registered for session {_sessionRuntimeId}."
+                    $"A Fantasy client transport is already registered for the same session object."
                 );
             }
         }
 
         public TransportState State => (TransportState)Volatile.Read(ref _state);
-
         public uint ConnectionEpoch => unchecked((uint)Volatile.Read(ref _connectionEpoch));
-
         public FantasyKcpTransportDiagnostics Diagnostics =>
             new FantasyKcpTransportDiagnostics(
                 Interlocked.Read(ref _sendsAccepted),
@@ -166,6 +162,7 @@ namespace AiNative.Client.Fantasy
             {
                 TransportState current = State;
                 if (current != TransportState.Connected)
+                {
                     return Completed(
                         new SendResult(
                             current == TransportState.Faulted
@@ -173,6 +170,8 @@ namespace AiNative.Client.Fantasy
                                 : SendStatus.Closed
                         )
                     );
+                }
+
                 if (!_outbound.TryEnqueue(channel.Id, payload.Span, sequence))
                 {
                     Interlocked.Increment(ref _sendBackpressure);
@@ -211,16 +210,20 @@ namespace AiNative.Client.Fantasy
             lock (_disposeGate)
             {
                 if (_disposed)
+                {
                     return default;
-                // Closed describes connectivity, not ownership of the independent Fantasy Scene.
+                }
+
+                // Closed 表示连接状态，不代表独立 Fantasy Scene 的所有权已释放。
                 _disposed = true;
                 Volatile.Write(ref _state, (int)TransportState.Draining);
                 lock (_sequenceGate)
                 {
-                    FantasyClientSessionRouter.Remove(_sessionRuntimeId, this);
+                    FantasyClientSessionRouter.Remove(_sessionIdentity, this);
                     _inbound.Drain();
                     _outbound.Drain();
                 }
+
                 try
                 {
                     _session.Dispose();
@@ -229,6 +232,7 @@ namespace AiNative.Client.Fantasy
                 {
                     Volatile.Write(ref _state, (int)TransportState.Closed);
                 }
+
                 return default;
             }
         }
@@ -282,6 +286,7 @@ namespace AiNative.Client.Fantasy
                     Interlocked.Increment(ref _inboundDropped);
                     return false;
                 }
+
                 if (sequence <= _lastInboundSequences[channelId])
                 {
                     Interlocked.Increment(ref _staleSequences);
@@ -324,58 +329,59 @@ namespace AiNative.Client.Fantasy
 
             var stopwatch = Stopwatch.StartNew();
             using (var timeout = new CancellationTokenSource(options.ConnectTimeoutMilliseconds))
-            using (
-                var linked = CancellationTokenSource.CreateLinkedTokenSource(
-                    cancellationToken,
-                    timeout.Token
-                )
-            )
             {
-                FantasyKcpRealtimeTransport transport = null;
-                IFantasyClientSession session = null;
-                int disconnected = 0;
-                try
+                using (
+                    var linked = CancellationTokenSource.CreateLinkedTokenSource(
+                        cancellationToken,
+                        timeout.Token
+                    )
+                )
                 {
-                    session = await connector
-                        .ConnectAsync(
-                            options,
-                            () =>
-                            {
-                                Interlocked.Exchange(ref disconnected, 1);
-                                transport?.NotifyDisconnected();
-                            },
-                            linked.Token
-                        )
-                        .ConfigureAwait(false);
-
-                    transport = new FantasyKcpRealtimeTransport(session);
-                    if (Volatile.Read(ref disconnected) != 0)
+                    FantasyKcpRealtimeTransport transport = null;
+                    IFantasyClientSession session = null;
+                    int disconnected = 0;
+                    try
                     {
-                        transport.NotifyDisconnected();
-                    }
+                        session = await connector
+                            .ConnectAsync(
+                                options,
+                                () =>
+                                {
+                                    Interlocked.Exchange(ref disconnected, 1);
+                                    transport?.NotifyDisconnected();
+                                },
+                                linked.Token
+                            )
+                            .ConfigureAwait(false);
+                        transport = new FantasyKcpRealtimeTransport(session);
+                        if (Volatile.Read(ref disconnected) != 0)
+                        {
+                            transport.NotifyDisconnected();
+                        }
 
-                    return new FantasyKcpConnectResult(
-                        FantasyKcpConnectStatus.Connected,
-                        transport,
-                        null
-                    );
-                }
-                catch (OperationCanceledException exception)
-                {
-                    session?.Dispose();
-                    FantasyKcpConnectStatus status = cancellationToken.IsCancellationRequested
-                        ? FantasyKcpConnectStatus.Cancelled
-                        : FantasyKcpConnectStatus.TimedOut;
-                    return new FantasyKcpConnectResult(status, null, exception);
-                }
-                catch (Exception exception)
-                {
-                    session?.Dispose();
-                    FantasyKcpConnectStatus status =
-                        stopwatch.ElapsedMilliseconds >= options.ConnectTimeoutMilliseconds
-                            ? FantasyKcpConnectStatus.TimedOut
-                            : FantasyKcpConnectStatus.Faulted;
-                    return new FantasyKcpConnectResult(status, null, exception);
+                        return new FantasyKcpConnectResult(
+                            FantasyKcpConnectStatus.Connected,
+                            transport,
+                            null
+                        );
+                    }
+                    catch (OperationCanceledException exception)
+                    {
+                        session?.Dispose();
+                        FantasyKcpConnectStatus status = cancellationToken.IsCancellationRequested
+                            ? FantasyKcpConnectStatus.Cancelled
+                            : FantasyKcpConnectStatus.TimedOut;
+                        return new FantasyKcpConnectResult(status, null, exception);
+                    }
+                    catch (Exception exception)
+                    {
+                        session?.Dispose();
+                        FantasyKcpConnectStatus status =
+                            stopwatch.ElapsedMilliseconds >= options.ConnectTimeoutMilliseconds
+                                ? FantasyKcpConnectStatus.TimedOut
+                                : FantasyKcpConnectStatus.Faulted;
+                        return new FantasyKcpConnectResult(status, null, exception);
+                    }
                 }
             }
         }
@@ -469,9 +475,9 @@ namespace AiNative.Client.Fantasy
                 }
 
                 Volatile.Write(ref _state, (int)TransportState.Closed);
-                FantasyClientSessionRouter.Remove(_sessionRuntimeId, this);
-                // Remote closure stops new admission, but accepted inbound still belongs to the reader.
-                // Only explicit Dispose releases unread packets. KCP ACK is not application consumption.
+                FantasyClientSessionRouter.Remove(_sessionIdentity, this);
+                // 远端关闭后不再接收新包，但已接收的数据仍归读取方消费。
+                // 只有显式 Dispose 才释放未读数据；KCP ACK 不等于应用已消费。
                 _outbound.Drain();
             }
         }

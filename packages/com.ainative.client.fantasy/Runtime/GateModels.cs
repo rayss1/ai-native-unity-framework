@@ -28,27 +28,39 @@ namespace AiNative.Client.Fantasy
         )
         {
             if (string.IsNullOrWhiteSpace(host))
+            {
                 throw new ArgumentException("Gate host required.");
+            }
+
             if (
                 port < 1
                 || port > 65535
                 || timeoutMilliseconds < 100
                 || timeoutMilliseconds > 60000
             )
+            {
                 throw new ArgumentOutOfRangeException(nameof(port));
+            }
+
             if (
                 !useTls
                 && !(IPAddress.TryParse(host, out var address) && IPAddress.IsLoopback(address))
             )
+            {
                 throw new ArgumentException(
                     "Plaintext Gate connections are restricted to explicit loopback IPs."
                 );
+            }
+
             certificateSha256 = (certificateSha256 ?? "").Replace(":", "").ToUpperInvariant();
             if (
                 certificateSha256.Length != 0
                 && (certificateSha256.Length != 64 || !IsHex(certificateSha256))
             )
+            {
                 throw new ArgumentException("Certificate pin must be a SHA256 hex digest.");
+            }
+
             Host = host;
             Port = port;
             UseTls = useTls;
@@ -59,8 +71,13 @@ namespace AiNative.Client.Fantasy
         private static bool IsHex(string value)
         {
             foreach (char c in value)
+            {
                 if (!(c >= '0' && c <= '9') && !(c >= 'A' && c <= 'F'))
+                {
                     return false;
+                }
+            }
+
             return true;
         }
     }

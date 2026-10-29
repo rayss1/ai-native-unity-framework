@@ -42,6 +42,7 @@ public sealed class ArchitectureValidator
         ValidateCycles(graph, diagnostics);
         ValidateSharedSources(root, files.CSharpFiles, rules, diagnostics);
         ValidateFantasyBoundary(root, files.CSharpFiles, files.ProjectFiles, rules, diagnostics);
+        ValidateClientFoundation(root, files.CSharpFiles, diagnostics);
         ValidateSolutions(root, files, diagnostics);
         ValidateUnityPackageGeneratedDirectories(root, files.PackageManifests, rules, diagnostics);
 
@@ -52,6 +53,80 @@ public sealed class ArchitectureValidator
                 .ThenBy(diagnostic => diagnostic.Message, StringComparer.Ordinal)
                 .ToArray()
         );
+    }
+
+    private static void ValidateClientFoundation(
+        string root,
+        IReadOnlyList<string> sources,
+        List<ArchitectureDiagnostic> diagnostics
+    )
+    {
+        foreach (string source in sources)
+        {
+            string path = Relative(root, source);
+            if (
+                !path.StartsWith("packages/com.ainative.client.", StringComparison.Ordinal)
+                || !path.Contains("/Runtime/", StringComparison.Ordinal)
+            )
+            {
+                continue;
+            }
+            bool pureContract =
+                path.StartsWith("packages/com.ainative.client.core/", StringComparison.Ordinal)
+                || path.StartsWith(
+                    "packages/com.ainative.client.assets/",
+                    StringComparison.Ordinal
+                );
+            var syntax = CSharpSyntaxTree
+                .ParseText(File.ReadAllText(source))
+                .GetCompilationUnitRoot();
+            var names = syntax
+                .DescendantNodes()
+                .OfType<NameSyntax>()
+                .Select(node => node.ToString());
+            foreach (string name in names)
+            {
+                string normalized = name.Replace("global::", "", StringComparison.Ordinal);
+                bool unity =
+                    normalized == "UnityEngine"
+                    || normalized.StartsWith("UnityEngine.", StringComparison.Ordinal)
+                    || normalized == "UnityEditor"
+                    || normalized.StartsWith("UnityEditor.", StringComparison.Ordinal);
+                bool taskLibrary =
+                    normalized == "Cysharp"
+                    || normalized.StartsWith("Cysharp.", StringComparison.Ordinal);
+                bool container =
+                    normalized == "VContainer"
+                    || normalized.StartsWith("VContainer.", StringComparison.Ordinal);
+                if (
+                    (pureContract && (unity || taskLibrary || container))
+                    || (
+                        taskLibrary
+                        && !path.StartsWith(
+                            "packages/com.ainative.client.async.unitask/",
+                            StringComparison.Ordinal
+                        )
+                    )
+                    || (
+                        container
+                        && !path.StartsWith(
+                            "packages/com.ainative.client.composition.vcontainer/",
+                            StringComparison.Ordinal
+                        )
+                    )
+                )
+                {
+                    diagnostics.Add(
+                        new ArchitectureDiagnostic(
+                            "ARC010",
+                            path,
+                            "Client contracts must remain engine-neutral; optional libraries terminate in their adapters."
+                        )
+                    );
+                    break;
+                }
+            }
+        }
     }
 
     private static Graph BuildGraph(

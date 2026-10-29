@@ -1,0 +1,1 @@
+{"name":"AiNative.Client.Assets.AssetBundle.Editor","rootNamespace":"AiNative.Client.Assets.AssetBundle.Editor","references":["AiNative.Client.Assets","AiNative.Client.Assets.AssetBundle"],"includePlatforms":["Editor"]}

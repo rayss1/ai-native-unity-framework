@@ -1,0 +1,8 @@
+{
+  "name": "AiNative.Client.Composition.VContainer",
+  "references": [
+    "VContainer",
+    "AiNative.Client.Core"
+  ],
+  "autoReferenced": false
+}

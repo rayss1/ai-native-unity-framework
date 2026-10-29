@@ -19,13 +19,26 @@
     "com.unity.modules.unitywebrequestaudio": "1.0.0",
     "com.unity.modules.unitywebrequesttexture": "1.0.0",
     "com.ainative.client.protocol": "file:../../../packages/com.ainative.client.protocol",
-    "com.ainative.client.protocol.protobuf": "file:../../../packages/com.ainative.client.protocol.protobuf"
+    "com.ainative.client.protocol.protobuf": "file:../../../packages/com.ainative.client.protocol.protobuf",
+    "com.ainative.client.core": "file:../../../packages/com.ainative.client.core",
+    "com.ainative.client.async.unitask": "file:../../../packages/com.ainative.client.async.unitask",
+    "com.ainative.client.composition.vcontainer": "file:../../../packages/com.ainative.client.composition.vcontainer",
+    "com.ainative.client.runtime": "file:../../../packages/com.ainative.client.runtime",
+    "com.ainative.client.assets": "file:../../../packages/com.ainative.client.assets",
+    "com.ainative.client.assets.assetbundle": "file:../../../packages/com.ainative.client.assets.assetbundle",
+    "com.ainative.client.ui.ugui": "file:../../../packages/com.ainative.client.ui.ugui",
+    "com.cysharp.unitask": "https://github.com/Cysharp/UniTask.git?path=src/UniTask/Assets/Plugins/UniTask#2e993ff18f28c931602a07292df0b0804eebef99",
+    "jp.hadashikick.vcontainer": "https://github.com/hadashiA/VContainer.git?path=VContainer/Assets/VContainer#5401e5a7ebc4980a2b82141ffc26391a6547edd7"
   },
   "testables": [
     "com.ainative.client.character",
     "com.ainative.client.fantasy",
     "com.ainative.client.prediction",
     "com.ainative.gameplay",
-    "com.ainative.realtime"
+    "com.ainative.realtime",
+    "com.ainative.client.core",
+    "com.ainative.client.runtime",
+    "com.ainative.client.assets.assetbundle",
+    "com.ainative.client.ui.ugui"
   ]
 }

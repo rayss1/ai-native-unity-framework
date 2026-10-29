@@ -118,7 +118,7 @@ function Get-AiNativeEditModeFixtureCounts {
         $fixtures['AiNative.Client.Application.Tests.BattleClientSessionTests'] = 39
         $fixtures['AiNative.Client.Prediction.Tests.CodecInjectionTests'] = 18
         $fixtures['AiNative.Client.Prediction.Tests.ProtobufBattleProtocolCodecTests'] = 28
-        $fixtures['AiNative.Client.Application.Tests.TopologyClientFlowRecoveryTests'] = 24
+        $fixtures['AiNative.Client.Application.Tests.TopologyClientFlowRecoveryTests'] = 29
         $fixtures['AiNative.Client.Application.Tests.TopologyUiFlowTests'] = 20
         $fixtures['AiNative.Client.Application.Tests.LocalMultiplayerTests'] = 3
         $fixtures['AiNative.Client.Character.Tests.CharacterActionContractTests'] = 1
@@ -129,6 +129,18 @@ function Get-AiNativeEditModeFixtureCounts {
         $fixtures['AiNative.Client.Application.Tests.BattleCombatEventTests'] = 4
         $fixtures['AiNative.Gameplay.Tests.ArenaHitGeometryTests'] = 6
         $fixtures['AiNative.Gameplay.Tests.ArenaTrainingMapTests'] = 7
+        # ADR-0021 framework inventory, verified by the 2026-10-29 EditMode report.
+        $fixtures['AiNative.Client.Application.Tests.ClientAssetIntegrityTests'] = 1
+        $fixtures['AiNative.Client.Application.Tests.FrameworkBootstrapBuildTests'] = 2
+        $fixtures['AiNative.Client.Application.Tests.TopologyViewModelTests'] = 6
+        $fixtures['AiNative.Client.Application.Tests.TopologyTerminalReceiveTests'] = 8
+        $fixtures['AiNative.Client.Assets.AssetBundle.Tests.LocalAssetBundleTests'] = 14
+        $fixtures['AiNative.Client.Core.Tests.ClientApplicationTests'] = 10
+        $fixtures['AiNative.Client.Core.Tests.MvvmTests'] = 9
+        $fixtures['AiNative.Client.Fantasy.Tests.FantasyKcpRealtimeTransportTests'] = 17
+        $fixtures['AiNative.Client.Runtime.Tests.ClientIntegrationContractTests'] = 7
+        $fixtures['AiNative.Client.UI.Tests.KeyedViewListTests'] = 3
+        $fixtures['AiNative.Client.UI.Tests.UiServiceTests'] = 7
     }
     return $fixtures
 }

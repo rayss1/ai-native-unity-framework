@@ -369,3 +369,23 @@ Client and Server adapters. They contain no vendor types and add no dependency
 edge. Values and migration constraints are documented in [the protocol guide](protocol-naming.md#opcode传输层消息编号).
 They do not select business methods or authenticate callers. Changing an inlined
 constant requires rebuilding both peers and a compatible protocol rollout.
+
+## 客户端基础框架（ADR-0021）
+
+依据 [ADR-0021](../ADR/0021-client-framework-foundation.md)。这些类型仅属于客户端；不修改 Shared、协议或固定 Tick 契约。公共异步结果为 `ValueTask`，取消为 `CancellationToken`。以下约定对应当前源码，不是平台验收结论。
+
+| 所有者及源码 | 公开入口 | 线程、所有权和失败语义 |
+| --- | --- | --- |
+| [Core](../../packages/com.ainative.client.core/README.md) | `IClientModule.StartAsync/StopAsync`；`ClientApplication.StartAsync/StopAsync`、`IsRunning` | 同一所有者上下文调用；显式模块顺序启动，包含失败模块在内逆序清理；停止先取消启动并等待，受理后清理使用 None。重复停止共享结果，清理异常聚合，完成后可再次启动。 |
+| Core MVVM | `BindableProperty<T>.Value`、`PropertyChanged`；`BindingScope.Add/Dispose` | 所属线程同步通知；相等值不通知；订阅所有权进入 BindingScope，逆序释放且聚合失败。 |
+| Core MVVM | `AsyncCommand.ExecuteAsync/Cancel/Dispose/RefreshCanExecute`；`IsExecuting/CanExecute/Error` | 执行中拒绝重入；业务异常保存于 Error，取消为正常结束。Dispose 请求取消并断开通知，不等待业务结束；调用方仍须等待 ExecuteAsync 观察收尾。 |
+| Core 诊断 | `IClientDiagnostics.Record/ReportException` | 事件和错误不携带凭据；调用上下文由所有者决定，不作为固定 Tick 热路径或业务成功前置条件。 |
+| [Runtime](../../packages/com.ainative.client.runtime/README.md) | `SceneId`；`ISceneService.SwitchAsync/UnloadAsync`；`ClientSceneService` | Unity 主线程；逻辑 ID 由应用解析为构建场景路径。Additive 串行加载，成功后移除旧内容；取消等待原生操作结束并卸载迟到场景。启动场景不归该服务释放。 |
+| [uGUI](../../packages/com.ainative.client.ui.ugui/README.md) | `IUIService.OpenAsync/CloseAsync/BackAsync`、`BlocksGameplay`；`UiService.Register/DisposeAsync` | Unity 主线程；每个 ID 单实例，按 Page/Modal/Overlay 分层，Back 跳过 Overlay。服务拥有成功打开的 UiView；关闭恢复可用焦点，工厂迟到结果释放后报告取消。 |
+| uGUI | `UiView.DisposeAsync`；`UguiBindings.Bind`；`KeyedViewList.Apply/Dispose` | UiView 重复释放共享同一结果，应用提供完整释放回调。绑定 scope 只解绑自身监听，不自动销毁 ViewModel。列表按稳定键复用，重复键在修改前拒绝；销毁时聚合释放异常。 |
+| [UniTask 适配](../../packages/com.ainative.client.async.unitask/README.md) | `UnityAsync.CompleteAsync/NextFrameAsync` | 主线程等待；原生操作不能被调用方取消，CompleteAsync 必须完成后由拥有者处理迟到资源。NextFrameAsync 支持取消。 |
+| [VContainer 装配](../../packages/com.ainative.client.composition.vcontainer/README.md) | `ClientServiceScope.Resolve/CreateChild/Dispose` | 仅组合根接触 VContainer 注册类型；父子所有权显式，先停止异步服务，再释放子作用域，最后父作用域。同步 Dispose 幂等。 |
+
+资源端口仍使用上文 `IAssetService`。ADR-0021 本期实现只加载随 Player 分发的本地 catalog/Bundle；不提供远程 manifest 激活、热更新或回滚服务。`TryGetLoaded` 成功也返回独立持有令牌；共享底层请求不共享释放所有权，单调用方取消不取消其他持有者的加载。实例应先销毁，再释放源句柄；预加载由服务作用域持有。
+
+应用应显式等待所有释放操作，不能把异步 OnDestroy 当作唯一关闭入口。每个应用实例管理自己的 MultiplayerEventSystem 及 InputSystemUIInputModule，显式注入 UiService 和 View，playerRoot 限定到本实例 UI；文本输入、失焦和模态阻挡由应用输入入口统一判断。Runtime 的 `ClientFrameEvents` 组件在主线程同步转发 Update/FixedUpdate/LateUpdate 及 FocusChanged/PauseChanged，时间参数单位为秒，销毁时清空监听。订阅者应随自身作用域解绑；组件不驱动网络或预测，不能增加第二个 Tick 入口。

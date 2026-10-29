@@ -54,6 +54,8 @@
 
 ## Unity 架构原则
 
+- 客户端实现、整理和审查必须遵守 [客户端代码规范](Docs/Architecture/client-coding-standards.md)。该规范适用于全部项目自有客户端代码；生成物、第三方和兼容边界按规范明确排除。
+
 - 尊重仓库既有 Unity 版本、包管理方式、目录结构、命名和编码规范。
 - 明确 Runtime、Editor、Tests 与 Samples 的边界，使用程序集定义控制依赖，避免循环依赖和不必要耦合。
 - Runtime 程序集不得引用 Editor 程序集；Editor 可显式引用同包 Runtime。

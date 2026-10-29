@@ -41,7 +41,10 @@ namespace AiNative.Client.Application.Tests
             var transport = new FakeTransport();
             var session = Active(transport, new FakeConnector(transport));
             for (uint i = 1; i <= 300; i++)
+            {
                 transport.Enqueue(Event(i), ArenaCombatEventProtocolV1.EventChannel, 1);
+            }
+
             session.Pump(0);
             session.Pump(0);
             Assert.That(session.DroppedCombatEvents, Is.EqualTo(44));

@@ -1,0 +1,8 @@
+{
+  "name": "AiNative.Client.Runtime.PlayMode.Tests",
+  "rootNamespace": "AiNative.Client.Runtime.Tests",
+  "references": ["AiNative.Client.Runtime"],
+  "autoReferenced": false,
+  "defineConstraints": ["UNITY_INCLUDE_TESTS"],
+  "optionalUnityReferences": ["TestAssemblies"]
+}

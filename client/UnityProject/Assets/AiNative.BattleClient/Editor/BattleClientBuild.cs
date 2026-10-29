@@ -12,7 +12,6 @@ namespace AiNative.Client.Editor
 {
     public static class BattleClientBuild
     {
-        private const string ScenePath = "Assets/AiNative.BattleClient/Scenes/BattleClient.unity";
         private const string NoticePath =
             "Packages/com.ainative.client.fantasy/THIRD-PARTY-NOTICES.md";
         private const string RepositoryLicensePath = "../../server/vendor/Fantasy/LICENSE";
@@ -29,7 +28,10 @@ namespace AiNative.Client.Editor
         public static void BuildWindowsAtPath(string output)
         {
             if (!Path.IsPathRooted(output))
+            {
                 throw new ArgumentException("Player output must be an absolute path.");
+            }
+
             output = Path.GetFullPath(output);
             BattleClientRendering.ValidateUrpConfiguration();
             if (!output.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
@@ -43,10 +45,9 @@ namespace AiNative.Client.Editor
                 NamedBuildTarget.Standalone,
                 ScriptingImplementation.Mono2x
             );
-
             BuildPlayerOptions options = new BuildPlayerOptions
             {
-                scenes = new[] { ScenePath },
+                scenes = FrameworkBootstrapBuild.GetPlayerScenes(),
                 locationPathName = output,
                 target = BuildTarget.StandaloneWindows64,
                 targetGroup = BuildTargetGroup.Standalone,
@@ -80,7 +81,6 @@ namespace AiNative.Client.Editor
 
             string outputDirectory = Path.GetDirectoryName(output);
             Directory.CreateDirectory(outputDirectory);
-
             NamedBuildTarget standalone = NamedBuildTarget.Standalone;
             ScriptingImplementation previousBackend = PlayerSettings.GetScriptingBackend(
                 standalone
@@ -126,10 +126,9 @@ namespace AiNative.Client.Editor
                     out macArchitectureProperty
                 );
                 AssetDatabase.SaveAssets();
-
                 BuildPlayerOptions options = new BuildPlayerOptions
                 {
-                    scenes = new[] { ScenePath },
+                    scenes = FrameworkBootstrapBuild.GetPlayerScenes(),
                     locationPathName = output,
                     target = BuildTarget.StandaloneOSX,
                     targetGroup = BuildTargetGroup.Standalone,
@@ -277,7 +276,6 @@ namespace AiNative.Client.Editor
             }
 
             File.Copy(source, Path.Combine(outputDirectory, "THIRD-PARTY-NOTICES.md"), true);
-
             string licenseSource = FindFantasyUnityLicense();
             if (!File.Exists(licenseSource))
             {
@@ -304,30 +302,38 @@ namespace AiNative.Client.Editor
             }
 
             File.Copy(licenseSource, Path.Combine(outputDirectory, "Fantasy-LICENSE.txt"), true);
-
             UnityEditor.PackageManager.PackageInfo protobufPackage =
                 UnityEditor.PackageManager.PackageInfo.FindForAssembly(
                     typeof(AiNative.Client.Protocol.Protobuf.ProtobufBattleProtocolCodec).Assembly
                 );
             if (protobufPackage == null)
+            {
                 throw new InvalidOperationException(
                     "Protobuf package must resolve before distribution."
                 );
+            }
+
             string notices = Path.Combine(protobufPackage.resolvedPath, "ThirdPartyNotices~");
             string protobufLicense = Path.Combine(notices, "Google.Protobuf.LICENSE");
             string dependencyLock = Path.Combine(notices, "dependencies.lock.json");
             if (!File.Exists(protobufLicense) || !File.Exists(dependencyLock))
+            {
                 throw new FileNotFoundException(
                     "Protobuf license and pinned dependency identity are required."
                 );
+            }
+
             string protobufLicenseText = File.ReadAllText(protobufLicense);
             if (
                 !protobufLicenseText.Contains("Redistribution and use in source and binary forms")
                 || !protobufLicenseText.Contains("Google")
             )
+            {
                 throw new InvalidDataException(
                     "Protobuf BSD license must preserve upstream terms."
                 );
+            }
+
             File.Copy(
                 protobufLicense,
                 Path.Combine(outputDirectory, "Google.Protobuf-LICENSE.txt"),
@@ -338,6 +344,45 @@ namespace AiNative.Client.Editor
                 Path.Combine(outputDirectory, "PROTOCOL-DEPENDENCIES.json"),
                 true
             );
+            CopyFrameworkNotice("com.ainative.client.async.unitask", "UniTask", outputDirectory);
+            CopyFrameworkNotice(
+                "com.ainative.client.composition.vcontainer",
+                "VContainer",
+                outputDirectory
+            );
+        }
+
+        // 通过已解析的包路径分发许可证，避免依赖本机检出目录布局。
+        private static void CopyFrameworkNotice(
+            string packageName,
+            string dependencyName,
+            string outputDirectory
+        )
+        {
+            foreach (
+                UnityEditor.PackageManager.PackageInfo package in UnityEditor.PackageManager.PackageInfo.GetAllRegisteredPackages()
+            )
+            {
+                if (package.name != packageName)
+                {
+                    continue;
+                }
+                string notices = Path.Combine(package.resolvedPath, "ThirdPartyNotices~");
+                File.Copy(
+                    Path.Combine(notices, "LICENSE.txt"),
+                    Path.Combine(outputDirectory, dependencyName + "-LICENSE.txt"),
+                    true
+                );
+                File.Copy(
+                    Path.Combine(notices, "README.md"),
+                    Path.Combine(outputDirectory, dependencyName + "-DEPENDENCY.md"),
+                    true
+                );
+                return;
+            }
+            throw new InvalidOperationException(
+                "Distribution dependency is unresolved: " + packageName
+            );
         }
 
         private static string FindFantasyUnityLicense()
@@ -347,20 +392,28 @@ namespace AiNative.Client.Editor
             )
             {
                 if (!string.Equals(package.name, "com.fantasy.unity", StringComparison.Ordinal))
+                {
                     continue;
+                }
+
                 string packageLicense = Path.Combine(package.resolvedPath, "LICENSE");
                 if (File.Exists(packageLicense))
+                {
                     return packageLicense;
+                }
 
-                // The Git package is rooted below the repository root; walk up only within
-                // that resolved checkout to locate the pinned fork's license.
+                // Git 包位于仓库子目录中；仅在该已解析的检出目录内向上查找，
+                // 定位固定版本分支的许可证。
                 DirectoryInfo directory = new DirectoryInfo(package.resolvedPath);
                 for (int depth = 0; directory is not null && depth < 6; depth++)
                 {
                     string candidate = Path.Combine(directory.FullName, "LICENSE");
                     string forkMarker = Path.Combine(directory.FullName, "AI_NATIVE_FORK.md");
                     if (File.Exists(candidate) && File.Exists(forkMarker))
+                    {
                         return candidate;
+                    }
+
                     directory = directory.Parent;
                 }
             }
@@ -373,7 +426,10 @@ namespace AiNative.Client.Editor
             for (int index = 0; index + 1 < arguments.Length; index++)
             {
                 if (!string.Equals(arguments[index], option, StringComparison.Ordinal))
+                {
                     continue;
+                }
+
                 string path = arguments[index + 1];
                 if (!Path.IsPathRooted(path))
                 {

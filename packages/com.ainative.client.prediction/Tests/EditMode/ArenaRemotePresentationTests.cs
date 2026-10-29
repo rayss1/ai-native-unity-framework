@@ -146,7 +146,10 @@ namespace AiNative.Client.Prediction.Tests
             Assert.That(Apply(view, broken, 1), Is.False);
             var tooMany = new byte[9][];
             for (int i = 0; i < tooMany.Length; i++)
+            {
                 tooMany[i] = Player((uint)i + 1, 0);
+            }
+
             Assert.That(Apply(view, Frame(12, tooMany), 1), Is.False);
             var output = new ArenaRemotePose[8];
             Assert.That(view.Advance(0, output), Is.EqualTo(1));
@@ -219,7 +222,10 @@ namespace AiNative.Client.Prediction.Tests
         {
             var view = new ArenaRemotePresentation();
             for (int i = 1; i <= 100; i++)
+            {
                 Apply(view, Frame((ulong)i * 3, Player(2, i * 30)), 1);
+            }
+
             var output = new ArenaRemotePose[8];
             view.Advance(float.NaN, output);
             Assert.That(output[0].XMillimetres, Is.EqualTo(2940).Within(0.01));
@@ -248,7 +254,10 @@ namespace AiNative.Client.Prediction.Tests
             for (int i = 1; i <= 60; i++)
             {
                 if (i % 3 == 0)
+                {
                     Apply(view, Frame((ulong)(106 + i), Player(2, 1060 + i * 10)), 1);
+                }
+
                 view.Advance(1f / 60, output);
                 Assert.That(output[0].XMillimetres, Is.GreaterThan(previous));
                 Assert.That(output[0].XMillimetres, Is.LessThan(1060 + i * 10 - 20));
@@ -288,6 +297,7 @@ namespace AiNative.Client.Prediction.Tests
                 accepted &= view.ApplySnapshot(decoded.PlayerSpan, (long)tick, 1);
                 view.Advance(1f / 60, output);
             }
+
             long allocated = allocationMeter.End();
             Assert.That(accepted, Is.True);
             Assert.That(allocated, Is.Zero);
@@ -344,6 +354,7 @@ namespace AiNative.Client.Prediction.Tests
                 Varint(data, (uint)player.Length);
                 data.AddRange(player);
             }
+
             return data.ToArray();
         }
 

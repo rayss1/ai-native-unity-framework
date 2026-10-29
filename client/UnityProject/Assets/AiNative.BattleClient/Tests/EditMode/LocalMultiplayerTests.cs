@@ -22,7 +22,10 @@ namespace AiNative.Client.Application.Tests
             var editors = serialized.FindProperty("m_EditorInstances");
             Assert.That(editors.arraySize, Is.EqualTo(count - 1));
             for (int i = 0; i < editors.arraySize; i++)
+            {
                 AssertInstance(editors.GetArrayElementAtIndex(i));
+            }
+
             Assert.That(serialized.FindProperty("m_LocalInstances").arraySize, Is.Zero);
             Assert.That(serialized.FindProperty("m_RemoteInstances").arraySize, Is.Zero);
         }

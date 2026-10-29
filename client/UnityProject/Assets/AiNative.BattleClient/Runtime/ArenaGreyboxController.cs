@@ -6,7 +6,7 @@ using Gyroscope = UnityEngine.InputSystem.Gyroscope;
 
 namespace AiNative.Client.Application
 {
-    /// <summary>Small greybox harness for exercising arena movement and mobile controls.</summary>
+    /// <summary>用于验证 Arena 移动和移动端操作的最小灰盒场景组件。</summary>
     [DisallowMultipleComponent]
     public sealed class ArenaGreyboxController : MonoBehaviour
     {
@@ -40,9 +40,14 @@ namespace AiNative.Client.Application
             _state = new ArenaPlayerState(1, 0, 0, 0);
             _state.Weapon = ArenaWeaponId.Machinegun;
             if (playerCamera is null)
+            {
                 playerCamera = GetComponentInChildren<Camera>();
+            }
+
             if (playerCamera is not null)
+            {
                 playerCamera.fieldOfView = 90f;
+            }
         }
 
         private void OnDisable() => ReleaseGyro();
@@ -50,7 +55,10 @@ namespace AiNative.Client.Application
         private void ReleaseGyro()
         {
             if (_ownedGyro != null && _ownedGyro.added)
+            {
                 InputSystem.DisableDevice(_ownedGyro);
+            }
+
             _ownedGyro = null;
         }
 
@@ -60,29 +68,29 @@ namespace AiNative.Client.Application
             if (move == Vector2.zero)
             {
                 Keyboard keyboard = Keyboard.current;
-                move =
-                    keyboard == null
-                        ? Vector2.zero
-                        : new Vector2(
-                            (keyboard.dKey.isPressed || keyboard.rightArrowKey.isPressed ? 1 : 0)
-                                - (
-                                    keyboard.aKey.isPressed || keyboard.leftArrowKey.isPressed
-                                        ? 1
-                                        : 0
-                                ),
-                            (keyboard.wKey.isPressed || keyboard.upArrowKey.isPressed ? 1 : 0)
-                                - (
-                                    keyboard.sKey.isPressed || keyboard.downArrowKey.isPressed
-                                        ? 1
-                                        : 0
-                                )
-                        );
+                if (keyboard == null)
+                {
+                    move = Vector2.zero;
+                }
+                else
+                {
+                    move = new Vector2(
+                        (keyboard.dKey.isPressed || keyboard.rightArrowKey.isPressed ? 1 : 0)
+                            - (keyboard.aKey.isPressed || keyboard.leftArrowKey.isPressed ? 1 : 0),
+                        (keyboard.wKey.isPressed || keyboard.upArrowKey.isPressed ? 1 : 0)
+                            - (keyboard.sKey.isPressed || keyboard.downArrowKey.isPressed ? 1 : 0)
+                    );
+                }
                 move = Vector2.ClampMagnitude(move, 1f);
             }
+
             Vector2 look = _look;
             Gyroscope sensor = enableGyro ? Gyroscope.current : null;
             if (_ownedGyro != null && _ownedGyro != sensor)
+            {
                 ReleaseGyro();
+            }
+
             if (sensor != null)
             {
                 if (!sensor.enabled)
@@ -90,9 +98,11 @@ namespace AiNative.Client.Application
                     InputSystem.EnableDevice(sensor);
                     _ownedGyro = sensor;
                 }
+
                 Vector3 gyro = sensor.angularVelocity.ReadValue();
                 look += new Vector2(gyro.x, gyro.y) * 0.15f;
             }
+
             _state.YawMillidegrees += Mathf.RoundToInt(look.x * lookSensitivity * 1000f);
             _state.PitchMillidegrees = Mathf.Clamp(
                 _state.PitchMillidegrees - Mathf.RoundToInt(look.y * lookSensitivity * 1000f),
@@ -121,14 +131,19 @@ namespace AiNative.Client.Application
             );
             transform.rotation = Quaternion.Euler(0, _state.YawMillidegrees / 1000f, 0);
             if (playerCamera is not null)
+            {
                 playerCamera.transform.localRotation = Quaternion.Euler(
                     _state.PitchMillidegrees / 1000f,
                     0,
                     0
                 );
+            }
+
             if (hud is not null)
+            {
                 hud.text =
                     $"HP {_state.Health}  AR {_state.Armor}  {_state.Weapon}  K {_state.Kills}";
+            }
         }
     }
 }

@@ -10,13 +10,13 @@ using Wire = AiNative.Protocol.V1;
 
 namespace AiNative.Client.Protocol.Protobuf
 {
-    /// <summary>Session-owned, single-threaded codec. Generated messages never escape this boundary.</summary>
+    /// <summary>会话持有的单线程编解码器；生成消息不得越过此边界。</summary>
     public sealed class ProtobufBattleProtocolCodec : IBattleProtocolCodec
     {
-        private readonly Wire.C2S_InputCommand input = new Wire.C2S_InputCommand();
-        private readonly byte[] receive = new byte[1200];
-        private readonly BattlePacketBuffer scratch = new BattlePacketBuffer();
-        private bool disposed;
+        private readonly Wire.C2S_InputCommand _input = new Wire.C2S_InputCommand();
+        private readonly byte[] _receive = new byte[1200];
+        private readonly BattlePacketBuffer _scratch = new BattlePacketBuffer();
+        private bool _disposed;
         public int MaximumFrameBytes => 1200;
         public int MaximumInputFrameBytes => 64;
         public TransportChannel ControlChannel =>
@@ -35,18 +35,21 @@ namespace AiNative.Client.Protocol.Protobuf
         )
         {
             writtenBytes = 0;
-            if (disposed || value.Sequence == 0)
+            if (_disposed || value.Sequence == 0)
+            {
                 return false;
-            input.RoomTick = value.ClientTick;
-            input.Sequence = value.Sequence;
-            input.MoveXMilli = value.MoveXMilli;
-            input.MoveYMilli = value.MoveZMilli;
-            input.YawMillidegrees = 0;
-            input.Buttons = (uint)value.Buttons;
-            input.WeaponId = (uint)value.Weapon;
-            input.LookYawMilli = value.LookYawMilli;
-            input.LookPitchMilli = value.LookPitchMilli;
-            return Encode(1100, input, destination, MaximumInputFrameBytes, out writtenBytes);
+            }
+
+            _input.RoomTick = value.ClientTick;
+            _input.Sequence = value.Sequence;
+            _input.MoveXMilli = value.MoveXMilli;
+            _input.MoveYMilli = value.MoveZMilli;
+            _input.YawMillidegrees = 0;
+            _input.Buttons = (uint)value.Buttons;
+            _input.WeaponId = (uint)value.Weapon;
+            _input.LookYawMilli = value.LookYawMilli;
+            _input.LookPitchMilli = value.LookPitchMilli;
+            return Encode(1100, _input, destination, MaximumInputFrameBytes, out writtenBytes);
         }
 
         public bool TryEncodeLegacyInput(
@@ -61,6 +64,7 @@ namespace AiNative.Client.Protocol.Protobuf
                 writtenBytes = 0;
                 return false;
             }
+
             var arena = new ArenaInput(
                 value.Sequence,
                 tick,
@@ -82,8 +86,11 @@ namespace AiNative.Client.Protocol.Protobuf
         )
         {
             writtenBytes = 0;
-            if (disposed || Encoding.UTF8.GetByteCount(clientBuild ?? "") > 128)
+            if (_disposed || Encoding.UTF8.GetByteCount(clientBuild ?? "") > 128)
+            {
                 return false;
+            }
+
             return Encode(
                 1000,
                 new Wire.C2S_LoginRequest
@@ -107,7 +114,7 @@ namespace AiNative.Client.Protocol.Protobuf
         )
         {
             writtenBytes = 0;
-            return !disposed
+            return !_disposed
                 && sessionId != 0
                 && roomId != 0
                 && Encode(
@@ -128,7 +135,7 @@ namespace AiNative.Client.Protocol.Protobuf
         )
         {
             writtenBytes = 0;
-            return !disposed
+            return !_disposed
                 && sessionId != 0
                 && epoch != 0
                 && lastTick <= long.MaxValue
@@ -157,7 +164,10 @@ namespace AiNative.Client.Protocol.Protobuf
             written = 0;
             int length = message.CalculateSize() + 2;
             if (length > maximum || length > destination.Length)
+            {
                 return false;
+            }
+
             message.WriteTo(destination.Slice(2, length - 2));
             BinaryPrimitives.WriteUInt16LittleEndian(destination, id);
             written = length;
@@ -169,14 +179,26 @@ namespace AiNative.Client.Protocol.Protobuf
             BattlePacketBuffer destination
         )
         {
-            if (disposed)
+            if (_disposed)
+            {
                 return BattleDecodeStatus.Disposed;
+            }
+
             if (destination == null)
+            {
                 throw new ArgumentNullException(nameof(destination));
+            }
+
             if (frame.Length < 2)
+            {
                 return BattleDecodeStatus.FrameTooShort;
+            }
+
             if (frame.Length > MaximumFrameBytes)
+            {
                 return BattleDecodeStatus.FrameTooLarge;
+            }
+
             ushort id = BinaryPrimitives.ReadUInt16LittleEndian(frame);
             MessageDescriptor descriptor;
             switch (id)
@@ -199,52 +221,70 @@ namespace AiNative.Client.Protocol.Protobuf
                 default:
                     return BattleDecodeStatus.UnknownMessage;
             }
+
             int length = frame.Length - 2;
-            frame.Slice(2).CopyTo(receive);
-            Clear(scratch);
+            frame.Slice(2).CopyTo(_receive);
+            Clear(_scratch);
             try
             {
                 bool arena = false;
-                using (var validation = new CodedInputStream(receive, 0, length))
+                using (var validation = new CodedInputStream(_receive, 0, length))
+                {
                     if (!Validate(validation, length, descriptor, ref arena, 0))
+                    {
                         return BattleDecodeStatus.MalformedPayload;
+                    }
+                }
+
                 switch (id)
                 {
                     case 1001:
-                        var login = Wire.S2C_LoginResponse.Parser.ParseFrom(receive, 0, length);
+                        var login = Wire.S2C_LoginResponse.Parser.ParseFrom(_receive, 0, length);
                         if (
                             login.SessionId == 0
                             || login.ConnectionEpoch == 0
                             || login.RoomTick > long.MaxValue
                         )
+                        {
                             return BattleDecodeStatus.MalformedPayload;
-                        scratch.Kind = BattleMessageKind.LoginResponse;
-                        scratch.SessionId = login.SessionId;
-                        scratch.ConnectionEpoch = login.ConnectionEpoch;
-                        scratch.Tick = login.RoomTick;
-                        scratch.GlobalRoomId = login.GlobalRoomId;
-                        scratch.BootEpoch = login.BootEpoch;
+                        }
+
+                        _scratch.Kind = BattleMessageKind.LoginResponse;
+                        _scratch.SessionId = login.SessionId;
+                        _scratch.ConnectionEpoch = login.ConnectionEpoch;
+                        _scratch.Tick = login.RoomTick;
+                        _scratch.GlobalRoomId = login.GlobalRoomId;
+                        _scratch.BootEpoch = login.BootEpoch;
                         break;
                     case 1011:
-                        var join = Wire.S2C_JoinRoomResponse.Parser.ParseFrom(receive, 0, length);
+                        var join = Wire.S2C_JoinRoomResponse.Parser.ParseFrom(_receive, 0, length);
                         if (join.RoomId == 0 || join.EntityId == 0 || join.TickRate == 0)
+                        {
                             return BattleDecodeStatus.MalformedPayload;
-                        scratch.Kind = BattleMessageKind.JoinResponse;
-                        scratch.RoomId = join.RoomId;
-                        scratch.EntityId = join.EntityId;
-                        scratch.TickRate = join.TickRate;
+                        }
+
+                        _scratch.Kind = BattleMessageKind.JoinResponse;
+                        _scratch.RoomId = join.RoomId;
+                        _scratch.EntityId = join.EntityId;
+                        _scratch.TickRate = join.TickRate;
                         break;
                     case 1101:
-                        var snapshot = Wire.S2C_SnapshotPush.Parser.ParseFrom(receive, 0, length);
+                        var snapshot = Wire.S2C_SnapshotPush.Parser.ParseFrom(_receive, 0, length);
                         if (snapshot.ProtocolMajor != 1)
+                        {
                             return BattleDecodeStatus.ProtocolMismatch;
+                        }
+
                         if (!MapSnapshot(snapshot, arena))
+                        {
                             return BattleDecodeStatus.MalformedPayload;
-                        scratch.Kind = BattleMessageKind.Snapshot;
+                        }
+
+                        _scratch.Kind = BattleMessageKind.Snapshot;
                         break;
                     case 1201:
                         var reconnect = Wire.S2C_ReconnectResponse.Parser.ParseFrom(
-                            receive,
+                            _receive,
                             0,
                             length
                         );
@@ -253,25 +293,38 @@ namespace AiNative.Client.Protocol.Protobuf
                             || reconnect.ConnectionEpoch == 0
                             || reconnect.ResumeTick != reconnect.Snapshot.RoomTick
                         )
+                        {
                             return BattleDecodeStatus.MalformedPayload;
+                        }
+
                         if (reconnect.Snapshot.ProtocolMajor != 1)
+                        {
                             return BattleDecodeStatus.ProtocolMismatch;
+                        }
+
                         if (!MapSnapshot(reconnect.Snapshot, arena))
+                        {
                             return BattleDecodeStatus.MalformedPayload;
-                        scratch.ConnectionEpoch = reconnect.ConnectionEpoch;
-                        scratch.Kind = BattleMessageKind.ReconnectResponse;
+                        }
+
+                        _scratch.ConnectionEpoch = reconnect.ConnectionEpoch;
+                        _scratch.Kind = BattleMessageKind.ReconnectResponse;
                         break;
                     case 1102:
                         var reliable = Wire.S2C_ReliableEventPush.Parser.ParseFrom(
-                            receive,
+                            _receive,
                             0,
                             length
                         );
                         if (!MapEvent(reliable))
+                        {
                             return BattleDecodeStatus.MalformedPayload;
+                        }
+
                         break;
                 }
-                Copy(scratch, destination);
+
+                Copy(_scratch, destination);
                 return BattleDecodeStatus.Accepted;
             }
             catch (InvalidProtocolBufferException)
@@ -284,8 +337,8 @@ namespace AiNative.Client.Protocol.Protobuf
             }
         }
 
-        // Validate wire shape with the library, not a second custom Protobuf decoder. This preserves
-        // strict singular-field and boolean checks, and proto3 field presence for legacy discrimination.
+        // 使用库验证线上结构，不另写第二套 Protobuf 解码器；保留严格的
+        // 单值字段、布尔值检查，以及用于区分旧协议的 proto3 字段存在性。
         private static bool Validate(
             CodedInputStream stream,
             long end,
@@ -295,39 +348,63 @@ namespace AiNative.Client.Protocol.Protobuf
         )
         {
             if (depth > 8)
+            {
                 return false;
+            }
+
             ulong seen = 0;
             while (stream.Position < end)
             {
                 uint tag = stream.ReadTag();
                 if (tag == 0)
+                {
                     return false;
+                }
+
                 int number = (int)(tag >> 3),
                     wire = (int)(tag & 7);
                 var field = descriptor.FindFieldByNumber(number);
                 if (field == null)
                 {
                     if (wire == 3 || wire == 4)
+                    {
                         return false;
+                    }
+
                     stream.SkipLastField();
                 }
                 else
                 {
-                    int expected =
-                        field.FieldType == FieldType.Fixed64 ? 1
-                        : field.FieldType == FieldType.String
-                        || field.FieldType == FieldType.Bytes
-                        || field.FieldType == FieldType.Message
-                            ? 2
-                        : 0;
+                    int expected;
+                    if (field.FieldType == FieldType.Fixed64)
+                    {
+                        expected = 1;
+                    }
+                    else
+                    {
+                        bool lengthDelimited =
+                            field.FieldType == FieldType.String
+                            || field.FieldType == FieldType.Bytes
+                            || field.FieldType == FieldType.Message;
+                        expected = lengthDelimited ? 2 : 0;
+                    }
                     if (wire != expected)
+                    {
                         return false;
+                    }
+
                     ulong bit = 1UL << number;
                     if (!field.IsRepeated && (seen & bit) != 0)
+                    {
                         return false;
+                    }
+
                     seen |= bit;
                     if (descriptor == Wire.PlayerState.Descriptor && number >= 7 && number <= 14)
+                    {
                         arena = true;
+                    }
+
                     if (field.FieldType == FieldType.Message)
                     {
                         int size = stream.ReadLength();
@@ -337,7 +414,9 @@ namespace AiNative.Client.Protocol.Protobuf
                             || childEnd > end
                             || !Validate(stream, childEnd, field.MessageType, ref arena, depth + 1)
                         )
+                        {
                             return false;
+                        }
                     }
                     else if (wire == 0)
                     {
@@ -346,14 +425,22 @@ namespace AiNative.Client.Protocol.Protobuf
                             value > uint.MaxValue
                             || (field.FieldType == FieldType.Bool && value > 1)
                         )
+                        {
                             return false;
+                        }
                     }
                     else
+                    {
                         stream.SkipLastField();
+                    }
                 }
+
                 if (stream.Position > end)
+                {
                     return false;
+                }
             }
+
             return stream.Position == end;
         }
 
@@ -368,7 +455,10 @@ namespace AiNative.Client.Protocol.Protobuf
                     > (arena ? BattlePacketBuffer.MaxArenaPlayers : BattlePacketBuffer.MaxPlayers)
                 || value.Pickups.Count > BattlePacketBuffer.MaxPickups
             )
+            {
                 return false;
+            }
+
             for (int i = 0; i < value.Players.Count; i++)
             {
                 var p = value.Players[i];
@@ -379,10 +469,18 @@ namespace AiNative.Client.Protocol.Protobuf
                     || p.WeaponId > 3
                     || (arena && p.EntityId > 8)
                 )
+                {
                     return false;
+                }
+
                 for (int j = 0; j < i; j++)
-                    if (scratch.Players[j].EntityId == p.EntityId)
+                {
+                    if (_scratch.Players[j].EntityId == p.EntityId)
+                    {
                         return false;
+                    }
+                }
+
                 var state = new ArenaPlayerState(
                     (long)value.RoomTick,
                     p.PositionXMilli,
@@ -403,8 +501,9 @@ namespace AiNative.Client.Protocol.Protobuf
                     Kills = p.Kills,
                     LastProcessedInputSequence = value.LastProcessedInputSequence,
                 };
-                scratch.Players[i] = new ArenaSnapshotPlayer(p.EntityId, state);
+                _scratch.Players[i] = new ArenaSnapshotPlayer(p.EntityId, state);
             }
+
             for (int i = 0; i < value.Pickups.Count; i++)
             {
                 var p = value.Pickups[i];
@@ -415,11 +514,19 @@ namespace AiNative.Client.Protocol.Protobuf
                     || (int)p.PickupType > 2
                     || p.RespawnTick > long.MaxValue
                 )
+                {
                     return false;
+                }
+
                 for (int j = 0; j < i; j++)
-                    if (scratch.Pickups[j].Id == (int)p.PickupId)
+                {
+                    if (_scratch.Pickups[j].Id == (int)p.PickupId)
+                    {
                         return false;
-                scratch.Pickups[i] = new ArenaPickupState(
+                    }
+                }
+
+                _scratch.Pickups[i] = new ArenaPickupState(
                     (int)p.PickupId,
                     (ArenaPickupType)p.PickupType,
                     p.PositionXMilli,
@@ -429,14 +536,15 @@ namespace AiNative.Client.Protocol.Protobuf
                     p.RespawnTick
                 );
             }
-            scratch.PlayerCount = value.Players.Count;
-            scratch.PickupCount = value.Pickups.Count;
-            scratch.Tick = value.RoomTick;
-            scratch.Acknowledgement = value.LastProcessedInputSequence;
-            scratch.Phase = (ArenaMatchPhase)value.MatchPhase;
-            scratch.RemainingTicks = value.RemainingTicks;
-            scratch.LeaderEntityId = value.LeaderEntityId;
-            scratch.HasArenaData = arena;
+
+            _scratch.PlayerCount = value.Players.Count;
+            _scratch.PickupCount = value.Pickups.Count;
+            _scratch.Tick = value.RoomTick;
+            _scratch.Acknowledgement = value.LastProcessedInputSequence;
+            _scratch.Phase = (ArenaMatchPhase)value.MatchPhase;
+            _scratch.RemainingTicks = value.RemainingTicks;
+            _scratch.LeaderEntityId = value.LeaderEntityId;
+            _scratch.HasArenaData = arena;
             return true;
         }
 
@@ -456,21 +564,33 @@ namespace AiNative.Client.Protocol.Protobuf
                 || (int)e.WeaponId > 3
                 || e.Damage > int.MaxValue
             )
+            {
                 return false;
+            }
+
             bool playerTarget = value.EventType == 1 || value.EventType == 2;
             if (playerTarget && (e.TargetEntityId == 0 || e.TargetEntityId > 8))
+            {
                 return false;
+            }
+
             if (
                 value.EventType == 4
                     ? e.TargetEntityId == 0 || (int)e.WeaponId != 0
                     : (int)e.WeaponId == 0
             )
+            {
                 return false;
+            }
+
             if (!playerTarget && value.EventType != 4 && e.TargetEntityId != 0)
+            {
                 return false;
-            scratch.Kind = BattleMessageKind.CombatEvent;
-            scratch.Tick = value.RoomTick;
-            scratch.CombatEvent = new ArenaPresentationEvent(
+            }
+
+            _scratch.Kind = BattleMessageKind.CombatEvent;
+            _scratch.Tick = value.RoomTick;
+            _scratch.CombatEvent = new ArenaPresentationEvent(
                 (ArenaPresentationEventKind)value.EventType,
                 value.Sequence,
                 value.RoomTick,
@@ -529,16 +649,19 @@ namespace AiNative.Client.Protocol.Protobuf
 
         public void Reset()
         {
-            Array.Clear(receive, 0, receive.Length);
-            Clear(scratch);
+            Array.Clear(_receive, 0, _receive.Length);
+            Clear(_scratch);
         }
 
         public void Dispose()
         {
-            if (disposed)
+            if (_disposed)
+            {
                 return;
+            }
+
             Reset();
-            disposed = true;
+            _disposed = true;
         }
     }
 }

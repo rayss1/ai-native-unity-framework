@@ -98,6 +98,14 @@ jobs:
       - name: Restore
         run: dotnet restore AiNative.sln
 
+      - name: Test client formatting source discovery
+        run: python3 -m unittest discover -s tools/formatting/tests -v
+
+      - name: Check client formatting
+        run: |
+          dotnet tool restore
+          python3 tools/formatting/format_csharp.py --scope client --check
+
       - name: Test portable validation regressions
         shell: bash
         run: |

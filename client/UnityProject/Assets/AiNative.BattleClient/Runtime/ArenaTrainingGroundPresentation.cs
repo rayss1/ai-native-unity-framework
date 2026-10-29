@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace AiNative.Client.Application
 {
-    /// <summary>Application-owned appearance of the shared, millimetre-based training map.</summary>
+    /// <summary>由应用持有的训练场表现；地图规则来自以毫米为单位的 Shared 数据。</summary>
     [DisallowMultipleComponent]
     public sealed class ArenaTrainingGroundPresentation : MonoBehaviour
     {
@@ -14,14 +14,16 @@ namespace AiNative.Client.Application
         {
             Material source = Resources.Load<Material>("BattleClient/Floor");
             if (source == null)
+            {
                 throw new InvalidOperationException("Missing BattleClient/Floor material.");
+            }
+
             _materials[0] = CreateMaterial(source, "Deck", new Color(.075f, .105f, .145f));
             _materials[1] = CreateMaterial(source, "Armor", new Color(.22f, .29f, .36f));
             _materials[2] = CreateMaterial(source, "Trim", new Color(.07f, .12f, .18f));
             _materials[3] = CreateMaterial(source, "Cyan", new Color(.05f, .65f, .95f), true);
             _materials[4] = CreateMaterial(source, "Amber", new Color(1f, .38f, .06f), true);
             _materials[5] = CreateMaterial(source, "Markings", new Color(.45f, .62f, .72f));
-
             float extent = ArenaTrainingMap.HalfExtent / 1000f;
             Box(
                 "TrainingDeck",
@@ -46,7 +48,7 @@ namespace AiNative.Client.Application
                         bounds.MaxZ - bounds.MinZ
                     ) / 1000f;
                 Box("SharedObstacle_" + i, center, size, 1, true);
-                // Colored top edges make silhouettes readable without adding collision geometry.
+                // 着色顶边用于突出轮廓，不增加碰撞几何。
                 int accent = center.x < 0 ? 3 : 4;
                 Box(
                     "ObstacleLight_" + i,
@@ -64,7 +66,7 @@ namespace AiNative.Client.Application
                 );
             }
 
-            // Flush markings have no colliders; all playable cover comes from Shared.
+            // 贴地标线不带碰撞体；所有可交互掩体均来自 Shared。
             for (int grid = -16; grid <= 16; grid += 4)
             {
                 Box(
@@ -82,6 +84,7 @@ namespace AiNative.Client.Application
                     false
                 );
             }
+
             for (int side = -1; side <= 1; side += 2)
             {
                 int accent = side < 0 ? 3 : 4;
@@ -104,6 +107,7 @@ namespace AiNative.Client.Application
                     Vector3 spawn = new Vector3(side * 16, .012f, lane * 12);
                     Outline("SpawnPad", spawn, 3, 3, accent);
                     for (int stripe = 0; stripe < 3; stripe++)
+                    {
                         Box(
                             "SpawnDirection",
                             spawn + new Vector3(-side * (1.9f + stripe * .4f), 0, 0),
@@ -111,8 +115,10 @@ namespace AiNative.Client.Application
                             accent,
                             false
                         );
+                    }
                 }
             }
+
             Outline("CenterCourt", new Vector3(0, .008f, 0), 16, 16, 5);
         }
 
@@ -126,14 +132,21 @@ namespace AiNative.Client.Application
             var material = new Material(source) { name = "TrainingGround_" + label };
             material.color = color;
             if (material.HasProperty("_BaseColor"))
+            {
                 material.SetColor("_BaseColor", color);
+            }
+
             if (material.HasProperty("_Smoothness"))
+            {
                 material.SetFloat("_Smoothness", .3f);
+            }
+
             if (emissive && material.HasProperty("_EmissionColor"))
             {
                 material.EnableKeyword("_EMISSION");
                 material.SetColor("_EmissionColor", color * 1.5f);
             }
+
             return material;
         }
 
@@ -188,8 +201,12 @@ namespace AiNative.Client.Application
         private void OnDestroy()
         {
             for (int i = 0; i < _materials.Length; i++)
+            {
                 if (_materials[i] != null)
+                {
                     Destroy(_materials[i]);
+                }
+            }
         }
     }
 }

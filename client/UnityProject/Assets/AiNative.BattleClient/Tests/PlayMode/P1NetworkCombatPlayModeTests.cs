@@ -13,7 +13,7 @@ namespace AiNative.Client.Application.PlayModeTests
     public sealed class P1NetworkCombatPlayModeTests
     {
         [UnityTest, Category("ExternalTopology")]
-        // Requires plaintext Gate 23001, two-player rooms and at least 7200 match ticks.
+        // 需要明文 Gate 23001、双人房间以及不少于 7200 Tick 的对局时长。
         public IEnumerator TwoClientsObserveAuthorityCombatRespawnAndReconnectIdentity()
         {
             var a = new GameObject("P1CombatClientA");
@@ -31,10 +31,14 @@ namespace AiNative.Client.Application.PlayModeTests
                     TakeControlWhenReady(first);
                     TakeControlWhenReady(second);
                     if (!first.enabled && !second.enabled)
+                    {
                         break;
+                    }
+
                     Assert.That(first.Error + second.Error, Is.Empty);
                     yield return null;
                 }
+
                 Assert.That(
                     first.enabled || second.enabled,
                     Is.False,
@@ -69,7 +73,10 @@ namespace AiNative.Client.Application.PlayModeTests
                             !shooter.TryGetArenaState(out var own)
                             || !victim.TryGetArenaState(out var target)
                         )
+                        {
                             continue;
+                        }
+
                         damaged |= target.Health < ArenaCombatRules.MaximumHealth;
                         countedKill |= own.Kills > 0;
                         double dx = target.PositionXMillimetres - own.PositionXMillimetres;
@@ -78,10 +85,16 @@ namespace AiNative.Client.Application.PlayModeTests
                         int yaw = (int)Math.Round(Math.Atan2(dx, dz) * 180000 / Math.PI);
                         int yawDelta = (yaw - own.YawMillidegrees) % 360000;
                         if (yawDelta > 180000)
+                        {
                             yawDelta -= 360000;
+                        }
+
                         if (yawDelta < -180000)
+                        {
                             yawDelta += 360000;
-                        // Leave the protected spawn bays through the south lane before exchanging fire.
+                        }
+
+                        // 先经南侧通道离开受保护的出生区，再交换射击。
                         bool inLane =
                             own.PositionZMillimetres < -16000
                             && target.PositionZMillimetres < -16000;
@@ -108,6 +121,7 @@ namespace AiNative.Client.Application.PlayModeTests
                             ArenaWeaponId.Machinegun
                         );
                     }
+
                     int count = shooter.DrainCombatEvents(events);
                     for (int i = 0; i < count; i++)
                     {
@@ -123,13 +137,16 @@ namespace AiNative.Client.Application.PlayModeTests
                                 item.Kind == ArenaPresentationEventKind.Kill
                                 && item.TargetEntityId == victimId;
                         }
+
                         respawn |=
                             item.Kind == ArenaPresentationEventKind.Respawn
                             && item.SourceEntityId == victimId;
                     }
+
                     victim.DrainCombatEvents(events);
                     yield return null;
                 }
+
                 Assert.That(
                     fire && hit && kill && respawn && damaged && countedKill,
                     Is.True,
@@ -148,7 +165,12 @@ namespace AiNative.Client.Application.PlayModeTests
                     victim.Pump(Time.unscaledDeltaTime);
                     yield return null;
                 }
-                Assert.That(victim.State, Is.EqualTo(BattleClientState.Active));
+
+                Assert.That(
+                    victim.State,
+                    Is.EqualTo(BattleClientState.Active),
+                    $"Reconnect failed: {victim.FaultReason}; shooter={shooter.State}; shooterFault={shooter.FaultReason}"
+                );
                 Assert.That(victim.IsPredictionInitialized, Is.True);
                 Assert.That(victim.EntityId, Is.EqualTo(victimId));
                 Assert.That(victim.SessionId, Is.EqualTo(session));
@@ -173,13 +195,16 @@ namespace AiNative.Client.Application.PlayModeTests
                 flow.Battle.Pump(Time.unscaledDeltaTime);
                 return;
             }
+
             if (
                 flow.Battle != null
                 && flow.Battle.State == BattleClientState.Active
                 && flow.Battle.IsPredictionInitialized
                 && flow.Battle.ArenaPhase == ArenaMatchPhase.Active
             )
+            {
                 flow.enabled = false; // Stop automated movement/reconnect; this test now owns pump and input cadence.
+            }
         }
     }
 }

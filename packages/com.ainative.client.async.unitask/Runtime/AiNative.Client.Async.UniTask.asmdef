@@ -1,0 +1,7 @@
+{
+  "name": "AiNative.Client.Async.UniTask",
+  "references": [
+    "UniTask"
+  ],
+  "autoReferenced": false
+}
