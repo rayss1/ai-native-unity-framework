@@ -47,13 +47,14 @@ namespace AiNative.Client.Application.PlayModeTests
             {
                 pool.Dispose();
             }
+
             yield return null;
         }
 
         [UnityTest]
         public IEnumerator RemoteVisualPoolPositionsHidesAndDestroysOwnedObjects()
         {
-            // Reflection keeps the application-only implementation out of the public framework API.
+            // 测试通过反射检查应用内部实现，避免为测试扩大框架公共 API。
             Type type = typeof(BattleClientCompositionRoot).Assembly.GetType(
                 "AiNative.Client.Application.ArenaRemoteVisualPool"
             );
@@ -105,6 +106,7 @@ namespace AiNative.Client.Application.PlayModeTests
             {
                 pool.Dispose();
             }
+
             yield return null;
             Assert.That(visual == null, Is.True, "Disposal must destroy pooled objects.");
         }

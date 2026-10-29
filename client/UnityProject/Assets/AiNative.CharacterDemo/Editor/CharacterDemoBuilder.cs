@@ -15,33 +15,39 @@ using Object = UnityEngine.Object;
 
 namespace AiNative.CharacterDemo.Editor
 {
-    /// <summary>Application composition only. Original art assets are never modified.</summary>
+    /// <summary>仅负责应用组装，不修改原始美术资产。</summary>
     public static class CharacterDemoBuilder
     {
         private const string Root = "Assets/AiNative.CharacterDemo";
         private const string Generated = Root + "/Generated";
         public const string ScenePath = Root + "/Scenes/CharacterDemo.unity";
         private const string Animations = "Assets/Art/Animations/";
-        private static readonly Dictionary<Material, Material> Materials =
+        private static readonly Dictionary<Material, Material> _materials =
             new Dictionary<Material, Material>();
 
         [MenuItem("AiNative/Character Demo/Build")]
         public static void Build()
         {
             if (EditorApplication.isPlayingOrWillChangePlaymode)
+            {
                 throw new InvalidOperationException("Exit Play Mode before building the demo.");
-            // Do not discard unrelated dirty scenes or replace their in-memory objects.
+            }
+
+            // 不得丢弃无关的未保存场景，也不得替换其中的内存对象。
             if (
                 Enumerable
                     .Range(0, SceneManager.sceneCount)
                     .Any(i => SceneManager.GetSceneAt(i).isDirty)
             )
+            {
                 throw new InvalidOperationException(
                     "Save the open scenes before building the demo."
                 );
+            }
+
             EnsureFolder(Generated);
             EnsureFolder(Root + "/Scenes");
-            Materials.Clear();
+            _materials.Clear();
             var controller = CreateController();
             var scene = EditorSceneManager.NewScene(
                 NewSceneSetup.EmptyScene,
@@ -50,7 +56,10 @@ namespace AiNative.CharacterDemo.Editor
             SceneManager.SetActiveScene(scene);
             var previousDemo = SceneManager.GetSceneByPath(ScenePath);
             if (previousDemo.IsValid() && previousDemo.isLoaded)
+            {
                 EditorSceneManager.CloseScene(previousDemo, true);
+            }
+
             try
             {
                 BuildCourse();
@@ -81,7 +90,10 @@ namespace AiNative.CharacterDemo.Editor
                     || !animator.avatar.isValid
                     || !animator.avatar.isHuman
                 )
+                {
                     throw new InvalidOperationException("VBOT must have a valid Humanoid Avatar.");
+                }
+
                 animator.applyRootMotion = false;
                 animator.runtimeAnimatorController = controller;
                 animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
@@ -92,10 +104,13 @@ namespace AiNative.CharacterDemo.Editor
                 StripBehavioursAndPhysics(rifle);
                 var hand = animator.GetBoneTransform(HumanBodyBones.RightHand);
                 if (hand == null)
+                {
                     throw new InvalidOperationException("VBOT has no mapped right hand.");
-                // The imported skeleton is in centimetres. Preserve the weapon's metre scale,
-                // and express attachment offsets in metres rather than bone-local centimetres.
-                // Calibrated against Idle@Rifle on this Avatar, not against the T-pose.
+                }
+
+                // 导入骨架采用厘米单位；保留武器的米制缩放，
+                // 挂点偏移使用米，不使用骨骼局部厘米。
+                // 根据此 Avatar 的 Idle@Rifle 姿态校准，不按 T-pose 校准。
                 rifle.transform.position =
                     hand.position + hand.rotation * new Vector3(-0.11598f, 0.00328f, -0.15439f);
                 rifle.transform.rotation =
@@ -108,7 +123,10 @@ namespace AiNative.CharacterDemo.Editor
                 ConvertMaterials(visual);
                 ConvertMaterials(rifle);
                 foreach (var child in player.GetComponentsInChildren<Transform>(true))
+                {
                     child.gameObject.layer = 2;
+                }
+
                 var cameraObject = new GameObject(
                     "Main Camera",
                     typeof(Camera),
@@ -129,7 +147,7 @@ namespace AiNative.CharacterDemo.Editor
                 );
                 var muzzle = new GameObject("Muzzle").transform;
                 muzzle.SetParent(rifle.transform, false);
-                // Centre of the imported barrel's front rim (mesh-local metres).
+                // 导入枪管前缘的中心点，单位为网格局部坐标米。
                 muzzle.localPosition = new Vector3(0, .0546f, .43f);
                 var tracer = CourseMaterial("Tracer", new Color(1, .8f, .15f));
                 tracer.EnableKeyword("_EMISSION");
@@ -160,7 +178,10 @@ namespace AiNative.CharacterDemo.Editor
         public static void BuildWindows()
         {
             if (!File.Exists(ScenePath))
+            {
                 throw new InvalidOperationException("Build the demo scene first.");
+            }
+
             var output = Path.GetFullPath(
                 Path.Combine(
                     Application.dataPath,
@@ -179,9 +200,12 @@ namespace AiNative.CharacterDemo.Editor
                 }
             );
             if (report.summary.result != BuildResult.Succeeded)
+            {
                 throw new InvalidOperationException(
                     "Character demo build failed: " + report.summary.result
                 );
+            }
+
             Debug.Log("Character demo Player: " + output);
         }
 
@@ -191,21 +215,37 @@ namespace AiNative.CharacterDemo.Editor
         private static void StripBehavioursAndPhysics(GameObject root)
         {
             foreach (var script in root.GetComponentsInChildren<MonoBehaviour>(true))
+            {
                 if (script != null)
+                {
                     Object.DestroyImmediate(script);
+                }
+            }
+
             foreach (var transform in root.GetComponentsInChildren<Transform>(true))
+            {
                 GameObjectUtility.RemoveMonoBehavioursWithMissingScript(transform.gameObject);
+            }
+
             foreach (var collider in root.GetComponentsInChildren<Collider>(true))
+            {
                 Object.DestroyImmediate(collider);
+            }
+
             foreach (var body in root.GetComponentsInChildren<Rigidbody>(true))
+            {
                 Object.DestroyImmediate(body);
+            }
         }
 
         private static void ConvertMaterials(GameObject root)
         {
             var shader = Shader.Find("Universal Render Pipeline/Lit");
             if (shader == null)
+            {
                 return;
+            }
+
             foreach (var renderer in root.GetComponentsInChildren<Renderer>(true))
             {
                 var materials = renderer.sharedMaterials;
@@ -219,8 +259,11 @@ namespace AiNative.CharacterDemo.Editor
                             StringComparison.Ordinal
                         )
                     )
+                    {
                         continue;
-                    if (!Materials.TryGetValue(original, out var converted))
+                    }
+
+                    if (!_materials.TryGetValue(original, out var converted))
                     {
                         var path =
                             Generated
@@ -233,26 +276,42 @@ namespace AiNative.CharacterDemo.Editor
                             converted = new Material(shader);
                             AssetDatabase.CreateAsset(converted, path);
                         }
+
                         converted.shader = shader;
                         converted.name = original.name + " (Demo URP)";
                         if (original.HasProperty("_MainTex"))
+                        {
                             converted.SetTexture("_BaseMap", original.GetTexture("_MainTex"));
+                        }
+
                         if (original.HasProperty("_Color"))
+                        {
                             converted.SetColor("_BaseColor", original.GetColor("_Color"));
+                        }
+
                         if (original.HasProperty("_BumpMap"))
                         {
                             converted.SetTexture("_BumpMap", original.GetTexture("_BumpMap"));
                             converted.EnableKeyword("_NORMALMAP");
                         }
+
                         if (original.HasProperty("_Metallic"))
+                        {
                             converted.SetFloat("_Metallic", original.GetFloat("_Metallic"));
+                        }
+
                         if (original.HasProperty("_Glossiness"))
+                        {
                             converted.SetFloat("_Smoothness", original.GetFloat("_Glossiness"));
+                        }
+
                         EditorUtility.SetDirty(converted);
-                        Materials.Add(original, converted);
+                        _materials.Add(original, converted);
                     }
+
                     materials[i] = converted;
                 }
+
                 renderer.sharedMaterials = materials;
             }
         }
@@ -270,12 +329,15 @@ namespace AiNative.CharacterDemo.Editor
             );
             ramp.transform.rotation = Quaternion.Euler(-30, 0, 0);
             for (int i = 0; i < 5; i++)
+            {
                 Box(
                     "Step " + i,
                     new Vector3(-2, (i + 1) * 0.1f, 3 + i * 0.7f),
                     new Vector3(2.5f, (i + 1) * 0.2f, 0.7f),
                     obstacles
                 );
+            }
+
             Box(
                 "Low ceiling - crouch clearance 1.25m",
                 new Vector3(4, 1.4f, 3),
@@ -314,6 +376,7 @@ namespace AiNative.CharacterDemo.Editor
                 target.AddComponent<CharacterHealth>();
                 target.AddComponent<TrainingTarget>();
             }
+
             var light = new GameObject("Sun", typeof(Light)).GetComponent<Light>();
             light.type = LightType.Directional;
             light.intensity = 1.5f;
@@ -334,6 +397,7 @@ namespace AiNative.CharacterDemo.Editor
                 );
                 AssetDatabase.CreateAsset(material, path);
             }
+
             material.color = color;
             EditorUtility.SetDirty(material);
             return material;
@@ -362,7 +426,10 @@ namespace AiNative.CharacterDemo.Editor
         private static void EnsureFolder(string path)
         {
             if (AssetDatabase.IsValidFolder(path))
+            {
                 return;
+            }
+
             string parent = path.Substring(0, path.LastIndexOf('/'));
             EnsureFolder(parent);
             AssetDatabase.CreateFolder(parent, path.Substring(path.LastIndexOf('/') + 1));

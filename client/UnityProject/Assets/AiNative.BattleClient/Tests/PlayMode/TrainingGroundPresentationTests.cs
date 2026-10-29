@@ -38,6 +38,7 @@ namespace AiNative.Client.Application.PlayModeTests
                     Assert.That(actual.max.y, Is.EqualTo(expected.MaxY / 1000f).Within(.0001f));
                     Assert.That(actual.max.z, Is.EqualTo(expected.MaxZ / 1000f).Within(.0001f));
                 }
+
                 var floor = root.transform.Find("TrainingDeck");
                 Assert.That(
                     floor.GetComponent<BoxCollider>().bounds.max.y,
@@ -54,6 +55,7 @@ namespace AiNative.Client.Application.PlayModeTests
             {
                 Object.Destroy(root);
             }
+
             yield return null;
             yield return null;
             Assert.That(root == null, Is.True);

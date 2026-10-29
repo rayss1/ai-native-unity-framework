@@ -1,11 +1,13 @@
 # ai-native-unity-framework
 An AI-native full-stack Unity game development framework for autonomous AI agents, covering client, server, shared modules, development tools, testing, build pipelines, and automation.
 
+Client framework implementation: [coding standards](Docs/Architecture/client-coding-standards.md), [development guide](Docs/Architecture/client-framework.md), and [current validation record](Docs/Architecture/client-framework-validation-2026-10-29.md). New framework cases are additional to historical release profiles.
+
 See [current progress and remaining gates](Docs/Architecture/current-status.md) for the single current status entry. Dated reports retain their original source/platform limits.
 
 The [client protocol migration](Docs/Architecture/client-protocol-codecs.md) introduces explicit codec injection, generated Protobuf Gate/battle messages and one decoded snapshot for prediction/presentation. See its [current validation record](Docs/Architecture/client-protocol-validation-2026-10-20.md) for allocation measurements and platform limits.
 
-P0 (PR #42), [P1 network character integration](Docs/Architecture/p1-network-character.md) (PR #43), and training arena/combat repairs (PR #44) are merged in the inspected `origin/main` at `aa06c05`. The current source uses the explicit `Development` validation profile (294 EditMode cases; expected full .NET inventory 660); `Current` retains the historical 166-case inventory. These counts are validation requirements, not a claim that the merged source has passed the full release gate.
+P0 (PR #42), [P1 network character integration](Docs/Architecture/p1-network-character.md) (PR #43), and training arena/combat repairs (PR #44) are merged in the inspected `origin/main` at `aa06c05`. The earlier protocol source uses the explicit `Development` validation profile (294 EditMode cases; expected full .NET inventory 660); `Current` retains the historical 166-case inventory. These counts are validation requirements, not a claim that the merged source has passed the full release gate.
 
 The [current progress page](Docs/Architecture/current-status.md) includes a plain-language architecture/code map and the October 20 local review on the earlier `2d92bcb` worktree: .NET Release build, architecture validation and 132 targeted tests passed. Those results do not validate PR #44. Unity, full .NET, database, device and deployment qualification were not rerun in that review. The current Arena supports at most eight players per room; historical 128-client results span multiple rooms.
 

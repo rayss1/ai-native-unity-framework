@@ -3,11 +3,11 @@ using UnityEngine;
 
 namespace AiNative.Client.Application
 {
-    /// <summary>Bridges dynamic device frames to accepted fixed-tick network commands.</summary>
+    /// <summary>将动态设备帧转换为固定 Tick 接受的网络命令。</summary>
     internal sealed class NetworkCharacterInput
     {
-        private bool _jump,
-            _reload;
+        private bool _jump;
+        private bool _reload;
         public ArenaWeaponId Weapon { get; private set; }
 
         public void Sample(bool jumpPressed, ArenaWeaponId weapon, bool reloadPressed = false)
@@ -15,7 +15,9 @@ namespace AiNative.Client.Application
             _jump |= jumpPressed;
             _reload |= reloadPressed;
             if (weapon != ArenaWeaponId.None)
+            {
                 Weapon = weapon;
+            }
         }
 
         public ArenaButtons Buttons(bool fireHeld) =>
@@ -23,8 +25,8 @@ namespace AiNative.Client.Application
             | (fireHeld ? ArenaButtons.Fire : ArenaButtons.None)
             | (_reload ? ArenaButtons.Reload : ArenaButtons.None);
 
-        // A rejected prepare leaves edges buffered for the next tick. Focus/UI/session
-        // boundaries instead discard them, so reconnect never replays a stale action.
+        // 准备失败时保留按键边沿，供下一 Tick 使用；焦点、UI 或会话边界
+        // 则丢弃边沿，防止重连重放过期动作。
         public void Commit() => Clear();
 
         public void Clear()

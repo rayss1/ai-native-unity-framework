@@ -33,9 +33,7 @@ namespace AiNative.Client.Prediction
         }
 
         public float SmoothingSeconds { get; }
-
         public int SnapThresholdMillimetres { get; }
-
         public static PresentationCorrectionOptions Default =>
             new PresentationCorrectionOptions(0.1f, 250);
     }
@@ -49,7 +47,6 @@ namespace AiNative.Client.Prediction
         }
 
         public double XMillimetres { get; }
-
         public double ZMillimetres { get; }
     }
 
@@ -69,17 +66,14 @@ namespace AiNative.Client.Prediction
         }
 
         public long SmoothedCorrections { get; }
-
         public long SnappedCorrections { get; }
-
         public bool IsSmoothing { get; }
-
         public int ResidualMillimetres { get; }
     }
 
     /// <summary>
-    /// Keeps simulation state authoritative while decaying only its visual offset.
-    /// The caller supplies render delta time and applies the returned position.
+    /// 保持模拟状态的权威性，仅逐步衰减表现偏移。
+    /// 调用方提供渲染帧时长，并应用返回的位置。
     /// </summary>
     public sealed class PresentationCorrectionSmoother
     {
@@ -113,7 +107,6 @@ namespace AiNative.Client.Prediction
         }
 
         public bool IsInitialized => _initialized;
-
         public PresentationCorrectionDiagnostics Diagnostics =>
             new PresentationCorrectionDiagnostics(
                 _smoothedCorrections,

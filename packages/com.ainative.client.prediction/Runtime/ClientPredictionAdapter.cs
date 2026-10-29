@@ -39,11 +39,8 @@ namespace AiNative.Client.Prediction
         }
 
         public PredictionSendStatus Status { get; }
-
         public bool Predicted { get; }
-
         public KinematicState PredictedState { get; }
-
         public bool DroppedOldestInput { get; }
     }
 
@@ -73,11 +70,8 @@ namespace AiNative.Client.Prediction
         }
 
         public PredictionPrepareStatus Status { get; }
-
         public int WrittenBytes { get; }
-
         public KinematicState PredictedState { get; }
-
         public bool DroppedOldestInput { get; }
     }
 
@@ -115,13 +109,9 @@ namespace AiNative.Client.Prediction
         }
 
         public SnapshotApplyStatus Status { get; }
-
         public uint ConnectionEpoch { get; }
-
         public bool HasReconciliation { get; }
-
         public ReconciliationResult Reconciliation { get; }
-
         public int CorrectionMagnitudeMillimetres { get; }
     }
 
@@ -175,38 +165,28 @@ namespace AiNative.Client.Prediction
         }
 
         public long AcceptedSnapshots { get; }
-
         public long Corrections { get; }
-
         public long CorrectionsOver250Millimetres { get; }
-
         public int MaximumCorrectionMillimetres { get; }
-
         public long HistoryMisses { get; }
-
         public long StaleSnapshots { get; }
-
         public long DroppedInputs { get; }
-
         public long ReconciliationSamples { get; }
-
         public int CorrectionP95Millimetres { get; }
-
         public int CorrectionP99Millimetres { get; }
     }
 
     /// <summary>
-    /// Unity-ready composition adapter for protocol-v1 input, acknowledgement, and
-    /// bounded prediction history. The caller owns frame routing and presentation.
+    /// 可用于 Unity 的 protocol-v1 输入、确认和有界预测历史组合适配器；
+    /// 帧路由及表现由调用方负责。
     /// </summary>
     public sealed class ClientPredictionAdapter : IAsyncDisposable
     {
         public int RequiredInputBufferBytes => _codec.MaximumInputFrameBytes;
+
         private readonly IBattleProtocolCodec _codec;
         private readonly BattlePacketBuffer _decoded = new BattlePacketBuffer();
-
         private const int CorrectionHistogramMaximumMillimetres = 8192;
-
         private readonly IRealtimeTransport _transport;
         private readonly ClientPredictionHistory _history;
         private readonly byte[] _sendBuffer;
@@ -253,11 +233,8 @@ namespace AiNative.Client.Prediction
         }
 
         public uint EntityId => _entityId;
-
         public uint ConnectionEpoch => _connectionEpoch;
-
         public bool IsInitialized => _initialized;
-
         public PredictionDiagnostics Diagnostics =>
             new PredictionDiagnostics(
                 _acceptedSnapshots,
@@ -273,12 +250,15 @@ namespace AiNative.Client.Prediction
             );
 
         /// <summary>
-        /// Starts a new bounded diagnostics window without changing prediction state.
+        /// 开始新的有界诊断窗口，不改变预测状态。
         /// </summary>
         public void ResetDiagnostics()
         {
             if (_disposed)
+            {
                 return;
+            }
+
             _acceptedSnapshots = 0;
             _corrections = 0;
             _correctionsOver250Millimetres = 0;
@@ -302,7 +282,7 @@ namespace AiNative.Client.Prediction
             return true;
         }
 
-        /// <summary>Sequence number assigned to the most recently prepared input.</summary>
+        /// <summary>最近一次成功准备的输入所使用的序号。</summary>
         public uint LastPreparedInputSequence =>
             _nextInputSequence == 0 ? uint.MaxValue : _nextInputSequence - 1;
 
@@ -354,24 +334,29 @@ namespace AiNative.Client.Prediction
             }
 
             if (!CanReplaySafely(_history.Current))
+            {
                 return new PredictionPrepareResult(
                     PredictionPrepareStatus.ArithmeticOverflow,
                     0,
                     default,
                     false
                 );
+            }
+
             uint sequence = _nextInputSequence;
             KinematicInput input = new KinematicInput(sequence, moveXMilli, moveZMilli);
             if (!_codec.TryEncodeLegacyInput(roomTick, input, destination, out int writtenBytes))
+            {
                 return new PredictionPrepareResult(
                     PredictionPrepareStatus.BufferTooSmall,
                     0,
                     default,
                     false
                 );
+            }
+
             KinematicState predicted = _history.Predict(input, out bool droppedOldest);
             _nextInputSequence = sequence == uint.MaxValue ? 0 : sequence + 1;
-
             return new PredictionPrepareResult(
                 PredictionPrepareStatus.Prepared,
                 writtenBytes,
@@ -493,7 +478,10 @@ namespace AiNative.Client.Prediction
                 _decoded
             );
             if (decode != BattleDecodeStatus.Accepted)
+            {
                 return Failure(MapDecodeStatus(decode), packet.ConnectionEpoch);
+            }
+
             return ApplyDecoded(_decoded, packet);
         }
 
@@ -503,14 +491,26 @@ namespace AiNative.Client.Prediction
         )
         {
             if (_disposed)
+            {
                 return Failure(SnapshotApplyStatus.Disposed, packet.ConnectionEpoch);
+            }
+
             bool reconnect = decoded.Kind == BattleMessageKind.ReconnectResponse;
             if (!reconnect && decoded.Kind != BattleMessageKind.Snapshot)
+            {
                 return Failure(SnapshotApplyStatus.WrongMessage, packet.ConnectionEpoch);
+            }
+
             if (!decoded.TryGetPlayer(_entityId, out var player))
+            {
                 return Failure(SnapshotApplyStatus.PlayerMissing, packet.ConnectionEpoch);
+            }
+
             if (player.State.Tick < 0)
+            {
                 return Failure(SnapshotApplyStatus.ArithmeticOverflow, packet.ConnectionEpoch);
+            }
+
             var state = new KinematicState(
                 player.State.Tick,
                 player.Acknowledgement,
@@ -564,10 +564,14 @@ namespace AiNative.Client.Prediction
                     0
                 );
             }
-            // Reconcile mutates its ring before replaying. Prove numeric headroom first,
-            // including one next input; rejection must preserve history, epoch and sequence.
+
+            // Reconcile 在重放前修改环形队列；必须先证明数值余量足够，
+            // 包括下一次输入；拒绝时必须保留历史、epoch 和序号。
             if (!CanReplaySafely(state))
+            {
                 return Failure(SnapshotApplyStatus.ArithmeticOverflow, authoritativeEpoch);
+            }
+
             _acceptedSnapshots++;
             _authoritativeTick = state.Tick;
             _authoritativeAcknowledgement = state.LastProcessedInputSequence;
@@ -603,15 +607,21 @@ namespace AiNative.Client.Prediction
             }
         }
 
-        /// <summary>Pure numeric admission check, also used before committing a transport epoch.
-        /// Call and apply on the owner thread without preparing intervening inputs.</summary>
+        /// <summary>纯数值准入检查，也用于提交传输 epoch 之前。
+        /// 在所属线程连续完成检查与应用，两者之间不得准备新输入。</summary>
         public bool CanReplaySafely(in KinematicState state)
         {
             if (_disposed)
+            {
                 return false;
+            }
+
             long steps = (_initialized ? _history.Count : 0) + 1L;
             if (state.Tick < 0 || state.Tick > long.MaxValue - steps)
+            {
                 return false;
+            }
+
             long margin = steps * KinematicMovement.FullInputMillimetresPerTick;
             long x = state.PositionXMillimetres,
                 z = state.PositionZMillimetres;
@@ -621,11 +631,17 @@ namespace AiNative.Client.Prediction
                 || z < int.MinValue + margin
                 || z > int.MaxValue - margin
             )
+            {
                 return false;
+            }
+
             if (!_initialized)
+            {
                 return true;
-            // Any acknowledged historical position is at most Count steps from Current.
-            // Reserve that distance in both directions before int correction subtraction.
+            }
+
+            // 任意已确认历史位置距离 Current 最多 Count 步。
+            // 执行 int 校正减法前，两个方向均须预留该距离。
             var current = _history.Current;
             return Math.Abs(x - current.PositionXMillimetres) + margin <= int.MaxValue
                 && Math.Abs(z - current.PositionZMillimetres) + margin <= int.MaxValue;
@@ -686,7 +702,10 @@ namespace AiNative.Client.Prediction
         private void EnsureNextSequenceAfter(uint acknowledgement)
         {
             if (_nextInputSequence == 0)
+            {
                 return; // Exhaustion is terminal for this session.
+            }
+
             if (acknowledgement == uint.MaxValue)
             {
                 _nextInputSequence = 0;
@@ -743,7 +762,10 @@ namespace AiNative.Client.Prediction
         private int CalculateCorrectionPercentile(int percentile)
         {
             if (_reconciliationSamples == 0)
+            {
                 return 0;
+            }
+
             long rank = (long)Math.Ceiling(_reconciliationSamples * (percentile / 100d));
             long cumulative = 0;
             for (int index = 0; index < _correctionHistogram.Length; index++)

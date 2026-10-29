@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <TargetFramework>netstandard2.1</TargetFramework>
+        <LangVersion>9.0</LangVersion>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>disable</ImplicitUsings>
+        <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+        <AssemblyName>AiNative.Client.Core</AssemblyName>
+    </PropertyGroup>
+    <ItemGroup>
+        <Compile Include="Runtime/**/*.cs" />
+    </ItemGroup>
+</Project>

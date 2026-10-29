@@ -6,24 +6,30 @@ using UnityEngine;
 
 namespace AiNative.CharacterDemo.Tests
 {
-    /// <summary>Application asset regression: baked planar root translation must never
-    /// move the visible hips away from the code-driven CharacterController.</summary>
+    /// <summary>应用资产回归：烘焙的平面根位移不得导致可见髋部
+    /// 偏离由代码驱动的 CharacterController。</summary>
     public sealed class CharacterAnimationRegressionTests
     {
         private const string RigPath =
             "Assets/AiNative.CharacterDemo/Generated/CharacterDemoRig.prefab";
         private const string OriginalControllerPath =
             "Assets/Art/Animations/Shooter/Invector@ShooterMelee.controller";
-        private GameObject rig,
-            floor;
+        private GameObject _rig;
+        private GameObject _floor;
 
         [TearDown]
         public void TearDown()
         {
-            if (rig != null)
-                Object.DestroyImmediate(rig);
-            if (floor != null)
-                Object.DestroyImmediate(floor);
+            if (_rig != null)
+            {
+                Object.DestroyImmediate(_rig);
+            }
+
+            if (_floor != null)
+            {
+                Object.DestroyImmediate(_floor);
+            }
+
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;
         }
@@ -38,9 +44,9 @@ namespace AiNative.CharacterDemo.Tests
                 Is.Not.Null,
                 "Generate the character demo assets before running the regression."
             );
-            rig = Object.Instantiate(prefab);
-            var motor = rig.GetComponentInChildren<CharacterMotor>(true);
-            var animator = rig.GetComponentInChildren<Animator>(true);
+            _rig = Object.Instantiate(prefab);
+            var motor = _rig.GetComponentInChildren<CharacterMotor>(true);
+            var animator = _rig.GetComponentInChildren<Animator>(true);
             Assert.That(motor, Is.Not.Null);
             Assert.That(animator, Is.Not.Null);
             Assert.That(
@@ -67,20 +73,27 @@ namespace AiNative.CharacterDemo.Tests
                 Is.EqualTo(original.layers.Length),
                 "The complete source controller layers must be retained."
             );
-
-            // Evaluate explicitly without render-loop input, camera or driver writes.
-            foreach (var behaviour in rig.GetComponentsInChildren<MonoBehaviour>(true))
+            // 显式推进动画，排除渲染循环输入、相机或驱动器写入的干扰。
+            foreach (var behaviour in _rig.GetComponentsInChildren<MonoBehaviour>(true))
+            {
                 if (behaviour != motor)
+                {
                     behaviour.enabled = false;
+                }
+            }
+
             motor.Configure(null, null);
             motor.transform.position = new Vector3(1200, 1000.05f, 1000);
             motor.transform.rotation = Quaternion.identity;
-            floor = new GameObject("Animation regression ground");
-            floor.transform.position = new Vector3(1200, 999.5f, 1000);
-            floor.AddComponent<BoxCollider>().size = new Vector3(100, 1, 100);
+            _floor = new GameObject("Animation regression ground");
+            _floor.transform.position = new Vector3(1200, 999.5f, 1000);
+            _floor.AddComponent<BoxCollider>().size = new Vector3(100, 1, 100);
             Physics.SyncTransforms();
             for (int i = 0; i < 30; i++)
+            {
                 motor.Simulate(default, 0, dt);
+            }
+
             Assert.That(motor.State.Grounded, Is.True);
             animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
             animator.SetBool("IsGrounded", true);
@@ -108,17 +121,21 @@ namespace AiNative.CharacterDemo.Tests
             );
             bool hasRunClip = false;
             foreach (var clip in animator.GetCurrentAnimatorClipInfo(0))
+            {
                 if (
                     clip.weight > .5f
                     && clip.clip.name.IndexOf("Run", System.StringComparison.OrdinalIgnoreCase) >= 0
                 )
+                {
                     hasRunClip = true;
+                }
+            }
+
             Assert.That(
                 hasRunClip,
                 Is.True,
                 "The regression must sample Run, not accidentally pass on idle."
             );
-
             Vector3 previousOffset = RelativeHips(motor, hips);
             float minForward = previousOffset.z,
                 maxForward = previousOffset.z;
@@ -160,6 +177,7 @@ namespace AiNative.CharacterDemo.Tests
                 maxSide = Mathf.Max(maxSide, offset.x);
                 previousOffset = offset;
             }
+
             var finalState = animator.GetCurrentAnimatorStateInfo(0);
             Assert.That(finalState.fullPathHash, Is.EqualTo(initialState.fullPathHash));
             Assert.That(
@@ -181,7 +199,7 @@ namespace AiNative.CharacterDemo.Tests
 
         private static Vector3 RelativeHips(CharacterMotor motor, Transform hips)
         {
-            // World metres, independent of the model's import scale.
+            // 使用世界坐标米，不受模型导入缩放影响。
             return Quaternion.Inverse(motor.transform.rotation)
                 * (hips.position - motor.transform.position);
         }

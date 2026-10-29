@@ -9,7 +9,7 @@ using AiNative.Realtime;
 
 namespace AiNative.Client.Application
 {
-    /// <summary>Immutable credentials issued by Gate for one Battle allocation. The ticket is never logged.</summary>
+    /// <summary>Gate 为单次 Battle 分配签发的不可变凭证；票据不得写入日志。</summary>
     public sealed class BattleAdmissionInfo
     {
         public BattleAdmissionInfo(
@@ -21,11 +21,20 @@ namespace AiNative.Client.Application
         )
         {
             if (string.IsNullOrWhiteSpace(roomId))
+            {
                 throw new ArgumentException("Global room is required.", nameof(roomId));
+            }
+
             if (string.IsNullOrWhiteSpace(bootEpoch))
+            {
                 throw new ArgumentException("Boot epoch is required.", nameof(bootEpoch));
+            }
+
             if (string.IsNullOrWhiteSpace(entryTicket))
+            {
                 throw new ArgumentException("Entry ticket is required.", nameof(entryTicket));
+            }
+
             RoomId = roomId;
             BootEpoch = bootEpoch;
             EntryTicket = entryTicket;
@@ -63,9 +72,7 @@ namespace AiNative.Client.Application
         }
 
         internal IRealtimeTransport Transport { get; }
-
         internal Func<uint, bool> TryAdvanceConnectionEpoch { get; }
-
         internal bool IsConnected => Transport is not null;
     }
 
@@ -94,6 +101,13 @@ namespace AiNative.Client.Application
             );
             if (result.Status != FantasyKcpConnectStatus.Connected || result.Transport is null)
             {
+                // 只记录传输建立阶段；此处尚未发送登录票据，不改变失败返回或重试语义。
+                UnityEngine.Debug.LogWarning(
+                    $"Battle connection attempt failed: status={result.Status}; "
+                        + $"timeoutMilliseconds={timeoutMilliseconds}; "
+                        + $"callerCancelled={cancellationToken.IsCancellationRequested}; "
+                        + $"error={result.Error}"
+                );
                 return default;
             }
 
@@ -105,8 +119,8 @@ namespace AiNative.Client.Application
     }
 
     /// <summary>
-    /// Product-level protocol and prediction composition. Call <see cref="Pump"/> from
-    /// Update and <see cref="PredictAndQueueInput"/> from FixedUpdate.
+    /// 产品层协议与预测组合；在 Update 调用 <see cref="Pump"/>，
+    /// 在 FixedUpdate 调用 <see cref="PredictAndQueueInput"/>。
     /// </summary>
     public sealed class BattleClientSession : IAsyncDisposable
     {
@@ -116,9 +130,7 @@ namespace AiNative.Client.Application
         public const int PhaseTimeoutMilliseconds = 5000;
         public const int DefaultInputRingCapacity = 256;
         public const int CombatEventCapacity = 256;
-
-        private static readonly float[] ReconnectDelaySeconds = { 0.25f, 0.5f, 1.0f };
-
+        private static readonly float[] _reconnectDelaySeconds = { 0.25f, 0.5f, 1.0f };
         private readonly string _host;
         private readonly int _port;
         private readonly string _clientBuild;
@@ -138,12 +150,12 @@ namespace AiNative.Client.Application
         private readonly byte[] _receiveBuffer;
         private readonly byte[] _controlBuffer;
 
-        // Transport owns this memory until completion, independently of ring clears on reconnect.
+        // 发送完成前由传输层借用此内存；重连清空环形队列不得影响它。
         private readonly byte[] _inputSendBuffer;
         private Task<SendResult> _pendingInputSend;
         private int _pendingInputLength;
-        private ulong _inputGeneration,
-            _pendingInputGeneration;
+        private ulong _inputGeneration;
+        private ulong _pendingInputGeneration;
         private CancellationTokenSource _connectCancellation;
         private Task<BattleTransportConnection> _connectTask;
         private ClientPredictionAdapter _prediction;
@@ -170,14 +182,14 @@ namespace AiNative.Client.Application
         private readonly ArenaPresentationEvent[] _combatEvents = new ArenaPresentationEvent[
             CombatEventCapacity
         ];
-        private int _combatEventHead,
-            _combatEventCount;
+        private int _combatEventHead;
+        private int _combatEventCount;
         private uint _lastCombatSequence;
         private ulong _lastCombatTick;
         private bool _hasCombatSequence;
         public long DroppedCombatEvents { get; private set; }
 
-        /// <summary>Drains authority feedback on the Pump thread. Overflow discards the oldest feedback.</summary>
+        /// <summary>在 Pump 所属线程消费权威反馈；队列溢出时丢弃最早反馈。</summary>
         public int DrainCombatEvents(Span<ArenaPresentationEvent> output)
         {
             int count = Math.Min(output.Length, _combatEventCount);
@@ -187,6 +199,7 @@ namespace AiNative.Client.Application
                 _combatEvents[_combatEventHead] = default;
                 _combatEventHead = (_combatEventHead + 1) % CombatEventCapacity;
             }
+
             _combatEventCount -= count;
             return count;
         }
@@ -195,7 +208,7 @@ namespace AiNative.Client.Application
         {
             Array.Clear(_combatEvents, 0, _combatEvents.Length);
             _combatEventHead = _combatEventCount = 0;
-            // The room owns the sequence. Preserve its watermark across same-allocation reconnects.
+            // 序号属于房间；同一分配重连时保留序号水位。
         }
 
         private void ApplyCombatEvent(BattlePacketBuffer message, in ReceivedPacket packet)
@@ -212,7 +225,10 @@ namespace AiNative.Client.Application
                     )
                 )
             )
+            {
                 return;
+            }
+
             _hasCombatSequence = true;
             _lastCombatSequence = item.Sequence;
             _lastCombatTick = item.Tick;
@@ -222,6 +238,7 @@ namespace AiNative.Client.Application
                 _combatEventCount--;
                 DroppedCombatEvents++;
             }
+
             _combatEvents[(_combatEventHead + _combatEventCount) % CombatEventCapacity] = item;
             _combatEventCount++;
         }
@@ -271,9 +288,15 @@ namespace AiNative.Client.Application
         )
         {
             if (string.IsNullOrWhiteSpace(host))
+            {
                 throw new ArgumentException("Host is required.", nameof(host));
+            }
+
             if (port is < 1 or > 65535)
+            {
                 throw new ArgumentOutOfRangeException(nameof(port));
+            }
+
             _codec = codec ?? throw new ArgumentNullException(nameof(codec));
             _receiveBuffer = new byte[codec.MaximumFrameBytes];
             _controlBuffer = new byte[codec.MaximumFrameBytes];
@@ -288,11 +311,8 @@ namespace AiNative.Client.Application
         }
 
         public BattleClientState State { get; private set; }
-
         public string FaultReason => _faultReason;
-
         public ulong SessionId => _sessionId;
-
         public uint EntityId => _entityId;
 
         public int AdvanceRemotePresentation(
@@ -301,20 +321,23 @@ namespace AiNative.Client.Application
         ) => _remotePresentation.Advance(deltaSeconds, destination);
 
         public uint ConnectionEpoch => _connectionEpoch;
-
         public uint InitialConnectionEpoch => _initialConnectionEpoch;
-
         public uint LocalRoomId => _localRoomId;
-
         public bool UsesTopologyAdmission => _admission is not null;
 
-        /// <summary>Refreshes short-lived credentials without changing the allocation. Call on the Pump thread.</summary>
+        /// <summary>在不改变房间分配的前提下刷新短期凭证；只能在 Pump 所属线程调用。</summary>
         public void UpdateAdmission(BattleAdmissionInfo admission)
         {
             if (_disposed)
+            {
                 throw new ObjectDisposedException(nameof(BattleClientSession));
+            }
+
             if (admission is null)
+            {
                 throw new ArgumentNullException(nameof(admission));
+            }
+
             if (
                 _admission is null
                 || !string.Equals(_admission.RoomId, admission.RoomId, StringComparison.Ordinal)
@@ -326,23 +349,22 @@ namespace AiNative.Client.Application
                 || !string.Equals(_admission.NodeId, admission.NodeId, StringComparison.Ordinal)
                 || !string.Equals(_admission.PlayerId, admission.PlayerId, StringComparison.Ordinal)
             )
+            {
                 throw new ArgumentException(
                     "Admission refresh must retain the same room, boot, node and player.",
                     nameof(admission)
                 );
+            }
+
             _admission = admission;
         }
 
         public ulong LastReceivedTick => _lastReceivedTick;
-
         public uint LastAcknowledgedSequence => _lastAcknowledgedSequence;
-
         public long DroppedInputFrames => _droppedInputFrames;
-
         public ArenaMatchPhase ArenaPhase => _arenaPhase;
         public uint ArenaRemainingTicks => _arenaRemainingTicks;
         public uint ArenaLeaderEntityId => _arenaLeaderEntityId;
-
         private bool IsArenaFinished => _hasArenaState && _arenaPhase == ArenaMatchPhase.Finished;
 
         public bool TryGetArenaState(out ArenaPlayerState state)
@@ -352,19 +374,19 @@ namespace AiNative.Client.Application
         }
 
         public int QueuedInputFrames => _inputRing.Count;
-
         public bool IsPredictionInitialized =>
             _arenaPrediction?.IsInitialized == true || _prediction?.IsInitialized == true;
-
         public PredictionDiagnostics PredictionDiagnostics => _prediction?.Diagnostics ?? default;
-
         public PresentationCorrectionDiagnostics PresentationDiagnostics =>
             _presentation.Diagnostics;
 
         public bool ResetPredictionDiagnostics()
         {
             if (_disposed || _prediction is null || !_prediction.IsInitialized)
+            {
                 return false;
+            }
+
             _prediction.ResetDiagnostics();
             return true;
         }
@@ -372,7 +394,10 @@ namespace AiNative.Client.Application
         public bool ResetPresentationDiagnostics()
         {
             if (_disposed || !_presentation.IsInitialized)
+            {
                 return false;
+            }
+
             _presentation.ResetDiagnostics();
             return true;
         }
@@ -388,6 +413,7 @@ namespace AiNative.Client.Application
                 position = _presentation.Advance(ToKinematic(arena), unscaledDeltaSeconds);
                 return true;
             }
+
             if (
                 _disposed
                 || _prediction is null
@@ -417,7 +443,10 @@ namespace AiNative.Client.Application
         public void Pump(float unscaledDeltaSeconds)
         {
             if (_disposed)
+            {
                 return;
+            }
+
             if (unscaledDeltaSeconds < 0 || float.IsNaN(unscaledDeltaSeconds))
             {
                 throw new ArgumentOutOfRangeException(nameof(unscaledDeltaSeconds));
@@ -442,8 +471,8 @@ namespace AiNative.Client.Application
                 }
             }
 
-            // Observe closure before draining: no new packet can be admitted after that boundary.
-            // If closure races this pump, retain ownership until the next bounded receive pass.
+            // 先观察关闭状态再消费队列；此边界之后不再接收新包。
+            // 若关闭与本次 Pump 并发，保留所有权，直到下一次有界接收完成。
             bool reconnectPending =
                 _sendFailed
                 || _transportSlot.State is TransportState.Closed or TransportState.Faulted;
@@ -496,6 +525,7 @@ namespace AiNative.Client.Application
         )
         {
             if (_arenaPrediction?.IsInitialized == true)
+            {
                 return PredictAndQueueArenaInput(
                     roomTick,
                     moveXMilli,
@@ -505,8 +535,13 @@ namespace AiNative.Client.Application
                     ArenaButtons.None,
                     _arenaPrediction.Current.Weapon
                 );
+            }
+
             if (_disposed)
+            {
                 return PredictionPrepareStatus.Disposed;
+            }
+
             if (
                 State != BattleClientState.Active
                 || _prediction is null
@@ -536,7 +571,7 @@ namespace AiNative.Client.Application
             return result.Status;
         }
 
-        /// <summary>Queues an arena command using the latest authority tick and shared arena prediction.</summary>
+        /// <summary>使用最新权威 Tick 和共享 Arena 预测，将输入命令加入队列。</summary>
         public PredictionPrepareStatus PredictAndQueueArenaInput(
             ulong roomTick,
             int moveXMilli,
@@ -548,7 +583,10 @@ namespace AiNative.Client.Application
         )
         {
             if (_disposed)
+            {
                 return PredictionPrepareStatus.Disposed;
+            }
+
             if (State != BattleClientState.Active || !IsPredictionInitialized || IsArenaFinished)
             {
                 return PredictionPrepareStatus.NotInitialized;
@@ -561,7 +599,10 @@ namespace AiNative.Client.Application
             }
 
             if (_arenaPrediction?.IsInitialized != true)
+            {
                 return PredictionPrepareStatus.NotInitialized;
+            }
+
             ulong stampedTick = checked(_lastReceivedTick + 1);
             ArenaPredictionPrepareResult predicted = _arenaPrediction.PrepareInput(
                 stampedTick,
@@ -578,33 +619,47 @@ namespace AiNative.Client.Application
                 _arenaState = predicted.PredictedState;
                 _inputRing.CommitWrite(predicted.WrittenBytes);
             }
+
             return (PredictionPrepareStatus)predicted.Status;
         }
 
         public void RequestReconnect()
         {
             if (_disposed || State != BattleClientState.Active)
+            {
                 return;
+            }
+
             BeginReconnect();
         }
 
-        /// <summary>Restarts only the original topology allocation after Gate has renewed its admission.
-        /// Call on the Pump thread; an exhausted connection can recover without starting another match.</summary>
+        /// <summary>仅在 Gate 续签准入后恢复原拓扑分配。
+        /// 只能在 Pump 所属线程调用；连接重试耗尽后可恢复，无需创建新比赛。</summary>
+        // 原分配重连不创建新房间，身份与节点 epoch 约束见 Docs/ADR/0017-single-region-service-topology.md。
         public bool ResumeOriginalAllocation(BattleAdmissionInfo admission)
         {
             if (admission == null || string.IsNullOrEmpty(admission.EntryTicket))
+            {
                 throw new ArgumentException(
                     "A renewed entry ticket is required.",
                     nameof(admission)
                 );
+            }
+
             UpdateAdmission(admission); // Validate identity before altering any connection or prediction state.
             if (IsArenaFinished)
+            {
                 return false;
+            }
+
             _connectCancellation?.Cancel();
             Task<BattleTransportConnection> abandoned = _connectTask;
             _connectTask = null;
             if (abandoned != null)
+            {
                 _ = DisposeAbandonedConnectionAsync(abandoned);
+            }
+
             State = BattleClientState.Reconnecting;
             _faultReason = "";
             _sendFailed = false;
@@ -612,12 +667,18 @@ namespace AiNative.Client.Application
             _remotePresentation.Reset();
             ClearCombatEvents();
             _topologyReconnecting = true;
-            // Unsent commands from the suspended owner must never cross the new authenticated connection.
+            // 旧会话挂起前未发送的命令不得进入新认证连接。
             ClearInputRing();
             if (_prediction != null)
+            {
                 _ = _prediction.DisposeAsync();
+            }
+
             if (_arenaPrediction != null)
+            {
                 _ = _arenaPrediction.DisposeAsync();
+            }
+
             _prediction = null;
             _arenaPrediction = null;
             _hasArenaState = false;
@@ -633,7 +694,7 @@ namespace AiNative.Client.Application
             _awaitingReconnectResponse = false;
             _phaseElapsedSeconds = 0;
             _reconnectAttempts = 1;
-            _retryDelayRemainingSeconds = ReconnectDelaySeconds[0];
+            _retryDelayRemainingSeconds = _reconnectDelaySeconds[0];
             _transportSlot.DetachAndDispose();
             return true;
         }
@@ -646,7 +707,9 @@ namespace AiNative.Client.Application
             {
                 BattleTransportConnection connection = await abandoned;
                 if (connection.Transport != null)
+                {
                     await connection.Transport.DisposeAsync();
+                }
             }
             catch (Exception)
             { /* The canceled connector owns its partial connection. */
@@ -656,7 +719,10 @@ namespace AiNative.Client.Application
         public async ValueTask DisposeAsync()
         {
             if (_disposed)
+            {
                 return;
+            }
+
             _disposed = true;
             State = BattleClientState.Disposed;
             ClearCombatEvents();
@@ -676,11 +742,11 @@ namespace AiNative.Client.Application
                 }
                 catch (OperationCanceledException)
                 {
-                    // Expected when disposal interrupts an in-flight connection.
+                    // 释放操作中断正在建立的连接时，此取消符合预期。
                 }
                 catch (Exception)
                 {
-                    // Disposal remains best-effort; the connector owns failed partial sessions.
+                    // 释放仍尽力执行；连接器负责清理建立失败的部分会话。
                 }
             }
 
@@ -691,11 +757,16 @@ namespace AiNative.Client.Application
             }
 
             if (_arenaPrediction is not null)
+            {
                 await _arenaPrediction.DisposeAsync();
+            }
+
             await _transportSlot.DisposeAsync();
             _codec.Dispose();
             if (_pendingInputSend != null)
+            {
                 _ = ObserveAbandonedInputSend(_pendingInputSend);
+            }
         }
 
         private void BeginConnect()
@@ -779,9 +850,13 @@ namespace AiNative.Client.Application
             )
             {
                 if (_topologyReconnecting)
+                {
                     ScheduleReconnectRetry("Login request was not accepted.");
+                }
                 else
+                {
                     Fail("Login request was not accepted.");
+                }
             }
         }
 
@@ -803,11 +878,14 @@ namespace AiNative.Client.Application
             }
         }
 
-        /// <summary>Settlement-tail receive pass. Never connects, sends inputs, or retries control traffic.</summary>
+        /// <summary>结算尾部接收阶段；不建立连接、不发送输入，也不重试控制消息。</summary>
         internal bool DrainAcceptedPackets()
         {
             if (_disposed)
+            {
                 return true;
+            }
+
             bool closedBeforeRead =
                 _transportSlot.State is TransportState.Closed or TransportState.Faulted;
             bool drained = PumpReceive(receiveOnly: true);
@@ -820,7 +898,10 @@ namespace AiNative.Client.Application
             while (budget-- > 0)
             {
                 if (!_transportSlot.TryReceive(_receiveBuffer, out ReceivedPacket packet))
+                {
                     return true;
+                }
+
                 if (!packet.IsComplete || packet.WrittenBytes > _receiveBuffer.Length)
                 {
                     continue;
@@ -828,7 +909,10 @@ namespace AiNative.Client.Application
 
                 ReadOnlySpan<byte> frame = _receiveBuffer.AsSpan(0, packet.WrittenBytes);
                 if (_codec.TryDecode(frame, _decoded) != BattleDecodeStatus.Accepted)
+                {
                     continue;
+                }
+
                 BattleMessageKind messageId = _decoded.Kind;
                 if (receiveOnly)
                 {
@@ -837,15 +921,21 @@ namespace AiNative.Client.Application
                         && (State is BattleClientState.Active or BattleClientState.Faulted)
                         && messageId == BattleMessageKind.Snapshot
                     )
+                    {
                         ApplySnapshot(_decoded, packet);
+                    }
                     else if (
                         _prediction != null
                         && (State is BattleClientState.Active or BattleClientState.Faulted)
                         && messageId == BattleMessageKind.CombatEvent
                     )
+                    {
                         ApplyCombatEvent(_decoded, packet);
+                    }
+
                     continue;
                 }
+
                 if (
                     State == BattleClientState.LoggingIn
                     && packet.Channel.Equals(_codec.ControlChannel)
@@ -886,7 +976,8 @@ namespace AiNative.Client.Application
                     ApplySnapshot(_decoded, packet);
                 }
             }
-            // Budget exhaustion is not proof of an empty queue; preserve it for the next frame.
+
+            // 预算耗尽不代表队列为空；剩余消息必须保留至下一帧。
             return false;
         }
 
@@ -914,9 +1005,15 @@ namespace AiNative.Client.Application
             _sessionId = sessionId;
             _connectionEpoch = epoch;
             if (_initialConnectionEpoch == 0)
+            {
                 _initialConnectionEpoch = epoch;
+            }
+
             if (_admission is not null)
+            {
                 _lastReceivedTick = roomTick;
+            }
+
             State = BattleClientState.JoiningRoom;
             _phaseElapsedSeconds = 0;
             if (
@@ -925,9 +1022,13 @@ namespace AiNative.Client.Application
             )
             {
                 if (_topologyReconnecting)
+                {
                     ScheduleReconnectRetry("Join-room request was not accepted.");
+                }
                 else
+                {
                     Fail("Join-room request was not accepted.");
+                }
             }
         }
 
@@ -956,7 +1057,7 @@ namespace AiNative.Client.Application
         {
             uint epoch = message.ConnectionEpoch;
             ulong resumeTick = message.Tick;
-            // Validate the whole snapshot before advancing connection state.
+            // 推进连接状态前，必须验证完整快照。
             if (
                 IsArenaFinished
                 || epoch <= _connectionEpoch
@@ -969,6 +1070,7 @@ namespace AiNative.Client.Application
                 ScheduleReconnectRetry("Malformed reconnect response or stale snapshot.");
                 return;
             }
+
             bool replaySafe =
                 _arenaPrediction != null
                     ? _arenaPrediction.CanReplaySafely(player.State)
@@ -982,11 +1084,13 @@ namespace AiNative.Client.Application
                 );
                 return;
             }
+
             if (!_transportSlot.TryAdvanceConnectionEpoch(epoch))
             {
                 ScheduleReconnectRetry("Reconnect epoch was rejected.");
                 return;
             }
+
             if (_arenaPrediction is not null)
             {
                 ReceivedPacket arenaPacket = new ReceivedPacket(
@@ -1001,6 +1105,7 @@ namespace AiNative.Client.Application
                     ScheduleReconnectRetry("Reconnect Arena snapshot was rejected.");
                     return;
                 }
+
                 _connectionEpoch = epoch;
                 _awaitingReconnectResponse = false;
                 _reconnectAttempts = 0;
@@ -1026,7 +1131,6 @@ namespace AiNative.Client.Application
             }
 
             ApplyPresentationReconciliation(applied);
-
             _connectionEpoch = epoch;
             _lastReceivedTick = resumeTick;
             _lastAcknowledgedSequence = message.Acknowledgement;
@@ -1042,21 +1146,33 @@ namespace AiNative.Client.Application
         )
         {
             if (IsArenaFinished)
+            {
                 return false;
+            }
+
             if (
                 (!reconnect && packet.ConnectionEpoch != _connectionEpoch)
                 || !packet.Channel.Equals(
                     reconnect ? _codec.ControlChannel : _codec.SnapshotChannel
                 )
             )
+            {
                 return false;
+            }
+
             if (
                 message.Tick < _lastReceivedTick
                 || message.Acknowledgement < _lastAcknowledgedSequence
             )
+            {
                 return false;
+            }
+
             if (!message.TryGetPlayer(_entityId, out var arena))
+            {
                 return false;
+            }
+
             if (message.HasArenaData)
             {
                 _arenaPrediction ??= new ArenaClientPredictionAdapter(
@@ -1072,7 +1188,10 @@ namespace AiNative.Client.Application
                         or ArenaSnapshotApplyStatus.Reconciled
                     )
                 )
+                {
                     return false;
+                }
+
                 _remotePresentation.ApplySnapshot(
                     message.PlayerSpan,
                     (long)message.Tick,
@@ -1081,10 +1200,11 @@ namespace AiNative.Client.Application
                 bool finished = arena.Phase == ArenaMatchPhase.Finished;
                 if (finished)
                 {
-                    // The terminal authority state supersedes every unacknowledged local command.
+                    // 终局权威状态取代所有尚未确认的本地命令。
                     _arenaPrediction.Initialize(arena.State);
                     ClearInputRing();
                 }
+
                 _arenaState = finished ? arena.State : result.State;
                 _arenaPhase = arena.Phase;
                 _arenaRemainingTicks = arena.RemainingTicks;
@@ -1093,13 +1213,22 @@ namespace AiNative.Client.Application
                 _lastReceivedTick = (ulong)arena.State.Tick;
                 _lastAcknowledgedSequence = arena.Acknowledgement;
                 if (finished || result.Status == ArenaSnapshotApplyStatus.Initialized)
+                {
                     _presentation.Initialize(ToKinematic(_arenaState));
+                }
                 else
+                {
                     _presentation.ApplyReconciliation(result.Reconciliation);
+                }
+
                 return true;
             }
+
             if (_arenaPrediction is not null)
+            {
                 return false;
+            }
+
             SnapshotApplyResult applied = _prediction.ApplyDecoded(message, packet);
             if (applied.Status is SnapshotApplyStatus.Initialized or SnapshotApplyStatus.Reconciled)
             {
@@ -1109,6 +1238,7 @@ namespace AiNative.Client.Application
                 _lastAcknowledgedSequence = message.Acknowledgement;
                 return true;
             }
+
             return false;
         }
 
@@ -1134,7 +1264,10 @@ namespace AiNative.Client.Application
             if (_pendingInputSend != null)
             {
                 if (!_pendingInputSend.IsCompleted)
+                {
                     return;
+                }
+
                 Task<SendResult> completed = _pendingInputSend;
                 _pendingInputSend = null;
                 try
@@ -1144,7 +1277,9 @@ namespace AiNative.Client.Application
                         _pendingInputGeneration == _inputGeneration
                         && !CompleteInputSend(result, _pendingInputLength)
                     )
+                    {
                         return;
+                    }
                 }
                 catch (Exception)
                 {
@@ -1155,6 +1290,7 @@ namespace AiNative.Client.Application
                     }
                 }
             }
+
             int budget = _inputRing.Count;
             while (budget-- > 0 && _inputRing.TryPeek(out byte[] frame, out int length))
             {
@@ -1168,17 +1304,20 @@ namespace AiNative.Client.Application
                     );
                     if (!pending.IsCompletedSuccessfully)
                     {
-                        // Consume this ValueTask exactly once. No retry or buffer reuse before completion.
+                        // 此 ValueTask 只能消费一次；完成前不得重试或复用缓冲区。
                         _pendingInputLength = length;
                         _pendingInputGeneration = generation;
                         _pendingInputSend = pending.AsTask();
                         return;
                     }
+
                     if (
                         generation != _inputGeneration
                         || !CompleteInputSend(pending.Result, length)
                     )
+                    {
                         return;
+                    }
                 }
                 catch (Exception)
                 {
@@ -1191,7 +1330,10 @@ namespace AiNative.Client.Application
         private bool CompleteInputSend(SendResult result, int length)
         {
             if (result.Status == SendStatus.WouldBlock)
+            {
                 return false;
+            }
+
             _inputRing.Pop();
             if (result.Status != SendStatus.Accepted || result.AcceptedBytes != length)
             {
@@ -1202,13 +1344,17 @@ namespace AiNative.Client.Application
                     return false;
                 }
             }
+
             return true;
         }
 
         private void BeginReconnect()
         {
             if (IsArenaFinished)
+            {
                 return;
+            }
+
             if (_sessionId == 0 || _prediction is null)
             {
                 Fail("Connection closed before a resumable session was established.");
@@ -1220,6 +1366,7 @@ namespace AiNative.Client.Application
                 ResumeOriginalAllocation(_admission);
                 return;
             }
+
             State = BattleClientState.Reconnecting;
             _sendFailed = false;
             ClearInputRing();
@@ -1228,7 +1375,7 @@ namespace AiNative.Client.Application
             ClearCombatEvents();
             _awaitingReconnectResponse = false;
             _reconnectAttempts = 1;
-            _retryDelayRemainingSeconds = ReconnectDelaySeconds[0];
+            _retryDelayRemainingSeconds = _reconnectDelaySeconds[0];
             _transportSlot.DetachAndDispose();
         }
 
@@ -1236,14 +1383,14 @@ namespace AiNative.Client.Application
         {
             _awaitingReconnectResponse = false;
             _transportSlot.DetachAndDispose();
-            if (_reconnectAttempts >= ReconnectDelaySeconds.Length)
+            if (_reconnectAttempts >= _reconnectDelaySeconds.Length)
             {
                 Fail(reason);
                 return;
             }
 
             State = BattleClientState.Reconnecting;
-            _retryDelayRemainingSeconds = ReconnectDelaySeconds[_reconnectAttempts];
+            _retryDelayRemainingSeconds = _reconnectDelaySeconds[_reconnectAttempts];
             _reconnectAttempts++;
             _phaseElapsedSeconds = 0;
         }
@@ -1286,7 +1433,6 @@ namespace AiNative.Client.Application
         {
             private IRealtimeTransport _current;
             private Func<uint, bool> _tryAdvanceEpoch;
-
             public TransportState State => _current?.State ?? TransportState.Closed;
 
             internal void Replace(IRealtimeTransport transport, Func<uint, bool> tryAdvanceEpoch)
@@ -1322,7 +1468,10 @@ namespace AiNative.Client.Application
             public bool TryReceive(Span<byte> destination, out ReceivedPacket packet)
             {
                 if (_current is not null)
+                {
                     return _current.TryReceive(destination, out packet);
+                }
+
                 packet = default;
                 return false;
             }
@@ -1346,7 +1495,10 @@ namespace AiNative.Client.Application
             internal InputFrameRing(int capacity, int frameBytes)
             {
                 if (capacity < 1)
+                {
                     throw new ArgumentOutOfRangeException(nameof(capacity));
+                }
+
                 _buffers = new byte[capacity][];
                 _lengths = new int[capacity];
                 for (int index = 0; index < capacity; index++)
@@ -1399,7 +1551,10 @@ namespace AiNative.Client.Application
             internal void Pop()
             {
                 if (_count == 0)
+                {
                     return;
+                }
+
                 _head = (_head + 1) % _buffers.Length;
                 _count--;
             }

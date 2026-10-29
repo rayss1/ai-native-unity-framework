@@ -1,0 +1,7 @@
+{
+  "name": "AiNative.Client.Core",
+  "rootNamespace": "AiNative.Client.Core",
+  "references": [],
+  "autoReferenced": false,
+  "noEngineReferences": true
+}

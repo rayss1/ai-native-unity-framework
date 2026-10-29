@@ -6,7 +6,7 @@ using UnityEngine;
 
 namespace AiNative.Client.Editor
 {
-    /// <summary>Author local-only scene and Multiplayer Play Mode assets through Unity serialization.</summary>
+    /// <summary>通过 Unity 序列化创建仅供本地使用的场景及 Multiplayer Play Mode 资产。</summary>
     [InitializeOnLoad]
     public static class LocalMultiplayerSetup
     {
@@ -22,7 +22,9 @@ namespace AiNative.Client.Editor
         private static void KeepLocalClientsRunning()
         {
             if (EditorApplication.isPlaying && !UnityEngine.Application.runInBackground)
+            {
                 UnityEngine.Application.runInBackground = true;
+            }
         }
 
         public const string ScenePath =
@@ -39,9 +41,15 @@ namespace AiNative.Client.Editor
         private static void Open(string configurationPath)
         {
             if (EditorApplication.isPlayingOrWillChangePlaymode)
+            {
                 throw new InvalidOperationException("Stop Play Mode before choosing a local test.");
+            }
+
             if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
+            {
                 return;
+            }
+
             EditorSceneManager.OpenScene(ScenePath);
             Selection.activeObject = AssetDatabase.LoadMainAssetAtPath(configurationPath);
             EditorGUIUtility.PingObject(Selection.activeObject);
@@ -52,14 +60,17 @@ namespace AiNative.Client.Editor
             );
         }
 
-        // Explicit authoring action; never runs automatically or overwrites a user's scene/configuration.
+        // 仅由显式编辑操作触发，不自动运行，也不覆盖用户场景或配置。
         [MenuItem("AI Native/Local Test/Create Missing Assets")]
         public static void CreateMissingAssets()
         {
             if (EditorApplication.isPlayingOrWillChangePlaymode)
+            {
                 throw new InvalidOperationException(
                     "Stop Play Mode before authoring local test assets."
                 );
+            }
+
             if (AssetDatabase.LoadAssetAtPath<SceneAsset>(ScenePath) == null)
             {
                 var previous = EditorSceneManager.GetActiveScene();
@@ -76,8 +87,11 @@ namespace AiNative.Client.Editor
                 EditorSceneManager.SaveScene(scene, ScenePath);
                 EditorSceneManager.CloseScene(scene, true);
                 if (previous.IsValid())
+                {
                     UnityEngine.SceneManagement.SceneManager.SetActiveScene(previous);
+                }
             }
+
             EnsureFolder("Assets/Settings");
             EnsureFolder("Assets/Settings/PlayMode");
             CreateConfiguration(TwoPlayersPath, 2);
@@ -88,9 +102,11 @@ namespace AiNative.Client.Editor
         private static void CreateConfiguration(string path, int count)
         {
             if (AssetDatabase.LoadMainAssetAtPath(path) != null)
+            {
                 return;
-            // ScenarioConfig is provided by the Unity 6000.3 editor module; keep reflection here,
-            // outside Runtime, so no multiplayer editor implementation leaks into the player.
+            } // ScenarioConfig is provided by the Unity 6000.3 editor module; keep reflection here,
+
+            // 此逻辑位于 Runtime 之外，避免多人编辑器实现进入 Player。
             Type type = Type.GetType(
                 "Unity.Multiplayer.PlayMode.Editor.ScenarioConfig, UnityEditor.MultiplayerModule",
                 true
@@ -107,7 +123,10 @@ namespace AiNative.Client.Editor
             SerializedProperty editors = serialized.FindProperty("m_EditorInstances");
             editors.arraySize = count - 1;
             for (int i = 0; i < editors.arraySize; i++)
+            {
                 ConfigureInstance(editors.GetArrayElementAtIndex(i), "Player " + (i + 2), scene);
+            }
+
             serialized.ApplyModifiedPropertiesWithoutUndo();
             AssetDatabase.CreateAsset(configuration, path);
         }
@@ -126,10 +145,12 @@ namespace AiNative.Client.Editor
         private static void EnsureFolder(string path)
         {
             if (!AssetDatabase.IsValidFolder(path))
+            {
                 AssetDatabase.CreateFolder(
                     System.IO.Path.GetDirectoryName(path).Replace('\\', '/'),
                     System.IO.Path.GetFileName(path)
                 );
+            }
         }
     }
 }

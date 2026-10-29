@@ -18,12 +18,17 @@ namespace AiNative.Client.Application.PlayModeTests
             System.Threading.Tasks.Task task = _idleDisposalTask;
             _idleDisposalTask = null;
             if (task == null)
+            {
                 yield break;
+            }
 
             while (!task.IsCompleted)
+            {
                 yield return null;
-            // Native Scene disposal is posted to its Unity thread context.
-            // Give that queue a frame even when the test aborted on an assertion.
+            }
+
+            // 原生 Scene 的释放被投递到其所属 Unity 线程上下文。
+            // 即使用例因断言中断，也要留一帧处理释放队列。
             yield return null;
             task.GetAwaiter().GetResult();
         }
@@ -86,7 +91,6 @@ namespace AiNative.Client.Application.PlayModeTests
             uint initialEpoch = session.ConnectionEpoch;
             uint acknowledgementBeforeReconnect = session.LastAcknowledgedSequence;
             session.RequestReconnect();
-
             DateTime reconnectDeadline = DateTime.UtcNow.AddSeconds(15);
             while (
                 DateTime.UtcNow < reconnectDeadline
@@ -147,8 +151,8 @@ namespace AiNative.Client.Application.PlayModeTests
                 ulong initialTick = session.LastReceivedTick;
                 ulong progressTick = initialTick;
                 double nextProgressCheckSeconds = 5;
-                // Pinned legacy Fantasy.config: idleTimeout=30000ms, idleInterval=5000ms.
-                // 45 seconds crosses the timeout and its next two inspection intervals.
+                // 固定旧版 Fantasy.config：idleTimeout=30000ms，idleInterval=5000ms。
+                // 45 秒覆盖超时时刻及之后两次检查间隔。
                 var idleClock = System.Diagnostics.Stopwatch.StartNew();
                 while (idleClock.Elapsed.TotalSeconds < 45)
                 {
@@ -173,6 +177,7 @@ namespace AiNative.Client.Application.PlayModeTests
                         progressTick = session.LastReceivedTick;
                         nextProgressCheckSeconds += 5;
                     }
+
                     yield return null;
                 }
 
@@ -183,7 +188,7 @@ namespace AiNative.Client.Application.PlayModeTests
             }
             finally
             {
-                // Start cleanup even when a live assertion aborts this iterator.
+                // 即使联机断言中断迭代器，也必须开始清理。
                 _idleDisposalTask = session.DisposeAsync().AsTask();
             }
         }
@@ -221,7 +226,10 @@ namespace AiNative.Client.Application.PlayModeTests
         {
             var task = session.DisposeAsync().AsTask();
             while (!task.IsCompleted)
+            {
                 yield return null;
+            }
+
             if (task.IsFaulted)
             {
                 throw (Exception)task.Exception ?? new InvalidOperationException("Dispose failed.");

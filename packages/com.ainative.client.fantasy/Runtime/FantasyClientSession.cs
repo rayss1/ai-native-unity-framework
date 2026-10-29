@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using global::Fantasy;
@@ -13,11 +15,11 @@ namespace AiNative.Client.Fantasy
     internal interface IFantasyClientSession : IDisposable
     {
         long RuntimeId { get; }
+        object RoutingIdentity { get; }
 
         bool IsClosed { get; }
 
         void Post(Action action);
-
         void Send(FantasyRealtimeEnvelope envelope);
     }
 
@@ -43,7 +45,7 @@ namespace AiNative.Client.Fantasy
         }
 
         public long RuntimeId => _session.RuntimeId;
-
+        public object RoutingIdentity => _session;
         public bool IsClosed => Volatile.Read(ref _disposed) != 0 || _session.IsDisposed;
 
         public void Post(Action action) => _session.Scene.ThreadSynchronizationContext.Post(action);
@@ -77,7 +79,7 @@ namespace AiNative.Client.Fantasy
     internal sealed class FantasyClientConnector : IFantasyClientConnector
     {
         internal static readonly FantasyClientConnector Instance = new FantasyClientConnector();
-        private static readonly SemaphoreSlim InitializationGate = new SemaphoreSlim(1, 1);
+        private static readonly SemaphoreSlim _initializationGate = new SemaphoreSlim(1, 1);
         private static int _initialized;
 
         private FantasyClientConnector() { }
@@ -133,10 +135,10 @@ namespace AiNative.Client.Fantasy
             {
                 try
                 {
-                    // Fantasy.Runtime is a process-wide Unity singleton. Release the old
-                    // Session and its owning Scene before creating an isolated client Scene.
-                    // The isolated Scene receives direct callbacks, so a late callback from
-                    // the old global Session cannot target the replacement transport.
+                    // Fantasy.Runtime 是进程级 Unity 单例；创建隔离客户端 Scene 前，
+                    // 先释放旧 Session 及其所属 Scene。
+                    // 隔离 Scene 直接接收回调，因此旧全局 Session 的迟到回调
+                    //不得进入替换后的传输实例。
                     global::Fantasy.Runtime.OnDestroy();
                     await EnsureInitializedAsync();
                     _scene = await Scene.Create();
@@ -195,10 +197,10 @@ namespace AiNative.Client.Fantasy
 
                 try
                 {
-                    // Scene.Connect bypasses FantasyRuntime's automatic heartbeat setup.
-                    // Both connection callbacks and Scene.Create's continuation run on the
-                    // owning Scene thread. Attach to this Session so its disposal also
-                    // removes the heartbeat timers; use FantasyRuntime's pinned defaults.
+                    // Scene.Connect 会绕过 FantasyRuntime 的自动心跳初始化。
+                    // 连接回调和 Scene.Create 的继续执行都在所属 Scene 线程上运行。
+                    // 将心跳绑定到此 Session，使释放会话时一并
+                    // 移除心跳定时器；沿用 FantasyRuntime 固定默认值。
                     if (_session.GetComponent<SessionHeartbeatComponent>() == null)
                     {
                         _session
@@ -262,7 +264,7 @@ namespace AiNative.Client.Fantasy
                     return;
                 }
 
-                await InitializationGate.WaitAsync();
+                await _initializationGate.WaitAsync();
                 try
                 {
                     if (Volatile.Read(ref _initialized) == 0)
@@ -273,7 +275,7 @@ namespace AiNative.Client.Fantasy
                 }
                 finally
                 {
-                    InitializationGate.Release();
+                    _initializationGate.Release();
                 }
             }
         }
@@ -281,34 +283,46 @@ namespace AiNative.Client.Fantasy
 
     internal static class FantasyClientSessionRouter
     {
-        private static readonly ConcurrentDictionary<long, FantasyKcpRealtimeTransport> Transports =
-            new ConcurrentDictionary<long, FantasyKcpRealtimeTransport>();
+        // RuntimeId 只在所属 Fantasy Scene 内唯一；对象身份避免独立客户端与重连场景冲突。
+        private sealed class SessionIdentityComparer : IEqualityComparer<object>
+        {
+            public new bool Equals(object left, object right) => ReferenceEquals(left, right);
+
+            public int GetHashCode(object value) => RuntimeHelpers.GetHashCode(value);
+        }
+
+        private static readonly ConcurrentDictionary<
+            object,
+            FantasyKcpRealtimeTransport
+        > _transports = new ConcurrentDictionary<object, FantasyKcpRealtimeTransport>(
+            new SessionIdentityComparer()
+        );
 
         internal static bool Register(
-            long sessionRuntimeId,
+            object sessionIdentity,
             FantasyKcpRealtimeTransport transport
-        ) => Transports.TryAdd(sessionRuntimeId, transport);
+        ) => _transports.TryAdd(sessionIdentity, transport);
 
-        internal static void Remove(long sessionRuntimeId, FantasyKcpRealtimeTransport transport)
+        internal static void Remove(object sessionIdentity, FantasyKcpRealtimeTransport transport)
         {
             if (
-                Transports.TryGetValue(sessionRuntimeId, out FantasyKcpRealtimeTransport current)
+                _transports.TryGetValue(sessionIdentity, out FantasyKcpRealtimeTransport current)
                 && ReferenceEquals(current, transport)
             )
             {
-                Transports.TryRemove(sessionRuntimeId, out _);
+                _transports.TryRemove(sessionIdentity, out _);
             }
         }
 
         internal static bool Deliver(
-            long sessionRuntimeId,
+            object sessionIdentity,
             uint channelId,
             ReadOnlySpan<byte> payload,
             ulong sequence
         )
         {
-            return Transports.TryGetValue(
-                    sessionRuntimeId,
+            return _transports.TryGetValue(
+                    sessionIdentity,
                     out FantasyKcpRealtimeTransport transport
                 ) && transport.TryEnqueueReceived(channelId, payload, sequence);
         }

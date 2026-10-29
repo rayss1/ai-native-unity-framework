@@ -1,0 +1,8 @@
+{
+  "name": "AiNative.Client.Runtime",
+  "references": [
+    "AiNative.Client.Core",
+    "AiNative.Client.Async.UniTask"
+  ],
+  "autoReferenced": false
+}

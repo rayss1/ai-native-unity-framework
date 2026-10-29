@@ -36,9 +36,7 @@ namespace AiNative.Client.Application.Tests
                     "ExpiresUnixSeconds",
                     DateTimeOffset.UtcNow.ToUnixTimeSeconds()
                 );
-
                 await Poll(flow);
-
                 Assert.That(flow.BackendStatus, Is.Not.Empty);
                 Assert.That(flow.State, Is.EqualTo("Battle"));
                 Assert.That(flow.Battle, Is.SameAs(battle));
@@ -83,9 +81,7 @@ namespace AiNative.Client.Application.Tests
                     "ExpiresUnixSeconds",
                     DateTimeOffset.UtcNow.ToUnixTimeSeconds()
                 );
-
                 await Poll(flow);
-
                 Assert.That(flow.Completed && flow.SettlementConfirmed, Is.True);
                 Assert.That(flow.BackendReconnectCount, Is.EqualTo(1));
                 Assert.That(flow.Battle, Is.SameAs(battle));
@@ -178,7 +174,7 @@ namespace AiNative.Client.Application.Tests
         {
             var flow = owner.AddComponent<TopologyClientFlow>();
             flow.Initialize(options, automated);
-            SetField(flow, "_backend", backend);
+            SetField(flow, "Backend", backend);
             SetField(flow, "_username", "original-user");
             SetField(flow, "_password", "original-password");
             var match = new GateMatch();
@@ -186,8 +182,8 @@ namespace AiNative.Client.Application.Tests
             SetProperty(match, "RoomId", "original-room");
             SetProperty(match, "BootEpoch", "original-boot");
             SetProperty(match, "NodeId", "original-node");
-            SetField(flow, "_match", match);
-            SetField(flow, "_requestId", "original-request");
+            SetField(flow, "CurrentMatch", match);
+            SetField(flow, "QueueRequestId", "original-request");
             SetProperty(
                 flow,
                 "Battle",
@@ -230,7 +226,9 @@ namespace AiNative.Client.Application.Tests
                             .GetField("_busy", BindingFlags.Instance | BindingFlags.NonPublic)
                             .GetValue(flow)
                 )
+                {
                     await Task.Yield();
+                }
 
                 Assert.That(
                     flow.Completed,
@@ -283,6 +281,7 @@ namespace AiNative.Client.Application.Tests
                 {
                     rejection = exception;
                 }
+
                 Assert.That(rejection, Is.Not.Null);
                 Assert.That(rejection.Code, Is.EqualTo("account-mismatch-active-battle"));
                 Assert.That(flow.Battle, Is.SameAs(battle));
@@ -362,11 +361,9 @@ namespace AiNative.Client.Application.Tests
                     "The replacement login did not arrive."
                 );
                 Assert.That(recovering.IsCompleted, Is.False);
-
                 typeof(TopologyClientFlow)
                     .GetMethod("FixedUpdate", BindingFlags.Instance | BindingFlags.NonPublic)
                     .Invoke(flow, null);
-
                 Assert.That(
                     flow.PreparedInputs,
                     Is.EqualTo(1),
@@ -425,13 +422,14 @@ namespace AiNative.Client.Application.Tests
                     Is.EqualTo(BattleClientState.Active),
                     "The old connection remains active until admission renews."
                 );
-
                 MethodInfo fixedUpdate = typeof(TopologyClientFlow).GetMethod(
                     "FixedUpdate",
                     BindingFlags.Instance | BindingFlags.NonPublic
                 );
                 for (int step = 0; step < 8; step++)
+                {
                     fixedUpdate.Invoke(flow, null);
+                }
 
                 Assert.That(
                     flow.PreparedInputs,
@@ -453,7 +451,10 @@ namespace AiNative.Client.Application.Tests
             {
                 gate.ReleaseLogin.TrySetResult(true);
                 if (recovering != null)
+                {
                     await recovering;
+                }
+
                 UnityEngine.Object.DestroyImmediate(owner);
             }
         }
@@ -502,6 +503,7 @@ namespace AiNative.Client.Application.Tests
                         "The fixture must exhaust ordinary reconnect retries."
                     );
                 }
+
                 SetProperty(
                     backend,
                     "ExpiresUnixSeconds",
@@ -509,7 +511,6 @@ namespace AiNative.Client.Application.Tests
                 );
                 Pause(flow, false);
                 await Poll(flow);
-
                 Assert.That(
                     battle.State,
                     Is.EqualTo(BattleClientState.Reconnecting),
@@ -586,6 +587,7 @@ namespace AiNative.Client.Application.Tests
                         DateTimeOffset.UtcNow.ToUnixTimeSeconds()
                     );
                 }
+
                 Pause(flow, true);
                 Pause(flow, false);
                 Exception rejection = null;
@@ -597,6 +599,7 @@ namespace AiNative.Client.Application.Tests
                 {
                     rejection = exception;
                 }
+
                 Assert.That(
                     rejection,
                     Is.Not.Null,
@@ -739,7 +742,9 @@ namespace AiNative.Client.Application.Tests
             {
                 UnityEngine.Object.DestroyImmediate(owner);
                 if (File.Exists(result))
+                {
                     File.Delete(result);
+                }
             }
         }
 
@@ -779,6 +784,7 @@ namespace AiNative.Client.Application.Tests
                 {
                     rejection = exception;
                 }
+
                 Assert.That(
                     rejection,
                     Is.Null,
@@ -803,7 +809,9 @@ namespace AiNative.Client.Application.Tests
                 );
                 Assert.That(flow.Error, Is.Empty);
                 if (!confirmed)
+                {
                     Assert.That(flow.BackendStatus, Is.Not.Empty);
+                }
             }
             finally
             {
@@ -844,6 +852,7 @@ namespace AiNative.Client.Application.Tests
                 {
                     rejection = exception;
                 }
+
                 Assert.That(rejection?.Code, Is.EqualTo("settlement-mismatch-active-battle"));
                 Assert.That(flow.Completed || flow.SettlementConfirmed, Is.False);
                 Assert.That(flow.Battle, Is.SameAs(battle));
@@ -896,11 +905,11 @@ namespace AiNative.Client.Application.Tests
                     Is.False
                 );
                 Assert.That(flow.PreparedInputs, Is.Zero);
-                Assert.That(GetField(flow, "_requestId"), Is.EqualTo(""));
+                Assert.That(GetField(flow, "QueueRequestId"), Is.EqualTo(""));
                 Assert.That(GetField(flow, "_resumePending"), Is.EqualTo(false));
                 Assert.That(GetField(flow, "_baselinePlayed"), Is.EqualTo(flow.Profile.Played));
                 Assert.That(flow.Profile.Played, Is.EqualTo(1));
-                Assert.That(GetField(flow, "_backend"), Is.SameAs(backend));
+                Assert.That(GetField(flow, "Backend"), Is.SameAs(backend));
                 Assert.That(backend.IsAuthenticated, Is.True);
                 Assert.That(flow.PlayerId, Is.EqualTo("original-player"));
                 Assert.That(flow.Party.PartyId, Is.EqualTo("original-party"));
@@ -935,6 +944,11 @@ namespace AiNative.Client.Application.Tests
             try
             {
                 var flow = CreateFinishedFlow(owner, gate, backend);
+                // 私有流程超时策略缩短，仅此永不释放的测试不等待产品的 20 秒上限。
+                if (queue == "original-request")
+                {
+                    SetField(flow, "_returnToLobbyTimeout", TimeSpan.FromMilliseconds(100));
+                }
                 BattleClientSession battle = flow.Battle;
                 GateCallException rejection = null;
                 try
@@ -945,17 +959,161 @@ namespace AiNative.Client.Application.Tests
                 {
                     rejection = exception;
                 }
+
                 Assert.That(rejection?.Code, Is.EqualTo(error));
                 Assert.That(flow.State, Is.EqualTo("Finished"));
                 Assert.That(flow.Completed && flow.SettlementConfirmed, Is.True);
                 Assert.That(flow.Battle, Is.SameAs(battle));
                 Assert.That(flow.MatchId, Is.EqualTo("original-match"));
-                Assert.That(GetField(flow, "_requestId"), Is.EqualTo("original-request"));
+                Assert.That(GetField(flow, "QueueRequestId"), Is.EqualTo("original-request"));
                 if (queue != "original-request")
+                {
                     Assert.That(gate.MatchRequests, Is.Empty);
+                }
             }
             finally
             {
+                UnityEngine.Object.DestroyImmediate(owner);
+            }
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public async Task CompletedReturn_WaitsForOriginalAllocationReleaseAndKeepsCommandBusy(
+            bool invalidAllocationWindow
+        )
+        {
+            using var gate = new GatePeer
+            {
+                PauseMatch = true,
+                TerminalAfterStatusRequests = 2,
+                TransientInvalidAllocation = invalidAllocationWindow,
+            };
+            using var backend = new GateBackendSession(
+                await FantasyGateClient.ConnectAsync(gate.Options)
+            );
+            await backend.LoginAsync("original-user", "original-password");
+            var owner = new GameObject("DelayedRoomRelease");
+            TopologyClientFlow flow = null;
+            TopologyViewModel viewModel = null;
+            try
+            {
+                flow = CreateFinishedFlow(owner, gate, backend);
+                BattleClientSession battle = flow.Battle;
+                viewModel = new TopologyViewModel(flow, _ => { });
+                Task returning = viewModel.Back.ExecuteAsync().AsTask();
+                await Task.WhenAny(gate.MatchBlocked.Task, Task.Delay(2500));
+                Assert.That(gate.MatchBlocked.Task.IsCompleted, Is.True);
+                Assert.That(viewModel.Back.IsExecuting, Is.True);
+                Assert.That(viewModel.Back.CanExecute, Is.False);
+                Assert.That(flow.UiBusy, Is.True);
+                Assert.That(flow.Battle, Is.SameAs(battle));
+                Assert.That(battle.State, Is.Not.EqualTo(BattleClientState.Disposed));
+                viewModel.Refresh();
+                Assert.That(viewModel.Status.Value, Is.EqualTo("正在等待房间释放…"));
+                gate.ReleaseMatch.TrySetResult(true);
+                await Task.WhenAny(returning, Task.Delay(4000));
+                Assert.That(returning.IsCompleted, Is.True, "终态传播后必须完成返回。");
+                await returning;
+                Assert.That(flow.Error, Is.Empty);
+                Assert.That(viewModel.Back.Error, Is.Null);
+                Assert.That(flow.State, Is.EqualTo("Lobby"));
+                Assert.That(flow.Battle, Is.Null);
+                Assert.That(battle.State, Is.EqualTo(BattleClientState.Disposed));
+                Assert.That(flow.Party.QueueRequestId, Is.Empty);
+                Assert.That(gate.MatchRequests.Count, Is.EqualTo(2));
+                Assert.That(gate.Methods.ToArray(), Does.Not.Contain("match.cancel"));
+            }
+            finally
+            {
+                gate.ReleaseMatch.TrySetResult(true);
+                viewModel?.Dispose();
+                if (flow != null)
+                {
+                    await flow.StopAsync();
+                }
+                UnityEngine.Object.DestroyImmediate(owner);
+            }
+        }
+
+        [TestCase("unexpected", "", "state-changed")]
+        [TestCase("ready", "match", "allocation-mismatch-active-battle")]
+        public async Task CompletedReturn_RejectsUnknownStateOrChangedAllocationImmediately(
+            string state,
+            string changedAllocation,
+            string error
+        )
+        {
+            using var gate = new GatePeer
+            {
+                MatchState = state,
+                ChangedAllocation = changedAllocation,
+            };
+            using var backend = new GateBackendSession(
+                await FantasyGateClient.ConnectAsync(gate.Options)
+            );
+            await backend.LoginAsync("original-user", "original-password");
+            var owner = new GameObject("InvalidReleaseIdentity");
+            TopologyClientFlow flow = null;
+            try
+            {
+                flow = CreateFinishedFlow(owner, gate, backend);
+                BattleClientSession battle = flow.Battle;
+                Task returning = Return(flow);
+                await Task.WhenAny(returning, Task.Delay(2500));
+                Assert.That(returning.IsCompleted, Is.True, "未知状态或身份变化不得进入重试等待。");
+                GateCallException rejection = Assert.ThrowsAsync<GateCallException>(async () =>
+                    await returning
+                );
+                Assert.That(rejection.Code, Is.EqualTo(error));
+                Assert.That(gate.MatchRequests.Count, Is.EqualTo(1));
+                Assert.That(flow.Battle, Is.SameAs(battle));
+                Assert.That(battle.State, Is.Not.EqualTo(BattleClientState.Disposed));
+            }
+            finally
+            {
+                if (flow != null)
+                {
+                    await flow.StopAsync();
+                }
+                UnityEngine.Object.DestroyImmediate(owner);
+            }
+        }
+
+        [Test]
+        public async Task CompletedReturn_CancellationPreservesOriginalBattleAndQueue()
+        {
+            using var gate = new GatePeer { PauseMatch = true };
+            using var backend = new GateBackendSession(
+                await FantasyGateClient.ConnectAsync(gate.Options)
+            );
+            await backend.LoginAsync("original-user", "original-password");
+            var owner = new GameObject("CancelledRoomRelease");
+            TopologyClientFlow flow = null;
+            try
+            {
+                flow = CreateFinishedFlow(owner, gate, backend);
+                BattleClientSession battle = flow.Battle;
+                Task returning = Return(flow);
+                await Task.WhenAny(gate.MatchBlocked.Task, Task.Delay(2500));
+                Assert.That(gate.MatchBlocked.Task.IsCompleted, Is.True);
+                ((CancellationTokenSource)GetField(flow, "_lifetime")).Cancel();
+                await Task.WhenAny(returning, Task.Delay(2500));
+                Assert.That(returning.IsCompleted, Is.True);
+                Assert.CatchAsync<OperationCanceledException>(async () => await returning);
+                Assert.That(flow.Battle, Is.SameAs(battle));
+                Assert.That(battle.State, Is.Not.EqualTo(BattleClientState.Disposed));
+                Assert.That(flow.State, Is.EqualTo("Finished"));
+                Assert.That(GetField(flow, "QueueRequestId"), Is.EqualTo("original-request"));
+                Assert.That(gate.Methods.ToArray(), Does.Not.Contain("match.cancel"));
+            }
+            finally
+            {
+                gate.ReleaseMatch.TrySetResult(true);
+                if (flow != null)
+                {
+                    await flow.StopAsync();
+                }
                 UnityEngine.Object.DestroyImmediate(owner);
             }
         }
@@ -989,7 +1147,10 @@ namespace AiNative.Client.Application.Tests
                 );
                 DateTime deadline = DateTime.UtcNow.AddSeconds(3);
                 while (flow.UiBusy && DateTime.UtcNow < deadline)
+                {
                     await Task.Yield();
+                }
+
                 Assert.That(flow.UiBusy, Is.False);
                 Assert.That(flow.Error, Is.Empty);
                 Assert.That(flow.AuthenticationRequired, Is.False);
@@ -1015,7 +1176,7 @@ namespace AiNative.Client.Application.Tests
             var party = new GateParty();
             SetProperty(party, "PartyId", "original-party");
             SetProperty(party, "QueueRequestId", "original-request");
-            SetField(flow, "_party", party);
+            SetField(flow, "LobbyParty", party);
             SetProperty(flow, "Completed", true);
             SetProperty(flow, "SettlementConfirmed", true);
             SetProperty(flow, "State", "Finished");
@@ -1037,14 +1198,14 @@ namespace AiNative.Client.Application.Tests
             {
                 flow = owner.AddComponent<TopologyClientFlow>();
                 flow.Initialize(gate.Options, false);
-                SetField(flow, "_backend", backend);
-                SetField(flow, "_requestId", "original-request");
+                SetField(flow, "Backend", backend);
+                SetField(flow, "QueueRequestId", "original-request");
                 SetProperty(flow, "State", "Queued");
                 Task polling;
                 SynchronizationContext original = SynchronizationContext.Current;
                 try
                 {
-                    // Hold only this operation's main-thread continuation, not the test runner.
+                    // 仅暂停本次操作的主线程继续执行，不暂停测试运行器。
                     SynchronizationContext.SetSynchronizationContext(held);
                     polling = (Task)
                         typeof(TopologyClientFlow)
@@ -1058,6 +1219,7 @@ namespace AiNative.Client.Application.Tests
                 {
                     SynchronizationContext.SetSynchronizationContext(original);
                 }
+
                 await Task.WhenAny(gate.MatchBlocked.Task, Task.Delay(2500));
                 Assert.That(gate.MatchBlocked.Task.IsCompleted, Is.True);
                 gate.ReleaseMatch.TrySetResult(true);
@@ -1068,9 +1230,8 @@ namespace AiNative.Client.Application.Tests
                     "The successful match response must have reached the captured main-thread continuation."
                 );
                 Assert.That(polling.IsCompleted, Is.False);
-
-                // EditMode requires explicit lifecycle invocation. The network response has
-                // already succeeded, so cancelling the token alone cannot undo this result.
+                // EditMode 需要显式调用生命周期；网络响应已成功，
+                // 因此仅取消令牌无法撤销该结果。
                 typeof(TopologyClientFlow)
                     .GetMethod("OnDestroy", BindingFlags.Instance | BindingFlags.NonPublic)
                     .Invoke(flow, null);
@@ -1078,8 +1239,11 @@ namespace AiNative.Client.Application.Tests
                 {
                     held.Drain();
                     if (!polling.IsCompleted)
+                    {
                         await Task.Delay(10);
+                    }
                 }
+
                 Assert.That(
                     polling.IsCompleted,
                     Is.True,
@@ -1102,7 +1266,10 @@ namespace AiNative.Client.Application.Tests
                 gate.ReleaseMatch.TrySetResult(true);
                 held.Drain();
                 if (flow != null && flow.Battle != null)
+                {
                     await flow.Battle.DisposeAsync();
+                }
+
                 UnityEngine.Object.DestroyImmediate(owner);
             }
         }
@@ -1123,7 +1290,9 @@ namespace AiNative.Client.Application.Tests
             internal void Drain()
             {
                 while (_callbacks.TryDequeue(out Action callback))
+                {
                     callback();
+                }
             }
         }
 
@@ -1133,11 +1302,14 @@ namespace AiNative.Client.Application.Tests
                     .GetMethod("ReturnToLobbyAsync", BindingFlags.Instance | BindingFlags.NonPublic)
                     .Invoke(flow, null);
 
-        private static object GetField(object target, string field) =>
-            target
-                .GetType()
-                .GetField(field, BindingFlags.Instance | BindingFlags.NonPublic)
-                .GetValue(target);
+        private static object GetField(object target, string field)
+        {
+            const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
+            FieldInfo member = target.GetType().GetField(field, flags);
+            return member != null
+                ? member.GetValue(target)
+                : target.GetType().GetProperty(field, flags).GetValue(target);
+        }
 
         private static void Pause(TopologyClientFlow flow, bool paused) =>
             typeof(TopologyClientFlow)
@@ -1150,11 +1322,19 @@ namespace AiNative.Client.Application.Tests
                     .GetMethod("PollAsync", BindingFlags.Instance | BindingFlags.NonPublic)
                     .Invoke(flow, null);
 
-        private static void SetField(object target, string field, object value) =>
-            target
-                .GetType()
-                .GetField(field, BindingFlags.Instance | BindingFlags.NonPublic)
-                .SetValue(target, value);
+        private static void SetField(object target, string field, object value)
+        {
+            const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
+            FieldInfo member = target.GetType().GetField(field, flags);
+            if (member != null)
+            {
+                member.SetValue(target, value);
+            }
+            else
+            {
+                target.GetType().GetProperty(field, flags).SetValue(target, value);
+            }
+        }
 
         private static void SetProperty(object target, string property, object value) =>
             target
@@ -1163,7 +1343,7 @@ namespace AiNative.Client.Application.Tests
                 .GetSetMethod(true)
                 .Invoke(target, new[] { value });
 
-        // Actual Fantasy TCP framing with a small backend.proto fixture peer; no Unity work runs on the server threads.
+        // 使用真实 Fantasy TCP 帧及最小 backend.proto 测试对端；服务线程不执行 Unity 操作。
         private sealed class GatePeer : IDisposable
         {
             private readonly TcpListener _listener = new TcpListener(IPAddress.Loopback, 0);
@@ -1179,6 +1359,9 @@ namespace AiNative.Client.Application.Tests
             internal bool SettlementConfirmed = true;
             internal bool AllocationLost;
             internal bool MatchExpired;
+            internal int TerminalAfterStatusRequests;
+            internal bool TransientInvalidAllocation;
+            internal string MatchState = "ready";
             internal bool PauseMatch;
             internal readonly TaskCompletionSource<bool> MatchBlocked =
                 new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -1252,6 +1435,7 @@ namespace AiNative.Client.Application.Tests
                                 LoginBlocked.TrySetResult(true);
                                 await ReleaseLogin.Task.ConfigureAwait(false);
                             }
+
                             reply = Join(
                                 Field(1, LoginPlayer),
                                 Field(2, "renewed-credential"),
@@ -1297,21 +1481,33 @@ namespace AiNative.Client.Application.Tests
                                 MatchBlocked.TrySetResult(true);
                                 await ReleaseMatch.Task.ConfigureAwait(false);
                             }
-                            reply = AllocationLost
-                                ? Bytes(
+
+                            if (AllocationLost)
+                            {
+                                reply = Bytes(
                                     1,
                                     Join(
                                         Field(1, "original-request"),
                                         Field(2, "Failed"),
                                         Field(5, "queue_lost")
                                     )
-                                )
-                                : Join(
+                                );
+                            }
+                            else
+                            {
+                                reply = Join(
                                     Bytes(
                                         1,
                                         Join(
                                             Field(1, "original-request"),
-                                            Field(2, "Allocated"),
+                                            Field(
+                                                2,
+                                                TerminalAfterStatusRequests > 0
+                                                && MatchRequests.Count
+                                                    >= TerminalAfterStatusRequests
+                                                    ? "failed"
+                                                    : MatchState
+                                            ),
                                             Field(
                                                 3,
                                                 ChangedAllocation == "match"
@@ -1346,6 +1542,19 @@ namespace AiNative.Client.Application.Tests
                                     ),
                                     Field(2, "renewed-ticket")
                                 );
+                            }
+                            if (
+                                TerminalAfterStatusRequests > 0
+                                && MatchRequests.Count >= TerminalAfterStatusRequests
+                            )
+                            {
+                                PartyQueueRequest = "";
+                            }
+                            else if (TransientInvalidAllocation)
+                            {
+                                error = "invalid_allocation";
+                                reply = Array.Empty<byte>();
+                            }
                             if (MatchExpired)
                             {
                                 error = "queue_expired";
@@ -1353,7 +1562,10 @@ namespace AiNative.Client.Application.Tests
                             }
                         }
                         else
+                        {
                             throw new InvalidDataException("Unexpected method: " + method);
+                        }
+
                         byte[] response = Bytes(
                             2,
                             Join(Field(1, correlation), Bytes(2, reply), Field(3, error))
@@ -1383,7 +1595,9 @@ namespace AiNative.Client.Application.Tests
                 _stop.Cancel();
                 _listener.Stop();
                 foreach (TcpClient peer in _peers)
+                {
                     peer.Dispose();
+                }
             }
 
             private static async Task Read(Stream stream, byte[] buffer, CancellationToken token)
@@ -1395,7 +1609,10 @@ namespace AiNative.Client.Application.Tests
                         .ReadAsync(buffer, offset, buffer.Length - offset, token)
                         .ConfigureAwait(false);
                     if (count == 0)
+                    {
                         throw new EndOfStreamException();
+                    }
+
                     offset += count;
                 }
             }
@@ -1412,8 +1629,12 @@ namespace AiNative.Client.Application.Tests
                         Varint(message, ref offset);
                         continue;
                     }
+
                     if (wire != 2)
+                    {
                         throw new InvalidDataException();
+                    }
+
                     int length = checked((int)Varint(message, ref offset));
                     if ((int)(key >> 3) == field)
                     {
@@ -1421,8 +1642,10 @@ namespace AiNative.Client.Application.Tests
                         Array.Copy(message, offset, value, 0, length);
                         return value;
                     }
+
                     offset += length;
                 }
+
                 return Array.Empty<byte>();
             }
 
@@ -1442,7 +1665,10 @@ namespace AiNative.Client.Application.Tests
             {
                 using var output = new MemoryStream();
                 foreach (byte[] value in values)
+                {
                     output.Write(value, 0, value.Length);
+                }
+
                 return output.ToArray();
             }
 
@@ -1454,6 +1680,7 @@ namespace AiNative.Client.Application.Tests
                     output.WriteByte((byte)((value & 127) | 128));
                     value >>= 7;
                 }
+
                 output.WriteByte((byte)value);
                 return output.ToArray();
             }
@@ -1466,8 +1693,11 @@ namespace AiNative.Client.Application.Tests
                     byte next = buffer[offset++];
                     value |= (ulong)(next & 127) << shift;
                     if ((next & 128) == 0)
+                    {
                         return value;
+                    }
                 }
+
                 throw new InvalidDataException();
             }
         }

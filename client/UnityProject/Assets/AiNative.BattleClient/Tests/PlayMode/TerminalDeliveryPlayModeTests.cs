@@ -30,7 +30,10 @@ namespace AiNative.Client.Application.PlayModeTests
                     && first.Error.Length == 0
                     && second.Error.Length == 0
                 )
+                {
                     yield return null;
+                }
+
                 Assert.That(first.Error, Is.Empty);
                 Assert.That(second.Error, Is.Empty);
                 Assert.That(
@@ -39,9 +42,8 @@ namespace AiNative.Client.Application.PlayModeTests
                     "Both clients must reach the final two seconds after the ordinary reconnect check."
                 );
                 Assert.That(first.MatchId, Is.EqualTo(second.MatchId));
-
-                // Disable only application Update/FixedUpdate. Fantasy's independently owned Scene keeps
-                // pumping sockets/KCP and acknowledging accepted terminal packets on the Unity thread.
+                // 仅停用应用的 Update/FixedUpdate；Fantasy 独立持有的 Scene 继续
+                // 在 Unity 线程更新 socket/KCP，并确认已接收的终局包。
                 first.enabled = false;
                 second.enabled = false;
                 ulong firstTick = first.Battle.LastReceivedTick,
@@ -55,7 +57,10 @@ namespace AiNative.Client.Application.PlayModeTests
                     Time.realtimeSinceStartup < closeDeadline
                     && !(Closed(firstTransport) && Closed(secondTransport))
                 )
+                {
                     yield return null;
+                }
+
                 Assert.That(
                     Closed(firstTransport) && Closed(secondTransport),
                     Is.True,
@@ -65,8 +70,7 @@ namespace AiNative.Client.Application.PlayModeTests
                 Assert.That(second.Battle.LastReceivedTick, Is.EqualTo(secondTick));
                 Assert.That(first.Battle.ArenaPhase, Is.EqualTo(ArenaMatchPhase.Active));
                 Assert.That(second.Battle.ArenaPhase, Is.EqualTo(ArenaMatchPhase.Active));
-
-                // Make the real Gate receipt win while application reception is still paused.
+                // 保持应用接收暂停，让真实 Gate 回执先到达。
                 float receiptDeadline = Time.realtimeSinceStartup + 15;
                 while (
                     Time.realtimeSinceStartup < receiptDeadline
@@ -79,13 +83,19 @@ namespace AiNative.Client.Application.PlayModeTests
                         Time.realtimeSinceStartup < receiptDeadline
                         && !(firstReceipt.IsCompleted && secondReceipt.IsCompleted)
                     )
+                    {
                         yield return null;
+                    }
+
                     Assert.That(firstReceipt.IsCompleted && secondReceipt.IsCompleted, Is.True);
                     firstReceipt.GetAwaiter().GetResult();
                     secondReceipt.GetAwaiter().GetResult();
                     if (!(first.Completed && second.Completed))
+                    {
                         yield return new WaitForSecondsRealtime(0.1f);
+                    }
                 }
+
                 Assert.That(
                     first.Completed
                         && second.Completed
@@ -95,8 +105,7 @@ namespace AiNative.Client.Application.PlayModeTests
                 );
                 Assert.That(first.Battle.ArenaPhase, Is.EqualTo(ArenaMatchPhase.Active));
                 Assert.That(second.Battle.ArenaPhase, Is.EqualTo(ArenaMatchPhase.Active));
-
-                // Exercise the real Completed/Settling Update path, not a direct Battle.Pump call.
+                // 覆盖真实 Completed/Settling 的 Update 路径，不直接调用 Battle.Pump。
                 first.enabled = true;
                 second.enabled = true;
                 for (
@@ -108,7 +117,10 @@ namespace AiNative.Client.Application.PlayModeTests
                         );
                     i++
                 )
+                {
                     yield return null;
+                }
+
                 Assert.That(
                     first.Battle.ArenaPhase,
                     Is.EqualTo(ArenaMatchPhase.Finished),
@@ -134,7 +146,10 @@ namespace AiNative.Client.Application.PlayModeTests
                     && first.Error.Length == 0
                     && second.Error.Length == 0
                 )
+                {
                     yield return null;
+                }
+
                 Assert.That(first.Error, Is.Empty);
                 Assert.That(second.Error, Is.Empty);
                 Assert.That(first.Completed && second.Completed, Is.True);
@@ -167,7 +182,7 @@ namespace AiNative.Client.Application.PlayModeTests
                     .GetMethod("PollAsync", BindingFlags.Instance | BindingFlags.NonPublic)
                     .Invoke(flow, null);
 
-        // Read-only test inspection avoids adding product launch flags or a new public networking port.
+        // 通过只读测试检查，避免新增产品启动参数或公开网络端口。
         private static object TransportSlot(BattleClientSession session) =>
             typeof(BattleClientSession)
                 .GetField("_transportSlot", BindingFlags.Instance | BindingFlags.NonPublic)

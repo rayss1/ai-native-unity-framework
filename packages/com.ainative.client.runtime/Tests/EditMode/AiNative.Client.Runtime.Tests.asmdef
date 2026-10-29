@@ -1,0 +1,9 @@
+{
+  "name": "AiNative.Client.Runtime.Tests",
+  "rootNamespace": "AiNative.Client.Runtime.Tests",
+  "references": ["AiNative.Client.Runtime", "AiNative.Client.Composition.VContainer", "AiNative.Client.Async.UniTask", "AiNative.Client.Core", "VContainer"],
+  "includePlatforms": ["Editor"],
+  "autoReferenced": false,
+  "defineConstraints": ["UNITY_INCLUDE_TESTS"],
+  "optionalUnityReferences": ["TestAssemblies"]
+}

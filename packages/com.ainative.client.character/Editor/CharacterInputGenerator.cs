@@ -36,6 +36,7 @@ namespace AiNative.Client.Character.Editor
             {
                 Object.DestroyImmediate(asset);
             }
+
             AssetDatabase.Refresh();
         }
     }

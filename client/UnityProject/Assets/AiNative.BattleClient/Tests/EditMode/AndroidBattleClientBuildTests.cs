@@ -72,6 +72,7 @@ namespace AiNative.Client.Application.Tests
                     Directory.CreateDirectory(Path.GetDirectoryName(path));
                     File.WriteAllText(path, "fixture");
                 }
+
                 File.WriteAllText(
                     Path.Combine(root, "NDK/source.properties"),
                     "Pkg.Revision = 27.2.12479018"
@@ -92,6 +93,7 @@ namespace AiNative.Client.Application.Tests
                     );
                     File.WriteAllText(path, content);
                 }
+
                 foreach (string file in new[] { "NDK/source.properties", "OpenJDK/release" })
                 {
                     string path = Path.Combine(root, file),
@@ -107,7 +109,9 @@ namespace AiNative.Client.Application.Tests
             finally
             {
                 if (Directory.Exists(root))
+                {
                     Directory.Delete(root, true);
+                }
             }
         }
 
@@ -123,7 +127,13 @@ namespace AiNative.Client.Application.Tests
             Assert.That(options.options, Is.EqualTo(BuildOptions.None));
             Assert.That(
                 options.scenes,
-                Is.EqualTo(new[] { "Assets/AiNative.BattleClient/Scenes/BattleClient.unity" })
+                Is.EqualTo(
+                    new[]
+                    {
+                        "Assets/AiNative.BattleClient/Scenes/FrameworkBootstrap.unity",
+                        "Assets/AiNative.BattleClient/Scenes/BattleClient.unity",
+                    }
+                )
             );
             Assert.That(options.locationPathName, Does.EndWith("battle.apk"));
         }
@@ -233,6 +243,7 @@ namespace AiNative.Client.Application.Tests
             {
                 observed = exception.InnerException;
             }
+
             Assert.That(reachedBuild, Is.True);
             Assert.That(observed, Is.SameAs(failure));
             Assert.That(
@@ -267,16 +278,30 @@ namespace AiNative.Client.Application.Tests
             var failure = new InvalidOperationException("fixture-preference-build-failure");
             try
             {
-                foreach (string key in EmbeddedKeys)
+                foreach (string key in _embeddedKeys)
+                {
                     if (preferencesExisted)
+                    {
                         EditorPrefs.SetBool(key, true);
+                    }
                     else
+                    {
                         EditorPrefs.DeleteKey(key);
-                foreach (string key in DirectoryKeys)
+                    }
+                }
+
+                foreach (string key in _directoryKeys)
+                {
                     if (preferencesExisted)
+                    {
                         EditorPrefs.SetString(key, "unused-custom-tool-location");
+                    }
                     else
+                    {
                         EditorPrefs.DeleteKey(key);
+                    }
+                }
+
                 SyncToolPreferences();
                 var before = CapturePreferences();
                 Exception observed = null;
@@ -300,6 +325,7 @@ namespace AiNative.Client.Application.Tests
                 {
                     observed = exception.InnerException;
                 }
+
                 Assert.That(observed, Is.SameAs(failure));
                 Assert.That(
                     CapturePreferences(),
@@ -314,14 +340,14 @@ namespace AiNative.Client.Application.Tests
             }
         }
 
-        // Only the six non-secret toolchain preferences are inspected; signing configuration is excluded.
-        private static readonly string[] EmbeddedKeys =
+        // 仅检查六项非敏感工具链偏好，不读取签名配置。
+        private static readonly string[] _embeddedKeys =
         {
             "SdkUseEmbedded",
             "NdkUseEmbedded",
             "JdkUseEmbedded",
         };
-        private static readonly string[] DirectoryKeys =
+        private static readonly string[] _directoryKeys =
         {
             "AndroidSdkRoot",
             "AndroidNdkRootR27C",
@@ -334,16 +360,17 @@ namespace AiNative.Client.Application.Tests
             for (int i = 0; i < 3; i++)
             {
                 values[i] = (
-                    EditorPrefs.HasKey(EmbeddedKeys[i]),
-                    EditorPrefs.GetBool(EmbeddedKeys[i], true),
+                    EditorPrefs.HasKey(_embeddedKeys[i]),
+                    EditorPrefs.GetBool(_embeddedKeys[i], true),
                     ""
                 );
                 values[i + 3] = (
-                    EditorPrefs.HasKey(DirectoryKeys[i]),
+                    EditorPrefs.HasKey(_directoryKeys[i]),
                     false,
-                    EditorPrefs.GetString(DirectoryKeys[i], "")
+                    EditorPrefs.GetString(_directoryKeys[i], "")
                 );
             }
+
             return values;
         }
 
@@ -354,13 +381,22 @@ namespace AiNative.Client.Application.Tests
             for (int i = 0; i < 3; i++)
             {
                 if (values[i].existed)
-                    EditorPrefs.SetBool(EmbeddedKeys[i], values[i].embedded);
+                {
+                    EditorPrefs.SetBool(_embeddedKeys[i], values[i].embedded);
+                }
                 else
-                    EditorPrefs.DeleteKey(EmbeddedKeys[i]);
+                {
+                    EditorPrefs.DeleteKey(_embeddedKeys[i]);
+                }
+
                 if (values[i + 3].existed)
-                    EditorPrefs.SetString(DirectoryKeys[i], values[i + 3].directory);
+                {
+                    EditorPrefs.SetString(_directoryKeys[i], values[i + 3].directory);
+                }
                 else
-                    EditorPrefs.DeleteKey(DirectoryKeys[i]);
+                {
+                    EditorPrefs.DeleteKey(_directoryKeys[i]);
+                }
             }
         }
 
@@ -473,9 +509,12 @@ namespace AiNative.Client.Application.Tests
             {
                 rejection = exception.InnerException;
             }
+
             Assert.That(rejection == null, Is.EqualTo(accepted));
             if (!accepted)
+            {
                 Assert.That(rejection, Is.InstanceOf<InvalidOperationException>());
+            }
         }
 
         private static Type Builder()

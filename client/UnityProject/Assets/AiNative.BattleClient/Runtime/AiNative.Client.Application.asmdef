@@ -10,7 +10,15 @@
     "Unity.InputSystem",
     "AiNative.Client.Character",
     "AiNative.Client.Protocol",
-    "AiNative.Client.Protocol.Protobuf"
+    "AiNative.Client.Protocol.Protobuf",
+    "AiNative.Client.Core",
+    "AiNative.Client.Assets",
+    "AiNative.Client.Assets.AssetBundle",
+    "AiNative.Client.UI.UGUI",
+    "AiNative.Client.Runtime",
+    "AiNative.Client.Composition.VContainer",
+    "VContainer",
+    "AiNative.Client.Async.UniTask"
   ],
   "autoReferenced": true
 }

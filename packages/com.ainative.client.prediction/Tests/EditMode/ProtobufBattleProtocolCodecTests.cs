@@ -30,6 +30,7 @@ namespace AiNative.Client.Prediction.Tests
                 LastProcessedInputSequence = 42,
             };
             for (int i = 1; i <= count; i++)
+            {
                 snapshot.Players.Add(
                     new Wire.PlayerState
                     {
@@ -40,6 +41,8 @@ namespace AiNative.Client.Prediction.Tests
                         Alive = arena,
                     }
                 );
+            }
+
             return snapshot;
         }
 
@@ -59,14 +62,20 @@ namespace AiNative.Client.Prediction.Tests
             );
             byte[] frame = new byte[64];
             for (int i = 0; i < 10000; i++)
+            {
                 codec.TryEncodeInput(input, frame, out _);
+            }
+
             using var allocationMeter = new CalibratedAllocationMeter();
             allocationMeter.RequireSupported();
             allocationMeter.Begin();
             int written = 0;
             bool success = true;
             for (int i = 0; i < 10000; i++)
+            {
                 success &= codec.TryEncodeInput(input, frame, out written);
+            }
+
             long allocated = allocationMeter.End();
             Assert.That(success, Is.True);
             Assert.That(allocated, Is.Zero);
@@ -124,13 +133,16 @@ namespace AiNative.Client.Prediction.Tests
             var poses = new ArenaRemotePose[8];
             var packet = new ReceivedPacket(codec.SnapshotChannel, 1, 1, 1, 1);
             for (int i = 0; i < 1000; i++)
+            {
                 CopyAndDispatch(decoded, dispatch, prediction, remote, poses, packet, i);
+            }
 
             using var allocationMeter = new CalibratedAllocationMeter();
             allocationMeter.RequireSupported();
             allocationMeter.Begin();
             int presentations = 0;
             for (int i = 1000; i < 11000; i++)
+            {
                 presentations += CopyAndDispatch(
                     decoded,
                     dispatch,
@@ -140,6 +152,8 @@ namespace AiNative.Client.Prediction.Tests
                     packet,
                     i
                 );
+            }
+
             long allocated = allocationMeter.End();
             Assert.That(
                 allocated,
@@ -188,10 +202,14 @@ namespace AiNative.Client.Prediction.Tests
                     Is.EqualTo(PredictionPrepareStatus.Prepared)
                 );
             }
+
             legacy.TryGetPredictedState(out var beforeLegacy);
             var beforeArena = arena ? fps.Current : default;
             for (int i = 0; i < input.Length; i++)
+            {
                 input[i] = 0xaa;
+            }
+
             if (arena)
             {
                 Assert.That(
@@ -218,6 +236,7 @@ namespace AiNative.Client.Prediction.Tests
                 legacy.TryGetPredictedState(out var after);
                 Assert.That(after, Is.EqualTo(beforeLegacy));
             }
+
             Assert.That(input, Is.All.EqualTo((byte)0xaa));
         }
 
@@ -243,10 +262,16 @@ namespace AiNative.Client.Prediction.Tests
             var fps = new ArenaClientPredictionAdapter(new FakeRealtimeTransport(), codec, 1);
             byte[] input = new byte[64];
             if (arena)
+            {
                 fps.ApplyDecoded(decoded, packet);
+            }
             else
+            {
                 legacy.ApplyDecoded(decoded, packet);
+            }
+
             if (arena)
+            {
                 fps.PrepareInput(
                     101,
                     1000,
@@ -257,18 +282,31 @@ namespace AiNative.Client.Prediction.Tests
                     ArenaWeaponId.Machinegun,
                     input
                 );
+            }
             else
+            {
                 legacy.PrepareInput(101, 1000, 0, input);
+            }
+
             legacy.TryGetPredictedState(out var beforeLegacy);
             var beforeArena = arena ? fps.Current : default;
             long accepted = arena ? fps.AcceptedSnapshots : legacy.Diagnostics.AcceptedSnapshots;
             source.RoomTick = invalidField == 0 ? (ulong)long.MaxValue : 102;
             if (invalidField == 1)
+            {
                 source.Players[0].PositionXMilli = int.MaxValue;
+            }
+
             if (invalidField == 2)
+            {
                 source.Players[0].PositionYMilli = int.MaxValue;
+            }
+
             if (invalidField == 3)
+            {
                 source.Players[0].VelocityYMilliPerSecond = int.MinValue;
+            }
+
             Assert.That(
                 codec.TryDecode(Frame(1101, source), decoded),
                 Is.EqualTo(BattleDecodeStatus.Accepted)
@@ -293,7 +331,8 @@ namespace AiNative.Client.Prediction.Tests
                 Assert.That(legacy.ConnectionEpoch, Is.EqualTo(1));
                 Assert.That(legacy.Diagnostics.AcceptedSnapshots, Is.EqualTo(accepted));
             }
-            // A valid followup on the original epoch must still replay the pending input.
+
+            // 原 epoch 上后续有效消息仍必须重放待确认输入。
             source = Snapshot(1, arena);
             source.RoomTick = 102;
             source.LastProcessedInputSequence = 0;
@@ -337,6 +376,7 @@ namespace AiNative.Client.Prediction.Tests
                 state.Tick = (long)dispatch.Tick;
                 dispatch.Players[i] = new ArenaSnapshotPlayer(decoded.Players[i].EntityId, state);
             }
+
             prediction.ApplyDecoded(dispatch, packet);
             remote.ApplySnapshot(dispatch.PlayerSpan, (long)dispatch.Tick, 1);
             return remote.Advance(1f / 60f, poses);
@@ -467,7 +507,7 @@ namespace AiNative.Client.Prediction.Tests
         {
             using var codec = new ProtobufBattleProtocolCodec();
             var output = new BattlePacketBuffer();
-            // Explicit velocity=0 remains an Arena discriminator, unlike legacy health.
+            // 显式 velocity=0 仍可区分 Arena；旧版 health 字段不能用于区分。
             byte[] frame = { 0x4d, 4, 8, 1, 0x22, 6, 8, 1, 0x30, 100, 0x38, 0 };
             Assert.That(codec.TryDecode(frame, output), Is.EqualTo(BattleDecodeStatus.Accepted));
             Assert.That(output.HasArenaData, Is.True);
@@ -579,7 +619,9 @@ namespace AiNative.Client.Prediction.Tests
             var output = new BattlePacketBuffer();
             var snapshot = Snapshot(count, arena);
             if (arena)
+            {
                 for (int i = 1; i <= 4; i++)
+                {
                     snapshot.Pickups.Add(
                         new Wire.PickupState
                         {
@@ -588,19 +630,27 @@ namespace AiNative.Client.Prediction.Tests
                             Active = true,
                         }
                     );
-            byte[] frame =
-                kind == "reconnect"
-                    ? Frame(
-                        1201,
-                        new Wire.S2C_ReconnectResponse
-                        {
-                            ConnectionEpoch = 2,
-                            ResumeTick = 100,
-                            Snapshot = snapshot,
-                        }
-                    )
-                : kind == "event"
-                    ? Frame(
+                }
+            }
+
+            byte[] frame;
+            if (kind == "reconnect")
+            {
+                frame = Frame(
+                    1201,
+                    new Wire.S2C_ReconnectResponse
+                    {
+                        ConnectionEpoch = 2,
+                        ResumeTick = 100,
+                        Snapshot = snapshot,
+                    }
+                );
+            }
+            else
+            {
+                if (kind == "event")
+                {
+                    frame = Frame(
                         1102,
                         new Wire.S2C_ReliableEventPush
                         {
@@ -613,11 +663,19 @@ namespace AiNative.Client.Prediction.Tests
                                 WeaponId = (Wire.ArenaWeaponId)1,
                             },
                         }
-                    )
-                : Frame(1101, snapshot);
+                    );
+                }
+                else
+                {
+                    frame = Frame(1101, snapshot);
+                }
+            }
             const int samples = 10000;
             for (int i = 0; i < 1000; i++)
+            {
                 codec.TryDecode(frame, output);
+            }
+
             var times = new long[samples];
             using var allocationMeter = new CalibratedAllocationMeter();
             allocationMeter.Begin();
@@ -629,16 +687,30 @@ namespace AiNative.Client.Prediction.Tests
                 accepted &= codec.TryDecode(frame, output) == BattleDecodeStatus.Accepted;
                 times[i] = Stopwatch.GetTimestamp() - start;
             }
+
             long elapsed = Stopwatch.GetTimestamp() - begin,
                 allocated = allocationMeter.End();
             Array.Sort(times);
             Assert.That(accepted, Is.True);
-            string allocationReport =
-                allocated >= 0
-                    ? allocationMeter.MeasuresBytes
-                        ? $"bytes/message={allocated / (double)samples}; bytes/sec@20Hz={allocated / (double)samples * 20}"
-                        : $"allocation-events/message={allocated / (double)samples}; allocation-events/sec@20Hz={allocated / (double)samples * 20}; bytes/message=UNVERIFIED; bytes/sec@20Hz=UNVERIFIED"
-                    : "bytes/message=UNVERIFIED; bytes/sec@20Hz=UNVERIFIED; allocation calibration failed";
+            string allocationReport;
+            if (allocated >= 0)
+            {
+                if (allocationMeter.MeasuresBytes)
+                {
+                    allocationReport =
+                        $"bytes/message={allocated / (double)samples}; bytes/sec@20Hz={allocated / (double)samples * 20}";
+                }
+                else
+                {
+                    allocationReport =
+                        $"allocation-events/message={allocated / (double)samples}; allocation-events/sec@20Hz={allocated / (double)samples * 20}; bytes/message=UNVERIFIED; bytes/sec@20Hz=UNVERIFIED";
+                }
+            }
+            else
+            {
+                allocationReport =
+                    "bytes/message=UNVERIFIED; bytes/sec@20Hz=UNVERIFIED; allocation calibration failed";
+            }
             TestContext.Out.WriteLine(
                 $"Diagnostic only: meter={allocationMeter.Source}; runtime={Environment.Version}; OS={Environment.OSVersion}; CPUs={Environment.ProcessorCount}; vector=kind:{kind},players:{count},arena:{arena},pickups:{snapshot.Pickups.Count},tick:100,ack:42; warmup=1000; samples={samples}; frameBytes={frame.Length}; {allocationReport}; durationMs={elapsed * 1000.0 / Stopwatch.Frequency}; percentile=nearest-rank; p50us={times[4999] * 1e6 / Stopwatch.Frequency}; p95us={times[9499] * 1e6 / Stopwatch.Frequency}; p99us={times[9899] * 1e6 / Stopwatch.Frequency}; generated parse trees/message=1"
             );

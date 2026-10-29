@@ -49,7 +49,10 @@ namespace AiNative.Client.Prediction.Tests
         {
             byte[] original = Frame(1);
             foreach (int length in new[] { 0, 1, 3, 5, 10, original.Length - 1 })
+            {
                 AssertRejected(original.AsSpan(0, length).ToArray());
+            }
+
             var wrongWire = (byte[])original.Clone();
             wrongWire[2] = 8;
             AssertRejected(wrongWire);

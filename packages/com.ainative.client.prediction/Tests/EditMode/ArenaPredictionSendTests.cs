@@ -33,12 +33,10 @@ namespace AiNative.Client.Prediction.Tests
                 frame
             );
             long tick = adapter.Current.Tick;
-
             SendResult sent = adapter
                 .SendPreparedAsync(frame.AsMemory(0, prepared.WrittenBytes))
                 .GetAwaiter()
                 .GetResult();
-
             Assert.That(sent.Status, Is.EqualTo(SendStatus.Accepted));
             Assert.That(
                 transport.LastPayload.ToArray(),
@@ -106,6 +104,7 @@ namespace AiNative.Client.Prediction.Tests
                     await adapter.SendPreparedAsync(new byte[1], cancellation.Token)
                 );
             }
+
             adapter.DisposeAsync().GetAwaiter().GetResult();
             Assert.That(
                 adapter.SendPreparedAsync(new byte[1]).Result.Status,
@@ -172,7 +171,10 @@ namespace AiNative.Client.Prediction.Tests
             )
             {
                 if (ThrowOnSend)
+                {
                     throw new InvalidOperationException("send-failed");
+                }
+
                 Payload = payload;
                 Token = cancellationToken;
                 return new ValueTask<SendResult>(Completion.Task);
@@ -205,6 +207,7 @@ namespace AiNative.Client.Prediction.Tests
                 transport.Completion.SetCanceled();
                 Assert.ThrowsAsync<TaskCanceledException>(async () => await pending);
             }
+
             var faulted = new DeferredTransport();
             var failure = new InvalidOperationException("async-send-failed");
             var pendingFailure = new ArenaClientPredictionAdapter(

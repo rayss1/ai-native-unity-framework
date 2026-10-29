@@ -6,7 +6,7 @@ using UnityEngine;
 
 namespace AiNative.Client.Application
 {
-    /// <summary>Application-owned bounded visuals. Poses are world-space, independent of the local player.</summary>
+    /// <summary>由应用持有的有界表现对象；姿态使用世界坐标，不依赖本地玩家。</summary>
     internal sealed class ArenaRemoteVisualPool : IDisposable
     {
         private readonly GameObject[] _visuals = new GameObject[
@@ -34,10 +34,16 @@ namespace AiNative.Client.Application
                 visual.name =
                     characterPrefab == null ? "RemotePlayerGreybox" : "RemoteNetworkCharacter";
                 if (characterPrefab == null)
+                {
                     visual.GetComponent<Renderer>().sharedMaterial = material;
-                // Presentation geometry does not participate in prediction or authoritative collision.
+                }
+
+                // 表现几何不参与预测或权威碰撞计算。
                 foreach (Collider collider in visual.GetComponentsInChildren<Collider>(true))
+                {
                     collider.enabled = false;
+                }
+
                 _presenters[i] = visual.GetComponent<NetworkCharacterPresenter>();
                 visual.SetActive(false);
                 _visuals[i] = visual;
@@ -47,21 +53,33 @@ namespace AiNative.Client.Application
         public void Apply(ArenaRemotePose[] poses, int count)
         {
             if (_disposed)
+            {
                 return;
+            }
+
             if (poses == null || count < 0 || count > poses.Length || count > _visuals.Length)
+            {
                 throw new ArgumentOutOfRangeException(nameof(count));
+            }
+
             for (int slot = 0; slot < _visuals.Length; slot++)
             {
                 bool present = false;
                 for (int i = 0; i < count; i++)
+                {
                     if (poses[i].EntityId == _ids[slot])
+                    {
                         present = true;
+                    }
+                }
+
                 if (!present)
                 {
                     _ids[slot] = 0;
                     _visuals[slot].SetActive(false);
                 }
             }
+
             for (int i = 0; i < count; i++)
             {
                 ArenaRemotePose pose = poses[i];
@@ -71,6 +89,7 @@ namespace AiNative.Client.Application
                     slot = Array.IndexOf(_ids, 0u);
                     _ids[slot] = pose.EntityId;
                 }
+
                 GameObject visual = _visuals[slot];
                 _presenters[slot]?.Apply(pose.State);
                 visual.transform.SetPositionAndRotation(
@@ -85,7 +104,7 @@ namespace AiNative.Client.Application
             }
         }
 
-        // Presentation-only target selection. The server independently validates every shot.
+        // 此处只选择表现层瞄准目标，每次射击仍由服务器独立验证。
         public Vector3 AimPoint(Ray ray, float range)
         {
             double nearest = range * 1000d;
@@ -93,7 +112,10 @@ namespace AiNative.Client.Application
             foreach (GameObject visual in _visuals)
             {
                 if (visual == null || !visual.activeSelf)
+                {
                     continue;
+                }
+
                 Vector3 relative =
                     (ray.origin - visual.transform.position + Vector3.up * _heightOffset) * 1000f;
                 if (
@@ -113,7 +135,8 @@ namespace AiNative.Client.Application
                     found = true;
                 }
             }
-            // Aim slightly inside the surface to tolerate millidegree quantization.
+
+            // 瞄准点略微进入表面，以容忍毫度量化误差。
             return ray.GetPoint((float)(nearest / 1000d) + (found ? .02f : 0));
         }
 
@@ -132,12 +155,18 @@ namespace AiNative.Client.Application
         public void Dispose()
         {
             if (_disposed)
+            {
                 return;
+            }
+
             _disposed = true;
             for (int i = 0; i < _visuals.Length; i++)
             {
                 if (_visuals[i] != null)
+                {
                     UnityEngine.Object.Destroy(_visuals[i]);
+                }
+
                 _visuals[i] = null;
                 _presenters[i] = null;
                 _ids[i] = 0;

@@ -52,13 +52,19 @@ public sealed class GateWireTests
     {
         PartyState party = new() { PartyId = "party", Version = 9 };
         for (int i = 0; i < 64; i++)
+        {
             party.Members.Add(new PartyMember { PlayerId = "p" + i, Ready = true });
+        }
+
         Assert.That(GateWire.Party(party.ToByteArray()).Members.Length, Is.EqualTo(64));
         party.Members.Add(new PartyMember());
         Assert.Throws<InvalidDataException>(() => GateWire.Party(party.ToByteArray()));
         PartyInvitations invitations = new();
         for (int i = 0; i < 64; i++)
+        {
             invitations.Parties.Add(new PartyState());
+        }
+
         Assert.That(
             GateProtocolCodec.Invitations(invitations.ToByteArray()).Length,
             Is.EqualTo(64)
@@ -92,6 +98,7 @@ public sealed class GateWireTests
                 output.WriteUInt32(1);
             }
         }
+
         Assert.Throws<InvalidDataException>(() => GateWire.Profile(fields.ToArray()));
         using MemoryStream party = new();
         using (CodedOutputStream output = new(party, leaveOpen: true))
@@ -99,6 +106,7 @@ public sealed class GateWireTests
             output.WriteTag(4, WireFormat.WireType.LengthDelimited);
             output.WriteBytes(ByteString.CopyFrom(fields.ToArray()));
         }
+
         Assert.Throws<InvalidDataException>(() => GateWire.Party(party.ToArray()));
     }
 
@@ -125,6 +133,7 @@ public sealed class GateWireTests
             output.WriteTag(1, WireFormat.WireType.Varint);
             output.WriteUInt64(1UL << 32);
         }
+
         Assert.Throws<InvalidDataException>(() =>
             GateProtocolCodec.ResponseEnvelope(stream.ToArray())
         );

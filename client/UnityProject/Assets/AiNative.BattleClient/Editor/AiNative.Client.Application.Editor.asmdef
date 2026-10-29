@@ -9,7 +9,10 @@
     "Unity.RenderPipelines.Universal.Runtime",
     "AiNative.Client.Character",
     "AiNative.Client.Protocol",
-    "AiNative.Client.Protocol.Protobuf"
+    "AiNative.Client.Protocol.Protobuf",
+    "AiNative.Client.Assets.AssetBundle.Editor",
+    "AiNative.Client.Assets.AssetBundle",
+    "AiNative.Client.UI.UGUI"
   ],
   "includePlatforms": [
     "Editor"

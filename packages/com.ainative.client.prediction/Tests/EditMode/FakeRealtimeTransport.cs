@@ -8,17 +8,11 @@ namespace AiNative.Client.Prediction.Tests
     internal sealed class FakeRealtimeTransport : IRealtimeTransport
     {
         private readonly byte[] _lastPayload = new byte[1200];
-
         public TransportState State { get; set; } = TransportState.Connected;
-
         public SendStatus NextSendStatus { get; set; } = SendStatus.Accepted;
-
         public TransportChannel LastChannel { get; private set; }
-
         public int LastPayloadLength { get; private set; }
-
         public int SendCount { get; private set; }
-
         public ReadOnlySpan<byte> LastPayload => _lastPayload.AsSpan(0, LastPayloadLength);
 
         public ValueTask<SendResult> SendAsync(

@@ -2,7 +2,7 @@ using UnityEngine;
 
 namespace AiNative.Client.Character
 {
-    /// <summary>Local projectile simulation; segment casts prevent tunnelling. Not network authority.</summary>
+    /// <summary>本地弹丸模拟；使用线段检测防止穿透，不作为联网权威。</summary>
     public sealed class CharacterRifle : MonoBehaviour
     {
         [SerializeField]
@@ -18,24 +18,28 @@ namespace AiNative.Client.Character
         private Material tracerMaterial;
 
         [SerializeField, Min(1)]
-        private float speed = 70,
-            range = 100,
-            damage = 25;
+        private float speed = 70;
+
+        [SerializeField, Min(1)]
+        private float range = 100;
+
+        [SerializeField, Min(1)]
+        private float damage = 25;
 
         [SerializeField]
         private LayerMask collisionMask = ~4;
 
         private sealed class Bullet
         {
-            public Vector3 Position,
-                Direction;
+            public Vector3 Position;
+            public Vector3 Direction;
             public float Remaining;
             public LineRenderer Line;
         }
 
-        private readonly Bullet[] bullets = new Bullet[32];
-        private CharacterMotor subscribed;
-        private int pending;
+        private readonly Bullet[] _bullets = new Bullet[32];
+        private CharacterMotor _subscribed;
+        private int _pending;
         public int Shots { get; private set; }
         public int Hits { get; private set; }
         public string LastHit { get; private set; } = "--";
@@ -53,63 +57,84 @@ namespace AiNative.Client.Character
             muzzle = origin;
             tracerMaterial = material;
             if (isActiveAndEnabled)
+            {
                 Subscribe();
+            }
         }
 
         private void OnEnable() => Subscribe();
 
         private void Subscribe()
         {
-            if (motor != null && subscribed == null)
+            if (motor != null && _subscribed == null)
             {
-                subscribed = motor;
-                subscribed.ShotFired += QueueShot;
+                _subscribed = motor;
+                _subscribed.ShotFired += QueueShot;
             }
         }
 
         private void Unsubscribe()
         {
-            if (subscribed != null)
-                subscribed.ShotFired -= QueueShot;
-            subscribed = null;
+            if (_subscribed != null)
+            {
+                _subscribed.ShotFired -= QueueShot;
+            }
+
+            _subscribed = null;
         }
 
-        private void QueueShot() => pending = Mathf.Min(pending + 1, bullets.Length);
+        private void QueueShot() => _pending = Mathf.Min(_pending + 1, _bullets.Length);
 
         private void LateUpdate()
         {
-            while (pending > 0)
+            while (_pending > 0)
             {
-                pending--;
+                _pending--;
                 Fire();
             }
+
             Advance(Time.deltaTime);
         }
 
         private void Fire()
         {
             if (view == null || muzzle == null)
+            {
                 return;
+            }
+
             var ray = view.ViewportPointToRay(new Vector3(.5f, .5f));
             Vector3 target = ray.GetPoint(range);
             if (Cast(ray.origin, ray.direction, range, out var aimHit))
+            {
                 target = aimHit.point;
+            }
+
             var direction = target - muzzle.position;
             if (Vector3.Dot(direction, ray.direction) <= 0)
+            {
                 direction = ray.direction;
+            }
+
             Launch(muzzle.position, direction);
         }
 
-        /// <summary>Main-thread local test/adapter entry; production input uses motor's accepted shot event.</summary>
+        /// <summary>主线程本地测试或适配入口；正式输入使用 Motor 已接受的开火事件。</summary>
         public void Launch(Vector3 origin, Vector3 direction)
         {
             if (direction.sqrMagnitude < .0001f)
-                return;
-            for (int i = 0; i < bullets.Length; i++)
             {
-                var bullet = bullets[i];
+                return;
+            }
+
+            for (int i = 0; i < _bullets.Length; i++)
+            {
+                var bullet = _bullets[i];
                 if (bullet != null && bullet.Remaining > 0)
+                {
                     continue;
+                }
+
                 if (bullet == null)
                 {
                     var go = new GameObject("Rifle tracer");
@@ -120,13 +145,14 @@ namespace AiNative.Client.Character
                     line.sharedMaterial = tracerMaterial;
                     line.startColor = line.endColor = new Color(1, .8f, .15f);
                     line.enabled = false;
-                    bullets[i] = bullet = new Bullet { Line = line };
+                    _bullets[i] = bullet = new Bullet { Line = line };
                 }
+
                 bullet.Position = origin;
                 bullet.Direction = direction.normalized;
                 bullet.Remaining = range;
                 Shots++;
-                // A muzzle inside geometry must not shoot through that geometry.
+                // 枪口位于几何体内部时，不得穿过该几何体射击。
                 foreach (
                     var overlap in Physics.OverlapSphere(
                         origin,
@@ -135,12 +161,15 @@ namespace AiNative.Client.Character
                         QueryTriggerInteraction.Ignore
                     )
                 )
+                {
                     if (!IsOwner(overlap))
                     {
                         Impact(overlap);
                         bullet.Remaining = 0;
                         return;
                     }
+                }
+
                 return;
             }
         }
@@ -148,14 +177,23 @@ namespace AiNative.Client.Character
         public void Advance(float seconds)
         {
             if (seconds <= 0)
+            {
                 return;
-            foreach (var bullet in bullets)
+            }
+
+            foreach (var bullet in _bullets)
             {
                 if (bullet == null)
+                {
                     continue;
+                }
+
                 bullet.Line.enabled = bullet.Remaining > 0;
                 if (bullet.Remaining <= 0)
+                {
                     continue;
+                }
+
                 float distance = Mathf.Min(speed * seconds, bullet.Remaining);
                 Vector3 end = bullet.Position + bullet.Direction * distance;
                 if (Cast(bullet.Position, bullet.Direction, distance, out var hit))
@@ -165,7 +203,10 @@ namespace AiNative.Client.Character
                     bullet.Remaining = 0;
                 }
                 else
+                {
                     bullet.Remaining -= distance;
+                }
+
                 bullet.Line.SetPosition(0, bullet.Position);
                 bullet.Line.SetPosition(1, end);
                 bullet.Position = end;
@@ -188,11 +229,14 @@ namespace AiNative.Client.Character
                     QueryTriggerInteraction.Ignore
                 )
             )
+            {
                 if (!IsOwner(hit.collider) && hit.distance < best)
                 {
                     nearest = hit;
                     best = hit.distance;
                 }
+            }
+
             return best < float.PositiveInfinity;
         }
 
@@ -209,26 +253,34 @@ namespace AiNative.Client.Character
                     + (health.IsDead ? " DOWN" : " HP " + health.Current);
             }
             else
+            {
                 LastHit = collider.name + " (blocked)";
+            }
         }
 
         private void OnDisable()
         {
             Unsubscribe();
-            pending = 0;
-            foreach (var bullet in bullets)
+            _pending = 0;
+            foreach (var bullet in _bullets)
+            {
                 if (bullet != null)
                 {
                     bullet.Remaining = 0;
                     bullet.Line.enabled = false;
                 }
+            }
         }
 
         private void OnDestroy()
         {
-            foreach (var bullet in bullets)
+            foreach (var bullet in _bullets)
+            {
                 if (bullet != null && bullet.Line != null)
+                {
                     Destroy(bullet.Line.gameObject);
+                }
+            }
         }
     }
 }

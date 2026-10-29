@@ -126,8 +126,8 @@ namespace AiNative.Client.Protocol
         public int PositionZMillimetres { get; }
     }
 
-    /// <summary>Caller-owned decode storage. Views expire on the next successful decode.
-    /// A failed decode must leave all fields and arrays unchanged. Owner-thread only.</summary>
+    /// <summary>调用方持有的解码存储；视图在下一次成功解码时失效。
+    /// 解码失败必须保持全部字段和数组不变；仅限所属线程。</summary>
     public sealed class BattlePacketBuffer
     {
         public const int MaxPlayers = 64;
@@ -136,19 +136,19 @@ namespace AiNative.Client.Protocol
         public readonly ArenaSnapshotPlayer[] Players = new ArenaSnapshotPlayer[MaxPlayers];
         public readonly ArenaPickupState[] Pickups = new ArenaPickupState[MaxPickups];
         public BattleMessageKind Kind;
-        public int PlayerCount,
-            PickupCount;
-        public ulong Tick,
-            SessionId;
-        public uint Acknowledgement,
-            ConnectionEpoch,
-            RoomId,
-            EntityId,
-            TickRate,
-            RemainingTicks,
-            LeaderEntityId;
-        public string GlobalRoomId = "",
-            BootEpoch = "";
+        public int PlayerCount;
+        public int PickupCount;
+        public ulong Tick;
+        public ulong SessionId;
+        public uint Acknowledgement;
+        public uint ConnectionEpoch;
+        public uint RoomId;
+        public uint EntityId;
+        public uint TickRate;
+        public uint RemainingTicks;
+        public uint LeaderEntityId;
+        public string GlobalRoomId = "";
+        public string BootEpoch = "";
         public bool HasArenaData;
         public ArenaMatchPhase Phase;
         public ArenaPresentationEvent CombatEvent;
@@ -158,6 +158,7 @@ namespace AiNative.Client.Protocol
         public bool TryGetPlayer(uint id, out DecodedArenaSnapshot snapshot)
         {
             for (int i = 0; i < PlayerCount; i++)
+            {
                 if (Players[i].EntityId == id)
                 {
                     var state = Players[i].State;
@@ -172,22 +173,30 @@ namespace AiNative.Client.Protocol
                     );
                     return true;
                 }
+            }
+
             snapshot = default;
             return false;
         }
     }
 
-    /// <summary>One explicit instance per session, owner-thread only. Never retain caller spans.
-    /// TryEncode failures write zero bytes and never advance gameplay. Reset drops temporary
-    /// connection state; Dispose is idempotent. Implementations own no transport.</summary>
+    /// <summary>每个会话显式持有一个实例，仅限所属线程；不得保留调用方 Span。
+    /// TryEncode 失败写入零字节且不推进玩法；Reset 丢弃临时连接状态，
+    /// Dispose 幂等；实现不持有传输层所有权。</summary>
     public interface IBattleProtocolCodec : IDisposable
     {
         int MaximumFrameBytes { get; }
+
         int MaximumInputFrameBytes { get; }
+
         TransportChannel ControlChannel { get; }
+
         TransportChannel InputChannel { get; }
+
         TransportChannel SnapshotChannel { get; }
+
         TransportChannel EventChannel { get; }
+
         bool TryEncodeInput(in ArenaInput input, Span<byte> destination, out int writtenBytes);
         bool TryEncodeLegacyInput(
             ulong tick,

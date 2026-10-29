@@ -36,6 +36,7 @@ namespace AiNative.Client.Application.PlayModeTests
                     secondRemote.Sample(second, first);
                     yield return null;
                 }
+
                 Assert.That(
                     first.Error,
                     Is.Empty,
@@ -88,23 +89,32 @@ namespace AiNative.Client.Application.PlayModeTests
             private readonly ArenaRemotePose[] _poses = new ArenaRemotePose[
                 ArenaClientProtocolV1.MaxSnapshotPlayers
             ];
-            private bool _hasBefore,
-                _hasAfter,
-                _movedBefore,
-                _movedAfter,
-                _cleared;
-            private double _lastX,
-                _lastZ;
+            private bool _hasBefore;
+            private bool _hasAfter;
+            private bool _movedBefore;
+            private bool _movedAfter;
+            private bool _cleared;
+            private double _lastX;
+            private double _lastZ;
 
             public void Sample(TopologyClientFlow own, TopologyClientFlow peer)
             {
                 if (own.Battle == null)
+                {
                     return;
+                }
+
                 int count = own.Battle.AdvanceRemotePresentation(Time.unscaledDeltaTime, _poses);
                 if (own.Battle.State == BattleClientState.Reconnecting && count == 0)
+                {
                     _cleared = true;
+                }
+
                 if (count == 0)
+                {
                     return;
+                }
+
                 Assert.That(
                     count,
                     Is.EqualTo(1),
@@ -112,7 +122,10 @@ namespace AiNative.Client.Application.PlayModeTests
                 );
                 Assert.That(_poses[0].EntityId, Is.Not.EqualTo(own.Battle.EntityId));
                 if (peer.Battle != null && peer.Battle.EntityId != 0)
+                {
                     Assert.That(_poses[0].EntityId, Is.EqualTo(peer.Battle.EntityId));
+                }
+
                 bool after = own.Reconnected;
                 bool changed =
                     System.Math.Abs(_poses[0].XMillimetres - _lastX)
@@ -121,15 +134,22 @@ namespace AiNative.Client.Application.PlayModeTests
                 if (after)
                 {
                     if (_hasAfter && changed)
+                    {
                         _movedAfter = true;
+                    }
+
                     _hasAfter = true;
                 }
                 else
                 {
                     if (_hasBefore && changed)
+                    {
                         _movedBefore = true;
+                    }
+
                     _hasBefore = true;
                 }
+
                 _lastX = _poses[0].XMillimetres;
                 _lastZ = _poses[0].ZMillimetres;
             }

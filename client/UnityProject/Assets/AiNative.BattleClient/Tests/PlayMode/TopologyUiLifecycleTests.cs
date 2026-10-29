@@ -14,8 +14,8 @@ namespace AiNative.Client.Application.PlayModeTests
         [UnityTest]
         public IEnumerator DestroyAndRecreateInteractiveFlow_CleansUiAndDiscardsQueuedOperations()
         {
-            // No account request is sent: these are real MonoBehaviour/UI lifetimes,
-            // with an intentionally pending background task in place of network I/O.
+            // 不发送账号请求；此处验证真实 MonoBehaviour/UI 生命周期，
+            // 用刻意保持未完成的后台任务代替网络 I/O。
             for (int round = 0; round < 2; round++)
             {
                 var owner = new GameObject("InteractiveUiLifecycle" + round);
@@ -24,12 +24,12 @@ namespace AiNative.Client.Application.PlayModeTests
                 {
                     var flow = owner.AddComponent<TopologyClientFlow>();
                     flow.Initialize(new GateConnectionOptions("127.0.0.1", 23001, false));
-                    yield return null; // Start creates and binds the actual prefab.
+                    yield return WaitForView(flow);
                     var view = (TopologyClientView)Field(flow, "_view");
                     Assert.That(
                         view != null,
                         Is.True,
-                        "Interactive flow must instantiate Resources/TopologyClientUI."
+                        "Interactive flow must load and bind ui.topology through the asset service."
                     );
                     Canvas canvas = view.GetComponentInChildren<Canvas>(true);
                     Assert.That(canvas != null, Is.True);
@@ -46,7 +46,6 @@ namespace AiNative.Client.Application.PlayModeTests
                         })
                     );
                     Assert.That(flow.UiBusy, Is.True);
-
                     UnityEngine.Object.Destroy(owner);
                     yield return null;
                     yield return null; // The view schedules its owned EventSystem for destruction.
@@ -73,10 +72,31 @@ namespace AiNative.Client.Application.PlayModeTests
                 finally
                 {
                     if (owner != null)
+                    {
                         UnityEngine.Object.Destroy(owner);
+                    }
+
                     refresh.TrySetResult(true);
                 }
             }
+        }
+
+        private static IEnumerator WaitForView(TopologyClientFlow flow)
+        {
+            float deadline = Time.realtimeSinceStartup + 10f;
+            while (
+                Field(flow, "_view") == null
+                && Time.realtimeSinceStartup < deadline
+                && flow.Error != "ui-load-failed"
+            )
+            {
+                yield return null;
+            }
+            Assert.That(
+                Field(flow, "_view"),
+                Is.Not.Null,
+                "UI initialization must complete within 10 seconds; error=" + flow.Error
+            );
         }
 
         private static object Field(object instance, string name) =>

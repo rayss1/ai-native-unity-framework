@@ -15,19 +15,16 @@ namespace AiNative.Client.Application
         public const ushort ReconnectRequestMessageId = 1200;
         public const ushort ReconnectResponseMessageId = 1201;
         public const int MaxFrameBytes = 1200;
-
         public static readonly TransportChannel ControlChannel = new TransportChannel(
             0,
             TransportDelivery.Reliable,
             TransportOrdering.Ordered
         );
-
         public static readonly TransportChannel SnapshotChannel = new TransportChannel(
             1,
             TransportDelivery.Unreliable,
             TransportOrdering.Sequenced
         );
-
         public static readonly TransportChannel InputChannel = new TransportChannel(
             2,
             TransportDelivery.Unreliable,
@@ -88,9 +85,14 @@ namespace AiNative.Client.Application
                     || !TryWriteString(destination, ref offset, 0x22, admission.RoomId)
                 )
             )
+            {
                 return false;
+            }
+
             if (offset > MaxFrameBytes)
+            {
                 return false;
+            }
 
             writtenBytes = offset;
             return true;
@@ -145,25 +147,35 @@ namespace AiNative.Client.Application
                 else if (field is 3 or 4 && wire == 2)
                 {
                     if (!TryReadLength(frame, ref offset, out ReadOnlySpan<byte> value))
+                    {
                         return false;
+                    }
+
                     string decoded;
                     try
                     {
-                        decoded = StrictUtf8.GetString(value);
+                        decoded = _strictUtf8.GetString(value);
                     }
                     catch (DecoderFallbackException)
                     {
                         return false;
                     }
+
                     if (field == 3)
+                    {
                         globalRoomId = decoded;
+                    }
                     else
+                    {
                         bootEpoch = decoded;
+                    }
                 }
                 else if (field == 5 && wire == 1)
                 {
                     if (!TryReadFixed64(frame, ref offset, out roomTick))
+                    {
                         return false;
+                    }
                 }
                 else if (!TrySkip(frame, ref offset, wire))
                 {
@@ -233,11 +245,17 @@ namespace AiNative.Client.Application
                     }
 
                     if (field == 1)
+                    {
                         roomId = value;
+                    }
                     else if (field == 2)
+                    {
                         entityId = value;
+                    }
                     else
+                    {
                         tickRate = value;
+                    }
                 }
                 else if (!TrySkip(frame, ref offset, wire))
                 {
@@ -305,18 +323,26 @@ namespace AiNative.Client.Application
                 if (field == 1 && wire == 0)
                 {
                     if (!TryReadUInt32(frame, ref offset, out connectionEpoch))
+                    {
                         return false;
+                    }
                 }
                 else if (field == 2 && wire == 1)
                 {
                     if (!TryReadFixed64(frame, ref offset, out resumeTick))
+                    {
                         return false;
+                    }
+
                     hasTick = true;
                 }
                 else if (field == 3 && wire == 2)
                 {
                     if (!TryReadLength(frame, ref offset, out _))
+                    {
                         return false;
+                    }
+
                     hasSnapshot = true;
                 }
                 else if (!TrySkip(frame, ref offset, wire))
@@ -345,20 +371,30 @@ namespace AiNative.Client.Application
             while (offset < frame.Length)
             {
                 if (!TryReadKey(frame, ref offset, out int field, out int wire))
+                {
                     return false;
+                }
+
                 if (field == 2 && wire == 1)
                 {
                     if (!TryReadFixed64(frame, ref offset, out roomTick))
+                    {
                         return false;
+                    }
+
                     hasTick = true;
                 }
                 else if (field == 6 && wire == 0)
                 {
                     if (!TryReadUInt32(frame, ref offset, out acknowledgement))
+                    {
                         return false;
+                    }
                 }
                 else if (!TrySkip(frame, ref offset, wire))
+                {
                     return false;
+                }
             }
 
             return hasTick;
@@ -419,13 +455,21 @@ namespace AiNative.Client.Application
             for (int shift = 0; shift < 70; shift += 7)
             {
                 if (offset >= source.Length)
+                {
                     return false;
+                }
+
                 byte current = source[offset++];
                 if (shift == 63 && current > 1)
+                {
                     return false;
+                }
+
                 value |= (ulong)(current & 0x7f) << shift;
                 if ((current & 0x80) == 0)
+                {
                     return true;
+                }
             }
 
             return false;
@@ -439,7 +483,10 @@ namespace AiNative.Client.Application
         {
             value = 0;
             if (source.Length - offset < 8)
+            {
                 return false;
+            }
+
             value = BinaryPrimitives.ReadUInt64LittleEndian(source.Slice(offset, 8));
             offset += 8;
             return true;
@@ -474,14 +521,20 @@ namespace AiNative.Client.Application
                     return TryReadVarint(source, ref offset, out _);
                 case 1:
                     if (source.Length - offset < 8)
+                    {
                         return false;
+                    }
+
                     offset += 8;
                     return true;
                 case 2:
                     return TryReadLength(source, ref offset, out _);
                 case 5:
                     if (source.Length - offset < 4)
+                    {
                         return false;
+                    }
+
                     offset += 4;
                     return true;
                 default:
@@ -492,12 +545,15 @@ namespace AiNative.Client.Application
         private static bool TryWriteByte(Span<byte> destination, ref int offset, byte value)
         {
             if ((uint)offset >= (uint)destination.Length)
+            {
                 return false;
+            }
+
             destination[offset++] = value;
             return true;
         }
 
-        private static readonly Encoding StrictUtf8 = new UTF8Encoding(false, true);
+        private static readonly Encoding _strictUtf8 = new UTF8Encoding(false, true);
 
         private static bool TryWriteString(
             Span<byte> destination,
@@ -512,7 +568,10 @@ namespace AiNative.Client.Application
                 || !TryWriteVarint(destination, ref offset, (ulong)length)
                 || destination.Length - offset < length
             )
+            {
                 return false;
+            }
+
             offset += Encoding.UTF8.GetBytes(value, destination.Slice(offset, length));
             return true;
         }
@@ -524,18 +583,25 @@ namespace AiNative.Client.Application
                 byte current = (byte)(value & 0x7f);
                 value >>= 7;
                 if (value != 0)
+                {
                     current |= 0x80;
-                if (!TryWriteByte(destination, ref offset, current))
-                    return false;
-            } while (value != 0);
+                }
 
+                if (!TryWriteByte(destination, ref offset, current))
+                {
+                    return false;
+                }
+            } while (value != 0);
             return true;
         }
 
         private static bool TryWriteFixed64(Span<byte> destination, ref int offset, ulong value)
         {
             if (destination.Length - offset < 8)
+            {
                 return false;
+            }
+
             BinaryPrimitives.WriteUInt64LittleEndian(destination.Slice(offset, 8), value);
             offset += 8;
             return true;

@@ -13,22 +13,19 @@ namespace AiNative.Client.Prediction
         public const int MaxInputFrameBytes = 64;
         public const ushort InputCommandMessageId = 1100;
         public const ushort SnapshotMessageId = 1101;
-
         public static readonly TransportChannel InputChannel = new TransportChannel(
             2,
             TransportDelivery.Unreliable,
             TransportOrdering.Sequenced
         );
-
         public static readonly TransportChannel SnapshotChannel = new TransportChannel(
             1,
             TransportDelivery.Unreliable,
             TransportOrdering.Sequenced
         );
-
         public const int MaxSnapshotPlayers = 8;
 
-        /// <summary>Decodes a full v1 snapshot atomically into caller storage; failure writes nothing.</summary>
+        /// <summary>将完整 v1 快照原子解码到调用方存储；失败时不写入任何内容。</summary>
         public static bool TryDecodePlayers(
             ReadOnlySpan<byte> frame,
             Span<ArenaSnapshotPlayer> destination,
@@ -43,7 +40,10 @@ namespace AiNative.Client.Prediction
                 || frame.Length > MaxDatagramBytes
                 || BinaryPrimitives.ReadUInt16LittleEndian(frame) != SnapshotMessageId
             )
+            {
                 return false;
+            }
+
             Span<ArenaSnapshotPlayer> scratch = stackalloc ArenaSnapshotPlayer[MaxSnapshotPlayers];
             int offset = HeaderBytes,
                 written = 0,
@@ -53,32 +53,51 @@ namespace AiNative.Client.Prediction
             while (offset < frame.Length)
             {
                 if (!TryReadKey(frame, ref offset, out int field, out int wire))
+                {
                     return false;
+                }
+
                 if (field <= 10)
                 {
-                    int expectedWire =
-                        field == 2 || field == 3 || field == 5 ? 1
-                        : field == 4 || field == 10 ? 2
-                        : 0;
+                    int expectedWire;
+                    if (field == 2 || field == 3 || field == 5)
+                    {
+                        expectedWire = 1;
+                    }
+                    else
+                    {
+                        expectedWire = field == 4 || field == 10 ? 2 : 0;
+                    }
                     if (wire != expectedWire)
+                    {
                         return false;
+                    }
+
                     if (field != 4 && field != 10)
                     {
                         int bit = 1 << field;
                         if ((seen & bit) != 0)
+                        {
                             return false;
+                        }
+
                         seen |= bit;
                     }
                 }
+
                 if (field == 1)
                 {
                     if (!TryReadUInt32(frame, ref offset, out major))
+                    {
                         return false;
+                    }
                 }
                 else if (field == 2)
                 {
                     if (!TryReadFixed64(frame, ref offset, out serverTick))
+                    {
                         return false;
+                    }
                 }
                 else if (field == 4)
                 {
@@ -87,15 +106,26 @@ namespace AiNative.Client.Prediction
                         || !TryReadLength(frame, ref offset, out ReadOnlySpan<byte> payload)
                         || !TryReadPlayerIdentity(payload, out uint id)
                     )
+                    {
                         return false;
+                    }
+
                     for (int i = 0; i < written; i++)
+                    {
                         if (scratch[i].EntityId == id)
+                        {
                             return false;
+                        }
+                    }
+
                     bool found = false,
                         arena = false;
                     ArenaPlayerState state = default;
                     if (!TryReadPlayer(payload, id, ref found, ref state, ref arena) || !found)
+                    {
                         return false;
+                    }
+
                     scratch[written++] = new ArenaSnapshotPlayer(id, state);
                 }
                 else if (field >= 6 && field <= 9)
@@ -104,24 +134,33 @@ namespace AiNative.Client.Prediction
                         !TryReadUInt32(frame, ref offset, out uint value)
                         || (field == 7 && value > 2)
                     )
+                    {
                         return false;
+                    }
                 }
                 else if (!TrySkip(frame, ref offset, wire))
+                {
                     return false;
+                }
             }
+
             if (
                 major != 1
                 || (seen & (1 << 2)) == 0
                 || serverTick > long.MaxValue
                 || destination.Length < written
             )
+            {
                 return false;
+            }
+
             for (int i = 0; i < written; i++)
             {
                 ArenaPlayerState state = scratch[i].State;
                 state.Tick = (long)serverTick;
                 scratch[i] = new ArenaSnapshotPlayer(scratch[i].EntityId, state);
             }
+
             scratch.Slice(0, written).CopyTo(destination);
             count = written;
             tick = (long)serverTick;
@@ -136,7 +175,10 @@ namespace AiNative.Client.Prediction
             while (offset < payload.Length)
             {
                 if (!TryReadKey(payload, ref offset, out int field, out int wire))
+                {
                     return false;
+                }
+
                 if (field <= 14)
                 {
                     int bit = 1 << field;
@@ -145,16 +187,27 @@ namespace AiNative.Client.Prediction
                         || (seen & bit) != 0
                         || !TryReadUInt32(payload, ref offset, out uint value)
                     )
+                    {
                         return false;
+                    }
+
                     seen |= bit;
                     if (field == 1)
+                    {
                         id = value;
+                    }
+
                     if (field == 12 && value > 1)
+                    {
                         return false;
+                    }
                 }
                 else if (!TrySkip(payload, ref offset, wire))
+                {
                     return false;
+                }
             }
+
             return id != 0;
         }
 
@@ -189,7 +242,10 @@ namespace AiNative.Client.Prediction
                     || !TryWriteVarint(destination, ref offset, ZigZag(input.MoveXMilli))
                 )
             )
+            {
                 return false;
+            }
+
             if (
                 input.MoveZMilli != 0
                 && (
@@ -197,7 +253,10 @@ namespace AiNative.Client.Prediction
                     || !TryWriteVarint(destination, ref offset, ZigZag(input.MoveZMilli))
                 )
             )
+            {
                 return false;
+            }
+
             if (
                 input.Buttons != ArenaButtons.None
                 && (
@@ -205,7 +264,10 @@ namespace AiNative.Client.Prediction
                     || !TryWriteVarint(destination, ref offset, (uint)input.Buttons)
                 )
             )
+            {
                 return false;
+            }
+
             if (
                 input.Weapon != ArenaWeaponId.None
                 && (
@@ -213,7 +275,10 @@ namespace AiNative.Client.Prediction
                     || !TryWriteVarint(destination, ref offset, (uint)input.Weapon)
                 )
             )
+            {
                 return false;
+            }
+
             if (
                 input.LookYawMilli != 0
                 && (
@@ -221,7 +286,10 @@ namespace AiNative.Client.Prediction
                     || !TryWriteVarint(destination, ref offset, ZigZag(input.LookYawMilli))
                 )
             )
+            {
                 return false;
+            }
+
             if (
                 input.LookPitchMilli != 0
                 && (
@@ -229,7 +297,9 @@ namespace AiNative.Client.Prediction
                     || !TryWriteVarint(destination, ref offset, ZigZag(input.LookPitchMilli))
                 )
             )
+            {
                 return false;
+            }
 
             writtenBytes = offset;
             return writtenBytes <= MaxInputFrameBytes;
@@ -263,20 +333,28 @@ namespace AiNative.Client.Prediction
             bool found = false;
             bool hasArenaData = false;
             ArenaPlayerState player = default;
-
             while (offset < payload.Length)
             {
                 if (!TryReadKey(payload, ref offset, out int field, out int wire))
+                {
                     return false;
+                }
+
                 switch (field)
                 {
                     case 1 when wire == 0:
                         if (!TryReadUInt32(payload, ref offset, out protocolMajor))
+                        {
                             return false;
+                        }
+
                         break;
                     case 2 when wire == 1:
                         if (!TryReadFixed64(payload, ref offset, out roomTick))
+                        {
                             return false;
+                        }
+
                         hasTick = true;
                         break;
                     case 4 when wire == 2:
@@ -294,31 +372,49 @@ namespace AiNative.Client.Prediction
                                 ref hasArenaData
                             )
                         )
+                        {
                             return false;
+                        }
+
                         break;
                     case 6 when wire == 0:
                         if (!TryReadUInt32(payload, ref offset, out acknowledgement))
+                        {
                             return false;
+                        }
+
                         break;
                     case 7 when wire == 0:
                         if (
                             !TryReadUInt32(payload, ref offset, out uint phaseValue)
                             || phaseValue > 2
                         )
+                        {
                             return false;
+                        }
+
                         phase = (ArenaMatchPhase)phaseValue;
                         break;
                     case 8 when wire == 0:
                         if (!TryReadUInt32(payload, ref offset, out remainingTicks))
+                        {
                             return false;
+                        }
+
                         break;
                     case 9 when wire == 0:
                         if (!TryReadUInt32(payload, ref offset, out leaderEntityId))
+                        {
                             return false;
+                        }
+
                         break;
                     default:
                         if (!TrySkip(payload, ref offset, wire))
+                        {
                             return false;
+                        }
+
                         break;
                 }
             }
@@ -352,27 +448,40 @@ namespace AiNative.Client.Prediction
                 frame.Length < HeaderBytes
                 || BinaryPrimitives.ReadUInt16LittleEndian(frame) != 1201
             )
+            {
                 return false;
+            }
+
             int offset = HeaderBytes;
             while (offset < frame.Length)
             {
                 if (!TryReadKey(frame, ref offset, out int field, out int wire))
+                {
                     return false;
+                }
+
                 if (field == 3 && wire == 2)
                 {
                     if (
                         !TryReadLength(frame, ref offset, out ReadOnlySpan<byte> payload)
                         || payload.Length + HeaderBytes > destination.Length
                     )
+                    {
                         return false;
+                    }
+
                     BinaryPrimitives.WriteUInt16LittleEndian(destination, SnapshotMessageId);
                     payload.CopyTo(destination.Slice(HeaderBytes));
                     writtenBytes = payload.Length + HeaderBytes;
                     return true;
                 }
+
                 if (!TrySkip(frame, ref offset, wire))
+                {
                     return false;
+                }
             }
+
             return false;
         }
 
@@ -403,89 +512,146 @@ namespace AiNative.Client.Prediction
             while (offset < payload.Length)
             {
                 if (!TryReadKey(payload, ref offset, out int field, out int wire))
+                {
                     return false;
-                // Health (field 6) belongs to the legacy protocol; unknown additions do not select Arena.
+                }
+
+                // Health（字段 6）属于旧协议；未知新增字段不得将消息判定为 Arena。
                 if (field >= 7 && field <= 14)
+                {
                     arenaFields = true;
+                }
+
                 switch (field)
                 {
                     case 1 when wire == 0:
                         if (!TryReadUInt32(payload, ref offset, out entityId))
+                        {
                             return false;
+                        }
+
                         break;
                     case 2 when wire == 0:
                         if (!TryReadUInt32(payload, ref offset, out uint valueX))
+                        {
                             return false;
+                        }
+
                         x = UnZigZag(valueX);
                         break;
                     case 3 when wire == 0:
                         if (!TryReadUInt32(payload, ref offset, out uint valueY))
+                        {
                             return false;
+                        }
+
                         y = UnZigZag(valueY);
                         break;
                     case 4 when wire == 0:
                         if (!TryReadUInt32(payload, ref offset, out uint valueZ))
+                        {
                             return false;
+                        }
+
                         z = UnZigZag(valueZ);
                         break;
                     case 5 when wire == 0:
                         if (!TryReadUInt32(payload, ref offset, out uint valueYaw))
+                        {
                             return false;
+                        }
+
                         yaw = UnZigZag(valueYaw);
                         break;
                     case 6 when wire == 0:
                         if (!TryReadUInt32(payload, ref offset, out health))
+                        {
                             return false;
+                        }
+
                         break;
                     case 14 when wire == 0:
                         if (!TryReadUInt32(payload, ref offset, out uint valuePitch))
+                        {
                             return false;
+                        }
+
                         pitch = UnZigZag(valuePitch);
                         break;
                     case 7 when wire == 0:
                         if (!TryReadUInt32(payload, ref offset, out uint valueVx))
+                        {
                             return false;
+                        }
+
                         vx = UnZigZag(valueVx);
                         break;
                     case 8 when wire == 0:
                         if (!TryReadUInt32(payload, ref offset, out uint valueVy))
+                        {
                             return false;
+                        }
+
                         vy = UnZigZag(valueVy);
                         break;
                     case 9 when wire == 0:
                         if (!TryReadUInt32(payload, ref offset, out uint valueVz))
+                        {
                             return false;
+                        }
+
                         vz = UnZigZag(valueVz);
                         break;
                     case 10 when wire == 0:
                         if (!TryReadUInt32(payload, ref offset, out weapon))
+                        {
                             return false;
+                        }
+
                         break;
                     case 11 when wire == 0:
                         if (!TryReadUInt32(payload, ref offset, out armor))
+                        {
                             return false;
+                        }
+
                         break;
                     case 12 when wire == 0:
                         if (!TryReadUInt32(payload, ref offset, out uint aliveValue))
+                        {
                             return false;
+                        }
+
                         alive = aliveValue != 0;
                         break;
                     case 13 when wire == 0:
                         if (!TryReadUInt32(payload, ref offset, out kills))
+                        {
                             return false;
+                        }
+
                         break;
                     default:
                         if (!TrySkip(payload, ref offset, wire))
+                        {
                             return false;
+                        }
+
                         break;
                 }
             }
 
             if (entityId != expectedEntityId)
+            {
                 return true;
+            }
+
             hasArenaData = arenaFields;
             if (found)
+            {
                 return false;
+            }
+
             player = new ArenaPlayerState(0, x, y, z)
             {
                 VelocityXMillimetresPerSecond = vx,
@@ -518,7 +684,10 @@ namespace AiNative.Client.Prediction
                 || key == 0
                 || key > uint.MaxValue
             )
+            {
                 return false;
+            }
+
             field = (int)(key >> 3);
             wire = (int)(key & 7);
             return field > 0;
@@ -528,7 +697,10 @@ namespace AiNative.Client.Prediction
         {
             value = 0;
             if (!TryReadVarint(source, ref offset, out ulong wide) || wide > uint.MaxValue)
+            {
                 return false;
+            }
+
             value = (uint)wide;
             return true;
         }
@@ -543,14 +715,23 @@ namespace AiNative.Client.Prediction
             for (int shift = 0; shift < 70; shift += 7)
             {
                 if (offset >= source.Length)
+                {
                     return false;
+                }
+
                 byte current = source[offset++];
                 if (shift == 63 && current > 1)
+                {
                     return false;
+                }
+
                 value |= (ulong)(current & 0x7f) << shift;
                 if ((current & 0x80) == 0)
+                {
                     return true;
+                }
             }
+
             return false;
         }
 
@@ -562,7 +743,10 @@ namespace AiNative.Client.Prediction
         {
             value = 0;
             if (source.Length - offset < 8)
+            {
                 return false;
+            }
+
             value = BinaryPrimitives.ReadUInt64LittleEndian(source.Slice(offset, 8));
             offset += 8;
             return true;
@@ -580,7 +764,10 @@ namespace AiNative.Client.Prediction
                 || length > int.MaxValue
                 || (int)length > source.Length - offset
             )
+            {
                 return false;
+            }
+
             value = source.Slice(offset, (int)length);
             offset += (int)length;
             return true;
@@ -594,14 +781,20 @@ namespace AiNative.Client.Prediction
                     return TryReadVarint(source, ref offset, out _);
                 case 1:
                     if (source.Length - offset < 8)
+                    {
                         return false;
+                    }
+
                     offset += 8;
                     return true;
                 case 2:
                     return TryReadLength(source, ref offset, out _);
                 case 5:
                     if (source.Length - offset < 4)
+                    {
                         return false;
+                    }
+
                     offset += 4;
                     return true;
                 default:
@@ -612,7 +805,10 @@ namespace AiNative.Client.Prediction
         private static bool TryWriteByte(Span<byte> destination, ref int offset, byte value)
         {
             if ((uint)offset >= (uint)destination.Length)
+            {
                 return false;
+            }
+
             destination[offset++] = value;
             return true;
         }
@@ -620,7 +816,10 @@ namespace AiNative.Client.Prediction
         private static bool TryWriteFixed64(Span<byte> destination, ref int offset, ulong value)
         {
             if (destination.Length - offset < 8)
+            {
                 return false;
+            }
+
             BinaryPrimitives.WriteUInt64LittleEndian(destination.Slice(offset, 8), value);
             offset += 8;
             return true;
@@ -633,9 +832,14 @@ namespace AiNative.Client.Prediction
                 byte current = (byte)(value & 0x7f);
                 value >>= 7;
                 if (value != 0)
+                {
                     current |= 0x80;
+                }
+
                 if (!TryWriteByte(destination, ref offset, current))
+                {
                     return false;
+                }
             } while (value != 0);
             return true;
         }

@@ -1,0 +1,1 @@
+{"name":"AiNative.Client.Assets.AssetBundle.Tests","rootNamespace":"AiNative.Client.Assets.AssetBundle.Tests","references":["AiNative.Client.Assets","AiNative.Client.Assets.AssetBundle","AiNative.Client.Assets.AssetBundle.Editor"],"includePlatforms":["Editor"],"autoReferenced":false,"defineConstraints":["UNITY_INCLUDE_TESTS"],"optionalUnityReferences":["TestAssemblies"]}

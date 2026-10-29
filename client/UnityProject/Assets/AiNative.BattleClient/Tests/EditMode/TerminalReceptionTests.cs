@@ -65,11 +65,14 @@ namespace AiNative.Client.Application.Tests
                     Is.EqualTo(PredictionPrepareStatus.Prepared)
                 );
                 for (int i = 0; i < 300; i++)
+                {
                     transport.Enqueue(
                         Frame((ulong)(101 + i)),
                         BattleClientProtocolV1.SnapshotChannel,
                         1
                     );
+                }
+
                 transport.Enqueue(
                     Frame(401, finished: true),
                     BattleClientProtocolV1.SnapshotChannel,
@@ -126,11 +129,14 @@ namespace AiNative.Client.Application.Tests
             try
             {
                 for (int i = 0; i < 256; i++)
+                {
                     transport.Enqueue(
                         Frame((ulong)(101 + i)),
                         BattleClientProtocolV1.SnapshotChannel,
                         1
                     );
+                }
+
                 transport.Close();
                 session.Pump(0);
                 Assert.That(session.State, Is.EqualTo(BattleClientState.Active));

@@ -10,13 +10,12 @@ namespace AiNative.Client.Prediction.Tests
 {
     public sealed class ProtocolParityTests
     {
-        private static readonly TransportChannel SnapshotChannel = new TransportChannel(
+        private static readonly TransportChannel _snapshotChannel = new TransportChannel(
             1,
             TransportDelivery.Unreliable,
             TransportOrdering.Sequenced
         );
-
-        private static readonly TransportChannel ControlChannel = new TransportChannel(
+        private static readonly TransportChannel _controlChannel = new TransportChannel(
             0,
             TransportDelivery.Reliable,
             TransportOrdering.Ordered
@@ -27,7 +26,6 @@ namespace AiNative.Client.Prediction.Tests
         {
             FakeRealtimeTransport transport = new FakeRealtimeTransport();
             ClientPredictionAdapter adapter = Initialize(transport, 7, 1);
-
             adapter.SendInputAsync(42, 1000, -500).GetAwaiter().GetResult();
             C2S_InputCommand expected = new C2S_InputCommand
             {
@@ -37,7 +35,6 @@ namespace AiNative.Client.Prediction.Tests
                 MoveYMilli = -500,
             };
             byte[] expectedFrame = Envelope(MessageId.C2SInputCommand, expected);
-
             Assert.That(transport.LastPayload.ToArray(), Is.EqualTo(expectedFrame));
         }
 
@@ -60,12 +57,10 @@ namespace AiNative.Client.Prediction.Tests
             frame[frame.Length - 3] = 0xa0;
             frame[frame.Length - 2] = 0x06;
             frame[frame.Length - 1] = 0x07;
-
             SnapshotApplyResult applied = adapter.ApplyPacket(
                 frame,
-                new ReceivedPacket(SnapshotChannel, frame.Length, frame.Length, 1, 1)
+                new ReceivedPacket(_snapshotChannel, frame.Length, frame.Length, 1, 1)
             );
-
             Assert.That(applied.Status, Is.EqualTo(SnapshotApplyStatus.Reconciled));
             Assert.That(applied.Reconciliation.After.PositionXMillimetres, Is.EqualTo(90));
         }
@@ -84,12 +79,10 @@ namespace AiNative.Client.Prediction.Tests
                 Snapshot = snapshot,
             };
             byte[] frame = Envelope(MessageId.S2CReconnectResponse, reconnect);
-
             SnapshotApplyResult applied = adapter.ApplyPacket(
                 frame,
-                new ReceivedPacket(ControlChannel, frame.Length, frame.Length, 1, 2)
+                new ReceivedPacket(_controlChannel, frame.Length, frame.Length, 1, 2)
             );
-
             Assert.That(applied.Status, Is.EqualTo(SnapshotApplyStatus.Reconciled));
             Assert.That(adapter.ConnectionEpoch, Is.EqualTo(2));
         }
@@ -111,7 +104,7 @@ namespace AiNative.Client.Prediction.Tests
             byte[] frame = Envelope(MessageId.S2CSnapshotPush, snapshot);
             SnapshotApplyResult applied = adapter.ApplyPacket(
                 frame,
-                new ReceivedPacket(SnapshotChannel, frame.Length, frame.Length, 1, connectionEpoch)
+                new ReceivedPacket(_snapshotChannel, frame.Length, frame.Length, 1, connectionEpoch)
             );
             Assert.That(applied.Status, Is.EqualTo(SnapshotApplyStatus.Initialized));
             return adapter;

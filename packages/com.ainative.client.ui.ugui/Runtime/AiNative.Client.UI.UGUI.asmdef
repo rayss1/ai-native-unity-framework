@@ -1,0 +1,9 @@
+{
+  "name": "AiNative.Client.UI.UGUI",
+  "references": [
+    "AiNative.Client.Core",
+    "UnityEngine.UI",
+    "Unity.InputSystem"
+  ],
+  "autoReferenced": false
+}

@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace AiNative.Client.Application
 {
-    /// <summary>Application adapter: simulation owns movement/health; this component only poses the avatar.</summary>
+    /// <summary>应用表现适配器；移动和生命值归模拟所有，此组件仅更新角色姿态。</summary>
     [DisallowMultipleComponent]
     public sealed class NetworkCharacterPresenter : MonoBehaviour
     {
@@ -21,7 +21,10 @@ namespace AiNative.Client.Application
             foreach (var child in GetComponentsInChildren<Transform>(true))
             {
                 if (child.name != "Muzzle")
+                {
                     continue;
+                }
+
                 _muzzleFlash = child.gameObject.AddComponent<Light>();
                 _muzzleFlash.color = new Color(1, .65f, .15f);
                 _muzzleFlash.range = 2;
@@ -37,21 +40,28 @@ namespace AiNative.Client.Application
             {
                 _shots++;
             }
+
             _flashUntil = Time.unscaledTime + .075f;
             if (_muzzleFlash != null)
+            {
                 _muzzleFlash.enabled = true;
+            }
         }
 
         private void Update()
         {
             if (_muzzleFlash != null && Time.unscaledTime >= _flashUntil)
+            {
                 _muzzleFlash.enabled = false;
+            }
         }
 
         private void OnDisable()
         {
             if (_muzzleFlash != null)
+            {
                 _muzzleFlash.enabled = false;
+            }
         }
 
         public void Apply(ArenaPlayerState state) => Apply(state, true);
@@ -68,7 +78,10 @@ namespace AiNative.Client.Application
             var local = Quaternion.Euler(0, -state.YawMillidegrees / 1000f, 0) * velocity;
             var direction = new Vector2(local.x, local.z);
             if (direction.sqrMagnitude > 1)
+            {
                 direction.Normalize();
+            }
+
             MotionState = new CharacterMotionState
             {
                 Velocity = velocity,
@@ -79,11 +92,16 @@ namespace AiNative.Client.Application
                 ShotSequence = _shots,
             };
             if (_animation == null)
+            {
                 _animation = GetComponentInChildren<CharacterAnimationDriver>(true);
+            }
+
             _animation?.SetPresentationState(MotionState);
-            // Renderer state follows authoritative/predicted snapshot, never local health scripts.
+            // 渲染状态跟随权威或预测快照，不读取本地生命值脚本。
             if (gameObject.activeSelf != state.Alive)
+            {
                 gameObject.SetActive(state.Alive);
+            }
         }
     }
 }

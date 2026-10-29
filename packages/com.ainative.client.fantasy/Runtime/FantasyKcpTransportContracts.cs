@@ -16,11 +16,8 @@ namespace AiNative.Client.Fantasy
         }
 
         public string Host { get; }
-
         public int Port { get; }
-
         public int ConnectTimeoutMilliseconds { get; }
-
         internal bool IsValid =>
             !string.IsNullOrWhiteSpace(Host)
             && Port > 0
@@ -51,11 +48,8 @@ namespace AiNative.Client.Fantasy
         }
 
         public FantasyKcpConnectStatus Status { get; }
-
         public FantasyKcpRealtimeTransport Transport { get; }
-
         public Exception Error { get; }
-
         public bool IsConnected => Status == FantasyKcpConnectStatus.Connected && Transport != null;
     }
 
@@ -83,19 +77,12 @@ namespace AiNative.Client.Fantasy
         }
 
         public long SendsAccepted { get; }
-
         public long SendBackpressure { get; }
-
         public long ReceivesAccepted { get; }
-
         public long OversizedFrames { get; }
-
         public long InvalidChannels { get; }
-
         public long StaleSequences { get; }
-
         public long InboundDropped { get; }
-
         public long ConnectionFaults { get; }
     }
 }

@@ -97,11 +97,8 @@ namespace AiNative.Client.Fantasy
             }
 
             internal byte[] Buffer { get; }
-
             internal int Length { get; }
-
             internal byte ChannelId { get; }
-
             internal ulong Sequence { get; }
 
             internal void Return()

@@ -98,7 +98,10 @@ namespace AiNative.Client.Application.PlayModeTests
                     type.GetMethod("GetPresenter").Invoke(pool, new object[] { 42u });
                 Assert.That(presenter.State, Is.EqualTo(state));
                 foreach (var collider in visual.GetComponentsInChildren<Collider>(true))
+                {
                     Assert.That(collider.enabled, Is.False);
+                }
+
                 state.Alive = false;
                 poses[0] = new ArenaRemotePose(42, 1500, 500, -2000, 0, state);
                 apply.Invoke(pool, new object[] { poses, 1 });
@@ -113,6 +116,7 @@ namespace AiNative.Client.Application.PlayModeTests
             {
                 pool.Dispose();
             }
+
             yield return null;
             Assert.That(visual == null, Is.True);
         }

@@ -10,19 +10,22 @@ using UnityEngine;
 
 namespace AiNative.Client.Editor
 {
-    /// <summary>Device-validation APK build. Temporary release and toolchain settings are always restored.</summary>
+    /// <summary>构建设备验收 APK；结束时始终恢复临时发布和工具链设置。</summary>
     public static class AndroidBattleClientBuild
     {
-        /// <summary>Run before restarting Unity with -buildTarget Android. The outer build runner restores project settings.</summary>
+        /// <summary>在以 -buildTarget Android 重启 Unity 前执行；外层构建脚本负责恢复项目设置。</summary>
         public static void PrepareAndroidBatchBuild()
         {
             NamedBuildTarget android = NamedBuildTarget.Android;
             string defines = PlayerSettings.GetScriptingDefineSymbols(android);
             if (Array.IndexOf(defines.Split(';'), "FANTASY_UNITY") < 0)
+            {
                 PlayerSettings.SetScriptingDefineSymbols(
                     android,
                     defines.Length == 0 ? "FANTASY_UNITY" : defines + ";FANTASY_UNITY"
                 );
+            }
+
             AssetDatabase.SaveAssets();
         }
 
@@ -31,7 +34,10 @@ namespace AiNative.Client.Editor
             string[] arguments = Environment.GetCommandLineArgs();
             int index = Array.IndexOf(arguments, "--ainative-build-output");
             if (index < 0 || index + 1 == arguments.Length)
+            {
                 throw new ArgumentException("Missing --ainative-build-output.");
+            }
+
             BuildAndroidReleaseAtPath(arguments[index + 1]);
         }
 
@@ -49,21 +55,32 @@ namespace AiNative.Client.Editor
                 !Path.IsPathRooted(outputPath)
                 || !outputPath.EndsWith(".apk", StringComparison.OrdinalIgnoreCase)
             )
+            {
                 throw new ArgumentException(
                     "Android release output must be an absolute .apk path.",
                     nameof(outputPath)
                 );
+            }
+
             if (string.IsNullOrWhiteSpace(applicationId) || applicationId.Split('.').Length < 2)
+            {
                 throw new ArgumentException(
                     "A reverse-domain Android application ID is required.",
                     nameof(applicationId)
                 );
+            }
+
             foreach (char c in applicationId)
+            {
                 if (!(char.IsLetterOrDigit(c) || c == '_' || c == '.'))
+                {
                     throw new ArgumentException(
                         "Invalid Android application ID.",
                         nameof(applicationId)
                     );
+                }
+            }
+
             outputPath = Path.GetFullPath(outputPath);
             Directory.CreateDirectory(Path.GetDirectoryName(outputPath));
             BattleClientRendering.ValidateUrpConfiguration();
@@ -73,9 +90,12 @@ namespace AiNative.Client.Editor
                 {
                     BuildReport report = BuildPipeline.BuildPlayer(CreateBuildOptions(outputPath));
                     if (report.summary.result != BuildResult.Succeeded)
+                    {
                         throw new InvalidOperationException(
                             $"Android IL2CPP build failed: {report.summary.result}, errors={report.summary.totalErrors}."
                         );
+                    }
+
                     BattleClientBuild.CopyThirdPartyNotice(Path.GetDirectoryName(outputPath));
                     WriteBuildIdentity(outputPath);
                 }
@@ -86,19 +106,24 @@ namespace AiNative.Client.Editor
         private static void ValidateBuildTarget(BuildTarget target, bool compiling, bool importing)
         {
             if (target != BuildTarget.Android)
+            {
                 throw new InvalidOperationException(
                     "Activate Android and complete compilation before building. For batch builds, run PrepareAndroidBatchBuild first, then restart Unity with -buildTarget Android."
                 );
+            }
+
             if (compiling || importing)
+            {
                 throw new InvalidOperationException(
                     "Android scripts and assets must finish compiling and importing before building."
                 );
+            }
         }
 
         private static BuildPlayerOptions CreateBuildOptions(string outputPath) =>
             new BuildPlayerOptions
             {
-                scenes = new[] { "Assets/AiNative.BattleClient/Scenes/BattleClient.unity" },
+                scenes = FrameworkBootstrapBuild.GetPlayerScenes(),
                 locationPathName = outputPath,
                 target = BuildTarget.Android,
                 targetGroup = BuildTargetGroup.Android,
@@ -147,10 +172,13 @@ namespace AiNative.Client.Editor
                 PlayerSettings.SetManagedStrippingLevel(target, ManagedStrippingLevel.Minimal);
                 PlayerSettings.SetApplicationIdentifier(target, applicationId);
                 if (Array.IndexOf(defines.Split(';'), "FANTASY_UNITY") < 0)
+                {
                     PlayerSettings.SetScriptingDefineSymbols(
                         target,
                         defines.Length == 0 ? "FANTASY_UNITY" : defines + ";FANTASY_UNITY"
                     );
+                }
+
                 EditorUserBuildSettings.buildAppBundle = false;
                 EditorUserBuildSettings.exportAsGoogleAndroidProject = false;
                 EditorUserBuildSettings.development = false;
@@ -223,6 +251,7 @@ namespace AiNative.Client.Editor
                 default:
                     throw new InvalidOperationException("Unsupported Android build host platform.");
             }
+
             if (
                 !File.Exists(Path.Combine(bundled, "SDK", "platforms", "android-35", "android.jar"))
                 || !File.Exists(Path.Combine(bundled, "SDK", "platform-tools", "adb" + suffix))
@@ -242,18 +271,23 @@ namespace AiNative.Client.Editor
                 || !File.Exists(Path.Combine(bundled, "NDK", "source.properties"))
                 || !File.Exists(Path.Combine(bundled, "OpenJDK", "release"))
             )
+            {
                 throw new InvalidOperationException(
                     "The current Unity Editor's bundled Android API35/SDK/NDK/JDK toolchain is incomplete."
                 );
+            }
+
             if (
                 !File.ReadAllText(Path.Combine(bundled, "NDK", "source.properties"))
                     .Contains("27.2.12479018")
                 || !File.ReadAllText(Path.Combine(bundled, "OpenJDK", "release"))
                     .Contains("JAVA_VERSION=\"17.")
             )
+            {
                 throw new InvalidOperationException(
                     "The Android validation toolchain requires NDK r27c and JDK17."
                 );
+            }
         }
 
         private static void SetTool(Type type, string property, string value) =>
@@ -262,33 +296,33 @@ namespace AiNative.Client.Editor
 
         private sealed class ToolchainPreferences
         {
-            // Root-path setters turn off UseEmbedded and overwrite the unused custom path.
-            // Capture only these non-secret toolchain preferences, including missing-key defaults.
-            private static readonly string[] EmbeddedKeys =
+            // 设置根路径会关闭 UseEmbedded，并覆盖未使用的自定义路径。
+            // 仅保存这些非敏感工具链偏好，包括键缺失时的默认值。
+            private static readonly string[] _embeddedKeys =
             {
                 "SdkUseEmbedded",
                 "NdkUseEmbedded",
                 "JdkUseEmbedded",
             };
-            private static readonly string[] DirectoryKeys =
+            private static readonly string[] _directoryKeys =
             {
                 "AndroidSdkRoot",
                 "AndroidNdkRootR27C",
                 "Jdk17Path",
             };
-            private readonly bool[] _hasEmbedded = new bool[3],
-                _embedded = new bool[3],
-                _hasDirectory = new bool[3];
+            private readonly bool[] _hasEmbedded = new bool[3];
+            private readonly bool[] _embedded = new bool[3];
+            private readonly bool[] _hasDirectory = new bool[3];
             private readonly string[] _directory = new string[3];
 
             internal ToolchainPreferences()
             {
                 for (int i = 0; i < 3; i++)
                 {
-                    _hasEmbedded[i] = EditorPrefs.HasKey(EmbeddedKeys[i]);
-                    _embedded[i] = EditorPrefs.GetBool(EmbeddedKeys[i], true);
-                    _hasDirectory[i] = EditorPrefs.HasKey(DirectoryKeys[i]);
-                    _directory[i] = EditorPrefs.GetString(DirectoryKeys[i], "");
+                    _hasEmbedded[i] = EditorPrefs.HasKey(_embeddedKeys[i]);
+                    _embedded[i] = EditorPrefs.GetBool(_embeddedKeys[i], true);
+                    _hasDirectory[i] = EditorPrefs.HasKey(_directoryKeys[i]);
+                    _directory[i] = EditorPrefs.GetString(_directoryKeys[i], "");
                 }
             }
 
@@ -297,15 +331,25 @@ namespace AiNative.Client.Editor
                 for (int i = 0; i < 3; i++)
                 {
                     if (_hasEmbedded[i])
-                        EditorPrefs.SetBool(EmbeddedKeys[i], _embedded[i]);
+                    {
+                        EditorPrefs.SetBool(_embeddedKeys[i], _embedded[i]);
+                    }
                     else
-                        EditorPrefs.DeleteKey(EmbeddedKeys[i]);
+                    {
+                        EditorPrefs.DeleteKey(_embeddedKeys[i]);
+                    }
+
                     if (_hasDirectory[i])
-                        EditorPrefs.SetString(DirectoryKeys[i], _directory[i]);
+                    {
+                        EditorPrefs.SetString(_directoryKeys[i], _directory[i]);
+                    }
                     else
-                        EditorPrefs.DeleteKey(DirectoryKeys[i]);
+                    {
+                        EditorPrefs.DeleteKey(_directoryKeys[i]);
+                    }
                 }
-                // Unity6000 caches both selections and directories in its AndroidRoot singletons.
+
+                // Unity 6000 的 AndroidRoot 单例同时缓存工具链选择和目录。
                 foreach (
                     string name in new[] { "AndroidSDKRoot", "AndroidNDKRoot", "AndroidJavaRoot" }
                 )
@@ -332,8 +376,8 @@ namespace AiNative.Client.Editor
         {
             string path = Path.GetFullPath("Library/AiNativeBuild/android-link.xml");
             Directory.CreateDirectory(Path.GetDirectoryName(path));
-            // Both fixed assemblies use source-generated Fantasy registration. Entity systems,
-            // heartbeat timers, the envelope handler and its serializers must survive IL2CPP stripping.
+            // 两个固定程序集均使用 Fantasy 源生成注册；实体系统、
+            // 心跳定时器、信封处理器及序列化器必须在 IL2CPP 裁剪后保留。
             File.WriteAllText(
                 path,
                 "<linker><assembly fullname=\"Fantasy.Unity\" preserve=\"all\"/><assembly fullname=\"AiNative.Client.Fantasy\" preserve=\"all\"/></linker>"
@@ -368,15 +412,15 @@ namespace AiNative.Client.Editor
         [Serializable]
         private sealed class BuildIdentity
         {
-            public string unityVersion,
-                applicationId,
-                apkSha256;
-            public string backend = "IL2CPP",
-                abi = "arm64-v8a",
-                ndk = "27.2.12479018",
-                jdk = "17";
-            public int minApi = 25,
-                targetApi = 35;
+            public string unityVersion;
+            public string applicationId;
+            public string apkSha256;
+            public string backend = "IL2CPP";
+            public string abi = "arm64-v8a";
+            public string ndk = "27.2.12479018";
+            public string jdk = "17";
+            public int minApi = 25;
+            public int targetApi = 35;
             public bool development = false;
         }
     }

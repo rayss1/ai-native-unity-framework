@@ -1,0 +1,10 @@
+{
+  "name": "com.ainative.client.composition.vcontainer",
+  "version": "0.1.0",
+  "displayName": "AiNative.Client.Composition.VContainer",
+  "unity": "6000.3",
+  "dependencies": {
+    "jp.hadashikick.vcontainer": "1.19.0",
+    "com.ainative.client.core": "0.1.0"
+  }
+}

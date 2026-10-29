@@ -29,7 +29,7 @@ public sealed class GateTlsConnectionTests
             DateTimeOffset.UtcNow.AddMinutes(-1),
             DateTimeOffset.UtcNow.AddHours(1)
         );
-        // Windows Schannel cannot acquire credentials from CreateSelfSigned's ephemeral key.
+        // Windows Schannel 无法从 CreateSelfSigned 的临时密钥获取凭证。
         using X509Certificate2 certificate = X509CertificateLoader.LoadPkcs12(
             generated.Export(X509ContentType.Pfx),
             null,
@@ -49,7 +49,9 @@ public sealed class GateTlsConnectionTests
             {
                 TestContext.Progress.WriteLine("TLS fixture server: " + e);
                 if (!wrongPin || e is not (AuthenticationException or IOException))
+                {
                     throw;
+                }
             }
         });
         string pin = wrongPin
@@ -63,9 +65,11 @@ public sealed class GateTlsConnectionTests
         try
         {
             if (wrongPin)
+            {
                 Assert.ThrowsAsync<AuthenticationException>(() =>
                     FantasyGateClient.ConnectAsync(options)
                 );
+            }
             else
             {
                 using FantasyGateClient client = await FantasyGateClient.ConnectAsync(options);

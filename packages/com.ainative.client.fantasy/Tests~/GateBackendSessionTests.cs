@@ -34,6 +34,7 @@ public sealed class GateBackendSessionTests
                     );
                     S2S_ControlResponse reply = new() { CorrelationId = request.CorrelationId };
                     if (i == 0)
+                    {
                         reply.Body = ByteString.CopyFrom(
                             new LoginResult
                             {
@@ -44,12 +45,14 @@ public sealed class GateBackendSessionTests
                                     .ToUnixTimeSeconds(),
                             }.ToByteArray()
                         );
+                    }
                     else
                     {
                         Assert.That(request.Method, Is.EqualTo("player.profile"));
                         Interlocked.Increment(ref profileRequests);
                         reply.Error = "invalid_session";
                     }
+
                     await stream.WriteAsync(
                         GateFrame.Encode(
                             402653361u,
@@ -150,6 +153,7 @@ public sealed class GateBackendSessionTests
                         PayloadHash = "authority-hash",
                     }.ToByteArray();
                 }
+
                 byte[] frame = GateFrame.Encode(
                     402653361u,
                     BinaryPrimitives.ReadUInt32LittleEndian(header.AsSpan(8)),

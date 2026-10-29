@@ -1,0 +1,10 @@
+{
+  "name": "AiNative.Client.Core.Tests",
+  "rootNamespace": "AiNative.Client.Core.Tests",
+  "references": ["AiNative.Client.Core"],
+  "includePlatforms": ["Editor"],
+  "autoReferenced": false,
+  "defineConstraints": ["UNITY_INCLUDE_TESTS"],
+  "noEngineReferences": true,
+  "optionalUnityReferences": ["TestAssemblies"]
+}

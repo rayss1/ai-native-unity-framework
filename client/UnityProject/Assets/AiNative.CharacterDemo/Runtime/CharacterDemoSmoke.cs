@@ -6,14 +6,16 @@ using UnityEngine.InputSystem.UI;
 
 namespace AiNative.CharacterDemo
 {
-    /// <summary>Opt-in built Player smoke; never runs during ordinary interactive play.</summary>
+    /// <summary>仅显式启用时执行的 Player 冒烟测试；普通交互运行不执行。</summary>
     public sealed class CharacterDemoSmoke : MonoBehaviour
     {
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void StartIfRequested()
         {
             if (Array.IndexOf(Environment.GetCommandLineArgs(), "--character-demo-smoke") >= 0)
+            {
                 new GameObject("Character demo smoke").AddComponent<CharacterDemoSmoke>();
+            }
         }
 
         private IEnumerator Start()
@@ -33,6 +35,7 @@ namespace AiNative.CharacterDemo
                 Fail("Missing demo composition or Humanoid rig");
                 yield break;
             }
+
             reader.SetCaptured(false);
             motor.Configure(null, null); // Explicitly drive this opt-in smoke, never double-step automatic Update.
             for (int i = 0; i < 30; i++)
@@ -40,33 +43,39 @@ namespace AiNative.CharacterDemo
                 motor.Simulate(default, 0, 1f / 60);
                 yield return null;
             }
+
             if (!motor.State.Grounded)
             {
                 Fail("Did not settle on ground");
                 yield break;
             }
+
             Vector3 start = motor.transform.position;
             for (int i = 0; i < 60; i++)
             {
                 motor.Simulate(new CharacterInputFrame { Move = Vector2.up }, 0, 1f / 60);
                 yield return null;
             }
+
             if (motor.transform.position.z - start.z < 3)
             {
                 Fail("Movement did not advance");
                 yield break;
             }
+
             motor.Simulate(new CharacterInputFrame { Jump = true }, 0, 1f / 60);
             if (motor.State.Grounded)
             {
                 Fail("Jump did not leave ground");
                 yield break;
             }
+
             for (int i = 0; i < 90; i++)
             {
                 motor.Simulate(default, 0, 1f / 60);
                 yield return null;
             }
+
             var rifle = motor.GetComponent<CharacterRifle>();
             var target = FindFirstObjectByType<CharacterHealth>();
             if (rifle == null || target == null)
@@ -74,6 +83,7 @@ namespace AiNative.CharacterDemo
                 Fail("Missing rifle or training targets");
                 yield break;
             }
+
             var camera = Camera.main;
             camera.GetComponent<CharacterOrbitCamera>().enabled = false;
             camera.transform.position =
@@ -95,17 +105,20 @@ namespace AiNative.CharacterDemo
                 Fail("Rifle action did not fire");
                 yield break;
             }
+
             float deadline = Time.realtimeSinceStartup + 3;
             while (target.Current == target.Maximum && Time.realtimeSinceStartup < deadline)
             {
                 motor.Simulate(new CharacterInputFrame { Aim = true }, 0, 1f / 60);
                 yield return null;
             }
+
             if (rifle.Shots != 1 || target.Current != 75)
             {
                 Fail("Accepted rifle shot did not deal exactly 25 damage: " + rifle.LastHit);
                 yield break;
             }
+
             motor.Simulate(
                 new CharacterInputFrame
                 {
@@ -121,11 +134,13 @@ namespace AiNative.CharacterDemo
                 Fail("Melee action did not start");
                 yield break;
             }
+
             for (int i = 0; i < 70; i++)
             {
                 motor.Simulate(default, 0, 1f / 60);
                 yield return null;
             }
+
             Debug.Log(
                 "CHARACTER_DEMO_SMOKE_PASS: composition, grounded movement, jump, rifle projectile damage and melee animation"
             );

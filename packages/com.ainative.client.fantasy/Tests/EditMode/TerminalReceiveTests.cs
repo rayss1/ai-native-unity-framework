@@ -25,7 +25,12 @@ namespace AiNative.Client.Fantasy.Tests
                 Assert.That(transport.State, Is.EqualTo(TransportState.Closed));
                 Assert.That(transport.TryEnqueueReceived(1, new byte[] { 40 }, 4), Is.False);
                 Assert.That(
-                    FantasyClientSessionRouter.Deliver(session.RuntimeId, 1, new byte[] { 40 }, 4),
+                    FantasyClientSessionRouter.Deliver(
+                        session.RoutingIdentity,
+                        1,
+                        new byte[] { 40 },
+                        4
+                    ),
                     Is.False
                 );
                 Assert.That(

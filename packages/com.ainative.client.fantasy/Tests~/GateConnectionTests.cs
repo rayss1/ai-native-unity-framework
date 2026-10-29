@@ -49,7 +49,9 @@ public sealed class GateConnectionTests
                 new S2C_GateTransportResponse { Payload = response.ToByteString() }.ToByteArray()
             );
             for (int offset = 0; offset < frame.Length; offset += 3)
+            {
                 await stream.WriteAsync(frame.AsMemory(offset, Math.Min(3, frame.Length - offset)));
+            }
         });
         using FantasyGateClient client = await FantasyGateClient.ConnectAsync(
             new("127.0.0.1", port, useTls: false)

@@ -7,7 +7,7 @@ using Google.Protobuf.Reflection;
 
 namespace AiNative.Client.Protocol.Protobuf
 {
-    /// <summary>Generated backend protocol facade. No generated message types cross this boundary.</summary>
+    /// <summary>生成后端协议的门面；生成消息类型不得越过此边界。</summary>
     public static class GateProtocolCodec
     {
         public const int MaxBody = 60000;
@@ -85,7 +85,10 @@ namespace AiNative.Client.Protocol.Protobuf
         {
             var m = Parse(bytes, LoginResult.Parser);
             if (m.ExpiresUnixSeconds < 0)
+            {
                 throw new InvalidDataException("gate-negative-expiry");
+            }
+
             return (m.PlayerId, m.SessionToken, m.ExpiresUnixSeconds);
         }
 
@@ -101,7 +104,10 @@ namespace AiNative.Client.Protocol.Protobuf
         {
             var m = Parse(bytes, PlayerProfile.Parser);
             if (m.Played < 0 || m.Won < 0 || m.Kills < 0)
+            {
                 throw new InvalidDataException("gate-negative-statistic");
+            }
+
             return (m.PlayerId, m.DisplayName, m.Played, m.Won, m.Kills);
         }
 
@@ -111,10 +117,16 @@ namespace AiNative.Client.Protocol.Protobuf
         {
             var m = Parse(bytes, PartyInvitations.Parser);
             if (m.Parties.Count > 64)
+            {
                 throw new InvalidDataException("gate-invitation-limit");
+            }
+
             var parties = new GateProtocolParty[m.Parties.Count];
             for (int i = 0; i < parties.Length; i++)
+            {
                 parties[i] = Map(m.Parties[i]);
+            }
+
             return parties;
         }
 
@@ -142,10 +154,16 @@ namespace AiNative.Client.Protocol.Protobuf
         private static GateProtocolParty Map(PartyState m)
         {
             if (m.Members.Count > 64)
+            {
                 throw new InvalidDataException("gate-party-limit");
+            }
+
             var members = new GateProtocolMember[m.Members.Count];
             for (int i = 0; i < members.Length; i++)
+            {
                 members[i] = new GateProtocolMember(m.Members[i].PlayerId, m.Members[i].Ready);
+            }
+
             return new GateProtocolParty
             {
                 PartyId = m.PartyId,
@@ -159,7 +177,10 @@ namespace AiNative.Client.Protocol.Protobuf
         private static byte[] Encode(IMessage message)
         {
             if (message.CalculateSize() > MaxBody)
+            {
                 throw new InvalidDataException("gate-body-limit");
+            }
+
             return message.ToByteArray();
         }
 
@@ -167,12 +188,18 @@ namespace AiNative.Client.Protocol.Protobuf
             where T : IMessage<T>, new()
         {
             if (bytes == null || bytes.Length > MaxBody)
+            {
                 throw new InvalidDataException("gate-body-limit");
+            }
+
             try
             {
-                // Structural validation retains existing defensive limits without materializing field buffers.
+                // 结构验证保留既有防御限制，不创建字段缓冲区。
                 using (var input = new CodedInputStream(bytes))
+                {
                     Validate(input, bytes.Length, DescriptorCache<T>.Value, 0);
+                }
+
                 return parser.ParseFrom(bytes);
             }
             catch (InvalidProtocolBufferException e)
@@ -189,16 +216,25 @@ namespace AiNative.Client.Protocol.Protobuf
         )
         {
             if (depth > 64)
+            {
                 throw new InvalidDataException("gate-recursion-limit");
+            }
+
             int count = 0;
             while (input.Position < end)
             {
                 uint tag = input.ReadTag();
                 if (tag == 0 || ++count > 1024)
+                {
                     throw new InvalidDataException("gate-field-limit");
+                }
+
                 var field = descriptor.FindFieldByNumber((int)(tag >> 3));
                 if ((tag & 7) == 3 || (tag & 7) == 4)
+                {
                     throw new InvalidDataException("gate-invalid-wire");
+                }
+
                 if (field != null)
                 {
                     uint expected =
@@ -208,28 +244,44 @@ namespace AiNative.Client.Protocol.Protobuf
                             ? 2u
                             : 0u;
                     if ((tag & 7) != expected)
+                    {
                         throw new InvalidDataException("gate-invalid-wire");
+                    }
+
                     if (field.FieldType == FieldType.Message)
                     {
                         int length = input.ReadLength();
                         long nestedEnd = input.Position + length;
                         if (length < 0 || nestedEnd > end)
+                        {
                             throw new InvalidDataException("gate-field-truncated");
+                        }
+
                         Validate(input, nestedEnd, field.MessageType, depth + 1);
                         continue;
                     }
+
                     if (field.FieldType == FieldType.UInt32)
                     {
                         if (input.ReadUInt64() > uint.MaxValue)
+                        {
                             throw new InvalidDataException("gate-integer-overflow");
+                        }
+
                         if (input.Position > end)
+                        {
                             throw new InvalidDataException("gate-field-truncated");
+                        }
+
                         continue;
                     }
                 }
+
                 input.SkipLastField();
                 if (input.Position > end)
+                {
                     throw new InvalidDataException("gate-field-truncated");
+                }
             }
         }
 
@@ -254,23 +306,23 @@ namespace AiNative.Client.Protocol.Protobuf
 
     public sealed class GateProtocolParty
     {
-        public string PartyId = "",
-            LeaderId = "",
-            QueueRequestId = "";
+        public string PartyId = "";
+        public string LeaderId = "";
+        public string QueueRequestId = "";
         public ulong Version;
         public GateProtocolMember[] Members = Array.Empty<GateProtocolMember>();
     }
 
     public sealed class GateProtocolMatch
     {
-        public string RequestId = "",
-            State = "",
-            MatchId = "",
-            Failure = "",
-            RoomId = "",
-            NodeId = "",
-            BootEpoch = "",
-            Address = "",
-            EntryTicket = "";
+        public string RequestId = "";
+        public string State = "";
+        public string MatchId = "";
+        public string Failure = "";
+        public string RoomId = "";
+        public string NodeId = "";
+        public string BootEpoch = "";
+        public string Address = "";
+        public string EntryTicket = "";
     }
 }

@@ -70,6 +70,7 @@ namespace AiNative.Client.Application.Tests
             {
                 rejection = exception.InnerException;
             }
+
             Assert.That(rejection, Is.InstanceOf<ArgumentException>());
         }
 

@@ -1,0 +1,9 @@
+{
+  "name": "com.ainative.client.async.unitask",
+  "version": "0.1.0",
+  "displayName": "AiNative.Client.Async.UniTask",
+  "unity": "6000.3",
+  "dependencies": {
+    "com.cysharp.unitask": "2.5.11"
+  }
+}
